@@ -1,0 +1,24 @@
+# Host boot file (L-Harness)
+
+> Local notes below/above the L-HARNESS markers are preserved by `l sync-hosts`.
+
+<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.15-core do-not-edit-inside -->
+---
+description: GrayMan L-Harness Protocol L boot rules
+globs:
+alwaysApply: true
+---
+
+# GrayMan L-Harness (Cursor)
+
+- **SSOT:** `protocols/north-star/001_NS_ProtocolL.md` — L wins over this rule file
+- **NO SIGNED FC = NO PRODUCT CODE**
+- Protocol V.1.9.15-core · Official https://github.com/GrayMan/l-harness
+- Start: read L + `protocols/north-star/002_NS_Handoff.md` delta
+- Conduct: A1–A3, A0=Ω only, ROE, OWASP Top 10 map honesty
+- KAE: Learned(L)=⊤ + KAE START ACK + L_pin before product work; else HALT
+- Token diet: no full L re-dump while L_pin holds; FC slice + code + H delta
+- Phase DAG: respect needs[]; FC FSM: no code in PROPUESTO
+- After L upgrades: run `l sync-hosts` (R-HOST-SYNC)
+- Ω: GrayMan · Raptors: Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+<!-- L-HARNESS:END -->

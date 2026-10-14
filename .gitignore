@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+
+# next
+.next/
+out/
+
+# env / secrets
+.env
+.env*.local
+
+# logs / os
+npm-debug.log*
+*.log
+.DS_Store
+Thumbs.db
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# tests
+coverage/
+playwright-report/
+test-results/
+
+# --- Protocol L · governancePublish=local-only ---
+# Law and brokers stay on disk. Product remote does not receive them.
+protocols/
+l-harness.config.json
+owaspCoverageMap.json
+L_HARNESS_NOTICE.md
+scripts/verifyL.mjs
+scripts/hPost.mjs
+scripts/hCheck.mjs
+scripts/olrSign.mjs
+scripts/phaseDag.mjs
+isoQualityMap.json
+isoSecurityMap.json
+# --- end Protocol L local-only ---
