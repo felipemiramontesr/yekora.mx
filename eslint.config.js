@@ -1,4 +1,5 @@
 import tsParser from '@typescript-eslint/parser';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -9,8 +10,11 @@ export default [
       '.next/**',
       'node_modules/**',
       'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
       'protocols/**',
-      'scripts/**',
+      // Protocol L brokers are local-only (.gitignore); the CI scripts in scripts/*.ts are linted.
+      'scripts/*.mjs',
     ],
   },
   {
@@ -23,4 +27,6 @@ export default [
     },
     rules: { 'no-unused-vars': 'warn' },
   },
+  // Same rule set SonarQube Cloud applies, so issues surface before the push.
+  sonarjs.configs.recommended,
 ];

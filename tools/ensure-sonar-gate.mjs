@@ -7,12 +7,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const gate = JSON.parse(fs.readFileSync(path.join(root, 'sonar-quality-gate.json'), 'utf8'));
+const gate = JSON.parse(
+  fs.readFileSync(path.join(root, 'sonar-quality-gate.json'), 'utf8')
+);
 const token = process.env.SONAR_TOKEN || '';
-const host = (process.env.SONAR_HOST_URL || gate.host || 'https://sonarcloud.io').replace(/\/$/, '');
+const host = (
+  process.env.SONAR_HOST_URL ||
+  gate.host ||
+  'https://sonarcloud.io'
+).replace(/\/$/, '');
 
 if (!token) {
-  console.error('SONAR_TOKEN is not set. The quality gate file is ready; the cloud project is not created.');
+  console.error(
+    'SONAR_TOKEN is not set. The quality gate file is ready; the cloud project is not created.'
+  );
   process.exit(1);
 }
 
@@ -20,7 +28,9 @@ const orgLine = fs
   .readFileSync(path.join(root, 'sonar-project.properties'), 'utf8')
   .split(/\r?\n/)
   .find((line) => line.startsWith('sonar.organization='));
-const organization = orgLine ? orgLine.slice('sonar.organization='.length).trim() : '';
+const organization = orgLine
+  ? orgLine.slice('sonar.organization='.length).trim()
+  : '';
 
 if (!organization) {
   console.error('sonar.organization is not set in sonar-project.properties.');
@@ -36,7 +46,9 @@ async function api(method, apiPath, params) {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
-      ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' }),
+      ...(method === 'GET'
+        ? {}
+        : { 'Content-Type': 'application/x-www-form-urlencoded' }),
     },
     ...(method === 'GET' ? {} : { body }),
   });
@@ -54,9 +66,14 @@ function conditionKey(c) {
   return `${c.metric}|${c.op}|${c.error}`;
 }
 
-const existing = await api('GET', `/api/qualitygates/show?name=${encodeURIComponent(gate.name)}`);
+const existing = await api(
+  'GET',
+  `/api/qualitygates/show?name=${encodeURIComponent(gate.name)}`
+);
 if (existing.status === 404) {
-  const created = await api('POST', '/api/qualitygates/create', { name: gate.name });
+  const created = await api('POST', '/api/qualitygates/create', {
+    name: gate.name,
+  });
   if (created.status >= 300) {
     console.error(`qualitygates/create failed: HTTP ${created.status}`);
     process.exit(1);
@@ -69,7 +86,10 @@ if (existing.status === 404) {
   console.log(`quality gate ${gate.name} already exists`);
 }
 
-const shown = await api('GET', `/api/qualitygates/show?name=${encodeURIComponent(gate.name)}`);
+const shown = await api(
+  'GET',
+  `/api/qualitygates/show?name=${encodeURIComponent(gate.name)}`
+);
 if (shown.status >= 300 || !shown.json) {
   console.error(`qualitygates/show failed: HTTP ${shown.status}`);
   process.exit(1);
@@ -77,7 +97,9 @@ if (shown.status >= 300 || !shown.json) {
 // SonarQube Cloud addresses a gate by its numeric id, not by its name.
 const gateId = String(shown.json.id);
 const have = new Set(
-  (shown.json.conditions || []).map((c) => conditionKey({ metric: c.metric, op: c.op, error: String(c.error) }))
+  (shown.json.conditions || []).map((c) =>
+    conditionKey({ metric: c.metric, op: c.op, error: String(c.error) })
+  )
 );
 for (const c of gate.conditions) {
   if (have.has(conditionKey(c))) continue;
@@ -88,7 +110,9 @@ for (const c of gate.conditions) {
     error: c.error,
   });
   if (added.status >= 300) {
-    console.error(`condition ${c.metric} ${c.op} ${c.error} failed: HTTP ${added.status} ${added.text}`);
+    console.error(
+      `condition ${c.metric} ${c.op} ${c.error} failed: HTTP ${added.status} ${added.text}`
+    );
     process.exit(1);
   }
   console.log(`condition ${c.metric} ${c.op} ${c.error}`);
@@ -105,7 +129,9 @@ if (project.status === 200 || project.status === 201) {
 } else if (/already exists|key already exists/i.test(project.text)) {
   console.log(`project ${gate.projectKey} already exists`);
 } else {
-  console.error(`projects/create failed: HTTP ${project.status} ${project.text}`);
+  console.error(
+    `projects/create failed: HTTP ${project.status} ${project.text}`
+  );
   process.exit(1);
 }
 
@@ -115,19 +141,63 @@ const visibility = await api('POST', '/api/projects/update_visibility', {
   visibility: 'public',
 });
 if (visibility.status >= 300) {
-  console.error(`projects/update_visibility failed: HTTP ${visibility.status} ${visibility.text}`);
+  console.error(
+    `projects/update_visibility failed: HTTP ${visibility.status} ${visibility.text}`
+  );
   process.exit(1);
 }
 console.log(`project ${gate.projectKey} is public`);
+
+// New projects get "master" as main branch; analyses of "main" would then land as a
+// short-lived branch, which the Free plan rejects.
+const branches = await api(
+  'GET',
+  `/api/project_branches/list?project=${encodeURIComponent(gate.projectKey)}`
+);
+const mainBranch = (branches.json?.branches || []).find((b) => b.isMain);
+if (mainBranch && mainBranch.name !== 'main') {
+  const stray = (branches.json.branches || []).find(
+    (b) => b.name === 'main' && !b.isMain
+  );
+  if (stray) {
+    const removed = await api('POST', '/api/project_branches/delete', {
+      project: gate.projectKey,
+      branch: 'main',
+    });
+    if (removed.status >= 300) {
+      console.error(
+        `project_branches/delete failed: HTTP ${removed.status} ${removed.text}`
+      );
+      process.exit(1);
+    }
+  }
+  const renamed = await api('POST', '/api/project_branches/rename', {
+    project: gate.projectKey,
+    name: 'main',
+  });
+  if (renamed.status >= 300) {
+    console.error(
+      `project_branches/rename failed: HTTP ${renamed.status} ${renamed.text}`
+    );
+    process.exit(1);
+  }
+  console.log(`main branch renamed ${mainBranch.name} -> main`);
+} else {
+  console.log('main branch is main');
+}
 
 const selected = await api('POST', '/api/qualitygates/select', {
   gateId,
   projectKey: gate.projectKey,
 });
 if (selected.status === 403) {
-  console.log(`[NOTE] Free plan does not allow custom quality gate assignment (HTTP 403). Project ${gate.projectKey} uses default ("Sonar way"). Spotless metrics enforced via CI.`);
+  console.log(
+    `[NOTE] Free plan does not allow custom quality gate assignment (HTTP 403). Project ${gate.projectKey} uses default ("Sonar way"). Spotless metrics enforced via CI.`
+  );
 } else if (selected.status >= 300) {
-  console.error(`qualitygates/select failed: HTTP ${selected.status} ${selected.text}`);
+  console.error(
+    `qualitygates/select failed: HTTP ${selected.status} ${selected.text}`
+  );
   process.exit(1);
 } else {
   console.log(`gate ${gate.name} selected for ${gate.projectKey}`);

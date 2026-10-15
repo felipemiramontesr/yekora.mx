@@ -1,0 +1,271 @@
+name: 🚀 Yekora Deployment
+
+# Single CI workflow (FC 001): same job graph as Archon's deploy.yml, with Yekora's own
+# stack inside each job (Next.js + Bun + Vitest + Playwright). The database migrations
+# workflow will live in its own file when a database exists.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  checks: write
+  statuses: write
+  pull-requests: write
+
+jobs:
+  frontend-validation:
+    name: 🎨 Frontend (Next.js) Verification (Shard ${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Grow the shard count as the test suite grows.
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Security Audit (blocking — critical=0 ∧ high=0)
+        if: matrix.shard == 1
+        run: bun scripts/dependencyAuditGate.ts
+      - name: Lint (ESLint + SonarJS)
+        if: matrix.shard == 1
+        run: bun run lint
+      - name: Type Check (TypeScript)
+        if: matrix.shard == 1
+        # Real error count for the dashboard; the step still fails when ERRORS > 0.
+        run: |
+          set +e
+          bun run typecheck > tsc-output.txt 2>&1
+          TSC_EXIT=$?
+          cat tsc-output.txt
+          ERRORS=$(grep -c "error TS" tsc-output.txt || true)
+          echo "{\"errors\": ${ERRORS:-0}, \"warnings\": 0}" > tsc-result.json
+          exit $TSC_EXIT
+      - name: Upload TSC Result
+        if: matrix.shard == 1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-tsc-result
+          path: tsc-result.json
+      - name: Test Shard
+        id: test_shard
+        run: bunx vitest run --shard=${{ matrix.shard }}/2
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
+        # Only when the shard ran: if an earlier step failed there is no XML.
+        if: always() && steps.test_shard.outcome != 'skipped'
+        with:
+          report_paths: 'test-results.xml'
+          detailed_summary: true
+          include_passed: true
+      - name: Upload Shard Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && steps.test_shard.outcome != 'skipped'
+        with:
+          name: frontend-results-shard-${{ matrix.shard }}
+          path: test-results.xml
+
+  backend-validation:
+    name: 🛡️ Backend (API) Verification — reserved slot
+    # Reserved until Yekora has an API layer (Archon parity).
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Backend slot reserved"
+
+  database-validation:
+    name: 🏛️ Database (SQL) Verification — reserved slot
+    # Reserved until the database engine is chosen (Archon parity).
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Database slot reserved"
+
+  security-scan:
+    name: 🔍 Secret Scan (TruffleHog)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@d201e543053f24f8edbc1caab9eb63f57d95714d # v3.82.0
+        with:
+          path: ./
+          base: ${{ github.event.before || '' }}
+          head: HEAD
+          extra_args: --only-verified
+
+  e2e-validation:
+    name: 🧪 E2E (Playwright) Verification
+    needs: [frontend-validation]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify local config never targets PROD
+        # smoke.spec.ts is reserved for a deployed URL: the local config must point at
+        # localhost and exclude it. Real check, not trust in the YAML.
+        run: |
+          bun -e "
+            import('./playwright.local.config.ts').then((m) => {
+              const url = m.default.use.baseURL;
+              const ignored = m.default.testIgnore ?? [];
+              console.log('Resolved baseURL:', url, '· testIgnore:', ignored);
+              if (!url.includes('localhost')) {
+                console.error('FATAL: baseURL does not resolve to localhost.');
+                process.exit(1);
+              }
+              if (!ignored.some((p) => String(p).includes('smoke.spec.ts'))) {
+                console.error('FATAL: smoke.spec.ts is not excluded.');
+                process.exit(1);
+              }
+            });
+          "
+      - name: Start Next.js dev server (background)
+        run: |
+          bun run dev -- --port 3000 &
+          bunx wait-on http://localhost:3000 --timeout 120000
+      - name: Install Playwright browsers (Chromium)
+        run: bunx playwright install --with-deps chromium
+      - name: Run Playwright E2E
+        run: bunx playwright test --config=playwright.local.config.ts
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  sonar-scan:
+    name: 🔍 SonarQube Quality Gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Generate coverage (lcov)
+        run: bun run test:coverage
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+      - name: SonarQube Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+      - name: SonarSpotless (A/A/A · 0 issues · coverage 100 · dup 0 · hotspots 100)
+        # Free plan cannot assign the custom gate: this guard enforces the bar. No if-guard.
+        run: node tools/verify-sonar-spotless.mjs
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+  global-certification:
+    name: 🔱 Yekora Global Certification
+    needs: [frontend-validation, security-scan, e2e-validation, sonar-scan]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # Gate 2 needs the base commit locally for `git diff base head`.
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download Shard Artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: all-results
+      - name: Run A04/A06/A08 real checks (OWASP evidence, no fixed text)
+        id: owasp_scripts
+        run: |
+          set +e
+          bun scripts/checkSecureDesignGates.ts
+          echo "a04=$?" >> "$GITHUB_OUTPUT"
+          bun scripts/dependencyAuditGate.ts
+          echo "a06=$?" >> "$GITHUB_OUTPUT"
+          bun scripts/checkPipelineIntegrity.ts
+          echo "a08=$?" >> "$GITHUB_OUTPUT"
+      - name: DC4 — Dead Exports Guard (blocking)
+        run: bun scripts/checkDeadExports.ts
+      - name: Gate 2 — Diff-Scoped Quality (blocking)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "No valid base ref (initial push or edge case) -- Gate 2 skipped this run."
+            exit 0
+          fi
+          bun scripts/checkDiffQuality.ts --base "$BASE" --head "$HEAD"
+      - name: Generate Certification Dashboard
+        env:
+          FRONTEND_RESULT: ${{ needs.frontend-validation.result }}
+          E2E_RESULT: ${{ needs.e2e-validation.result }}
+          SONAR_RESULT: ${{ needs.sonar-scan.result }}
+          SECURITY_RESULT: ${{ needs.security-scan.result }}
+          A04_EXIT: ${{ steps.owasp_scripts.outputs.a04 }}
+          A06_EXIT: ${{ steps.owasp_scripts.outputs.a06 }}
+          A08_EXIT: ${{ steps.owasp_scripts.outputs.a08 }}
+        run: bun scripts/generateCertificationDashboard.ts all-results >> "$GITHUB_STEP_SUMMARY"
+
+  hostinger-deployment:
+    name: 🚀 Deployment to Hostinger — disabled slot
+    needs: [global-certification]
+    # Disabled until Ω provides the hosting target, build type and credentials.
+    if: false && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Hostinger deployment slot reserved"

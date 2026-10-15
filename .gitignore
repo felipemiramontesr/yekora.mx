@@ -23,6 +23,7 @@ next-env.d.ts
 coverage/
 playwright-report/
 test-results/
+test-results.xml
 
 # --- Protocol L · governancePublish=local-only ---
 # Law and brokers stay on disk. Product remote does not receive them.
