@@ -1,0 +1,332 @@
+{
+  "meta": {
+    "title": "YĒKORA | Tienda Outdoor",
+    "description": "Gear, clothing and accessories for hiking, mountaineering, climbing, canyoning and adventure. Mexican and international brands for different experiences, needs and budgets."
+  },
+  "home": {
+    "hero": {
+      "eyebrow": "A Mexican outdoor store",
+      "title": "The right gear. Clear information. Options for every stage of your adventure.",
+      "lede": "From your first hike to a technical expedition, we help you choose the gear you actually need.",
+      "primaryCta": "Find your route",
+      "secondaryCta": "Meet YĒKORA"
+    },
+    "disciplines": {
+      "title": "Disciplines",
+      "lede": "Each activity calls for different gear. Start with yours."
+    },
+    "mexicanTalent": {
+      "title": "Mexican talent and craftsmanship",
+      "lede": "We make room for Mexican brands and makers who design gear for adventure, alongside trusted international brands.",
+      "note": "Soon you will meet the brands we work with here."
+    }
+  },
+  "about": {
+    "metaTitle": "About us | YĒKORA",
+    "title": "About us",
+    "lede": "YĒKORA is a Mexican store specializing in gear, clothing and accessories for outdoor activities.",
+    "sections": [
+      {
+        "title": "Who we are",
+        "paragraphs": [
+          "We started with a clear idea: bring the outdoors closer to more people, with functional products, trusted brands and options for different needs and budgets.",
+          "We believe enjoying nature should not depend on owning the most expensive gear, but we also know quality, function and safety matter. That is why we bring together Mexican and international brands, with a special focus on supporting Mexican makers.",
+          "From a first hike to a technical expedition, we want everyone to find the right gear for their path."
+        ]
+      },
+      {
+        "title": "Our purpose",
+        "paragraphs": [
+          "Help more people live outdoor experiences with the right gear, the information they need and the confidence to start or continue their own route. We don't just want to sell products: we want to make experiences possible."
+        ]
+      },
+      {
+        "title": "Mission",
+        "paragraphs": [
+          "Offer a reliable and accessible selection of outdoor gear, combining quality, function and advice so everyone can choose according to their activity, experience and budget.",
+          "Support Mexican brands and bring specialized products both to beginners and to people building their skills in the mountains and other natural settings."
+        ]
+      },
+      {
+        "title": "Vision",
+        "paragraphs": [
+          "Become a Mexican outdoor store known for trust, variety and knowledge of the gear it sells, with physical and online stores that bring Mexican and international brands to a growing community that enjoys hiking, mountaineering, climbing, canyoning, trail running and other outdoor activities.",
+          "Grow responsibly, keeping our identity, our closeness to customers and our commitment to a respectful relationship with nature."
+        ]
+      }
+    ],
+    "valuesTitle": "Our values",
+    "values": [
+      {
+        "title": "Accessibility",
+        "text": "There are many ways to start an adventure. We offer options for different budgets without losing sight of quality and function."
+      },
+      {
+        "title": "Trust",
+        "text": "We want you to know what you are buying, what each product is for and what its limits are."
+      },
+      {
+        "title": "Love for nature",
+        "text": "The outdoors inspires us. We promote a mindful and respectful practice of outdoor activities."
+      },
+      {
+        "title": "Supporting Mexican talent",
+        "text": "We value Mexican talent, design and manufacturing, and make room for Mexican brands that deserve more visibility."
+      },
+      {
+        "title": "Learning and community",
+        "text": "There is always something new to learn. We listen to people of every experience level and share useful knowledge."
+      }
+    ],
+    "promiseTitle": "Our promise",
+    "promise": "The right gear. Clear information. Options for every stage of your adventure. We don't claim the most expensive product is always the best choice: we help you find what you really need.",
+    "personalityTitle": "Who we are like",
+    "personality": [
+      "Approachable: we speak plainly, without elitism or unnecessary jargon.",
+      "Reliable: we explain what a product really does rather than overstate its benefits.",
+      "Adventurous: we love discovering new places, disciplines and experiences.",
+      "Practical: good gear has to meet a real need.",
+      "Authentic: our identity comes from the Mexican outdoors."
+    ],
+    "closing": "YĒKORA doesn't want everyone to buy more gear. It wants to help everyone buy better."
+  },
+  "legal": {
+    "updatedLabel": "Last updated",
+    "updated": "October 15, 2026",
+    "draftNotice": "Base version under legal review. Items marked as pending will be completed and the text validated before any customer personal data is collected. The Spanish version governs.",
+    "privacy": {
+      "metaTitle": "Privacy notice | YĒKORA",
+      "title": "Privacy notice and personal data handling",
+      "sections": [
+        {
+          "title": "Data controller",
+          "paragraphs": [
+            "The controller of your personal data is [Pending: name or legal name of the controller], located at [Pending: address], under Mexico's Federal Law on Protection of Personal Data Held by Private Parties published in the Official Gazette on March 20, 2025."
+          ]
+        },
+        {
+          "title": "Personal data we handle",
+          "paragraphs": [
+            "At this stage the site is informational: it has no forms, user accounts or online purchases, and we do not ask for data that identifies you.",
+            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use two first-party technical cookies, described in the Cookie policy."
+          ]
+        },
+        {
+          "title": "Purposes",
+          "paragraphs": [
+            "Primary purposes, needed for the site: show you the content, remember the language you chose, remember that you read the cookie notice and protect the site against misuse.",
+            "Secondary purposes: none. We do not use your data for advertising, commercial profiling or analytics."
+          ]
+        },
+        {
+          "title": "Transfers",
+          "paragraphs": [
+            "We do not transfer your personal data to third parties. The site's hosting provider acts as a processor and only handles technical data on behalf of the controller."
+          ]
+        },
+        {
+          "title": "ARCO rights and withdrawal of consent",
+          "paragraphs": [
+            "You can exercise your rights of Access, Rectification, Cancellation and Opposition, withdraw your consent or limit the use of your data by sending a request to [Pending: privacy contact email].",
+            "Your request must include your name, a way to reply to you, a document proving your identity or that of your representative, and a clear description of the data and the right you want to exercise. We will reply within the time limits set by law."
+          ]
+        },
+        {
+          "title": "Cookies",
+          "paragraphs": [
+            "The site only uses first-party technical cookies. We use no third-party, advertising or analytics cookies. Details are in the Cookie policy."
+          ]
+        },
+        {
+          "title": "Changes to this notice",
+          "paragraphs": [
+            "When this notice changes, for example when online purchases are enabled, we will publish the new version on this page with its update date before collecting any new data."
+          ]
+        }
+      ]
+    },
+    "cookies": {
+      "metaTitle": "Cookie policy | YĒKORA",
+      "title": "Cookie policy",
+      "sections": [
+        {
+          "title": "What cookies are",
+          "paragraphs": [
+            "Cookies are small files a website stores in your browser to remember information between visits."
+          ]
+        },
+        {
+          "title": "Cookies we use",
+          "paragraphs": [
+            "We only use first-party technical cookies, needed for the site to work as you expect. We use no analytics, advertising or third-party cookies."
+          ]
+        },
+        {
+          "title": "How to turn them off",
+          "paragraphs": [
+            "You can delete or block cookies in your browser settings. The site will keep working, but it will not remember your language and will show the cookie notice again."
+          ]
+        },
+        {
+          "title": "Changes to this policy",
+          "paragraphs": [
+            "If we use other cookies in the future, we will update this policy and ask for your consent where the law requires it, before turning them on."
+          ]
+        }
+      ],
+      "table": {
+        "caption": "YĒKORA technical cookies",
+        "name": "Name",
+        "purpose": "What it is for",
+        "duration": "Duration",
+        "rows": [
+          {
+            "name": "yekora_locale",
+            "purpose": "Remember the language you chose.",
+            "duration": "1 year"
+          },
+          {
+            "name": "yekora_cookie_consent",
+            "purpose": "Remember that you read the cookie notice.",
+            "duration": "1 year"
+          }
+        ]
+      }
+    },
+    "terms": {
+      "metaTitle": "Terms and conditions | YĒKORA",
+      "title": "Terms and conditions of use",
+      "sections": [
+        {
+          "title": "Purpose",
+          "paragraphs": [
+            "These terms govern the use of yekora.mx, operated by [Pending: name or legal name of the controller]. By using the site you accept these terms."
+          ]
+        },
+        {
+          "title": "Site use policy",
+          "paragraphs": [
+            "You may browse the content for personal and informational purposes. You may not use the site for unlawful activities, try to access its systems without authorization, disrupt how it works or copy its content for commercial purposes without permission."
+          ]
+        },
+        {
+          "title": "Trademarks and intellectual property",
+          "paragraphs": [
+            "The YĒKORA brand, its logo, its isotype and the site's content are protected under Mexican law. Third-party brands shown belong to their owners."
+          ]
+        },
+        {
+          "title": "Product information and prices",
+          "paragraphs": [
+            "We describe products with clear information about their uses and limits. Under Mexico's Federal Consumer Protection Law, prices are stated in Mexican pesos (MXN) and include the total amount to pay. In the English version, the US dollar price will only be a reference and the peso price will remain visible."
+          ]
+        },
+        {
+          "title": "Online purchases",
+          "paragraphs": [
+            "The site does not sell products online yet. Before enabling purchases we will publish the terms of sale, shipping, returns and warranties, in line with chapter VIII Bis of the Federal Consumer Protection Law and standard NMX-COE-001-SCFI-2018."
+          ]
+        },
+        {
+          "title": "Consumer rights",
+          "paragraphs": [
+            "Your consumer rights are protected by Mexico's Federal Consumer Protection Law. You can contact the Federal Consumer Protection Agency (PROFECO) with any complaint."
+          ]
+        },
+        {
+          "title": "Governing law",
+          "paragraphs": [
+            "These terms are governed by the federal laws of the United Mexican States. For their interpretation and enforcement, the parties submit to the competent courts of [Pending: city and state]."
+          ]
+        }
+      ]
+    }
+  },
+  "brand": {
+    "name": "YĒKORA",
+    "descriptor": "TIENDA OUTDOOR",
+    "logoAlt": "YĒKORA — Tienda Outdoor",
+    "homeLink": "YĒKORA, go to home"
+  },
+  "header": {
+    "navLabel": "Main navigation",
+    "menu": "Menu",
+    "about": "About us",
+    "catalog": "Catalog",
+    "comingSoon": "Coming soon"
+  },
+  "disciplines": {
+    "senderismo": "Hiking",
+    "montana": "Mountaineering",
+    "escalada": "Climbing",
+    "canonismo": "Canyoning",
+    "trail-running": "Trail running"
+  },
+  "activities": {
+    "levelLabel": "Level",
+    "items": {
+      "senderismo": {
+        "level": "From beginner",
+        "description": "Footwear, packs and layers to walk at your own pace, from your first trail to long treks."
+      },
+      "montana": {
+        "level": "Intermediate to advanced",
+        "description": "Gear for cold, altitude and changing weather, chosen for what it really does and its limits."
+      },
+      "escalada": {
+        "level": "All levels, with training",
+        "description": "Protection and progression gear. We tell you what each piece is for, and what it is not for."
+      },
+      "canonismo": {
+        "level": "Intermediate, guided",
+        "description": "Wetsuits, ropes and accessories to descend canyons safely and with good judgment."
+      },
+      "trail-running": {
+        "level": "From beginner",
+        "description": "Light footwear and gear for mountain running, matched to your terrain and distance."
+      }
+    }
+  },
+  "brandBanner": {
+    "title": "Buy better, not more",
+    "lede": "We don't want you to buy more gear. We want you to find the gear you actually need.",
+    "pillars": {
+      "seleccion": {
+        "title": "Selection",
+        "text": "Products chosen with care, not an endless catalog."
+      },
+      "confianza": {
+        "title": "Trust",
+        "text": "Clear information: what each product is for and where its limits are."
+      },
+      "accesibilidad": {
+        "title": "Accessibility",
+        "text": "Options for different budgets, without giving up quality or function."
+      }
+    }
+  },
+  "footer": {
+    "tagline": "The right gear. Clear information. Options for every stage of your adventure.",
+    "disciplinesTitle": "Disciplines",
+    "companyTitle": "YĒKORA",
+    "legalTitle": "Legal",
+    "mexicanTalent": "We champion Mexican outdoor brands and makers.",
+    "privacy": "Privacy notice",
+    "cookies": "Cookie policy",
+    "terms": "Terms and conditions",
+    "rights": "All rights reserved."
+  },
+  "cookieBanner": {
+    "label": "Cookie notice",
+    "text": "This site only uses technical cookies: one remembers your language and one remembers this notice. We use no analytics and no third-party cookies.",
+    "policy": "Read the cookie policy",
+    "accept": "Got it"
+  },
+  "languageSwitcher": {
+    "label": "Language",
+    "names": {
+      "es-MX": "Español",
+      "en": "English"
+    }
+  }
+}

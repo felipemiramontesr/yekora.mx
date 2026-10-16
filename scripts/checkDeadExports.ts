@@ -11,6 +11,8 @@ import { basename, extname, join, relative } from 'node:path';
 
 const root = process.cwd();
 const SOURCE_DIRS = ['app', 'components', 'lib'];
+// Root files Next.js loads by convention: they consume exports but their own exports are framework entry points.
+const ROOT_CONSUMERS = ['middleware.ts'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const APP_ROUTER_FILES = new Set([
   'page',
@@ -29,6 +31,8 @@ const FRAMEWORK_EXPORTS = new Set([
   'generateStaticParams',
   'viewport',
   'generateViewport',
+  // Route segment config read by Next.js (e.g. app/[locale]: 404 for unsupported locales).
+  'dynamicParams',
 ]);
 
 const MODIFIERS = new Set(['declare', 'async']);
@@ -96,6 +100,10 @@ const files = SOURCE_DIRS.flatMap((dir) => walk(join(root, dir))).filter(
 const contents = new Map(
   files.map((file) => [file, readFileSync(file, 'utf8')])
 );
+const consumers = new Map(contents);
+for (const file of ROOT_CONSUMERS.map((name) => join(root, name))) {
+  if (existsSync(file)) consumers.set(file, readFileSync(file, 'utf8'));
+}
 const orphans: string[] = [];
 
 for (const [file, source] of contents) {
@@ -105,7 +113,7 @@ for (const [file, source] of contents) {
   for (const name of namedExports(source)) {
     if (FRAMEWORK_EXPORTS.has(name)) continue;
     const usage = new RegExp(`\\b${name.replaceAll('$', '\\$')}\\b`);
-    const used = [...contents].some(
+    const used = [...consumers].some(
       ([other, text]) => other !== file && usage.test(text)
     );
     if (!used) orphans.push(`${relative(root, file)} → ${name}`);

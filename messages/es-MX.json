@@ -1,0 +1,332 @@
+{
+  "meta": {
+    "title": "YĒKORA | Tienda Outdoor",
+    "description": "Equipamiento, ropa y accesorios para senderismo, montaña, escalada, cañonismo y aventura. Marcas mexicanas e internacionales para diferentes experiencias, necesidades y presupuestos."
+  },
+  "home": {
+    "hero": {
+      "eyebrow": "Tienda outdoor mexicana",
+      "title": "Equipo adecuado. Información clara. Opciones para cada etapa de tu aventura.",
+      "lede": "Desde una primera caminata hasta una expedición técnica, te ayudamos a elegir el equipo que de verdad necesitas.",
+      "primaryCta": "Encuentra tu ruta",
+      "secondaryCta": "Conoce YĒKORA"
+    },
+    "disciplines": {
+      "title": "Disciplinas",
+      "lede": "Cada actividad pide equipo distinto. Empieza por la tuya."
+    },
+    "mexicanTalent": {
+      "title": "Talento y fabricación mexicana",
+      "lede": "Abrimos espacio a marcas y fabricantes nacionales que diseñan equipo para la aventura, junto a marcas internacionales de confianza.",
+      "note": "Pronto conocerás aquí a las marcas con las que trabajamos."
+    }
+  },
+  "about": {
+    "metaTitle": "Nosotros | YĒKORA",
+    "title": "Nosotros",
+    "lede": "YĒKORA es una tienda mexicana especializada en equipamiento, ropa y accesorios para actividades al aire libre.",
+    "sections": [
+      {
+        "title": "Quiénes somos",
+        "paragraphs": [
+          "Nacemos con una idea clara: acercar el mundo outdoor a más personas, con productos funcionales, marcas confiables y alternativas para distintas necesidades y presupuestos.",
+          "Creemos que disfrutar de la naturaleza no debería depender de tener el equipo más costoso, pero también sabemos que la calidad, la funcionalidad y la seguridad importan. Por eso reunimos marcas mexicanas e internacionales, con especial interés en impulsar a los fabricantes nacionales.",
+          "Desde una primera caminata hasta una expedición técnica, queremos que cada persona encuentre el equipo adecuado para su camino."
+        ]
+      },
+      {
+        "title": "Nuestro propósito",
+        "paragraphs": [
+          "Hacer que más personas puedan vivir experiencias al aire libre con el equipo adecuado, la información necesaria y la confianza para comenzar o continuar su propia ruta. No queremos vender solamente productos: queremos facilitar experiencias."
+        ]
+      },
+      {
+        "title": "Misión",
+        "paragraphs": [
+          "Ofrecer una selección confiable y accesible de equipamiento outdoor, combinando calidad, funcionalidad y asesoría para que cada persona elija de acuerdo con su actividad, experiencia y presupuesto.",
+          "Impulsar el talento de marcas mexicanas y acercar productos especializados tanto a quienes comienzan como a quienes buscan desarrollar sus capacidades en la montaña y otros entornos naturales."
+        ]
+      },
+      {
+        "title": "Visión",
+        "paragraphs": [
+          "Ser una tienda outdoor mexicana reconocida por su confianza, variedad y conocimiento del equipo que comercializa, con una plataforma de venta física y digital que acerque marcas nacionales e internacionales a una comunidad creciente que disfruta el senderismo, el montañismo, la escalada, el cañonismo, el trail running y otras actividades al aire libre.",
+          "Crecer de manera responsable, manteniendo nuestra identidad, la cercanía con nuestros clientes y el compromiso con una relación respetuosa con la naturaleza."
+        ]
+      }
+    ],
+    "valuesTitle": "Nuestros valores",
+    "values": [
+      {
+        "title": "Accesibilidad",
+        "text": "Existen diferentes formas de comenzar una aventura. Ofrecemos alternativas para distintos presupuestos sin perder de vista la calidad y la funcionalidad."
+      },
+      {
+        "title": "Confianza",
+        "text": "Queremos que sepas qué estás comprando, para qué sirve cada producto y cuáles son sus limitaciones."
+      },
+      {
+        "title": "Pasión por la naturaleza",
+        "text": "Nos inspira el mundo exterior. Promovemos una práctica consciente y respetuosa de las actividades outdoor."
+      },
+      {
+        "title": "Impulso a lo mexicano",
+        "text": "Valoramos el talento, el diseño y la fabricación nacional, y abrimos espacio a marcas mexicanas que merecen más visibilidad."
+      },
+      {
+        "title": "Aprendizaje y comunidad",
+        "text": "Siempre hay algo nuevo por aprender. Escuchamos a personas de todos los niveles de experiencia y compartimos conocimiento útil."
+      }
+    ],
+    "promiseTitle": "Nuestra promesa",
+    "promise": "Equipo adecuado. Información clara. Opciones para cada etapa de tu aventura. No pretendemos que el producto más caro sea siempre la mejor elección: buscamos que encuentres lo que realmente necesitas.",
+    "personalityTitle": "Cómo somos",
+    "personality": [
+      "Cercana: hablamos de manera directa, sin elitismo ni tecnicismos innecesarios.",
+      "Confiable: explicamos las características reales de un producto antes que exagerar sus beneficios.",
+      "Aventurera: nos entusiasma descubrir nuevos lugares, disciplinas y experiencias.",
+      "Práctica: un buen equipo debe responder a una necesidad real.",
+      "Auténtica: construimos nuestra identidad desde el entorno outdoor mexicano."
+    ],
+    "closing": "YĒKORA no busca que todos compren más equipo. Busca ayudar a que cada persona compre mejor."
+  },
+  "legal": {
+    "updatedLabel": "Última actualización",
+    "updated": "15 de octubre de 2026",
+    "draftNotice": "Versión base en revisión jurídica. Los datos marcados como pendientes se completarán y el texto se validará antes de recabar cualquier dato personal de clientes.",
+    "privacy": {
+      "metaTitle": "Aviso de privacidad | YĒKORA",
+      "title": "Aviso de privacidad y manejo de datos personales",
+      "sections": [
+        {
+          "title": "Responsable del tratamiento",
+          "paragraphs": [
+            "El responsable del tratamiento de tus datos personales es [Pendiente: nombre o razón social del responsable], con domicilio en [Pendiente: domicilio], conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares publicada en el Diario Oficial de la Federación el 20 de marzo de 2025."
+          ]
+        },
+        {
+          "title": "Datos personales que tratamos",
+          "paragraphs": [
+            "En esta etapa el sitio es informativo: no tiene formularios, cuentas de usuario ni compras en línea, y no te pedimos datos que te identifiquen.",
+            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos dos cookies técnicas propias, descritas en la Política de cookies."
+          ]
+        },
+        {
+          "title": "Finalidades",
+          "paragraphs": [
+            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido, recordar el idioma que elegiste, recordar que ya leíste el aviso de cookies y proteger el sitio frente a usos indebidos.",
+            "Finalidades secundarias: ninguna. No usamos tus datos para publicidad, perfiles comerciales ni analítica."
+          ]
+        },
+        {
+          "title": "Transferencias",
+          "paragraphs": [
+            "No transferimos tus datos personales a terceros. El proveedor de alojamiento del sitio actúa como encargado y solo trata los datos técnicos por cuenta del responsable."
+          ]
+        },
+        {
+          "title": "Derechos ARCO y revocación del consentimiento",
+          "paragraphs": [
+            "Puedes ejercer tus derechos de Acceso, Rectificación, Cancelación y Oposición, revocar tu consentimiento o limitar el uso de tus datos enviando una solicitud a [Pendiente: correo de contacto de privacidad].",
+            "Tu solicitud debe incluir tu nombre, un medio para responderte, el documento que acredite tu identidad o la de tu representante, una descripción clara de los datos y del derecho que quieres ejercer. Te responderemos en los plazos que establece la ley."
+          ]
+        },
+        {
+          "title": "Cookies",
+          "paragraphs": [
+            "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies."
+          ]
+        },
+        {
+          "title": "Cambios a este aviso",
+          "paragraphs": [
+            "Cuando cambie este aviso, por ejemplo al habilitar compras en línea, publicaremos la nueva versión en esta página con su fecha de actualización antes de recabar nuevos datos."
+          ]
+        }
+      ]
+    },
+    "cookies": {
+      "metaTitle": "Política de cookies | YĒKORA",
+      "title": "Política de cookies",
+      "sections": [
+        {
+          "title": "Qué son las cookies",
+          "paragraphs": [
+            "Las cookies son pequeños archivos que un sitio guarda en tu navegador para recordar información entre visitas."
+          ]
+        },
+        {
+          "title": "Cookies que usamos",
+          "paragraphs": [
+            "Solo usamos cookies técnicas propias, necesarias para que el sitio funcione como esperas. No usamos cookies de analítica, de publicidad ni de terceros."
+          ]
+        },
+        {
+          "title": "Cómo desactivarlas",
+          "paragraphs": [
+            "Puedes borrar o bloquear las cookies desde la configuración de tu navegador. Si lo haces, el sitio seguirá funcionando, pero no recordará tu idioma y volverá a mostrarte el aviso de cookies."
+          ]
+        },
+        {
+          "title": "Cambios a esta política",
+          "paragraphs": [
+            "Si en el futuro usamos otras cookies, actualizaremos esta política y te pediremos tu consentimiento cuando la ley lo requiera, antes de activarlas."
+          ]
+        }
+      ],
+      "table": {
+        "caption": "Cookies técnicas de YĒKORA",
+        "name": "Nombre",
+        "purpose": "Para qué sirve",
+        "duration": "Duración",
+        "rows": [
+          {
+            "name": "yekora_locale",
+            "purpose": "Recordar el idioma que elegiste.",
+            "duration": "1 año"
+          },
+          {
+            "name": "yekora_cookie_consent",
+            "purpose": "Recordar que ya leíste el aviso de cookies.",
+            "duration": "1 año"
+          }
+        ]
+      }
+    },
+    "terms": {
+      "metaTitle": "Términos y condiciones | YĒKORA",
+      "title": "Términos y condiciones de uso",
+      "sections": [
+        {
+          "title": "Objeto",
+          "paragraphs": [
+            "Estos términos regulan el uso del sitio yekora.mx, operado por [Pendiente: nombre o razón social del responsable]. Al usar el sitio aceptas estos términos."
+          ]
+        },
+        {
+          "title": "Política de uso del sitio",
+          "paragraphs": [
+            "Puedes consultar el contenido para fines personales e informativos. No está permitido usar el sitio para actividades ilícitas, intentar acceder sin autorización a sus sistemas, alterar su funcionamiento ni copiar su contenido con fines comerciales sin autorización."
+          ]
+        },
+        {
+          "title": "Propiedad industrial e intelectual",
+          "paragraphs": [
+            "La marca YĒKORA, su logotipo, su isotipo y los contenidos del sitio están protegidos por la legislación mexicana. Las marcas de terceros que aparezcan pertenecen a sus titulares."
+          ]
+        },
+        {
+          "title": "Información de productos y precios",
+          "paragraphs": [
+            "Describimos los productos con información clara sobre sus usos y limitaciones. Conforme a la Ley Federal de Protección al Consumidor, los precios se expresan en moneda nacional (MXN) e incluyen el monto total a pagar. En la versión en inglés, el precio en dólares será solo una referencia y el precio en pesos seguirá visible."
+          ]
+        },
+        {
+          "title": "Compras en línea",
+          "paragraphs": [
+            "Por ahora el sitio no vende productos en línea. Antes de habilitar compras publicaremos las condiciones de venta, envío, devoluciones y garantías, conforme al capítulo VIII Bis de la Ley Federal de Protección al Consumidor y a la norma NMX-COE-001-SCFI-2018."
+          ]
+        },
+        {
+          "title": "Derechos del consumidor",
+          "paragraphs": [
+            "Tus derechos como consumidor están protegidos por la Ley Federal de Protección al Consumidor. Puedes acudir a la Procuraduría Federal del Consumidor (PROFECO) para cualquier reclamación."
+          ]
+        },
+        {
+          "title": "Legislación aplicable",
+          "paragraphs": [
+            "Estos términos se rigen por las leyes federales de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes de [Pendiente: ciudad y estado]."
+          ]
+        }
+      ]
+    }
+  },
+  "brand": {
+    "name": "YĒKORA",
+    "descriptor": "TIENDA OUTDOOR",
+    "logoAlt": "YĒKORA — Tienda Outdoor",
+    "homeLink": "YĒKORA, ir al inicio"
+  },
+  "header": {
+    "navLabel": "Navegación principal",
+    "menu": "Menú",
+    "about": "Nosotros",
+    "catalog": "Catálogo",
+    "comingSoon": "Próximamente"
+  },
+  "disciplines": {
+    "senderismo": "Senderismo",
+    "montana": "Montaña",
+    "escalada": "Escalada",
+    "canonismo": "Cañonismo",
+    "trail-running": "Trail running"
+  },
+  "activities": {
+    "levelLabel": "Nivel",
+    "items": {
+      "senderismo": {
+        "level": "Desde principiante",
+        "description": "Calzado, mochilas y capas para caminar a tu ritmo, desde la primera ruta hasta las travesías largas."
+      },
+      "montana": {
+        "level": "Intermedio a avanzado",
+        "description": "Equipo para frío, altura y cambios de clima, elegido por su función real y sus límites."
+      },
+      "escalada": {
+        "level": "Todos los niveles, con formación",
+        "description": "Equipo de protección y progresión. Te decimos para qué sirve cada pieza y para qué no."
+      },
+      "canonismo": {
+        "level": "Intermedio, con guía",
+        "description": "Neoprenos, cuerdas y accesorios para descender cañones con seguridad y criterio."
+      },
+      "trail-running": {
+        "level": "Desde principiante",
+        "description": "Calzado y equipo ligero para correr en montaña según tu terreno y tu distancia."
+      }
+    }
+  },
+  "brandBanner": {
+    "title": "Compra mejor, no más",
+    "lede": "No buscamos que compres más equipo, sino que encuentres el que de verdad necesitas.",
+    "pillars": {
+      "seleccion": {
+        "title": "Selección",
+        "text": "Productos elegidos con criterio, no un catálogo infinito."
+      },
+      "confianza": {
+        "title": "Confianza",
+        "text": "Información clara: para qué sirve cada producto y cuáles son sus límites."
+      },
+      "accesibilidad": {
+        "title": "Accesibilidad",
+        "text": "Opciones para distintos presupuestos, sin perder calidad ni funcionalidad."
+      }
+    }
+  },
+  "footer": {
+    "tagline": "Equipo adecuado. Información clara. Opciones para cada etapa de tu aventura.",
+    "disciplinesTitle": "Disciplinas",
+    "companyTitle": "YĒKORA",
+    "legalTitle": "Legal",
+    "mexicanTalent": "Impulsamos a marcas y fabricantes mexicanos de equipo outdoor.",
+    "privacy": "Aviso de privacidad",
+    "cookies": "Política de cookies",
+    "terms": "Términos y condiciones",
+    "rights": "Todos los derechos reservados."
+  },
+  "cookieBanner": {
+    "label": "Aviso de cookies",
+    "text": "Este sitio solo usa cookies técnicas: una recuerda tu idioma y otra este aviso. No usamos analítica ni cookies de terceros.",
+    "policy": "Ver política de cookies",
+    "accept": "Entendido"
+  },
+  "languageSwitcher": {
+    "label": "Idioma",
+    "names": {
+      "es-MX": "Español",
+      "en": "English"
+    }
+  }
+}
