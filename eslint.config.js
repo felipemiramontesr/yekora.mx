@@ -8,6 +8,8 @@ export default [
       'dist/**',
       'build/**',
       '.next/**',
+      // Static export output (next build with output: 'export').
+      'out/**',
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',

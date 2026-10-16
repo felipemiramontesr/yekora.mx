@@ -108,13 +108,13 @@
           "title": "Datos personales que tratamos",
           "paragraphs": [
             "En esta etapa el sitio es informativo: no tiene formularios, cuentas de usuario ni compras en línea, y no te pedimos datos que te identifiquen.",
-            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos dos cookies técnicas propias, descritas en la Política de cookies."
+            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos una sola cookie técnica propia, descrita en la Política de cookies."
           ]
         },
         {
           "title": "Finalidades",
           "paragraphs": [
-            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido, recordar el idioma que elegiste, recordar que ya leíste el aviso de cookies y proteger el sitio frente a usos indebidos.",
+            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido en el idioma de la página que visitas, recordar que ya leíste el aviso de cookies y proteger el sitio frente a usos indebidos.",
             "Finalidades secundarias: ninguna. No usamos tus datos para publicidad, perfiles comerciales ni analítica."
           ]
         },
@@ -164,7 +164,7 @@
         {
           "title": "Cómo desactivarlas",
           "paragraphs": [
-            "Puedes borrar o bloquear las cookies desde la configuración de tu navegador. Si lo haces, el sitio seguirá funcionando, pero no recordará tu idioma y volverá a mostrarte el aviso de cookies."
+            "Puedes borrar o bloquear las cookies desde la configuración de tu navegador. Si lo haces, el sitio seguirá funcionando, pero volverá a mostrarte el aviso de cookies."
           ]
         },
         {
@@ -180,11 +180,6 @@
         "purpose": "Para qué sirve",
         "duration": "Duración",
         "rows": [
-          {
-            "name": "yekora_locale",
-            "purpose": "Recordar el idioma que elegiste.",
-            "duration": "1 año"
-          },
           {
             "name": "yekora_cookie_consent",
             "purpose": "Recordar que ya leíste el aviso de cookies.",
@@ -318,7 +313,7 @@
   },
   "cookieBanner": {
     "label": "Aviso de cookies",
-    "text": "Este sitio solo usa cookies técnicas: una recuerda tu idioma y otra este aviso. No usamos analítica ni cookies de terceros.",
+    "text": "Este sitio solo usa una cookie técnica, para recordar que ya leíste este aviso. No usamos analítica ni cookies de terceros.",
     "policy": "Ver política de cookies",
     "accept": "Entendido"
   },

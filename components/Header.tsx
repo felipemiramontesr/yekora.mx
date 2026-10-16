@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
+import { routeFor } from '@/lib/routes';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface HeaderProps {
@@ -14,8 +15,8 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
       {disciplines.map((discipline) => (
         <li key={discipline}>
           <a
-            href={`/${locale}#${discipline}`}
-            className="underline-offset-4 hover:underline"
+            href={`${routeFor('home', locale)}#${discipline}`}
+            className="tap-target underline-offset-4 hover:underline"
           >
             {messages.disciplines[discipline]}
           </a>
@@ -23,8 +24,8 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
       ))}
       <li>
         <a
-          href={`/${locale}/nosotros`}
-          className="underline-offset-4 hover:underline"
+          href={routeFor('about', locale)}
+          className="tap-target underline-offset-4 hover:underline"
         >
           {messages.header.about}
         </a>
@@ -47,35 +48,43 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
     <header className="sticky top-0 z-40 bg-petroleo text-marfil">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-3">
         <a
-          href={`/${locale}`}
+          href={routeFor('home', locale)}
           aria-label={messages.brand.homeLink}
-          className="shrink-0"
+          className="tap-target shrink-0 gap-3"
         >
-          {/* The name is a custom vector trace: always the client's SVG, never retyped. */}
+          {/* Horizontal lockup from the client's individual elements; the name is never retyped.
+              The link's aria-label names it, so the images are decorative. */}
           <img
-            src="/brand/YEKORA_isotipo_vectorial.svg"
-            alt={messages.brand.logoAlt}
-            width={36}
-            height={44}
+            src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"
+            alt=""
+            width={28}
+            height={32}
+          />
+          <img
+            src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"
+            alt=""
+            width={101}
+            height={18}
           />
         </a>
         <nav
           aria-label={messages.header.navLabel}
-          className="hidden flex-1 md:block"
+          className="hidden flex-1 xl:block"
         >
           <ul className="flex flex-wrap items-center gap-5 text-sm">
             <NavItems locale={locale} messages={messages} />
           </ul>
         </nav>
-        <div className="hidden md:block">
+        <div className="hidden xl:block">
           <LanguageSwitcher
             locale={locale}
             messages={messages.languageSwitcher}
           />
         </div>
-        {/* Mobile menu without client JavaScript: native <details>/<summary>. */}
-        <details className="relative md:hidden">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
+        {/* Phones and tablets: menu without client JavaScript (native <details>/<summary>).
+            The full bar needs xl: below 1280 px it wraps onto two lines. */}
+        <details className="relative xl:hidden">
+          <summary className="tap-target cursor-pointer list-none gap-2 px-1 text-sm">
             <Menu aria-hidden="true" size={22} />
             {messages.header.menu}
           </summary>
@@ -83,7 +92,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
             aria-label={messages.header.navLabel}
             className="absolute right-0 mt-3 w-64 rounded-lg bg-petroleo p-4 shadow-lg"
           >
-            <ul className="flex flex-col gap-3 text-sm">
+            <ul className="flex flex-col text-sm">
               <NavItems locale={locale} messages={messages} />
             </ul>
             <div className="mt-4 border-t border-marfil/20 pt-4">

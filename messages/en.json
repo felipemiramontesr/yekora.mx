@@ -108,13 +108,13 @@
           "title": "Personal data we handle",
           "paragraphs": [
             "At this stage the site is informational: it has no forms, user accounts or online purchases, and we do not ask for data that identifies you.",
-            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use two first-party technical cookies, described in the Cookie policy."
+            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use a single first-party technical cookie, described in the Cookie policy."
           ]
         },
         {
           "title": "Purposes",
           "paragraphs": [
-            "Primary purposes, needed for the site: show you the content, remember the language you chose, remember that you read the cookie notice and protect the site against misuse.",
+            "Primary purposes, needed for the site: show you the content in the language of the page you visit, remember that you read the cookie notice and protect the site against misuse.",
             "Secondary purposes: none. We do not use your data for advertising, commercial profiling or analytics."
           ]
         },
@@ -164,7 +164,7 @@
         {
           "title": "How to turn them off",
           "paragraphs": [
-            "You can delete or block cookies in your browser settings. The site will keep working, but it will not remember your language and will show the cookie notice again."
+            "You can delete or block cookies in your browser settings. The site will keep working, but it will show the cookie notice again."
           ]
         },
         {
@@ -180,11 +180,6 @@
         "purpose": "What it is for",
         "duration": "Duration",
         "rows": [
-          {
-            "name": "yekora_locale",
-            "purpose": "Remember the language you chose.",
-            "duration": "1 year"
-          },
           {
             "name": "yekora_cookie_consent",
             "purpose": "Remember that you read the cookie notice.",
@@ -318,7 +313,7 @@
   },
   "cookieBanner": {
     "label": "Cookie notice",
-    "text": "This site only uses technical cookies: one remembers your language and one remembers this notice. We use no analytics and no third-party cookies.",
+    "text": "This site only uses one technical cookie, to remember that you read this notice. We use no analytics and no third-party cookies.",
     "policy": "Read the cookie policy",
     "accept": "Got it"
   },

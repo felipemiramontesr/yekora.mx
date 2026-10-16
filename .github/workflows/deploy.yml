@@ -147,14 +147,26 @@ jobs:
               }
             });
           "
-      - name: Start Next.js dev server (background)
+      - name: Build static export (out/)
+        run: bun run build
+      - name: Serve out/ with Apache (httpd 2.4 + mod_rewrite + .htaccess, as on Hostinger)
+        # The suite runs against what Hostinger serves, not the dev server (FC 003 F2).
         run: |
-          bun run dev -- --port 3000 &
-          bunx wait-on http://localhost:3000 --timeout 120000
+          docker run -d --name yekora-httpd -p 3100:80 \
+            -v "$PWD/out:/usr/local/apache2/htdocs:ro" \
+            -v "$PWD/e2e/apache/yekora.conf:/usr/local/apache2/conf/extra/yekora.conf:ro" \
+            httpd:2.4 \
+            sh -c 'echo "Include conf/extra/yekora.conf" >> conf/httpd.conf && exec httpd-foreground'
+          bunx wait-on http://localhost:3100 --timeout 60000
       - name: Install Playwright browsers (Chromium)
         run: bunx playwright install --with-deps chromium
-      - name: Run Playwright E2E
+      - name: Run Playwright E2E (content, RWD gate, .htaccess rules)
+        env:
+          E2E_APACHE: '1'
         run: bunx playwright test --config=playwright.local.config.ts
+      - name: Apache logs
+        if: failure()
+        run: docker logs yekora-httpd
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -262,10 +274,100 @@ jobs:
         run: bun scripts/generateCertificationDashboard.ts all-results >> "$GITHUB_STEP_SUMMARY"
 
   hostinger-deployment:
-    name: 🚀 Deployment to Hostinger — disabled slot
+    name: 🚀 Deployment to Hostinger
+    # Only certified pushes to main reach production (FC 003). Hostinger's own Git
+    # auto-deployment stays off: this job is the only way in.
     needs: [global-certification]
-    # Disabled until Ω provides the hosting target, build type and credentials.
-    if: false && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    # One deploy at a time; a newer push waits instead of cutting an rsync in half.
+    concurrency:
+      group: hostinger-production
+      cancel-in-progress: false
+    env:
+      # Secrets reach the scripts as variables, never pasted into the script text.
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
     steps:
-      - run: echo "Hostinger deployment slot reserved"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build static export (out/)
+        run: bun run build
+      - name: Stamp the build with its commit (out/version.txt)
+        run: printf '%s\n' "$GITHUB_SHA" > out/version.txt
+
+      - name: 🔑 Setup SSH key and pinned host key
+        # known_hosts comes only from the secret, never from scanning the host. A host key that does
+        # not match aborts every connection below (StrictHostKeyChecking=yes).
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/yekora_deploy
+          chmod 600 ~/.ssh/yekora_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          echo "SSH_CMD=ssh -p $SSH_PORT -i $HOME/.ssh/yekora_deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30" >> "$GITHUB_ENV"
+
+      - name: 🛡️ A1 probe — the key only reaches yekora.mx/public_html
+        # The account is shared with Archon (production). The key must be confined by rrsync
+        # to domains/yekora.mx/public_html: no shell, and no way above that folder.
+        run: |
+          if $SSH_CMD "$SSH_USERNAME@$SSH_HOST" 'ls ~' > /dev/null 2>&1; then
+            echo "FATAL A1: the deploy key opens a shell on the account. Restrict it with rrsync."
+            exit 1
+          fi
+          rsync --list-only -e "$SSH_CMD" "$SSH_USERNAME@$SSH_HOST:./" > /dev/null
+          # rrsync either refuses these paths or maps them back inside public_html; seeing
+          # public_html, domains or home in the listing means the key escaped.
+          for outside in '../' '/'; do
+            LISTING=$(rsync --list-only -e "$SSH_CMD" "$SSH_USERNAME@$SSH_HOST:$outside" 2>/dev/null || true)
+            if printf '%s\n' "$LISTING" | grep -qE '[[:space:]](public_html|domains|home)/?$'; then
+              echo "FATAL A1: the deploy key can list '$outside' above public_html. Restrict it with rrsync."
+              exit 1
+            fi
+          done
+          echo "[OK] A1 key confined: no shell, rsync only inside its folder."
+
+      - name: 🚀 Deploy out/ to public_html via rsync
+        # Relative destination ./ is the rrsync root (public_html itself, never a nested copy).
+        # .well-known/ holds Hostinger's SSL validation and is never touched.
+        run: |
+          rsync -avz --delete --exclude='.well-known/' \
+            -e "$SSH_CMD" \
+            ./out/ \
+            "$SSH_USERNAME@$SSH_HOST:./"
+
+      - name: 🔥 Smoke test — production serves this commit
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            LIVE=$(curl -fsS "https://yekora.mx/version.txt?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' || true)
+            if [ "$LIVE" = "$GITHUB_SHA" ]; then break; fi
+            echo "Attempt $attempt: live version '$LIVE', expected $GITHUB_SHA"
+            sleep 10
+          done
+          if [ "$LIVE" != "$GITHUB_SHA" ]; then
+            echo "FATAL: https://yekora.mx/version.txt does not serve $GITHUB_SHA"
+            exit 1
+          fi
+          for url in https://yekora.mx/ https://yekora.mx/en/; do
+            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
+            echo "$url → $STATUS"
+            if [ "$STATUS" != "200" ]; then exit 1; fi
+          done
+          echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English."
+
+      - name: Remove the SSH key from the runner
+        if: always()
+        run: rm -f ~/.ssh/yekora_deploy

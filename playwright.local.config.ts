@@ -2,32 +2,38 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Yekora E2E — local config, the only one CI runs.
- * Target: the Next.js dev server on http://localhost:3000.
+ * Target: the static export in out/, never the dev server, so the suite sees what Hostinger serves.
+ * Locally Playwright builds and serves out/ with scripts/serveStatic.ts; CI serves it with
+ * Apache (httpd:2.4 + mod_rewrite) and sets E2E_APACHE, which also runs htaccess.spec.ts
+ * (the local server does not read .htaccess).
  * smoke.spec.ts is reserved for checks against a deployed URL and is always excluded here;
  * the CI anti-PROD guard asserts both rules before Playwright starts.
  */
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['**/smoke.spec.ts'],
+  testIgnore: process.env.E2E_APACHE
+    ? ['**/smoke.spec.ts']
+    : ['**/smoke.spec.ts', '**/htaccess.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
+  workers: process.env.CI ? 2 : 4,
   reporter: 'html',
   timeout: 45_000,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3100',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     viewport: { width: 1280, height: 720 },
   },
-  // CI starts the dev server in its own step; locally Playwright starts it or reuses it.
-  webServer: {
-    command: 'bun run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: process.env.E2E_APACHE
+    ? undefined
+    : {
+        command: 'bun run build && bun scripts/serveStatic.ts 3100',
+        url: 'http://localhost:3100',
+        reuseExistingServer: false,
+        timeout: 180_000,
+      },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

@@ -11,9 +11,11 @@ describe('Header', () => {
   );
 
   it('uses the client isotype and links home in the current language', () => {
-    expect(html).toContain('src="/brand/YEKORA_isotipo_vectorial.svg"');
-    expect(html).toContain('alt="YĒKORA — Tienda Outdoor"');
-    expect(html).toContain('href="/en" aria-label="YĒKORA, go to home"');
+    expect(html).toContain(
+      'src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"'
+    );
+    expect(html).toContain('src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"');
+    expect(html).toContain('href="/en/" aria-label="YĒKORA, go to home"');
   });
 
   it('anchors every discipline inside the current language', () => {
@@ -24,10 +26,10 @@ describe('Header', () => {
       'canonismo',
       'trail-running',
     ]) {
-      expect(html).toContain(`href="/en#${anchor}"`);
+      expect(html).toContain(`href="/en/#${anchor}"`);
     }
     expect(html).toContain('Mountaineering');
-    expect(html).toContain('href="/en/nosotros"');
+    expect(html).toContain('href="/en/about/"');
   });
 
   it('shows the catalog as coming soon, never as a link', () => {
@@ -45,7 +47,7 @@ describe('Header', () => {
     const spanish = renderToStaticMarkup(
       <Header locale="es-MX" messages={getMessages('es-MX')} />
     );
-    expect(spanish).toContain('href="/es-MX#canonismo"');
+    expect(spanish).toContain('href="/#canonismo"');
     expect(spanish).toContain('Cañonismo');
     expect(spanish).toContain('Próximamente');
   });

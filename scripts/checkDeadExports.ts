@@ -4,6 +4,9 @@
  * by any other non-test source file.
  * Whitelist: App Router convention files (page, layout, route, …) are wired by the framework,
  * not by imports, and so are the route segment exports listed in FRAMEWORK_EXPORTS.
+ * FC 003 F2: also fails when a file in public/ is not referenced by its URL path from any
+ * non-test source file, since everything in public/ is published to yekora.mx. Server
+ * configuration files (SERVER_FILES) are read by Apache, not by the site.
  * CLI: `bun scripts/checkDeadExports.ts` — exit 0 = no dead exports · exit 1 = orphans found.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -11,9 +14,9 @@ import { basename, extname, join, relative } from 'node:path';
 
 const root = process.cwd();
 const SOURCE_DIRS = ['app', 'components', 'lib'];
-// Root files Next.js loads by convention: they consume exports but their own exports are framework entry points.
-const ROOT_CONSUMERS = ['middleware.ts'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
+const PUBLIC_DIR = 'public';
+const SERVER_FILES = new Set(['.htaccess']);
 const APP_ROUTER_FILES = new Set([
   'page',
   'layout',
@@ -56,8 +59,7 @@ function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((entry) => {
     const fullPath = join(dir, entry);
-    if (statSync(fullPath).isDirectory()) return walk(fullPath);
-    return SOURCE_EXTENSIONS.has(extname(entry)) ? [fullPath] : [];
+    return statSync(fullPath).isDirectory() ? walk(fullPath) : [fullPath];
   });
 }
 
@@ -95,15 +97,11 @@ function namedExports(source: string): string[] {
 }
 
 const files = SOURCE_DIRS.flatMap((dir) => walk(join(root, dir))).filter(
-  (f) => !isTestFile(f)
+  (f) => SOURCE_EXTENSIONS.has(extname(f)) && !isTestFile(f)
 );
 const contents = new Map(
   files.map((file) => [file, readFileSync(file, 'utf8')])
 );
-const consumers = new Map(contents);
-for (const file of ROOT_CONSUMERS.map((name) => join(root, name))) {
-  if (existsSync(file)) consumers.set(file, readFileSync(file, 'utf8'));
-}
 const orphans: string[] = [];
 
 for (const [file, source] of contents) {
@@ -113,16 +111,30 @@ for (const [file, source] of contents) {
   for (const name of namedExports(source)) {
     if (FRAMEWORK_EXPORTS.has(name)) continue;
     const usage = new RegExp(`\\b${name.replaceAll('$', '\\$')}\\b`);
-    const used = [...consumers].some(
+    const used = [...contents].some(
       ([other, text]) => other !== file && usage.test(text)
     );
     if (!used) orphans.push(`${relative(root, file)} → ${name}`);
   }
 }
 
+// public/brand/x.svg is served at /brand/x.svg: a source file must name that path.
+const publicFiles = walk(join(root, PUBLIC_DIR)).filter(
+  (f) => !SERVER_FILES.has(basename(f))
+);
+for (const file of publicFiles) {
+  const urlPath = `/${relative(join(root, PUBLIC_DIR), file).replaceAll('\\', '/')}`;
+  const used = [...contents.values()].some((text) => text.includes(urlPath));
+  if (!used) orphans.push(`${relative(root, file)} → not referenced`);
+}
+
 if (orphans.length > 0) {
-  console.error('[FAIL] DC4 dead exports (named exports with no consumer):');
+  console.error(
+    '[FAIL] DC4 dead code (named exports or public/ files with no consumer):'
+  );
   for (const orphan of orphans) console.error(`  - ${orphan}`);
   process.exit(1);
 }
-console.log(`[OK] DC4 no dead exports across ${files.length} source file(s).`);
+console.log(
+  `[OK] DC4 no dead exports across ${files.length} source file(s) and no unreferenced public/ file across ${publicFiles.length}.`
+);

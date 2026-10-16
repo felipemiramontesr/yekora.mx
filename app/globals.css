@@ -3,3 +3,11 @@
 @tailwind utilities;
 
 /* Protocol L — Tailwind only (do not mix with Bootstrap) */
+
+@layer components {
+  /* Mobile First: every tap target is at least 44 × 44 px (WCAG 2.5.5).
+     e2e/responsive.spec.ts fails the build when one is smaller. */
+  .tap-target {
+    @apply inline-flex min-h-11 min-w-11 items-center;
+  }
+}

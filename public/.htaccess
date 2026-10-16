@@ -1,0 +1,11 @@
+# YĒKORA · static site rules (FC 003, Amendment 1).
+# Spanish lives at the root and English under /en/: the URL alone decides the language,
+# so there is no redirect by cookie or by browser language.
+Options -Indexes
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+
+RewriteEngine On
+
+# Preventive: the earlier /es-MX/ prefix moved to the root.
+RewriteRule ^es-MX/?(.*)$ /$1 [R=301,L]

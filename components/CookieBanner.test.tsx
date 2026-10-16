@@ -36,12 +36,12 @@ describe('CookieBanner', () => {
       />
     );
     const banner = screen.getByRole('region', { name: 'Aviso de cookies' });
-    expect(banner.textContent).toContain('solo usa cookies técnicas');
+    expect(banner.textContent).toContain('solo usa una cookie técnica');
     expect(
       screen
         .getByRole('link', { name: 'Ver política de cookies' })
         .getAttribute('href')
-    ).toBe('/es-MX/cookies');
+    ).toBe('/cookies/');
 
     fireEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 

@@ -10,10 +10,6 @@ export const defaultLocale: Locale = 'es-MX';
 
 const dictionaries: Record<Locale, Messages> = { 'es-MX': esMX, en };
 
-export function isLocale(value: string | undefined): value is Locale {
-  return locales.includes(value as Locale);
-}
-
 export function getMessages(locale: Locale): Messages {
   return dictionaries[locale];
 }

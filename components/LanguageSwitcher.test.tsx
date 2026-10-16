@@ -11,7 +11,7 @@ afterEach(cleanup);
 
 describe('LanguageSwitcher', () => {
   it('links the same page in each language and marks the current one', () => {
-    pathname.current = '/es-MX/nosotros';
+    pathname.current = '/nosotros/';
     render(
       <LanguageSwitcher
         locale="es-MX"
@@ -20,10 +20,10 @@ describe('LanguageSwitcher', () => {
     );
     const english = screen.getByRole('link', { name: 'English' });
     const spanish = screen.getByRole('link', { name: 'Español' });
-    expect(english.getAttribute('href')).toBe('/en/nosotros');
+    expect(english.getAttribute('href')).toBe('/en/about/');
     expect(english.getAttribute('hreflang')).toBe('en');
     expect(english.getAttribute('aria-current')).toBeNull();
-    expect(spanish.getAttribute('href')).toBe('/es-MX/nosotros');
+    expect(spanish.getAttribute('href')).toBe('/nosotros/');
     expect(spanish.getAttribute('aria-current')).toBe('true');
     expect(screen.getByRole('navigation', { name: 'Idioma' })).toBeTruthy();
   });
@@ -38,7 +38,7 @@ describe('LanguageSwitcher', () => {
     );
     expect(
       screen.getByRole('link', { name: 'Español' }).getAttribute('href')
-    ).toBe('/es-MX');
+    ).toBe('/');
     expect(screen.getByRole('navigation', { name: 'Language' })).toBeTruthy();
   });
 });

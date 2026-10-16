@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
+import { routeFor } from '@/lib/routes';
 
 // Technical cookie, declared in /cookies. Only records that the notice was read.
 const CONSENT_COOKIE = 'yekora_cookie_consent';
@@ -46,8 +47,8 @@ export function CookieBanner({
         <p className="text-sm">
           {messages.text}{' '}
           <a
-            href={`/${locale}/cookies`}
-            className="underline underline-offset-4"
+            href={routeFor('cookies', locale)}
+            className="tap-target underline underline-offset-4"
           >
             {messages.policy}
           </a>
@@ -55,7 +56,7 @@ export function CookieBanner({
         <button
           type="button"
           onClick={accept}
-          className="self-start rounded-md bg-marfil px-4 py-2 text-sm font-semibold text-petroleo sm:self-auto"
+          className="min-h-11 self-start rounded-md bg-marfil px-4 py-2 text-sm font-semibold text-petroleo sm:self-auto"
         >
           {messages.accept}
         </button>

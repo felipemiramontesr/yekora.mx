@@ -6,13 +6,13 @@ export default defineConfig({
   // Same `@/*` alias as tsconfig.json paths.
   resolve: { alias: { '@': fileURLToPath(new URL('./', import.meta.url)) } },
   test: {
-    // Server Components and the middleware run in node; Client Component tests opt into
+    // Server Components run in node; Client Component tests opt into
     // jsdom per file with `// @vitest-environment jsdom`.
     environment: 'node',
     include: [
       'app/**/*.{test,spec}.{ts,tsx}',
       'components/**/*.{test,spec}.{ts,tsx}',
-      'middleware.test.ts',
+      'lib/**/*.{test,spec}.{ts,tsx}',
     ],
     // JUnit feeds the per-shard test report and the certification dashboard in CI.
     reporters: ['default', 'junit'],
@@ -23,12 +23,12 @@ export default defineConfig({
       include: [
         'app/**/*.{ts,tsx}',
         'components/**/*.{ts,tsx}',
-        'middleware.ts',
+        'lib/**/*.{ts,tsx}',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',
         'components/**/*.{test,spec}.{ts,tsx}',
-        'middleware.test.ts',
+        'lib/**/*.{test,spec}.{ts,tsx}',
       ],
       thresholds: {
         lines: 100,
