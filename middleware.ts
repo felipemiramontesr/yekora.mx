@@ -42,5 +42,6 @@ export function middleware(request: NextRequest): NextResponse {
 
 export const config = {
   // Pages only: skip Next internals, API routes and any path with a file extension.
-  matcher: ['/((?!_next|api|.*\\..*).*)'],
+  // `[.]` matches a literal dot without escaping (Next.js reads this value statically).
+  matcher: ['/((?!_next|api|.*[.].*).*)'],
 };
