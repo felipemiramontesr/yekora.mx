@@ -141,6 +141,60 @@ test('the mobile menu opens without client JavaScript', async ({
   await context.close();
 });
 
+test('the shipping and returns policy is one footer click away in both languages', async ({
+  page,
+}) => {
+  for (const [home, link, path, heading] of [
+    [
+      '/',
+      'Envíos y devoluciones',
+      /\/envios-y-devoluciones\/$/,
+      'Envíos y devoluciones',
+    ],
+    [
+      '/en/',
+      'Shipping and returns',
+      /\/en\/shipping-and-returns\/$/,
+      'Shipping and returns',
+    ],
+  ] as const) {
+    await page.goto(home);
+    await page
+      .getByRole('contentinfo')
+      .getByRole('link', { name: link })
+      .click();
+    await expect(page).toHaveURL(path);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+    await expect(page.locator('main')).toContainText('30');
+  }
+});
+
+// Ω's rule (FC 005, I-AntiPending): no page shows a placeholder or a draft notice.
+test('legal pages show the real controller and nothing pending', async ({
+  page,
+}) => {
+  for (const path of [
+    '/privacidad/',
+    '/terminos/',
+    '/cookies/',
+    '/envios-y-devoluciones/',
+    '/en/privacy/',
+    '/en/terms/',
+    '/en/cookies/',
+    '/en/shipping-and-returns/',
+  ]) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    const text = await page.locator('main').innerText();
+    expect(text).not.toMatch(
+      /Pendiente|Pending|revisión jurídica|legal review/
+    );
+  }
+  await page.goto('/privacidad/');
+  await expect(page.locator('main')).toContainText('Ana Karen Flores Baca');
+  await expect(page.locator('main')).toContainText('contacto@yekora.mx');
+});
+
 test('an unknown path is a branded 404 that leads back home in both languages', async ({
   page,
 }) => {

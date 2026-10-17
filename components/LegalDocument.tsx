@@ -1,13 +1,25 @@
 import type { ReactNode } from 'react';
 import type { Messages } from '@/app/i18n';
 
+/** Keys of `legal` that hold a full document (title + sections). */
+type LegalDocumentKey = 'privacy' | 'cookies' | 'terms' | 'shipping';
+
+/** Props of {@link LegalDocument}. */
 interface LegalDocumentProps {
+  /** The localized `legal` dictionary; supplies the "last updated" label and date. */
   legal: Messages['legal'];
-  document: Messages['legal']['privacy' | 'cookies' | 'terms'];
+  /** The document to render: privacy notice, cookie policy, terms or shipping and returns. */
+  document: Messages['legal'][LegalDocumentKey];
+  /** Extra content after the sections, e.g. the cookie table. */
   children?: ReactNode;
 }
 
-// Shared layout of the privacy notice, cookie policy and terms: same structure, different text.
+/**
+ * Shared layout of every legal page: title, last-updated date and the document's sections.
+ *
+ * Invariant (FC 005, I-AntiPending): the published texts are final. There is no draft notice
+ * and no placeholder; anything still pending lives in the local backlog (K), never on the site.
+ */
 export function LegalDocument({
   legal,
   document,
@@ -18,12 +30,6 @@ export function LegalDocument({
       <h1 className="text-4xl font-semibold">{document.title}</h1>
       <p className="mt-3 text-sm text-petroleo/80">
         {legal.updatedLabel}: {legal.updated}
-      </p>
-      <p
-        role="note"
-        className="mt-6 border-l-4 border-ocre bg-white/60 p-4 text-sm"
-      >
-        {legal.draftNotice}
       </p>
       {document.sections.map((section) => (
         <section key={section.title} className="mt-10">

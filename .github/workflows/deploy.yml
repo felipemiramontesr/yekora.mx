@@ -361,7 +361,8 @@ jobs:
             echo "FATAL: https://yekora.mx/version.txt does not serve $GITHUB_SHA"
             exit 1
           fi
-          for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico; do
+          for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico \
+            https://yekora.mx/envios-y-devoluciones/ https://yekora.mx/en/shipping-and-returns/; do
             STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
             echo "$url → $STATUS"
             if [ "$STATUS" != "200" ]; then exit 1; fi

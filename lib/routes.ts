@@ -14,6 +14,10 @@ const ROUTE_MAP = {
   privacy: { 'es-MX': '/privacidad/', en: '/en/privacy/' },
   cookies: { 'es-MX': '/cookies/', en: '/en/cookies/' },
   terms: { 'es-MX': '/terminos/', en: '/en/terms/' },
+  shipping: {
+    'es-MX': '/envios-y-devoluciones/',
+    en: '/en/shipping-and-returns/',
+  },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 export type Page = keyof typeof ROUTE_MAP;

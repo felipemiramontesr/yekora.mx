@@ -13,6 +13,9 @@ import About, { metadata as AboutMeta } from './nosotros/page';
 import Privacy, { metadata as PrivacyMeta } from './privacidad/page';
 import Cookies, { metadata as CookiesMeta } from './cookies/page';
 import Terms, { metadata as TermsMeta } from './terminos/page';
+import Shipping, {
+  metadata as ShippingMeta,
+} from './envios-y-devoluciones/page';
 
 describe('es-MX routes', () => {
   it('root layout declares lang="es-MX" and the site metadata', () => {
@@ -48,6 +51,14 @@ describe('es-MX routes', () => {
   it('terms is canonical at /terminos/', () => {
     expect(TermsMeta.alternates?.canonical).toBe('/terminos/');
     expect(renderToStaticMarkup(<Terms />)).toContain('<h1');
+  });
+
+  it('shipping and returns is canonical at /envios-y-devoluciones/', () => {
+    expect(ShippingMeta.alternates?.canonical).toBe('/envios-y-devoluciones/');
+    expect(ShippingMeta.alternates?.languages).toMatchObject({
+      en: '/en/shipping-and-returns/',
+    });
+    expect(renderToStaticMarkup(<Shipping />)).toContain('<h1');
   });
 
   it('home shows the brand promise', () => {

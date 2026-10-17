@@ -92,8 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Última actualización",
-    "updated": "15 de octubre de 2026",
-    "draftNotice": "Versión base en revisión jurídica. Los datos marcados como pendientes se completarán y el texto se validará antes de recabar cualquier dato personal de clientes.",
+    "updated": "17 de octubre de 2026",
     "privacy": {
       "metaTitle": "Aviso de privacidad | YĒKORA",
       "title": "Aviso de privacidad y manejo de datos personales",
@@ -101,7 +100,7 @@
         {
           "title": "Responsable del tratamiento",
           "paragraphs": [
-            "El responsable del tratamiento de tus datos personales es [Pendiente: nombre o razón social del responsable], con domicilio en [Pendiente: domicilio], conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares publicada en el Diario Oficial de la Federación el 20 de marzo de 2025."
+            "El responsable del tratamiento de tus datos personales es Ana Karen Flores Baca, con domicilio en Av. Barones 209, colonia Las Américas, C.P. 98612, Guadalupe, Zacatecas, México (teléfono 492 942 1780, correo contacto@yekora.mx), conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares publicada en el Diario Oficial de la Federación el 20 de marzo de 2025."
           ]
         },
         {
@@ -127,7 +126,7 @@
         {
           "title": "Derechos ARCO y revocación del consentimiento",
           "paragraphs": [
-            "Puedes ejercer tus derechos de Acceso, Rectificación, Cancelación y Oposición, revocar tu consentimiento o limitar el uso de tus datos enviando una solicitud a [Pendiente: correo de contacto de privacidad].",
+            "Puedes ejercer tus derechos de Acceso, Rectificación, Cancelación y Oposición, revocar tu consentimiento o limitar el uso de tus datos enviando una solicitud a contacto@yekora.mx.",
             "Tu solicitud debe incluir tu nombre, un medio para responderte, el documento que acredite tu identidad o la de tu representante, una descripción clara de los datos y del derecho que quieres ejercer. Te responderemos en los plazos que establece la ley."
           ]
         },
@@ -195,7 +194,7 @@
         {
           "title": "Objeto",
           "paragraphs": [
-            "Estos términos regulan el uso del sitio yekora.mx, operado por [Pendiente: nombre o razón social del responsable]. Al usar el sitio aceptas estos términos."
+            "Estos términos regulan el uso del sitio yekora.mx, operado por Ana Karen Flores Baca. Al usar el sitio aceptas estos términos."
           ]
         },
         {
@@ -231,7 +230,53 @@
         {
           "title": "Legislación aplicable",
           "paragraphs": [
-            "Estos términos se rigen por las leyes federales de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes de [Pendiente: ciudad y estado]."
+            "Estos términos se rigen por las leyes federales de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes de Guadalupe, Zacatecas, México."
+          ]
+        }
+      ]
+    },
+    "shipping": {
+      "metaTitle": "Envíos y devoluciones | YĒKORA",
+      "title": "Envíos y devoluciones",
+      "sections": [
+        {
+          "title": "Cobertura y tiempos de envío",
+          "paragraphs": [
+            "Enviamos a toda la República Mexicana por paquetería nacional.",
+            "El costo y el tiempo estimado de entrega se calculan y se te informan antes de que confirmes tu compra."
+          ]
+        },
+        {
+          "title": "Plazo para devolver",
+          "paragraphs": [
+            "Tienes 30 días naturales a partir de la entrega para devolver un producto.",
+            "Envíalo en las mismas condiciones en que lo recibiste, con sus accesorios y su empaque."
+          ]
+        },
+        {
+          "title": "Costo del envío de devolución",
+          "paragraphs": [
+            "Si el producto llegó dañado, defectuoso o no es el que pediste, YĒKORA cubre el envío de devolución y te enviamos la guía sin costo.",
+            "Si lo devuelves por cambio de opinión, de preferencia o de talla, el envío de devolución corre por tu cuenta."
+          ]
+        },
+        {
+          "title": "Reembolsos",
+          "paragraphs": [
+            "Te reembolsamos en un plazo de hasta 10 días hábiles a partir de que recibimos la devolución, por el mismo medio de pago que usaste."
+          ]
+        },
+        {
+          "title": "Garantías",
+          "paragraphs": [
+            "Los productos cuentan con la garantía oficial de su fabricante. YĒKORA te acompaña y gestiona el trámite sin costo adicional."
+          ]
+        },
+        {
+          "title": "Cómo iniciar una devolución o una reclamación",
+          "paragraphs": [
+            "Escríbenos a contacto@yekora.mx o llámanos al 492 942 1780 con tu número de pedido y el motivo. Te respondemos con los pasos a seguir.",
+            "Tus derechos como consumidor están protegidos por la Ley Federal de Protección al Consumidor. Puedes acudir a la Procuraduría Federal del Consumidor (PROFECO) para cualquier reclamación."
           ]
         }
       ]
@@ -309,7 +354,8 @@
     "privacy": "Aviso de privacidad",
     "cookies": "Política de cookies",
     "terms": "Términos y condiciones",
-    "rights": "Todos los derechos reservados."
+    "rights": "Todos los derechos reservados.",
+    "shipping": "Envíos y devoluciones"
   },
   "cookieBanner": {
     "label": "Aviso de cookies",

@@ -3,14 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { LegalView } from './LegalView';
 
 describe('LegalView', () => {
-  it('privacy notice: LFPDPPP 2025 sections, pending data flagged, no abrogated authority', () => {
+  it('privacy notice: LFPDPPP 2025 sections, the real controller, no abrogated authority', () => {
     const html = renderToStaticMarkup(
       <LegalView locale="es-MX" document="privacy" />
     );
     expect(html).toContain('Aviso de privacidad y manejo de datos personales');
     expect(html).toContain('20 de marzo de 2025');
     expect(html).toContain('Derechos ARCO');
-    expect(html).toContain('[Pendiente: correo de contacto de privacidad]');
+    expect(html).toContain('es Ana Karen Flores Baca, con domicilio en');
+    expect(html).toContain('C.P. 98612, Guadalupe, Zacatecas');
+    expect(html).toContain('enviando una solicitud a contacto@yekora.mx');
     expect(html).toContain('una sola cookie técnica');
     expect(html).not.toContain('INAI');
     expect(html).not.toContain('<table');
@@ -32,6 +34,10 @@ describe('LegalView', () => {
     );
     expect(spanish).toContain('moneda nacional (MXN)');
     expect(spanish).toContain('NMX-COE-001-SCFI-2018');
+    expect(spanish).toContain('operado por Ana Karen Flores Baca');
+    expect(spanish).toContain(
+      'tribunales competentes de Guadalupe, Zacatecas, México'
+    );
     const english = renderToStaticMarkup(
       <LegalView locale="en" document="terms" />
     );

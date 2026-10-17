@@ -13,6 +13,9 @@ import About, { metadata as AboutMeta } from './about/page';
 import Privacy, { metadata as PrivacyMeta } from './privacy/page';
 import Cookies, { metadata as CookiesMeta } from './cookies/page';
 import Terms, { metadata as TermsMeta } from './terms/page';
+import Shipping, {
+  metadata as ShippingMeta,
+} from './shipping-and-returns/page';
 
 describe('en routes', () => {
   it('root layout declares lang="en" and the site metadata', () => {
@@ -52,5 +55,13 @@ describe('en routes', () => {
 
   it('home shows the brand promise', () => {
     expect(renderToStaticMarkup(<Home />)).toContain('The right gear');
+  });
+
+  it('shipping and returns is canonical at /en/shipping-and-returns/', () => {
+    expect(ShippingMeta.alternates?.canonical).toBe(
+      '/en/shipping-and-returns/'
+    );
+    expect(ShippingMeta.title).toBe('Shipping and returns | YĒKORA');
+    expect(renderToStaticMarkup(<Shipping />)).toContain('<h1');
   });
 });

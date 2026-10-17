@@ -12,6 +12,7 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
     { href: routeFor('privacy', locale), label: footer.privacy },
     { href: routeFor('cookies', locale), label: footer.cookies },
     { href: routeFor('terms', locale), label: footer.terms },
+    { href: routeFor('shipping', locale), label: footer.shipping },
   ];
   return (
     <footer className="bg-petroleo text-marfil">

@@ -6,13 +6,13 @@ import { LegalDocument } from './LegalDocument';
 describe('LegalDocument', () => {
   const { legal } = getMessages('es-MX');
 
-  it('renders the title, update date, review notice and every section', () => {
+  it('renders the title, update date and every section, with no draft notice', () => {
     const html = renderToStaticMarkup(
       <LegalDocument legal={legal} document={legal.terms} />
     );
     expect(html).toContain('<h1');
-    expect(html).toContain('Última actualización: 15 de octubre de 2026');
-    expect(html).toContain('role="note"');
+    expect(html).toContain('Última actualización: 17 de octubre de 2026');
+    expect(html).not.toContain('role="note"');
     expect(html.match(/<h2/g)).toHaveLength(legal.terms.sections.length);
   });
 

@@ -92,8 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Last updated",
-    "updated": "October 15, 2026",
-    "draftNotice": "Base version under legal review. Items marked as pending will be completed and the text validated before any customer personal data is collected. The Spanish version governs.",
+    "updated": "October 17, 2026",
     "privacy": {
       "metaTitle": "Privacy notice | YĒKORA",
       "title": "Privacy notice and personal data handling",
@@ -101,7 +100,7 @@
         {
           "title": "Data controller",
           "paragraphs": [
-            "The controller of your personal data is [Pending: name or legal name of the controller], located at [Pending: address], under Mexico's Federal Law on Protection of Personal Data Held by Private Parties published in the Official Gazette on March 20, 2025."
+            "The controller of your personal data is Ana Karen Flores Baca, located at Av. Barones 209, Las Américas, 98612 Guadalupe, Zacatecas, Mexico (phone +52 492 942 1780, email contacto@yekora.mx), under Mexico's Federal Law on Protection of Personal Data Held by Private Parties published in the Official Gazette on March 20, 2025."
           ]
         },
         {
@@ -127,7 +126,7 @@
         {
           "title": "ARCO rights and withdrawal of consent",
           "paragraphs": [
-            "You can exercise your rights of Access, Rectification, Cancellation and Opposition, withdraw your consent or limit the use of your data by sending a request to [Pending: privacy contact email].",
+            "You can exercise your rights of Access, Rectification, Cancellation and Opposition, withdraw your consent or limit the use of your data by sending a request to contacto@yekora.mx.",
             "Your request must include your name, a way to reply to you, a document proving your identity or that of your representative, and a clear description of the data and the right you want to exercise. We will reply within the time limits set by law."
           ]
         },
@@ -195,7 +194,7 @@
         {
           "title": "Purpose",
           "paragraphs": [
-            "These terms govern the use of yekora.mx, operated by [Pending: name or legal name of the controller]. By using the site you accept these terms."
+            "These terms govern the use of yekora.mx, operated by Ana Karen Flores Baca. By using the site you accept these terms."
           ]
         },
         {
@@ -231,7 +230,53 @@
         {
           "title": "Governing law",
           "paragraphs": [
-            "These terms are governed by the federal laws of the United Mexican States. For their interpretation and enforcement, the parties submit to the competent courts of [Pending: city and state]."
+            "These terms are governed by the federal laws of the United Mexican States. For their interpretation and enforcement, the parties submit to the competent courts of Guadalupe, Zacatecas, Mexico."
+          ]
+        }
+      ]
+    },
+    "shipping": {
+      "metaTitle": "Shipping and returns | YĒKORA",
+      "title": "Shipping and returns",
+      "sections": [
+        {
+          "title": "Coverage and delivery times",
+          "paragraphs": [
+            "We ship anywhere in Mexico through national courier services.",
+            "The shipping cost and estimated delivery time are calculated and shown to you before you confirm your purchase."
+          ]
+        },
+        {
+          "title": "Return window",
+          "paragraphs": [
+            "You have 30 calendar days from delivery to return a product.",
+            "Send it back in the same condition you received it, with its accessories and packaging."
+          ]
+        },
+        {
+          "title": "Return shipping cost",
+          "paragraphs": [
+            "If the product arrived damaged, defective or is not the one you ordered, YĒKORA covers the return shipping and sends you a prepaid label.",
+            "If you return it because you changed your mind, your preference or your size, the return shipping is on you."
+          ]
+        },
+        {
+          "title": "Refunds",
+          "paragraphs": [
+            "We refund you within 10 business days after we receive the return, to the same payment method you used."
+          ]
+        },
+        {
+          "title": "Warranties",
+          "paragraphs": [
+            "Products carry their manufacturer's official warranty. YĒKORA guides you and handles the claim at no extra cost."
+          ]
+        },
+        {
+          "title": "How to start a return or a claim",
+          "paragraphs": [
+            "Write to contacto@yekora.mx or call +52 492 942 1780 with your order number and the reason. We will reply with the next steps.",
+            "Your rights as a consumer are protected by the Mexican Federal Consumer Protection Law. You can turn to PROFECO, the Federal Consumer Protection Agency, for any claim."
           ]
         }
       ]
@@ -309,7 +354,8 @@
     "privacy": "Privacy notice",
     "cookies": "Cookie policy",
     "terms": "Terms and conditions",
-    "rights": "All rights reserved."
+    "rights": "All rights reserved.",
+    "shipping": "Shipping and returns"
   },
   "cookieBanner": {
     "label": "Cookie notice",

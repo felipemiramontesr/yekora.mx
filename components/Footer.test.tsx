@@ -22,6 +22,18 @@ describe('Footer', () => {
     expect(html).toContain('Aviso de privacidad');
   });
 
+  it('links the shipping and returns policy in both languages', () => {
+    expect(html).toMatch(
+      /href="\/envios-y-devoluciones\/"[^>]*>Envíos y devoluciones<\/a>/
+    );
+    const english = renderToStaticMarkup(
+      <Footer locale="en" messages={getMessages('en')} />
+    );
+    expect(english).toMatch(
+      /href="\/en\/shipping-and-returns\/"[^>]*>Shipping and returns<\/a>/
+    );
+  });
+
   it('anchors disciplines and credits Mexican makers without naming brands', () => {
     expect(html).toContain('href="/#trail-running"');
     expect(html).toContain('Impulsamos a marcas y fabricantes mexicanos');

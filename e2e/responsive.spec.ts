@@ -26,6 +26,9 @@ const PAGES = [
   '/en/privacy/',
   '/en/cookies/',
   '/en/terms/',
+  // Shipping and returns policy (FC 005).
+  '/envios-y-devoluciones/',
+  '/en/shipping-and-returns/',
   // Branded 404 (FC 004): any unknown path.
   '/no-existe/',
 ];
