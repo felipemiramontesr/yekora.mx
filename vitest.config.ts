@@ -13,6 +13,8 @@ export default defineConfig({
       'app/**/*.{test,spec}.{ts,tsx}',
       'components/**/*.{test,spec}.{ts,tsx}',
       'lib/**/*.{test,spec}.{ts,tsx}',
+      // CI gate rules (scripts/lib) are tested too, but stay out of product coverage below.
+      'scripts/**/*.{test,spec}.ts',
     ],
     // JUnit feeds the per-shard test report and the certification dashboard in CI.
     reporters: ['default', 'junit'],

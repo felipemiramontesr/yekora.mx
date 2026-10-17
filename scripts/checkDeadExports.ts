@@ -3,40 +3,24 @@
  * Scans named exports in app/, components/ and lib/ and fails when one is not referenced
  * by any other non-test source file.
  * Whitelist: App Router convention files (page, layout, route, …) are wired by the framework,
- * not by imports, and so are the route segment exports listed in FRAMEWORK_EXPORTS.
+ * not by imports, and so are the route segment exports listed in FRAMEWORK_EXPORTS. Both lists\n * live in scripts/lib/sourceFiles.ts, shared with the TSDoc gate (FC 006).
  * FC 003 F2: also fails when a file in public/ is not referenced by its URL path from any
  * non-test source file, since everything in public/ is published to yekora.mx. Server
  * configuration files (SERVER_FILES) are read by Apache, not by the site.
  * CLI: `bun scripts/checkDeadExports.ts` — exit 0 = no dead exports · exit 1 = orphans found.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, extname, join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
+import {
+  FRAMEWORK_EXPORTS,
+  isAppRouterFile,
+  productSourceFiles,
+  walk,
+} from './lib/sourceFiles';
 
 const root = process.cwd();
-const SOURCE_DIRS = ['app', 'components', 'lib'];
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const PUBLIC_DIR = 'public';
 const SERVER_FILES = new Set(['.htaccess']);
-const APP_ROUTER_FILES = new Set([
-  'page',
-  'layout',
-  'template',
-  'not-found',
-  'error',
-  'global-error',
-  'loading',
-  'default',
-  'route',
-]);
-const FRAMEWORK_EXPORTS = new Set([
-  'metadata',
-  'generateMetadata',
-  'generateStaticParams',
-  'viewport',
-  'generateViewport',
-  // Route segment config read by Next.js (e.g. app/[locale]: 404 for unsupported locales).
-  'dynamicParams',
-]);
 
 const MODIFIERS = new Set(['declare', 'async']);
 const DECLARATION_KEYWORDS = new Set([
@@ -50,18 +34,6 @@ const DECLARATION_KEYWORDS = new Set([
   'interface',
   'enum',
 ]);
-
-function isTestFile(path: string): boolean {
-  return /\.(test|spec)\.tsx?$/.test(path) || path.endsWith('.d.ts');
-}
-
-function walk(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap((entry) => {
-    const fullPath = join(dir, entry);
-    return statSync(fullPath).isDirectory() ? walk(fullPath) : [fullPath];
-  });
-}
 
 // Token walk instead of one big regex: `export [declare] [async] <keyword> <name>`.
 function declaredExport(line: string): string | undefined {
@@ -96,18 +68,14 @@ function namedExports(source: string): string[] {
   return [...new Set([...declared, ...listedExports(source)])];
 }
 
-const files = SOURCE_DIRS.flatMap((dir) => walk(join(root, dir))).filter(
-  (f) => SOURCE_EXTENSIONS.has(extname(f)) && !isTestFile(f)
-);
+const files = productSourceFiles(root);
 const contents = new Map(
   files.map((file) => [file, readFileSync(file, 'utf8')])
 );
 const orphans: string[] = [];
 
 for (const [file, source] of contents) {
-  const stem = basename(file, extname(file));
-  if (relative(root, file).startsWith('app') && APP_ROUTER_FILES.has(stem))
-    continue;
+  if (isAppRouterFile(root, file)) continue;
   for (const name of namedExports(source)) {
     if (FRAMEWORK_EXPORTS.has(name)) continue;
     const usage = new RegExp(`\\b${name.replaceAll('$', '\\$')}\\b`);

@@ -1,12 +1,18 @@
 import { getMessages, type Locale } from '@/app/i18n';
 import { LegalDocument } from '../LegalDocument';
 
+/** Props of {@link LegalView}. */
 interface LegalViewProps {
+  /** Language of the page; picks the dictionary. */
   locale: Locale;
+  /** Which legal document to render. */
   document: 'privacy' | 'cookies' | 'terms';
 }
 
-// Privacy notice, cookie policy and terms. The cookie policy also lists the cookies the site sets.
+/**
+ * Privacy notice, cookie policy or terms, shared by the Spanish and English routes.
+ * The cookie policy also renders the table of cookies the site sets (exactly one, FC 003).
+ */
 export function LegalView({ locale, document }: Readonly<LegalViewProps>) {
   const { legal } = getMessages(locale);
   if (document !== 'cookies') {

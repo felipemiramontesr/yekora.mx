@@ -8,8 +8,11 @@ import { routeFor } from '@/lib/routes';
 const CONSENT_COOKIE = 'yekora_cookie_consent';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
+/** Props of {@link CookieBanner}. */
 interface CookieBannerProps {
+  /** Language of the page; picks the cookie policy link. */
   locale: Locale;
+  /** Localized notice text, link label and button label. */
   messages: Messages['cookieBanner'];
 }
 
@@ -19,6 +22,13 @@ function hasConsent(): boolean {
     .some((entry) => entry.startsWith(`${CONSENT_COOKIE}=`));
 }
 
+/**
+ * Cookie notice (LFPDPPP transparency). The site sets a single technical cookie, the one that
+ * records this notice was read, so there is nothing to opt into: the button only dismisses.
+ *
+ * Hidden in the static HTML and shown after hydration only when the cookie is missing, so a
+ * returning visitor never sees it flash. The cookie lasts one year, SameSite=Lax, Secure on HTTPS.
+ */
 export function CookieBanner({
   locale,
   messages,

@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:tsdoc": "bun scripts/checkTsDocCoverage.ts",
     "test": "vitest run --coverage",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

@@ -1,3 +1,11 @@
+/**
+ * Route map and page metadata of the static site (FC 003, ADR 0002).
+ *
+ * Spanish lives at the root and English under /en/ with translated slugs. Every route ends in
+ * `/`: the static export writes each page as a folder with index.html, which Apache serves as is.
+ *
+ * @module
+ */
 import type { Metadata } from 'next';
 import {
   defaultLocale,
@@ -6,8 +14,6 @@ import {
   type Messages,
 } from '@/app/i18n';
 
-// Spanish lives at the root, English under /en/ with translated slugs (FC 003, Amendment 1).
-// Every route ends in `/`: the static export writes each page as a folder with index.html.
 const ROUTE_MAP = {
   home: { 'es-MX': '/', en: '/en/' },
   about: { 'es-MX': '/nosotros/', en: '/en/about/' },
@@ -20,13 +26,27 @@ const ROUTE_MAP = {
   },
 } as const satisfies Record<string, Record<Locale, string>>;
 
+/** A page that exists in every language (key of the route map). */
 export type Page = keyof typeof ROUTE_MAP;
 
+/**
+ * URL path of a page in a language.
+ *
+ * @param page - Which page.
+ * @param locale - Which language.
+ * @returns Absolute path with trailing slash, e.g. `/en/about/`.
+ */
 export function routeFor(page: Page, locale: Locale): string {
   return ROUTE_MAP[page][locale];
 }
 
-// Which page a path belongs to, in either language, so the switcher can open its translation.
+/**
+ * Which page a path belongs to, in either language, so the language switcher can open the
+ * same page translated. Accepts paths with or without the final slash.
+ *
+ * @param pathname - Current URL path.
+ * @returns The matching page, or `home` for an unknown path.
+ */
 export function pageFromPath(pathname: string): Page {
   const path = pathname.endsWith('/') ? pathname : `${pathname}/`;
   const match = (Object.keys(ROUTE_MAP) as Page[]).find((page) =>
@@ -41,7 +61,11 @@ function pageTitle(messages: Messages, page: Page): string {
   return messages.legal[page].metaTitle;
 }
 
-// Site-wide metadata of a root layout: base URL for absolute links, default title and description.
+/**
+ * Site-wide metadata of a root layout: base URL for absolute links, default title and description.
+ *
+ * @param locale - Language of the layout.
+ */
 export function siteMetadata(locale: Locale): Metadata {
   const { meta } = getMessages(locale);
   return {
@@ -51,7 +75,13 @@ export function siteMetadata(locale: Locale): Metadata {
   };
 }
 
-// A page's metadata: localized title, canonical in its own language and the hreflang pair.
+/**
+ * A page's metadata: localized title, canonical in its own language and the hreflang set,
+ * with Spanish as `x-default`.
+ *
+ * @param page - Which page.
+ * @param locale - Language of this copy of the page.
+ */
 export function pageMetadata(page: Page, locale: Locale): Metadata {
   return {
     title: pageTitle(getMessages(locale), page),

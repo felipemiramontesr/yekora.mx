@@ -1,11 +1,18 @@
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 
+/** Props of {@link Footer}. */
 interface FooterProps {
+  /** Language of the page; picks the localized links. */
   locale: Locale;
+  /** Full dictionary of that language. */
   messages: Messages;
 }
 
+/**
+ * Site footer: brand lockup and promise, discipline anchors, About, and the legal pages
+ * (privacy, cookies, terms, shipping and returns) in the current language.
+ */
 export function Footer({ locale, messages }: Readonly<FooterProps>) {
   const { footer } = messages;
   const legal = [

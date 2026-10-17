@@ -14,12 +14,19 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+/** Props of {@link SiteShell}. */
 interface SiteShellProps {
+  /** Document language: sets `<html lang>` and the dictionary of header, footer and notice. */
   locale: Locale;
+  /** Page content, rendered inside `<main>`. */
   children: ReactNode;
 }
 
-// The document shared by both root layouts (app/(es) and app/(en)/en); only the language differs.
+/**
+ * The HTML document shared by both root layouts (`app/(es)` and `app/(en)/en`) and by the
+ * branded 404: fonts, global styles, header, main, footer and cookie notice. Only the language
+ * differs, which is why the layouts are one line each (ADR 0004).
+ */
 export function SiteShell({ locale, children }: Readonly<SiteShellProps>) {
   const messages = getMessages(locale);
   return (

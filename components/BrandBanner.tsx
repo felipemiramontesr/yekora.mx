@@ -1,11 +1,18 @@
 import type { Messages } from '@/app/i18n';
 
+/** Props of {@link BrandBanner}. */
 interface BrandBannerProps {
+  /** Localized title, lede and the three pillars. */
   messages: Messages['brandBanner'];
 }
 
+/** The brand's three ideas from the client's positioning, in display order. */
 const PILLARS = ['seleccion', 'confianza', 'accesibilidad'] as const;
 
+/**
+ * Brand philosophy band on the home page: selection, trust and accessibility, the three ideas
+ * of the client's positioning. Anchored as `#filosofia`.
+ */
 export function BrandBanner({ messages }: Readonly<BrandBannerProps>) {
   return (
     <section id="filosofia" className="scroll-mt-24 bg-petroleo text-marfil">

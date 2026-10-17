@@ -57,6 +57,9 @@ jobs:
           ERRORS=$(grep -c "error TS" tsc-output.txt || true)
           echo "{\"errors\": ${ERRORS:-0}, \"warnings\": 0}" > tsc-result.json
           exit $TSC_EXIT
+      - name: TSDoc Coverage (blocking — every exported declaration documented)
+        if: matrix.shard == 1
+        run: bun run check:tsdoc
       - name: Upload TSC Result
         if: matrix.shard == 1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

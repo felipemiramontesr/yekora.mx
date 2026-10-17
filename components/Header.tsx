@@ -3,8 +3,11 @@ import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
+/** Props of {@link Header}. */
 interface HeaderProps {
+  /** Language of the page; picks the localized links. */
   locale: Locale;
+  /** Full dictionary of that language. */
   messages: Messages;
 }
 
@@ -43,6 +46,11 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
   );
 }
 
+/**
+ * Site header: brand lockup linking home, the discipline anchors, About, the catalog placeholder
+ * and the language switcher. From xl (1280 px) a single bar; below, a menu built on native
+ * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
+ */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <header className="sticky top-0 z-40 bg-petroleo text-marfil">
