@@ -1,5 +1,19 @@
+import { Award, ShieldCheck, Sparkles, Trees, Users } from 'lucide-react';
 import { getMessages, type Locale } from '@/app/i18n';
 
+/**
+ * Icon of each brand value, in the order of `about.values` in both dictionaries:
+ * accessibility, trust, love of nature, support for Mexican brands, learning and community.
+ * AboutView.test.tsx fails if a dictionary adds or removes a value without updating this list.
+ */
+const VALUE_ICONS = [ShieldCheck, Award, Trees, Sparkles, Users] as const;
+
+/**
+ * "About us" page body, shared by `/nosotros/` and `/en/about/`: who YĒKORA is, purpose,
+ * mission, vision, the five brand values, the promise and the brand personality.
+ *
+ * @param locale - Language of the page; picks the dictionary.
+ */
 export function AboutView({ locale }: Readonly<{ locale: Locale }>) {
   const { about } = getMessages(locale);
   return (
@@ -21,12 +35,18 @@ export function AboutView({ locale }: Readonly<{ locale: Locale }>) {
       <section className="mt-12">
         <h2 className="text-2xl font-semibold">{about.valuesTitle}</h2>
         <dl className="mt-6 grid gap-6 sm:grid-cols-2">
-          {about.values.map((value) => (
-            <div key={value.title} className="border-t-2 border-ocre pt-3">
-              <dt className="font-semibold">{value.title}</dt>
-              <dd className="mt-2 text-petroleo/80">{value.text}</dd>
-            </div>
-          ))}
+          {about.values.map((value, index) => {
+            const Icon = VALUE_ICONS[index];
+            return (
+              <div key={value.title} className="border-t-2 border-ocre pt-3">
+                <dt className="flex items-center gap-3 font-semibold">
+                  <Icon aria-hidden="true" size={22} className="shrink-0" />
+                  {value.title}
+                </dt>
+                <dd className="mt-2 text-petroleo/80">{value.text}</dd>
+              </div>
+            );
+          })}
         </dl>
       </section>
 

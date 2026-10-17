@@ -20,7 +20,7 @@ test('an unknown path answers 404 with the exported 404 page', async ({
 }) => {
   const response = await request.get('/no-existe/', { maxRedirects: 0 });
   expect(response.status()).toBe(404);
-  expect(await response.text()).toContain('This page could not be found');
+  expect(await response.text()).toContain('Ruta no encontrada');
 });
 
 test('folders without an index are never listed', async ({ request }) => {

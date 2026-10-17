@@ -26,6 +26,8 @@ const PAGES = [
   '/en/privacy/',
   '/en/cookies/',
   '/en/terms/',
+  // Branded 404 (FC 004): any unknown path.
+  '/no-existe/',
 ];
 
 // Subpixel rounding of the scrollbar, the same tolerance Archon documents.

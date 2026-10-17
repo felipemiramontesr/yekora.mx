@@ -28,6 +28,19 @@ describe('LanguageSwitcher', () => {
     expect(screen.getByRole('navigation', { name: 'Idioma' })).toBeTruthy();
   });
 
+  it('shows a decorative globe that adds nothing to the link names', () => {
+    pathname.current = '/';
+    const { container } = render(
+      <LanguageSwitcher
+        locale="en"
+        messages={getMessages('en').languageSwitcher}
+      />
+    );
+    const globe = container.querySelector('svg.lucide-globe');
+    expect(globe?.getAttribute('aria-hidden')).toBe('true');
+    expect(globe?.closest('a')).toBeNull();
+  });
+
   it('falls back to the locale root when the path is unknown', () => {
     pathname.current = null;
     render(

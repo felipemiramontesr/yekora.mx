@@ -1,14 +1,22 @@
 'use client';
 
+import { Globe } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { locales, type Locale, type Messages } from '@/app/i18n';
 import { pageFromPath, routeFor } from '@/lib/routes';
 
+/** Props of {@link LanguageSwitcher}. */
 interface LanguageSwitcherProps {
+  /** Language of the current page; its link is marked with `aria-current`. */
   locale: Locale;
+  /** Localized navigation label and language names. */
   messages: Messages['languageSwitcher'];
 }
 
+/**
+ * Links to the current page in every language. The globe icon is decorative: each link is
+ * named by its language written in that language ("Español", "English").
+ */
 export function LanguageSwitcher({
   locale,
   messages,
@@ -20,6 +28,7 @@ export function LanguageSwitcher({
       aria-label={messages.label}
       className="flex items-center gap-2 text-sm"
     >
+      <Globe aria-hidden="true" size={18} className="shrink-0 opacity-80" />
       {locales.map((target) => (
         <a
           key={target}

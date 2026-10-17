@@ -20,4 +20,19 @@ describe('ActivityCard', () => {
     expect(html).toContain('Todos los niveles, con formación');
     expect(html).toContain('para qué no');
   });
+
+  it('shows the discipline pictogram as decoration before the heading', () => {
+    const { activities, disciplines } = getMessages('en');
+    const html = renderToStaticMarkup(
+      <ActivityCard
+        discipline="canonismo"
+        name={disciplines.canonismo}
+        levelLabel={activities.levelLabel}
+        activity={activities.items.canonismo}
+      />
+    );
+    expect(html).toMatch(
+      /<svg[^>]*aria-hidden="true"[^>]*data-discipline="canonismo".*<h3/
+    );
+  });
 });

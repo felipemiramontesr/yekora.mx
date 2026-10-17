@@ -141,7 +141,62 @@ test('the mobile menu opens without client JavaScript', async ({
   await context.close();
 });
 
-test('an unknown path is a 404', async ({ page }) => {
+test('an unknown path is a branded 404 that leads back home in both languages', async ({
+  page,
+}) => {
   const response = await page.goto('/no-existe/');
   expect(response?.status()).toBe(404);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Ruta no encontrada'
+  );
+  await expect(
+    page.getByRole('link', { name: 'Volver al sendero principal' })
+  ).toHaveAttribute('href', '/');
+  await expect(
+    page.getByRole('link', { name: 'Back to the home trail' })
+  ).toHaveAttribute('href', '/en/');
 });
+
+test('the tab shows the YĒKORA favicon', async ({ page, request }) => {
+  await page.goto('/');
+  const svgIcon = await page
+    .locator('link[rel="icon"][type="image/svg+xml"]')
+    .getAttribute('href');
+  expect(svgIcon).toMatch(/^\/icon\.svg/);
+  const svg = await request.get(svgIcon ?? '');
+  expect(svg.status()).toBe(200);
+  expect(await svg.text()).toContain('#213C41');
+  const ico = await request.get('/favicon.ico');
+  expect(ico.status()).toBe(200);
+  // ICO header: reserved 0, type 1 (icon).
+  expect([...(await ico.body()).subarray(0, 4)]).toEqual([0, 0, 1, 0]);
+});
+
+// FC 004 · T1.1 Named(Tx, Al) ⟺ Tx ∨ Al and T1.2 Dec(D, H) ⟺ ¬D ∨ H, on every icon-bearing page.
+for (const path of ['/', '/en/', '/nosotros/', '/no-existe/']) {
+  test(`${path}: every icon is hidden decoration and every control has a name`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    const icons = page.locator('main svg, header svg, footer svg');
+    expect(await icons.count()).toBeGreaterThan(0);
+    for (const hidden of await icons.evaluateAll((svgs) =>
+      svgs.map((svg) => svg.getAttribute('aria-hidden'))
+    )) {
+      expect(hidden).toBe('true');
+    }
+    const unnamed = await page
+      .locator('a[href], button, summary')
+      .evaluateAll((controls) =>
+        controls
+          .filter(
+            (control) =>
+              !control.textContent?.trim() &&
+              !control.getAttribute('aria-label')?.trim()
+          )
+          .map((control) => control.outerHTML.slice(0, 80))
+      );
+    expect(unnamed).toEqual([]);
+  });
+}

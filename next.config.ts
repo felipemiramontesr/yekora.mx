@@ -6,5 +6,8 @@ const nextConfig: NextConfig = {
   output: 'export',
   trailingSlash: true,
   images: { unoptimized: true },
+  // FC 004: with two root layouts no layout can wrap a 404, so app/global-not-found.tsx renders
+  // its own document and the export writes it to out/404.html.
+  experimental: { globalNotFound: true },
 };
 export default nextConfig;

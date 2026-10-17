@@ -11,6 +11,18 @@ describe('HomeView', () => {
     expect(html).toContain('href="/nosotros/"');
   });
 
+  it('draws the hero backdrop and button icons as hidden decoration', () => {
+    const html = renderToStaticMarkup(<HomeView locale="es-MX" />);
+    const hero =
+      /<section data-hero="true"[\s\S]*?<\/section>/.exec(html)?.[0] ?? '';
+    // Backdrop drawing, overlay and both button icons are all decorative.
+    expect(hero.match(/aria-hidden="true"/g)).toHaveLength(4);
+    expect(hero).toContain('from-petroleo/95');
+    expect(hero).toContain('to-petroleo/80');
+    expect(hero).toContain('lucide-compass');
+    expect(hero).toContain('lucide-arrow-right');
+  });
+
   it('lists the five disciplines as anchor targets', () => {
     const html = renderToStaticMarkup(<HomeView locale="es-MX" />);
     for (const id of [

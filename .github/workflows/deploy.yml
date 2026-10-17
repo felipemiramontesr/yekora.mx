@@ -361,12 +361,16 @@ jobs:
             echo "FATAL: https://yekora.mx/version.txt does not serve $GITHUB_SHA"
             exit 1
           fi
-          for url in https://yekora.mx/ https://yekora.mx/en/; do
+          for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico; do
             STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
             echo "$url → $STATUS"
             if [ "$STATUS" != "200" ]; then exit 1; fi
           done
-          echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English."
+          # An unknown path must answer 404 with the branded page, never 200 (FC 004).
+          NOT_FOUND=$(curl -sS -o /tmp/404.html -w '%{http_code}' "https://yekora.mx/ruta-inexistente-$GITHUB_SHA/")
+          echo "unknown path → $NOT_FOUND"
+          if [ "$NOT_FOUND" != "404" ] || ! grep -q 'Ruta no encontrada' /tmp/404.html; then exit 1; fi
+          echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English, its favicon and the branded 404."
 
       - name: Remove the SSH key from the runner
         if: always()

@@ -323,5 +323,12 @@
       "es-MX": "Español",
       "en": "English"
     }
+  },
+  "notFound": {
+    "metaTitle": "Página no encontrada | YĒKORA",
+    "eyebrow": "Error 404",
+    "title": "Ruta no encontrada",
+    "lede": "Has salido del sendero. La página que buscas no existe o cambió de lugar.",
+    "back": "Volver al sendero principal"
   }
 }
