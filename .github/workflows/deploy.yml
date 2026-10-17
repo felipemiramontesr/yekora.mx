@@ -306,8 +306,16 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build static export (out/)
         run: bun run build
-      - name: Stamp the build with its commit (out/version.txt)
-        run: printf '%s\n' "$GITHUB_SHA" > out/version.txt
+      - name: Stamp the build with its commit (out/version.txt, out/sw.js)
+        # FC 007: the service worker only updates in browsers when its bytes change, so the
+        # commit SHA replaces the __BUILD_SHA__ marker; its cache name changes on every deploy.
+        run: |
+          printf '%s\n' "$GITHUB_SHA" > out/version.txt
+          sed -i "s/__BUILD_SHA__/$GITHUB_SHA/g" out/sw.js
+          if grep -q '__BUILD_SHA__' out/sw.js || ! grep -q "$GITHUB_SHA" out/sw.js; then
+            echo "FATAL: out/sw.js was not stamped with $GITHUB_SHA"
+            exit 1
+          fi
 
       - name: 🔑 Setup SSH key and pinned host key
         # known_hosts comes only from the secret, never from scanning the host. A host key that does
@@ -365,11 +373,18 @@ jobs:
             exit 1
           fi
           for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico \
-            https://yekora.mx/envios-y-devoluciones/ https://yekora.mx/en/shipping-and-returns/; do
+            https://yekora.mx/envios-y-devoluciones/ https://yekora.mx/en/shipping-and-returns/ \
+            https://yekora.mx/manifest.webmanifest https://yekora.mx/offline/ https://yekora.mx/en/offline/; do
             STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
             echo "$url → $STATUS"
             if [ "$STATUS" != "200" ]; then exit 1; fi
           done
+          # FC 007 G1: production must serve the stamped service worker, never the bare marker.
+          curl -fsS "https://yekora.mx/sw.js?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' -o /tmp/sw.js
+          if grep -q '__BUILD_SHA__' /tmp/sw.js || ! grep -q "$GITHUB_SHA" /tmp/sw.js; then
+            echo "FATAL: https://yekora.mx/sw.js does not carry $GITHUB_SHA"
+            exit 1
+          fi
           # An unknown path must answer 404 with the branded page, never 200 (FC 004).
           NOT_FOUND=$(curl -sS -o /tmp/404.html -w '%{http_code}' "https://yekora.mx/ruta-inexistente-$GITHUB_SHA/")
           echo "unknown path → $NOT_FOUND"

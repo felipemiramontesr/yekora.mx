@@ -9,3 +9,12 @@ RewriteEngine On
 
 # Preventive: the earlier /es-MX/ prefix moved to the root.
 RewriteRule ^es-MX/?(.*)$ /$1 [R=301,L]
+
+# PWA (FC 007): the manifest needs its own MIME type, and the service worker and manifest must
+# never be cached by HTTP, so a new deploy (new SHA inside sw.js) reaches browsers right away.
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+  <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>

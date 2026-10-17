@@ -133,7 +133,8 @@
         {
           "title": "Cookies",
           "paragraphs": [
-            "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies."
+            "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies.",
+            "También guardamos en tu navegador una copia técnica de los archivos del sitio (Cache Storage) para que funcione sin conexión. No contiene datos personales."
           ]
         },
         {
@@ -158,6 +159,13 @@
           "title": "Cookies que usamos",
           "paragraphs": [
             "Solo usamos cookies técnicas propias, necesarias para que el sitio funcione como esperas. No usamos cookies de analítica, de publicidad ni de terceros."
+          ]
+        },
+        {
+          "title": "Almacenamiento local para uso sin conexión",
+          "paragraphs": [
+            "Además de la cookie técnica, el sitio guarda en tu navegador una copia de sus archivos (Cache Storage, mediante un service worker) para cargar más rápido y mostrarte las páginas que ya visitaste cuando no tienes conexión.",
+            "Esa copia no contiene datos personales ni sirve para rastrearte, y se renueva automáticamente con cada versión del sitio. Puedes borrarla desde la configuración de tu navegador, en los datos del sitio."
           ]
         },
         {
@@ -376,5 +384,12 @@
     "title": "Ruta no encontrada",
     "lede": "Has salido del sendero. La página que buscas no existe o cambió de lugar.",
     "back": "Volver al sendero principal"
+  },
+  "offline": {
+    "metaTitle": "Sin conexión | YĒKORA",
+    "eyebrow": "Sin conexión",
+    "title": "Estás fuera de cobertura",
+    "lede": "No pudimos cargar esta página porque tu dispositivo no tiene conexión a internet. Las páginas que ya visitaste siguen disponibles.",
+    "retry": "Reintentar"
   }
 }

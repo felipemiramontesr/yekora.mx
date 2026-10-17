@@ -29,6 +29,9 @@ const PAGES = [
   // Shipping and returns policy (FC 005).
   '/envios-y-devoluciones/',
   '/en/shipping-and-returns/',
+  // Offline fallback pages (FC 007).
+  '/offline/',
+  '/en/offline/',
   // Branded 404 (FC 004): any unknown path.
   '/no-existe/',
 ];

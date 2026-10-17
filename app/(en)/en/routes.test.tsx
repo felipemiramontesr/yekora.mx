@@ -16,6 +16,7 @@ import Terms, { metadata as TermsMeta } from './terms/page';
 import Shipping, {
   metadata as ShippingMeta,
 } from './shipping-and-returns/page';
+import Offline, { metadata as OfflineMeta } from './offline/page';
 
 describe('en routes', () => {
   it('root layout declares lang="en" and the site metadata', () => {
@@ -63,5 +64,11 @@ describe('en routes', () => {
     );
     expect(ShippingMeta.title).toBe('Shipping and returns | YĒKORA');
     expect(renderToStaticMarkup(<Shipping />)).toContain('<h1');
+  });
+
+  it('offline is canonical at /en/offline/ and never indexed', () => {
+    expect(OfflineMeta.alternates?.canonical).toBe('/en/offline/');
+    expect(OfflineMeta.robots).toEqual({ index: false, follow: false });
+    expect(renderToStaticMarkup(<Offline />)).toContain('<h1');
   });
 });

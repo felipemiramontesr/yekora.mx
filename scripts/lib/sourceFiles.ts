@@ -29,6 +29,8 @@ export const APP_ROUTER_FILES = new Set([
   'loading',
   'default',
   'route',
+  // Metadata file conventions (FC 007): manifest.ts becomes /manifest.webmanifest.
+  'manifest',
 ]);
 
 /** Named exports that Next.js reads from route files (metadata and segment config). */
@@ -39,6 +41,8 @@ export const FRAMEWORK_EXPORTS = new Set([
   'viewport',
   'generateViewport',
   'dynamicParams',
+  // Route segment config; the static export requires 'force-static' on metadata routes.
+  'dynamic',
 ]);
 
 /** Tests and declaration files are never product API. */

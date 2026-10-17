@@ -133,7 +133,8 @@
         {
           "title": "Cookies",
           "paragraphs": [
-            "The site only uses first-party technical cookies. We use no third-party, advertising or analytics cookies. Details are in the Cookie policy."
+            "The site only uses first-party technical cookies. We use no third-party, advertising or analytics cookies. Details are in the Cookie policy.",
+            "We also keep a technical copy of the site files in your browser (Cache Storage) so it works offline. It holds no personal data."
           ]
         },
         {
@@ -158,6 +159,13 @@
           "title": "Cookies we use",
           "paragraphs": [
             "We only use first-party technical cookies, needed for the site to work as you expect. We use no analytics, advertising or third-party cookies."
+          ]
+        },
+        {
+          "title": "Local storage for offline use",
+          "paragraphs": [
+            "Besides the technical cookie, the site keeps a copy of its files in your browser (Cache Storage, through a service worker) so it loads faster and shows the pages you already visited when you are offline.",
+            "That copy holds no personal data, is not used to track you, and is renewed automatically with each version of the site. You can delete it from your browser settings, under site data."
           ]
         },
         {
@@ -376,5 +384,12 @@
     "title": "Trail not found",
     "lede": "You have left the trail. The page you are looking for does not exist or has moved.",
     "back": "Back to the home trail"
+  },
+  "offline": {
+    "metaTitle": "Offline | YĒKORA",
+    "eyebrow": "Offline",
+    "title": "You are out of coverage",
+    "lede": "We could not load this page because your device has no internet connection. The pages you already visited are still available.",
+    "retry": "Try again"
   }
 }

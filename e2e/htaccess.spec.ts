@@ -23,6 +23,23 @@ test('an unknown path answers 404 with the exported 404 page', async ({
   expect(await response.text()).toContain('Ruta no encontrada');
 });
 
+// FC 007: the service worker and manifest bypass HTTP caching; the manifest has its MIME type.
+test('the service worker and manifest are never cached by HTTP', async ({
+  request,
+}) => {
+  for (const path of ['/sw.js', '/manifest.webmanifest']) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['cache-control']).toBe(
+      'no-cache, no-store, must-revalidate'
+    );
+  }
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.headers()['content-type']).toContain(
+    'application/manifest+json'
+  );
+});
+
 test('folders without an index are never listed', async ({ request }) => {
   const response = await request.get('/brand/', { maxRedirects: 0 });
   expect(response.status()).toBe(403);

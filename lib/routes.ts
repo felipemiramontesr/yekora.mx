@@ -24,6 +24,8 @@ const ROUTE_MAP = {
     'es-MX': '/envios-y-devoluciones/',
     en: '/en/shipping-and-returns/',
   },
+  // Offline fallback served by the service worker (FC 007); noindex, never linked.
+  offline: { 'es-MX': '/offline/', en: '/en/offline/' },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 /** A page that exists in every language (key of the route map). */
@@ -58,6 +60,7 @@ export function pageFromPath(pathname: string): Page {
 function pageTitle(messages: Messages, page: Page): string {
   if (page === 'home') return messages.meta.title;
   if (page === 'about') return messages.about.metaTitle;
+  if (page === 'offline') return messages.offline.metaTitle;
   return messages.legal[page].metaTitle;
 }
 

@@ -8,6 +8,7 @@ describe('routes', () => {
     expect(routeFor('about', 'es-MX')).toBe('/nosotros/');
     expect(routeFor('about', 'en')).toBe('/en/about/');
     expect(routeFor('terms', 'en')).toBe('/en/terms/');
+    expect(routeFor('offline', 'en')).toBe('/en/offline/');
   });
 
   it('finds the page of a path in either language, with or without the final slash', () => {
@@ -30,6 +31,9 @@ describe('routes', () => {
       },
     });
     expect(pageMetadata('home', 'es-MX').title).toBe('YĒKORA | Tienda Outdoor');
+    expect(pageMetadata('offline', 'es-MX').title).toBe(
+      'Sin conexión | YĒKORA'
+    );
     expect(pageMetadata('cookies', 'es-MX').title).toBe(
       'Política de cookies | YĒKORA'
     );
