@@ -64,11 +64,26 @@ test('offline: visited pages still open, others show the offline page in their l
 }) => {
   await page.goto('/');
   await controlledBy(page);
+  // The install step precached both offline pages (checked before cutting the network).
+  const cached = await page.evaluate(async () => {
+    const paths: string[] = [];
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const request of await cache.keys()) {
+        paths.push(`${name} ${new URL(request.url).pathname}`);
+      }
+    }
+    return paths;
+  });
+  expect(cached.join('\n')).toMatch(/ \/offline\/$/m);
+  expect(cached.join('\n')).toMatch(/ \/en\/offline\/$/m);
   await page.goto('/nosotros/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nosotros');
 
   await context.setOffline(true);
-  await page.goto('/nosotros/');
+  const visited = await page.goto('/nosotros/');
+  // Served by the worker from its cache, not by the browser's HTTP cache.
+  expect(visited?.fromServiceWorker()).toBe(true);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nosotros');
 
   await page.goto('/terminos/');
