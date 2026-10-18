@@ -81,8 +81,8 @@ test('offline: visited pages still open, others show the offline page in their l
   );
 
   await context.setOffline(false);
-  // The retry is a plain link: it must work even if the offline page never hydrated.
-  await page.getByRole('link', { name: 'Try again' }).click();
+  // The retry is a no-action GET form: it must work even if the offline page never hydrated.
+  await page.getByRole('button', { name: 'Try again' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Terms and conditions of use'
   );

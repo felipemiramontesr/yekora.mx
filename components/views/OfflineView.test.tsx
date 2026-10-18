@@ -12,15 +12,20 @@ describe('OfflineView', () => {
     for (const icon of icons) expect(icon).toContain('aria-hidden="true"');
   });
 
-  it('retries with a plain link to the current URL, so it works without JavaScript', () => {
+  it('retries with a no-action GET form, so it works without JavaScript', () => {
     const html = renderToStaticMarkup(<OfflineView locale="es-MX" />);
-    expect(html).toMatch(/<a href=""[^>]*>[\s\S]*Reintentar<\/a>/);
-    expect(html).not.toContain('<button');
+    expect(html).toMatch(
+      /<form method="get"><button type="submit"[^>]*>[\s\S]*Reintentar<\/button><\/form>/
+    );
+    expect(html).not.toContain('action=');
+    expect(html).not.toContain('<a ');
   });
 
   it('is translated to English', () => {
     const html = renderToStaticMarkup(<OfflineView locale="en" />);
     expect(html).toMatch(/<h1[^>]*>You are out of coverage<\/h1>/);
-    expect(html).toMatch(/<a href=""[^>]*>[\s\S]*Try again<\/a>/);
+    expect(html).toMatch(
+      /<button type="submit"[^>]*>[\s\S]*Try again<\/button>/
+    );
   });
 });

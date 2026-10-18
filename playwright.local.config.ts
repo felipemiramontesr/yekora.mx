@@ -18,7 +18,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: process.env.CI ? 2 : 4,
-  reporter: 'html',
+  // In CI the github reporter turns every failure into a public annotation on the run, so the
+  // exact error is readable without downloading logs; the HTML report stays as an artifact.
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
   timeout: 45_000,
   use: {
     baseURL: 'http://localhost:3100',
