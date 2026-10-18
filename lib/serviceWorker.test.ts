@@ -9,6 +9,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const ORIGIN = 'https://yekora.mx';
 const SOURCE = readFileSync('public/sw.js', 'utf8');
 const CACHE = 'yekora-__BUILD_SHA__';
+// What the precache downloads for each offline page: real exports reference their chunks,
+// styles and fonts with src/href attributes (shared chunks may repeat across pages).
+const OFFLINE_HTML: Record<string, string> = {
+  '/offline/':
+    '<link rel="stylesheet" href="/_next/static/css/site.css"/><script src="/_next/static/chunks/offline-es.js" async></script>',
+  '/en/offline/':
+    '<link rel="preload" href="/_next/static/media/inter.woff2"/><script src="/_next/static/chunks/offline-en.js" async></script><script src="/_next/static/chunks/offline-es.js"></script>',
+};
 // A classic worker script, not a module: kept in a variable so tsc does not resolve it.
 const WORKER_PATH = '../public/sw.js';
 
@@ -40,7 +48,9 @@ async function loadWorker(fetchImpl: typeof online) {
           entries.set(keyOf(request), response);
         },
         addAll: async (urls: string[]) => {
-          for (const url of urls) entries.set(keyOf(url), new Response(url));
+          for (const url of urls) {
+            entries.set(keyOf(url), new Response(OFFLINE_HTML[url] ?? url));
+          }
         },
       };
     },
@@ -139,12 +149,14 @@ describe('public/sw.js', () => {
       .set(`${ORIGIN}/nosotros/`, new Response('visited'));
     expect(await (await worker.request('/nosotros/'))!.text()).toBe('visited');
     expect(await (await worker.request('/terminos/'))!.text()).toBe(
-      '/offline/'
+      OFFLINE_HTML['/offline/']
     );
     expect(await (await worker.request('/en/terms/'))!.text()).toBe(
-      '/en/offline/'
+      OFFLINE_HTML['/en/offline/']
     );
-    expect(await (await worker.request('/en'))!.text()).toBe('/en/offline/');
+    expect(await (await worker.request('/en'))!.text()).toBe(
+      OFFLINE_HTML['/en/offline/']
+    );
   });
 
   it('returns a network error when neither the page nor the offline page is cached', async () => {
@@ -180,7 +192,17 @@ describe('public/sw.js', () => {
     ).toBeUndefined();
   });
 
-  it('precaches the offline pages and icons on install', async () => {
+  it('returns a network error for an asset that is neither cached nor reachable', async () => {
+    const worker = await loadWorker(offline);
+    const response = await worker.request(
+      '/_next/static/chunks/x.js',
+      'GET',
+      'no-cors'
+    );
+    expect(response!.type).toBe('error');
+  });
+
+  it('precaches the offline pages with their scripts, styles and fonts, and the icons', async () => {
     const worker = await loadWorker(online);
     await worker.lifecycle('install');
     expect([...worker.store.get(CACHE)!.keys()]).toEqual(
@@ -190,6 +212,10 @@ describe('public/sw.js', () => {
         '/favicon.ico',
         '/icons/icon-192.png',
         '/icons/icon-512.png',
+        '/_next/static/css/site.css',
+        '/_next/static/chunks/offline-es.js',
+        '/_next/static/media/inter.woff2',
+        '/_next/static/chunks/offline-en.js',
       ].map((path) => `${ORIGIN}${path}`)
     );
   });

@@ -77,6 +77,16 @@ test('offline: visited pages still open, others show the offline page in their l
   });
   expect(cached.join('\n')).toMatch(/ \/offline\/$/m);
   expect(cached.join('\n')).toMatch(/ \/en\/offline\/$/m);
+  // ...together with every script, style and font they load: offline, a missing chunk makes
+  // Next.js reload the page, which then fails.
+  for (const offlinePage of ['/offline/', '/en/offline/']) {
+    const html = await (await page.request.get(offlinePage)).text();
+    for (const [, asset] of html.matchAll(
+      /(?:src|href)="(\/_next\/static\/[^"]+)"/g
+    )) {
+      expect(cached.join('\n'), asset).toContain(` ${asset}`);
+    }
+  }
   await page.goto('/nosotros/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nosotros');
 
@@ -89,6 +99,12 @@ test('offline: visited pages still open, others show the offline page in their l
   await page.goto('/terminos/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Estás fuera de cobertura'
+  );
+  // Complete offline: the page keeps its URL and its brand styles (petróleo background).
+  await expect(page).toHaveURL(/\/terminos\/$/);
+  await expect(page.locator('main section').first()).toHaveCSS(
+    'background-color',
+    'rgb(33, 60, 65)'
   );
   await page.goto('/en/terms/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
