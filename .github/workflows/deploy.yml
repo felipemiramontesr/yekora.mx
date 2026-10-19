@@ -329,6 +329,11 @@ jobs:
           find release -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp apps/api/dist/index.js apps/api/dist/package.json release/
           git -C release add -A
+          # A re-run of the same commit rebuilds identical bytes: already published, not an error.
+          if git -C release diff --cached --quiet; then
+            echo "[OK] api-release already holds $GITHUB_SHA (re-run): nothing to publish"
+            exit 0
+          fi
           git -C release commit -qm "API release $GITHUB_SHA"
           git -C release push origin HEAD:refs/heads/api-release
           echo "[OK] api-release ← $GITHUB_SHA"
