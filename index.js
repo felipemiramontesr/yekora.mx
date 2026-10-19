@@ -80906,7 +80906,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.4.4"),
+  API_VERSION: external_exports.string().default("0.5.2"),
   GIT_SHA: external_exports.string().default("dev")
 });
 function loadConfig(env2) {
@@ -80938,10 +80938,192 @@ function problem(status, title, detail) {
   return detail === void 0 ? { type: "about:blank", title, status } : { type: "about:blank", title, status, detail };
 }
 
+// ../../lib/cart/cartTypes.ts
+var MAX_LINES = 50;
+var MAX_QUANTITY = 99;
+var cartLinesSchema = external_exports.array(
+  external_exports.object({
+    sku: external_exports.string().min(1).max(64),
+    quantity: external_exports.number().int().min(1).max(MAX_QUANTITY)
+  }).strict()
+).max(MAX_LINES).refine((lines) => new Set(lines.map((l) => l.sku)).size === lines.length, {
+  message: "Each SKU may appear only once"
+});
+var cents = external_exports.number().int();
+var cartQuoteSchema = external_exports.object({
+  items: external_exports.array(
+    external_exports.object({
+      sku: external_exports.string(),
+      slug: external_exports.string().nullable(),
+      name: external_exports.string().nullable(),
+      quantity: cents.min(1),
+      unitPriceMxnCents: cents.positive().nullable(),
+      lineTotalMxnCents: cents.nonnegative().nullable(),
+      lineBaseMxnCents: cents.nonnegative().nullable(),
+      lineTaxMxnCents: cents.nonnegative().nullable(),
+      stockStatus: external_exports.enum([
+        "available",
+        "low_stock",
+        "out_of_stock",
+        "unavailable"
+      ]),
+      availableQuantity: cents.min(0).max(MAX_QUANTITY),
+      purchasable: external_exports.boolean()
+    })
+  ),
+  summary: external_exports.object({
+    subtotalMxnCents: cents.nonnegative(),
+    taxMxnCents: cents.nonnegative(),
+    totalMxnCents: cents.nonnegative(),
+    totalItems: cents.nonnegative(),
+    referenceUsdCents: cents.nonnegative().nullable(),
+    exchangeRate: external_exports.object({ series: external_exports.string(), date: external_exports.string(), rate: external_exports.string() }).nullable()
+  }).refine((s) => s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents),
+  warnings: external_exports.array(
+    external_exports.object({
+      sku: external_exports.string(),
+      code: external_exports.enum(["unavailable", "out_of_stock", "insufficient_stock"])
+    })
+  )
+});
+
 // src/lib/money.ts
 function usdCents(priceMxnCents, fix) {
   if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
   return Math.round(priceMxnCents / fix);
+}
+
+// src/services/cartQuote.ts
+var LOW_STOCK = 5;
+var MAX_QUANTITY2 = 99;
+function splitVat(totalMxnCents) {
+  const base = Math.round(totalMxnCents * 100 / 116);
+  return { base, tax: totalMxnCents - base };
+}
+function stockStatus(stock) {
+  if (stock <= 0) return "out_of_stock";
+  return stock < LOW_STOCK ? "low_stock" : "available";
+}
+function quoteLine(line, row, lang3) {
+  if (!row) {
+    return {
+      quoted: {
+        sku: line.sku,
+        slug: null,
+        name: null,
+        quantity: line.quantity,
+        unitPriceMxnCents: null,
+        lineTotalMxnCents: null,
+        lineBaseMxnCents: null,
+        lineTaxMxnCents: null,
+        stockStatus: "unavailable",
+        availableQuantity: 0,
+        purchasable: false
+      },
+      warning: "unavailable"
+    };
+  }
+  const unit = Number(row.price_mxn_cents);
+  const stock = Number(row.stock);
+  const total = unit * line.quantity;
+  const { base, tax } = splitVat(total);
+  const status = stockStatus(stock);
+  const purchasable = stock >= line.quantity;
+  let warning;
+  if (status === "out_of_stock") warning = "out_of_stock";
+  else if (!purchasable) warning = "insufficient_stock";
+  return {
+    quoted: {
+      sku: row.sku,
+      slug: row.slug,
+      name: lang3 === "en" ? row.name_en : row.name_es,
+      quantity: line.quantity,
+      unitPriceMxnCents: unit,
+      lineTotalMxnCents: total,
+      lineBaseMxnCents: base,
+      lineTaxMxnCents: tax,
+      stockStatus: status,
+      availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
+      purchasable
+    },
+    warning,
+    counted: purchasable ? { base, tax, total } : void 0
+  };
+}
+function buildQuote(lines, rows, rate, lang3) {
+  const bySku = new Map(rows.map((row) => [row.sku, row]));
+  const items = [];
+  const warnings = [];
+  const summary = {
+    subtotalMxnCents: 0,
+    taxMxnCents: 0,
+    totalMxnCents: 0,
+    totalItems: 0
+  };
+  for (const line of lines) {
+    const { quoted, warning, counted } = quoteLine(
+      line,
+      bySku.get(line.sku),
+      lang3
+    );
+    items.push(quoted);
+    if (warning) warnings.push({ sku: line.sku, code: warning });
+    if (counted) {
+      summary.subtotalMxnCents += counted.base;
+      summary.taxMxnCents += counted.tax;
+      summary.totalMxnCents += counted.total;
+      summary.totalItems += quoted.quantity;
+    }
+  }
+  const fix = rate ? Number(rate.rate) : null;
+  const referenceUsdCents = summary.totalMxnCents > 0 ? usdCents(summary.totalMxnCents, fix) : null;
+  return {
+    items,
+    summary: { ...summary, referenceUsdCents, exchangeRate: rate },
+    warnings
+  };
+}
+async function quoteCart(db, lines, rate, lang3) {
+  const rows = lines.length === 0 ? [] : await db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    [lines.map((line) => line.sku)]
+  );
+  return buildQuote(lines, rows, rate, lang3);
+}
+
+// src/routes/cart.ts
+var requestSchema = external_exports.object({ items: cartLinesSchema }).strict();
+var lang = external_exports.enum(["es-MX", "en"]).default("es-MX");
+function registerCartRoutes(app, deps) {
+  app.post(
+    "/v1/cart/quote",
+    {
+      bodyLimit: 16 * 1024,
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+    },
+    async (request, reply) => {
+      const body = requestSchema.safeParse(request.body);
+      const language = lang.safeParse(
+        request.query.lang
+      );
+      if (!body.success || !language.success) {
+        return reply.code(400).type(PROBLEM_TYPE).send(
+          problem(
+            400,
+            "Invalid cart",
+            body.error?.issues[0]?.message ?? "Invalid lang"
+          )
+        );
+      }
+      const quote = await quoteCart(
+        deps.db,
+        body.data.items,
+        await deps.rate(),
+        language.data
+      );
+      return cartQuoteSchema.parse(quote);
+    }
+  );
 }
 
 // src/services/catalog.ts
@@ -80985,12 +81167,12 @@ async function findProduct(db, slug2) {
 
 // src/routes/catalog.ts
 var slug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160);
-var lang = external_exports.enum(["es-MX", "en"]).default("es-MX");
+var lang2 = external_exports.enum(["es-MX", "en"]).default("es-MX");
 var listQuery = external_exports.object({
   discipline: slug.max(40).optional(),
   level: slug.max(40).optional(),
   sort: external_exports.enum(SORTS).default("name"),
-  lang,
+  lang: lang2,
   page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
   pageSize: external_exports.coerce.number().int().min(1).max(48).default(24)
 });
@@ -81036,7 +81218,7 @@ function registerCatalogRoutes(app, deps) {
   });
   app.get("/v1/catalog/:slug", async (request, reply) => {
     const params = external_exports.object({ slug }).safeParse(request.params);
-    const language = lang.safeParse(request.query.lang);
+    const language = lang2.safeParse(request.query.lang);
     if (!params.success || !language.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
     }
@@ -81085,7 +81267,7 @@ async function buildApp(deps) {
     trustProxy: true
   });
   await app.register(import_helmet.default);
-  await app.register(import_cors.default, { origin: CORS_ORIGINS, methods: ["GET"] });
+  await app.register(import_cors.default, { origin: CORS_ORIGINS, methods: ["GET", "POST"] });
   await app.register(import_rate_limit.default, { max: 120, timeWindow: "1 minute" });
   app.setErrorHandler((error, _request, reply) => {
     const status = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
@@ -81105,6 +81287,7 @@ async function buildApp(deps) {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
+  registerCartRoutes(app, { db: deps.db, rate: deps.rate });
   registerExchangeRateRoute(app, deps.rate);
   return app;
 }
@@ -81216,7 +81399,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "fe957c073dfc74edb95885ae3306057d025665a9" : void 0;
+var sha = true ? "945fb6d38af77418a5d91bbc51d8d6db8be48366" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
