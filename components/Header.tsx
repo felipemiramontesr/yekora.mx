@@ -1,6 +1,7 @@
 import { Menu } from 'lucide-react';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
+import { CartButton } from './cart/CartButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 /** Props of {@link Header}. */
@@ -46,8 +47,8 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
 }
 
 /**
- * Site header: brand lockup linking home, the discipline anchors, About, the catalog and the
- * language switcher. From xl (1280 px) a single bar; below, a menu built on native
+ * Site header: brand lockup linking home, the discipline anchors, About, the catalog, the
+ * language switcher and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
  * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
  */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {
@@ -88,6 +89,12 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
             messages={messages.languageSwitcher}
           />
         </div>
+        {/* FC 009: always visible, on every screen size, outside the collapsible menu. */}
+        <CartButton
+          locale={locale}
+          messages={messages.cart}
+          priceMessages={messages.catalog.price}
+        />
         {/* Phones and tablets: menu without client JavaScript (native <details>/<summary>).
             The full bar needs xl: below 1280 px it wraps onto two lines. */}
         <details className="relative xl:hidden">

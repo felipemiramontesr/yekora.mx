@@ -113,7 +113,7 @@
         {
           "title": "Purposes",
           "paragraphs": [
-            "Primary purposes, needed for the site: show you the content in the language of the page you visit, remember that you read the cookie notice and protect the site against misuse.",
+            "Primary purposes, needed for the site: show you the content in the language of the page you visit, remember that you read the cookie notice, keep the products you add to your pack in your browser and protect the site against misuse.",
             "Secondary purposes: none. We do not use your data for advertising, commercial profiling or analytics."
           ]
         },
@@ -134,7 +134,8 @@
           "title": "Cookies",
           "paragraphs": [
             "The site only uses first-party technical cookies. We use no third-party, advertising or analytics cookies. Details are in the Cookie policy.",
-            "We also keep a technical copy of the site files in your browser (Cache Storage) so it works offline. It holds no personal data."
+            "We also keep a technical copy of the site files in your browser (Cache Storage) so it works offline. It holds no personal data.",
+            "If you add products to your pack, we keep in your browser (local storage, «yekora_cart_v1») only the code of each product and its quantity. It is not a cookie, holds no personal data and is never sent to third parties; the details are in the Cookie policy."
           ]
         },
         {
@@ -159,6 +160,13 @@
           "title": "Cookies we use",
           "paragraphs": [
             "We only use first-party technical cookies, needed for the site to work as you expect. We use no analytics, advertising or third-party cookies."
+          ]
+        },
+        {
+          "title": "Your pack (cart)",
+          "paragraphs": [
+            "If you add products to your pack, the site keeps in your browser, in local storage under the name «yekora_cart_v1», only the code of each product and the quantity you chose, so it is still there on your next visit.",
+            "It is not a cookie, holds no personal data, is not used to track you and is never sent to third parties. Prices and stock are always checked on our server. It is erased when you empty your pack, or from the site data in your browser."
           ]
         },
         {
@@ -421,12 +429,50 @@
       "level": "Level",
       "inStock": "In stock",
       "outOfStock": "Out of stock",
+      "addToCart": "Add to pack",
       "sku": "SKU"
     },
     "price": {
+      "vatIncluded": "VAT included",
       "currencyNote": "Prices in Mexican pesos (MXN).",
       "usdReference": "≈ {usd}",
       "fxNote": "US dollar reference at Banxico's FIX exchange rate of {date} ({rate} MXN per USD). You pay in Mexican pesos."
+    }
+  },
+  "cart": {
+    "metaTitle": "Your pack | YĒKORA",
+    "title": "Your pack",
+    "open": "Open your pack",
+    "count": { "one": "1 product", "other": "{count} products" },
+    "close": "Close",
+    "viewFull": "View full pack",
+    "added": "Added to your pack",
+    "empty": {
+      "title": "Your pack is empty",
+      "text": "When you add gear, it shows up here with its price, stock and the VAT breakdown.",
+      "cta": "Browse the catalog"
+    },
+    "line": {
+      "quantity": "Quantity of {name}",
+      "decrease": "Remove one {name}",
+      "increase": "Add one {name}",
+      "remove": "Remove {name} from your pack",
+      "each": "{price} each",
+      "unavailable": "This product is no longer available.",
+      "outOfStock": "Out of stock for now.",
+      "insufficient": { "one": "Only 1 left.", "other": "Only {count} left." },
+      "adjust": "Adjust to {count}"
+    },
+    "summary": {
+      "title": "Summary",
+      "subtotal": "Subtotal before VAT",
+      "tax": "VAT (16 %)",
+      "total": "Total with VAT",
+      "items": { "one": "1 item", "other": "{count} items" },
+      "usdReference": "≈ {usd}",
+      "updating": "Updating prices and stock…",
+      "offline": "Offline: prices and stock will update when you reconnect.",
+      "failed": "We could not update the prices right now. The last confirmed ones are shown."
     }
   }
 }

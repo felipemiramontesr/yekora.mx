@@ -6,12 +6,14 @@
  *   d) FC 008 · R1 / T1.2: db-migrations.yml is triggered by workflow_dispatch only, runs in
  *      production-db, checks the actor and pins every action (scripts/lib/workflowGuards.ts).
  *   e) FC 008 · R1: no workflow other than db-migrations.yml mentions self-hosted.
+ *   f) FC 009 · K-13: the apiv1 smoke test and the catalog read of deploy.yml are always on.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
 } from './lib/workflowGuards';
@@ -53,6 +55,11 @@ if (existsSync(deployPath)) {
     if (!usesLines.some((uses) => uses.startsWith(prefix))) {
       failures.push(`b) deploy.yml does not use ${prefix}`);
     }
+  }
+  for (const violation of deployWorkflowViolations(
+    readFileSync(deployPath, 'utf8')
+  )) {
+    failures.push(`f) deploy.yml: ${violation}`);
   }
 } else {
   failures.push('b) .github/workflows/deploy.yml is missing');

@@ -28,6 +28,8 @@ const ROUTE_MAP = {
   offline: { 'es-MX': '/offline/', en: '/en/offline/' },
   // Catalog (FC 008); each product lives one level below, under the same slug in both languages.
   catalog: { 'es-MX': '/catalogo/', en: '/en/catalog/' },
+  // Guest cart (FC 009); noindex: its content lives in the visitor's browser.
+  cart: { 'es-MX': '/carrito/', en: '/en/cart/' },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 /** A page that exists in every language (key of the route map). */
@@ -93,6 +95,7 @@ function pageTitle(messages: Messages, page: Page): string {
   if (page === 'about') return messages.about.metaTitle;
   if (page === 'offline') return messages.offline.metaTitle;
   if (page === 'catalog') return messages.catalog.metaTitle;
+  if (page === 'cart') return messages.cart.metaTitle;
   return messages.legal[page].metaTitle;
 }
 

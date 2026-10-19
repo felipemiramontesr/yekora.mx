@@ -113,7 +113,7 @@
         {
           "title": "Finalidades",
           "paragraphs": [
-            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido en el idioma de la página que visitas, recordar que ya leíste el aviso de cookies y proteger el sitio frente a usos indebidos.",
+            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido en el idioma de la página que visitas, recordar que ya leíste el aviso de cookies, conservar en tu navegador los productos que agregas a tu mochila y proteger el sitio frente a usos indebidos.",
             "Finalidades secundarias: ninguna. No usamos tus datos para publicidad, perfiles comerciales ni analítica."
           ]
         },
@@ -134,7 +134,8 @@
           "title": "Cookies",
           "paragraphs": [
             "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies.",
-            "También guardamos en tu navegador una copia técnica de los archivos del sitio (Cache Storage) para que funcione sin conexión. No contiene datos personales."
+            "También guardamos en tu navegador una copia técnica de los archivos del sitio (Cache Storage) para que funcione sin conexión. No contiene datos personales.",
+            "Si agregas productos a tu mochila, guardamos en tu navegador (almacenamiento local, «yekora_cart_v1») solo el código de cada producto y su cantidad. No es una cookie, no contiene datos personales y no se envía a terceros; el detalle está en la Política de cookies."
           ]
         },
         {
@@ -159,6 +160,13 @@
           "title": "Cookies que usamos",
           "paragraphs": [
             "Solo usamos cookies técnicas propias, necesarias para que el sitio funcione como esperas. No usamos cookies de analítica, de publicidad ni de terceros."
+          ]
+        },
+        {
+          "title": "Tu mochila (carrito)",
+          "paragraphs": [
+            "Si agregas productos a tu mochila, el sitio guarda en tu navegador, con almacenamiento local bajo el nombre «yekora_cart_v1», solo el código de cada producto y la cantidad que elegiste, para conservarla entre visitas.",
+            "No es una cookie, no contiene datos personales, no sirve para rastrearte y no se envía a terceros. Los precios y las existencias se consultan siempre en nuestro servidor. Se borra al vaciar tu mochila o desde los datos del sitio en tu navegador."
           ]
         },
         {
@@ -421,12 +429,53 @@
       "level": "Nivel",
       "inStock": "Disponible",
       "outOfStock": "Agotado",
+      "addToCart": "Agregar a la mochila",
       "sku": "SKU"
     },
     "price": {
+      "vatIncluded": "IVA incluido",
       "currencyNote": "Precios en pesos mexicanos (MXN).",
       "usdReference": "≈ {usd}",
       "fxNote": "Referencia en dólares con el tipo de cambio FIX de Banxico del {date} ({rate} MXN por USD). El cobro se hace en pesos mexicanos."
+    }
+  },
+  "cart": {
+    "metaTitle": "Tu mochila | YĒKORA",
+    "title": "Tu mochila",
+    "open": "Abrir tu mochila",
+    "count": { "one": "1 producto", "other": "{count} productos" },
+    "close": "Cerrar",
+    "viewFull": "Ver mochila completa",
+    "added": "Agregado a tu mochila",
+    "empty": {
+      "title": "Tu mochila está vacía",
+      "text": "Cuando agregues equipo, aparecerá aquí con su precio, existencias y el desglose de IVA.",
+      "cta": "Ver catálogo"
+    },
+    "line": {
+      "quantity": "Cantidad de {name}",
+      "decrease": "Quitar una unidad de {name}",
+      "increase": "Agregar una unidad de {name}",
+      "remove": "Quitar {name} de la mochila",
+      "each": "{price} c/u",
+      "unavailable": "Este producto ya no está disponible.",
+      "outOfStock": "Agotado por ahora.",
+      "insufficient": {
+        "one": "Solo queda 1 pieza.",
+        "other": "Solo quedan {count} piezas."
+      },
+      "adjust": "Ajustar a {count}"
+    },
+    "summary": {
+      "title": "Resumen",
+      "subtotal": "Subtotal sin IVA",
+      "tax": "IVA (16 %)",
+      "total": "Total con IVA",
+      "items": { "one": "1 pieza", "other": "{count} piezas" },
+      "usdReference": "≈ {usd}",
+      "updating": "Actualizando precios y existencias…",
+      "offline": "Sin conexión: los precios y existencias se actualizarán al reconectar.",
+      "failed": "No pudimos actualizar los precios ahora. Se muestran los últimos confirmados."
     }
   }
 }

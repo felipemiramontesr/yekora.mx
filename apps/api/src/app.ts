@@ -17,6 +17,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { CORS_ORIGINS, type ApiConfig } from './config';
 import { problem, PROBLEM_TYPE } from './lib/problem';
+import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
 import { registerExchangeRateRoute } from './routes/exchangeRate';
 import type { Db } from './services/db';
@@ -48,7 +49,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     trustProxy: true,
   });
   await app.register(helmet);
-  await app.register(cors, { origin: CORS_ORIGINS, methods: ['GET'] });
+  // FC 009: POST only for the cart quote; the origins stay the site and the local servers.
+  await app.register(cors, { origin: CORS_ORIGINS, methods: ['GET', 'POST'] });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -76,6 +78,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
+  registerCartRoutes(app, { db: deps.db, rate: deps.rate });
   registerExchangeRateRoute(app, deps.rate);
   return app;
 }

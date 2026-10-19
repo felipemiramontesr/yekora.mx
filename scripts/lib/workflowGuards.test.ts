@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
   unpinnedActions,
@@ -52,6 +53,41 @@ describe('mentionsSelfHosted', () => {
     expect(
       mentionsSelfHosted('# never self-hosted here\nruns-on: ubuntu\n')
     ).toBe(false);
+  });
+});
+
+describe('deployWorkflowViolations (FC 009 · K-13: API checks always on)', () => {
+  const SMOKE = '- name: 🔥 Smoke test — apiv1.yekora.mx serves this commit';
+
+  it('the real deploy.yml is conformant', () => {
+    expect(deployWorkflowViolations(deploy)).toEqual([]);
+  });
+
+  it('flags the retired switch, a conditional smoke test and an optional catalog read', () => {
+    const tampered = deploy
+      .replace(SMOKE, `${SMOKE}\n        if: vars.API_LIVE == 'true'`)
+      .replace(
+        'CATALOG_API_URL: https://apiv1.yekora.mx',
+        "CATALOG_API_URL: ${{ vars.API_LIVE == 'true' && 'https://apiv1.yekora.mx' || '' }}"
+      );
+    expect(deployWorkflowViolations(tampered)).toEqual([
+      'the retired API_LIVE switch is back (K-13)',
+      'the apiv1.yekora.mx smoke test must not be conditional',
+      'the site build must always read the catalog from apiv1.yekora.mx',
+    ]);
+  });
+
+  it('flags a conditional smoke test under any other condition', () => {
+    const tampered = deploy.replace(SMOKE, `${SMOKE}\n        if: false`);
+    expect(deployWorkflowViolations(tampered)).toEqual([
+      'the apiv1.yekora.mx smoke test must not be conditional',
+    ]);
+  });
+
+  it('flags a missing smoke test', () => {
+    expect(
+      deployWorkflowViolations(deploy.replace(SMOKE, '- name: other'))
+    ).toContain('the apiv1.yekora.mx smoke test is missing');
   });
 });
 

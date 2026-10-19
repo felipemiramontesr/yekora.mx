@@ -18,7 +18,7 @@ import type { ExchangeRate, Product } from '@/lib/api/catalogClient';
  * @param currency - ISO 4217 code.
  * @param locale - Language of the page.
  */
-function formatMoney(
+export function formatMoney(
   cents: number,
   currency: 'MXN' | 'USD',
   locale: Locale

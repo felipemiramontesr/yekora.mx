@@ -338,9 +338,8 @@ jobs:
           git -C release push origin HEAD:refs/heads/api-release
           echo "[OK] api-release ← $GITHUB_SHA"
       - name: 🔥 Smoke test — apiv1.yekora.mx serves this commit
-        # Enabled by the repository variable API_LIVE once Hostinger's app tracks api-release
-        # (F5 bootstrap). Up to 6 minutes for Hostinger to pull the branch and restart.
-        if: vars.API_LIVE == 'true'
+        # FC 009 F0 · K-13: unconditional (the F5 bootstrap switch API_LIVE is gone; the A08 gate
+        # fails if it ever comes back). Up to 6 minutes for Hostinger to pull and restart.
         run: |
           set -uo pipefail
           for attempt in $(seq 1 36); do
@@ -352,13 +351,16 @@ jobs:
           [ "$LIVE" = "$GITHUB_SHA" ] || { echo "FATAL: apiv1.yekora.mx does not run $GITHUB_SHA"; exit 1; }
           curl -fsS https://apiv1.yekora.mx/health | jq -e '.status == "ok" and .db == "connected"'
           curl -fsS https://apiv1.yekora.mx/v1/catalog | jq -e '.items | type == "array"' > /dev/null
-          # 503 is the documented answer while no Banxico FIX has been stored yet.
+          # A Banxico FIX is stored since 2026-10-19: a 503 here would mean the rates were lost.
           RATE=$(curl -sS -o /dev/null -w '%{http_code}' https://apiv1.yekora.mx/v1/exchange-rate)
-          [ "$RATE" = "200" ] || [ "$RATE" = "503" ] || { echo "FATAL: /v1/exchange-rate → $RATE"; exit 1; }
-          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate $RATE"
-      - name: Smoke test pending (API_LIVE not set)
-        if: vars.API_LIVE != 'true'
-        run: echo "::notice::api-release published; apiv1.yekora.mx is not checked until API_LIVE=true (F5 bootstrap)."
+          [ "$RATE" = "200" ] || { echo "FATAL: /v1/exchange-rate → $RATE"; exit 1; }
+          # FC 009 F4: the cart quote answers the empty cart with a zeroed summary.
+          curl -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+            -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
+            -d '{"items":[]}' \
+            | jq -e '.items == [] and .warnings == [] and .summary.totalMxnCents == 0 and .summary.subtotalMxnCents == 0 and .summary.taxMxnCents == 0' > /dev/null \
+            || { echo "FATAL: /v1/cart/quote does not quote the empty cart"; exit 1; }
+          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate 200 · cart quote OK"
 
   hostinger-deployment:
     name: 🚀 Deployment to Hostinger
@@ -390,11 +392,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Build static export (out/)
-        # FC 008: once API_LIVE is set the catalog is read from apiv1.yekora.mx (a failed read
-        # fails the build and the previous deploy stays online); until then it ships empty and
-        # shows «Próximamente».
+        # FC 008/009: the catalog is always read from apiv1.yekora.mx; a failed read fails the
+        # build and the previous deploy stays online.
         env:
-          CATALOG_API_URL: ${{ vars.API_LIVE == 'true' && 'https://apiv1.yekora.mx' || '' }}
+          CATALOG_API_URL: https://apiv1.yekora.mx
         run: bun run build
       - name: 🛡️ A1 guard — no fictitious product reaches production
         # FC 008 Does NOT: fictitious products in production. E2E fixture slugs start with e2e-
@@ -475,7 +476,8 @@ jobs:
           fi
           for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico \
             https://yekora.mx/envios-y-devoluciones/ https://yekora.mx/en/shipping-and-returns/ \
-            https://yekora.mx/manifest.webmanifest https://yekora.mx/offline/ https://yekora.mx/en/offline/; do
+            https://yekora.mx/manifest.webmanifest https://yekora.mx/offline/ https://yekora.mx/en/offline/ \
+            https://yekora.mx/catalogo/ https://yekora.mx/en/catalog/ https://yekora.mx/carrito/ https://yekora.mx/en/cart/; do
             STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
             echo "$url → $STATUS"
             if [ "$STATUS" != "200" ]; then exit 1; fi

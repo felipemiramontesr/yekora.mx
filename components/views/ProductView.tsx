@@ -3,6 +3,7 @@ import { getMessages, type Locale } from '@/app/i18n';
 import type { ExchangeRate, Product } from '@/lib/api/catalogClient';
 import { fill, priceNote, priceText } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
+import { AddToCartButton } from '../cart/AddToCartButton';
 import { ProductVisual } from '../catalog/ProductVisual';
 
 /** Props of {@link ProductView}. */
@@ -65,6 +66,10 @@ export function ProductView({
             </div>
           </dl>
           <p className="mt-8 text-3xl font-semibold">{price.mxn}</p>
+          {/* LFPC 7 Bis: the stored price is the net price, VAT included (Ω, 073_AN). */}
+          <p className="text-sm text-petroleo/80">
+            {catalog.price.vatIncluded}
+          </p>
           {price.usd && (
             <p className="mt-1 text-petroleo/80">
               {fill(catalog.price.usdReference, { usd: price.usd })}
@@ -78,6 +83,12 @@ export function ProductView({
               ? catalog.product.inStock
               : catalog.product.outOfStock}
           </p>
+          <AddToCartButton
+            sku={product.sku}
+            inStock={product.inStock}
+            label={catalog.product.addToCart}
+            outOfStockLabel={catalog.product.outOfStock}
+          />
           <p className="mt-6 whitespace-pre-line leading-relaxed">
             {product.description}
           </p>

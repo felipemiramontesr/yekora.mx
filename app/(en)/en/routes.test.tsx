@@ -15,6 +15,7 @@ vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
 
 import Layout, { metadata as layoutMeta } from './layout';
 import Catalog, { metadata as CatalogMeta } from './catalog/page';
+import Cart, { metadata as CartMeta } from './cart/page';
 import * as ProductPage from './catalog/[slug]/page';
 import Home, { metadata as HomeMeta } from './page';
 import About, { metadata as AboutMeta } from './about/page';
@@ -66,6 +67,13 @@ describe('en routes', () => {
     expect(CatalogMeta.alternates?.canonical).toBe('/en/catalog/');
     expect(CatalogMeta.title).toBe('Catalog | YĒKORA');
     expect(renderToStaticMarkup(<Catalog />)).toContain('Coming soon');
+  });
+
+  it('cart is at /en/cart/, never indexed, and prerenders the empty pack', () => {
+    expect(CartMeta.alternates?.canonical).toBe('/en/cart/');
+    expect(CartMeta.title).toBe('Your pack | YĒKORA');
+    expect(CartMeta.robots).toEqual({ index: false, follow: false });
+    expect(renderToStaticMarkup(<Cart />)).toContain('Your pack is empty');
   });
 
   it('product pages exist only for the snapshot slugs (static export)', () => {

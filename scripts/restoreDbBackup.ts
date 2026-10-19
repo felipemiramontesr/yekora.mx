@@ -14,7 +14,14 @@
  * Executables come from explicit paths, never from PATH. Passwords travel in the child
  * environment (MYSQL_PWD, -pass env:), never on the command line.
  *
- * CLI: `bun scripts/restoreDbBackup.ts --rehearse`
+ * CLI:
+ *   bun scripts/restoreDbBackup.ts --rehearse
+ *   bun scripts/restoreDbBackup.ts --from <backup.sql.gz.enc> [--expect-tables <n>]
+ *
+ * `--from` (FC 009 F0 · K-12) restores a backup downloaded from the production migrations
+ * workflow into RESTORE_DB_NAME on localhost and times it: the real RTO drill. Its key comes from
+ * RESTORE_BACKUP_KEY, a variable Ω sets for that one command from a hidden prompt, so the
+ * production key never sits in .env.local next to the local rehearsal key.
  *
  * @module
  */
@@ -34,6 +41,13 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+/** Value following a flag, or undefined when the flag is absent. */
+function flagValue(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index === -1 ? undefined : (process.argv[index + 1] ?? '');
+}
+
+const fromFile = flagValue('--from');
 const host = requiredEnv('DB_HOST');
 const port = process.env.DB_PORT ?? '3306';
 const user = requiredEnv('DB_USER');
@@ -46,7 +60,10 @@ const openssl = requiredEnv('OPENSSL_BIN');
 const childEnv = {
   ...process.env,
   MYSQL_PWD: password,
-  BACKUP_KEY: requiredEnv('DB_BACKUP_ENCRYPTION_KEY'),
+  // A production backup is opened with the production key, never with the local one.
+  BACKUP_KEY: requiredEnv(
+    fromFile === undefined ? 'DB_BACKUP_ENCRYPTION_KEY' : 'RESTORE_BACKUP_KEY'
+  ),
 };
 const connectionArgs = ['-h', host, '-P', port, '-u', user];
 
@@ -146,31 +163,77 @@ async function rowCounts(
   return new Map(totals);
 }
 
-async function rehearse(): Promise<void> {
+/** Local server, scratch database distinct from the source, Yekora databases only. */
+function assertSafeTargets(): void {
   if (!isLocalHost(host))
-    throw new Error(`the rehearsal only runs on localhost, not ${host}`);
+    throw new Error(`restores only run on localhost, not ${host}`);
   if (target === source)
     throw new Error('RESTORE_DB_NAME must differ from DB_NAME');
-  // The local server is shared with other projects: only yekora_ databases are ever touched.
+  // The local server is shared with other projects: only Yekora databases are ever touched.
   if (!isYekoraDatabase(source) || !isYekoraDatabase(target)) {
     throw new Error(
-      'DB_NAME and RESTORE_DB_NAME must both be yekora_ databases'
+      'DB_NAME and RESTORE_DB_NAME must both be Yekora databases'
     );
   }
+}
+
+/** Opens a server connection and recreates the empty scratch database. */
+async function freshTarget(): Promise<mysql.Connection> {
   const connection = await mysql.createConnection({
     host,
     port: Number(port),
     user,
     password,
   });
+  await connection.query('DROP DATABASE IF EXISTS ??', [target]);
+  await connection.query(
+    'CREATE DATABASE ?? CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    [target]
+  );
+  return connection;
+}
+
+const seconds = (ms: number) => (ms / 1000).toFixed(1);
+
+/**
+ * K-12 drill: restores a downloaded production backup into the scratch database and times it.
+ * The file must decrypt with the production key and load without errors; with
+ * `--expect-tables` the restored copy must have exactly that many tables.
+ */
+async function restoreFrom(file: string): Promise<void> {
+  assertSafeTargets();
+  const size = statSync(file).size;
+  const expectTables = flagValue('--expect-tables');
+  const connection = await freshTarget();
+  try {
+    const started = Date.now();
+    await restore(file);
+    const restored = Date.now();
+    const counts = await rowCounts(connection, target);
+    if (expectTables !== undefined && counts.size !== Number(expectTables)) {
+      throw new Error(
+        `restored ${counts.size} tables, expected ${expectTables}`
+      );
+    }
+    const rows = [...counts].map(([table, total]) => `${table}=${total}`);
+    const detail = rows.length > 0 ? ' (' + rows.join(', ') + ')' : '';
+    console.log(
+      `[OK] backup decrypted and loaded into ${target}: ${counts.size} tables${detail}.`
+    );
+    console.log(
+      `[RTO] decrypt + restore ${seconds(restored - started)} s (target < 900 s) · backup size ${size} bytes`
+    );
+  } finally {
+    await connection.end();
+  }
+}
+
+async function rehearse(): Promise<void> {
+  assertSafeTargets();
+  const connection = await freshTarget();
   const workDir = mkdtempSync(join(tmpdir(), 'yekora-restore-'));
   const file = join(workDir, `backup_${source}.sql.gz.enc`);
   try {
-    await connection.query('DROP DATABASE IF EXISTS ??', [target]);
-    await connection.query(
-      'CREATE DATABASE ?? CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
-      [target]
-    );
     const started = Date.now();
     await backup(file);
     const backedUp = Date.now();
@@ -189,7 +252,6 @@ async function rehearse(): Promise<void> {
     ) {
       throw new Error(`restored copy differs: ${JSON.stringify(mismatches)}`);
     }
-    const seconds = (ms: number) => (ms / 1000).toFixed(1);
     console.log(
       `[OK] ${expected.size} tables, same row counts in ${source} and ${target}.`
     );
@@ -203,12 +265,14 @@ async function rehearse(): Promise<void> {
   }
 }
 
-if (!process.argv.includes('--rehearse')) {
-  console.error('usage: bun scripts/restoreDbBackup.ts --rehearse');
+if (!process.argv.includes('--rehearse') && !fromFile) {
+  console.error(
+    'usage: bun scripts/restoreDbBackup.ts --rehearse | --from <backup.sql.gz.enc> [--expect-tables <n>]'
+  );
   process.exit(2);
 }
 try {
-  await rehearse();
+  await (fromFile ? restoreFrom(fromFile) : rehearse());
 } catch (error: unknown) {
   console.error(
     `[FAIL] ${error instanceof Error ? error.message : String(error)}`

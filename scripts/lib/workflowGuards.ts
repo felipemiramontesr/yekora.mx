@@ -65,6 +65,40 @@ export function mentionsSelfHosted(workflow: string): boolean {
 }
 
 /**
+ * Violations of the always-on API checks of deploy.yml (FC 009 F0 · K-13). The F5 bootstrap
+ * switch `vars.API_LIVE` let the API smoke test and the catalog read be skipped without failing;
+ * it is retired, and nothing may make those two steps conditional again.
+ *
+ * @param workflow - Text of deploy.yml.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function deployWorkflowViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  // Code only: a comment may tell the history of the switch.
+  const code = workflow.split(/\r?\n/).map((line) => line.split('#')[0]);
+  if (code.some((line) => line.includes('API_LIVE'))) {
+    violations.push('the retired API_LIVE switch is back (K-13)');
+  }
+  const lines = workflow.split(/\r?\n/).map((line) => line.trim());
+  const smoke = lines.indexOf(
+    '- name: 🔥 Smoke test — apiv1.yekora.mx serves this commit'
+  );
+  if (smoke === -1) {
+    violations.push('the apiv1.yekora.mx smoke test is missing');
+  } else if (
+    lines.slice(smoke + 1, smoke + 4).some((line) => line.startsWith('if:'))
+  ) {
+    violations.push('the apiv1.yekora.mx smoke test must not be conditional');
+  }
+  if (!lines.includes('CATALOG_API_URL: https://apiv1.yekora.mx')) {
+    violations.push(
+      'the site build must always read the catalog from apiv1.yekora.mx'
+    );
+  }
+  return violations;
+}
+
+/**
  * Every R1 violation of the migrations workflow.
  *
  * @param workflow - Text of db-migrations.yml.

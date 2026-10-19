@@ -36,6 +36,9 @@ const PAGES = [
   // yet, so product pages are checked in catalog.spec.ts, not here.
   '/catalogo/',
   '/en/catalog/',
+  // Cart (FC 009): 19 routes × 6 viewports = 114 cells.
+  '/carrito/',
+  '/en/cart/',
   // Branded 404 (FC 004): any unknown path.
   '/no-existe/',
 ];

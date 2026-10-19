@@ -30,7 +30,9 @@ test('the Spanish catalog lists every product in pesos only', async ({
 }) => {
   await page.goto('/catalogo/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Catálogo');
-  await expect(page.getByRole('status')).toHaveText('3 productos');
+  await expect(page.locator('main').getByRole('status')).toHaveText(
+    '3 productos'
+  );
   await expect(cards(page)).toHaveCount(3);
   await expect(page.locator('main')).toContainText('$4,850.00 MXN');
   await expect(page.locator('main')).toContainText(
@@ -61,7 +63,9 @@ test('filters by discipline and level, sorts by price and recovers from an empty
   await filter(page, 'Disciplina').selectOption({ label: 'Escalada' });
   await expect(cards(page)).toHaveCount(1);
   await expect(cards(page)).toContainText('Arnés alpino');
-  await expect(page.getByRole('status')).toHaveText('1 producto');
+  await expect(page.locator('main').getByRole('status')).toHaveText(
+    '1 producto'
+  );
 
   await filter(page, 'Nivel').selectOption({ label: 'Principiante' });
   await expect(page.getByText('Ningún producto coincide')).toBeVisible();

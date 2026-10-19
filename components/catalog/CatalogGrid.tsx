@@ -110,7 +110,12 @@ function ProductCard({
         <h2 className="text-lg font-semibold group-hover:underline">
           {item.name}
         </h2>
-        <p className="mt-auto text-lg font-semibold">{item.price.mxn}</p>
+        <p className="mt-auto text-lg font-semibold">
+          {item.price.mxn}{' '}
+          <span className="text-xs font-normal text-petroleo/80">
+            {messages.price.vatIncluded}
+          </span>
+        </p>
         {item.price.usd && (
           <p className="text-sm text-petroleo/80">
             {fill(messages.price.usdReference, { usd: item.price.usd })}
