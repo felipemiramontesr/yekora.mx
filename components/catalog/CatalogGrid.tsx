@@ -210,11 +210,12 @@ export function CatalogGrid({
         </Filter>
       </fieldset>
 
-      <p role="status" className="mt-6 text-sm text-petroleo/80">
+      {/* <output> carries the status role natively, so the count is announced when it changes. */}
+      <output className="mt-6 block text-sm text-petroleo/80">
         {fill(plural === 'one' ? filters.results.one : filters.results.other, {
           count: visible.length,
         })}
-      </p>
+      </output>
 
       {visible.length === 0 ? (
         <div className="mt-6 flex flex-col items-start gap-4">

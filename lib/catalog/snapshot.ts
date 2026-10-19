@@ -41,17 +41,17 @@ const snapshotSchema = z
   })
   // Each product page links its translation (hreflang): both languages must list the same slugs.
   .refine(
-    ({ products }) =>
-      products['es-MX']
-        .map((p) => p.slug)
-        .sort()
-        .join() ===
-      products.en
-        .map((p) => p.slug)
-        .sort()
-        .join(),
+    ({ products }) => slugList(products['es-MX']) === slugList(products.en),
     { message: 'es-MX and en must list the same products' }
   );
+
+/** Slugs of a product list in a stable order, to compare two languages regardless of order. */
+function slugList(products: readonly { slug: string }[]): string {
+  return products
+    .map((product) => product.slug)
+    .sort((a, b) => a.localeCompare(b))
+    .join();
+}
 
 /** The catalog of both languages and the FIX of its USD reference. */
 export type CatalogSnapshot = z.infer<typeof snapshotSchema>;
