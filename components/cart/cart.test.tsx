@@ -191,7 +191,7 @@ describe('cart button and panel', () => {
     fireEvent.click(cartLink());
     fireEvent.click(within(panel()).getByText('Tu mochila está vacía'));
     expect(panel().hasAttribute('open')).toBe(true);
-    fireEvent.click(panel());
+    fireEvent.click(panel().querySelector('[data-cart-backdrop]') as Element);
     expect(panel().hasAttribute('open')).toBe(false);
   });
 

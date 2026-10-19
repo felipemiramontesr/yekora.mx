@@ -46,14 +46,22 @@ export function CartDrawer({
       ref={dialog}
       aria-label={messages.title}
       onClose={onClose}
-      // A click on the backdrop lands on the dialog itself, not on its content.
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      className="fixed inset-y-0 right-0 left-auto m-0 h-full max-h-none w-full max-w-md overflow-y-auto bg-marfil p-0 text-petroleo backdrop:bg-petroleo/60"
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent p-0 text-petroleo backdrop:bg-petroleo/60"
     >
+      {/* The dimmed area is a real button, so "click outside to close" is an interactive
+          element (S6847). Hidden from assistive tech and out of the tab order: the keyboard and screen
+          readers close it with Esc or the "Cerrar" button. */}
+      <button
+        type="button"
+        data-cart-backdrop
+        tabIndex={-1}
+        aria-hidden="true"
+        aria-label={messages.close}
+        onClick={onClose}
+        className="absolute inset-0 size-full cursor-default"
+      />
       {open && (
-        <div className="flex min-h-full flex-col gap-4 p-5">
+        <div className="relative ml-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto bg-marfil p-5">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-2xl font-semibold">{messages.title}</h2>
             <button
