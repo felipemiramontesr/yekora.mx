@@ -64,6 +64,39 @@ export function decide(
 }
 
 /**
+ * The migrations one run applies (Archon model: one named migration per production run).
+ *
+ * Without a target, every pending migration in order (local development). With a target, only
+ * that file, and only when every earlier migration is already applied, so the order of the
+ * folder is always the order of the database. A target already applied is a safe no-op.
+ *
+ * @param plan - Every canonical migration with its decision, in order (tampering already ruled out).
+ * @param target - File name chosen for this run, or undefined for all pending.
+ * @returns The steps to apply, in order; empty when there is nothing to do.
+ * @throws When the target is not a migration of the folder, or an earlier one is still pending.
+ */
+export function stepsToApply<
+  Step extends { file: string; decision: MigrationDecision },
+>(plan: readonly Step[], target?: string): Step[] {
+  if (target === undefined) {
+    return plan.filter((step) => step.decision === 'apply');
+  }
+  const index = plan.findIndex((step) => step.file === target);
+  if (index === -1) {
+    throw new Error(`${target} is not a canonical migration in migrations/`);
+  }
+  const earlier = plan
+    .slice(0, index)
+    .filter((step) => step.decision === 'apply');
+  if (earlier.length > 0) {
+    throw new Error(
+      `apply ${earlier.map((step) => step.file).join(', ')} first: migrations run in order`
+    );
+  }
+  return plan[index].decision === 'apply' ? [plan[index]] : [];
+}
+
+/**
  * Whether a database host is the local machine. Development data (`seed_dev.sql`) and
  * rollbacks only run there: fictitious products must never reach production.
  *

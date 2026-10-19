@@ -9,7 +9,15 @@
  */
 import { start } from './index';
 
-const { stop } = await start(process.env);
+/** Commit stamped by apps/api/build.ts; absent when running unbundled. */
+declare const __BUILD_SHA__: string | undefined;
+
+// The stamp wins over any GIT_SHA in the server environment: /health must report the bytes
+// that actually run, not a value someone typed in hPanel.
+const sha = typeof __BUILD_SHA__ === 'string' ? __BUILD_SHA__ : undefined;
+const { stop } = await start(
+  sha ? { ...process.env, GIT_SHA: sha } : process.env
+);
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     void stop().then(() => process.exit(0));

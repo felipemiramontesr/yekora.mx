@@ -86,6 +86,16 @@ export function migrationsWorkflowViolations(
   if (!lines.includes('environment: production-db')) {
     violations.push('the migrate job must run in environment production-db');
   }
+  // Archon's convention (Ω, 2026-10-19): every run is titled with the migration it applies.
+  if (
+    !lines.includes(
+      'run-name: 🏛️ ${{ inputs.migration_file }} · @${{ github.actor }}'
+    )
+  ) {
+    violations.push(
+      'the run title must name the migration file (Archon convention)'
+    );
+  }
   if (!workflow.includes(`[ "$ACTOR" = "${owner}" ]`)) {
     violations.push(`the actor guard for ${owner} is missing`);
   }

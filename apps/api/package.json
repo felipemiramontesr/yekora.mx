@@ -2,14 +2,14 @@
   "name": "@yekora/api",
   "private": true,
   "type": "module",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "YĒKORA catalog API (FC 008): Fastify on Node 24, MariaDB with hand-written parameterized SQL, no ORM.",
   "engines": {
     "node": ">=24.0.0"
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/index.js --packages=external",
+    "build": "bun build.ts",
     "start": "node dist/index.js"
   },
   "devDependencies": {

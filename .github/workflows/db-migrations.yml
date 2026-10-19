@@ -25,10 +25,16 @@
 # ============================================================
 
 name: 🏛️ DB Migrations (PROD)
-run-name: 🏛️ DB migrations · @${{ github.actor }}
+# Archon's convention: every run is titled with the migration it applies.
+run-name: 🏛️ ${{ inputs.migration_file }} · @${{ github.actor }}
 
 on:
   workflow_dispatch:
+    inputs:
+      migration_file:
+        description: 'File in migrations/ (NNN_V<version>_FC<nnn>-F<n>_<YYYYMMDD>_<description>.sql)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -42,6 +48,7 @@ jobs:
     name: 🔐 Authorize (T1.2 · D ∧ A)
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Only GrayMan, only main, only by hand
         env:
           ACTOR: ${{ github.actor }}
@@ -53,6 +60,19 @@ jobs:
           [ "$REF" = "refs/heads/main" ] || { echo "::error::D: ref $REF is not main"; exit 1; }
           [ "$ACTOR" = "felipemiramontesr" ] || { echo "::error::A: actor $ACTOR is not the sovereign owner"; exit 1; }
           echo "✅ D ∧ A: workflow_dispatch on main by $ACTOR"
+      - name: Migration file (T1.3 · F — canonical name, versioned in main)
+        # The input only ever travels in a quoted environment variable, never inside the script.
+        env:
+          MIGRATION_FILE: ${{ inputs.migration_file }}
+        run: |
+          set -euo pipefail
+          case "$MIGRATION_FILE" in
+            *[!A-Za-z0-9._-]* | "" ) echo "::error::F: name outside [A-Za-z0-9._-]"; exit 1 ;;
+          esac
+          CANONICAL='^[0-9]{3}_V[0-9]+\.[0-9]+\.[0-9]+_FC[0-9]{3}-F[0-9]+_[0-9]{8}_[a-z0-9]+(_[a-z0-9]+)*\.sql$'
+          [[ "$MIGRATION_FILE" =~ $CANONICAL ]] || { echo "::error::F: not NNN_V<version>_FC<nnn>-F<n>_<YYYYMMDD>_<description>.sql"; exit 1; }
+          git ls-files --error-unmatch "migrations/$MIGRATION_FILE" >/dev/null 2>&1 || { echo "::error::F: migrations/$MIGRATION_FILE is not versioned in main"; exit 1; }
+          echo "✅ F: $MIGRATION_FILE"
 
   migrate:
     name: 🏛️ Backup and migrate
@@ -61,6 +81,8 @@ jobs:
     # O: GrayMan approves this environment before the job starts.
     environment: production-db
     timeout-minutes: 20
+    env:
+      MIGRATION_FILE: ${{ inputs.migration_file }}
     defaults:
       run:
         shell: bash
@@ -100,7 +122,7 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
         run: |
           set -euo pipefail
-          bun scripts/migrateDb.ts --plan | tee plan.txt
+          bun scripts/migrateDb.ts --plan --target "$MIGRATION_FILE" | tee plan.txt
           echo "tables=$(sed -n 's/^\[PLAN\] tables=//p' plan.txt)" >> "$GITHUB_OUTPUT"
           echo "pending=$(sed -n 's/^\[PLAN\] pending=//p' plan.txt)" >> "$GITHUB_OUTPUT"
 
@@ -117,7 +139,7 @@ jobs:
           TABLES: ${{ steps.plan.outputs.tables }}
         run: |
           set -euo pipefail
-          FILE="backup_pre_migration_$(date -u +%Y%m%dT%H%M%SZ).sql.gz.enc"
+          FILE="backup_pre_${MIGRATION_FILE%.sql}_$(date -u +%Y%m%dT%H%M%SZ).sql.gz.enc"
           MYSQL_PWD="$DB_PASSWORD" mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" \
             --single-transaction --routines --triggers "$DB_NAME" \
             | gzip \
@@ -155,7 +177,7 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
-        run: bun scripts/migrateDb.ts
+        run: bun scripts/migrateDb.ts --target "$MIGRATION_FILE"
 
       - name: Verify (idempotent registry and seeded references — aggregates only)
         id: verify
@@ -167,7 +189,7 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
         run: |
           set -euo pipefail
-          bun scripts/migrateDb.ts --plan | tee verify.txt
+          bun scripts/migrateDb.ts --plan --target "$MIGRATION_FILE" | tee verify.txt
           grep -q '^\[PLAN\] pending=0$' verify.txt || { echo "::error::Migrations still pending after apply"; exit 1; }
           q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -N -B "$DB_NAME" -e "$1"; }
           CATEGORIES=$(q "SELECT COUNT(*) FROM categories WHERE slug IN ('senderismo','montana','escalada','canonismo','trail-running')")
@@ -184,7 +206,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "### 🏛️ DB migrations — production"
+            echo "### 🏛️ $MIGRATION_FILE — production"
             echo ""
             echo "| Step | Result |"
             echo "| :--- | :--- |"

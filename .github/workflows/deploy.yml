@@ -288,11 +288,79 @@ jobs:
           A08_EXIT: ${{ steps.owasp_scripts.outputs.a08 }}
         run: bun scripts/generateCertificationDashboard.ts all-results >> "$GITHUB_STEP_SUMMARY"
 
+  api-release:
+    name: 📦 API release (apiv1.yekora.mx)
+    # FC 008 F5 · R2: the CI is the only compiler. The certified, self-contained bundle goes to
+    # the api-release branch, which Hostinger's Node.js app tracks; Hostinger never installs or
+    # builds anything. /health reports the stamped commit, so the smoke test proves what runs.
+    needs: [global-certification]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: api-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build the certified bundle (stamped with this commit)
+        run: bun run --cwd apps/api build
+      - name: Publish to the api-release branch
+        # A worktree shares the checkout credentials; the branch holds only index.js and its
+        # dependency-free package.json, one commit per release.
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin api-release > /dev/null; then
+            git fetch --depth=1 origin api-release
+            git worktree add --detach release origin/api-release
+          else
+            git worktree add --detach release
+            git -C release checkout --orphan api-release-init
+            git -C release rm -rfq .
+          fi
+          find release -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp apps/api/dist/index.js apps/api/dist/package.json release/
+          git -C release add -A
+          git -C release commit -qm "API release $GITHUB_SHA"
+          git -C release push origin HEAD:refs/heads/api-release
+          echo "[OK] api-release ← $GITHUB_SHA"
+      - name: 🔥 Smoke test — apiv1.yekora.mx serves this commit
+        # Enabled by the repository variable API_LIVE once Hostinger's app tracks api-release
+        # (F5 bootstrap). Up to 6 minutes for Hostinger to pull the branch and restart.
+        if: vars.API_LIVE == 'true'
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 36); do
+            LIVE=$(curl -fsS "https://apiv1.yekora.mx/health" | jq -r '.sha' 2> /dev/null || true)
+            if [ "$LIVE" = "$GITHUB_SHA" ]; then break; fi
+            echo "Attempt $attempt: live sha '$LIVE', expected $GITHUB_SHA"
+            sleep 10
+          done
+          [ "$LIVE" = "$GITHUB_SHA" ] || { echo "FATAL: apiv1.yekora.mx does not run $GITHUB_SHA"; exit 1; }
+          curl -fsS https://apiv1.yekora.mx/health | jq -e '.status == "ok" and .db == "connected"'
+          curl -fsS https://apiv1.yekora.mx/v1/catalog | jq -e '.items | type == "array"' > /dev/null
+          # 503 is the documented answer while no Banxico FIX has been stored yet.
+          RATE=$(curl -sS -o /dev/null -w '%{http_code}' https://apiv1.yekora.mx/v1/exchange-rate)
+          [ "$RATE" = "200" ] || [ "$RATE" = "503" ] || { echo "FATAL: /v1/exchange-rate → $RATE"; exit 1; }
+          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate $RATE"
+      - name: Smoke test pending (API_LIVE not set)
+        if: vars.API_LIVE != 'true'
+        run: echo "::notice::api-release published; apiv1.yekora.mx is not checked until API_LIVE=true (F5 bootstrap)."
+
   hostinger-deployment:
     name: 🚀 Deployment to Hostinger
     # Only certified pushes to main reach production (FC 003). Hostinger's own Git
-    # auto-deployment stays off: this job is the only way in.
-    needs: [global-certification]
+    # auto-deployment stays off: this job is the only way in. FC 008: after the API release, so
+    # the catalog is read from the API that was just verified.
+    needs: [global-certification, api-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     # One deploy at a time; a newer push waits instead of cutting an rsync in half.
@@ -317,8 +385,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Build static export (out/)
-        # FC 008: without CATALOG_API_URL the catalog is empty and shows «Próximamente»; the API
-        # source is wired in F5, once apiv1.yekora.mx exists.
+        # FC 008: once API_LIVE is set the catalog is read from apiv1.yekora.mx (a failed read
+        # fails the build and the previous deploy stays online); until then it ships empty and
+        # shows «Próximamente».
+        env:
+          CATALOG_API_URL: ${{ vars.API_LIVE == 'true' && 'https://apiv1.yekora.mx' || '' }}
         run: bun run build
       - name: 🛡️ A1 guard — no fictitious product reaches production
         # FC 008 Does NOT: fictitious products in production. E2E fixture slugs start with e2e-

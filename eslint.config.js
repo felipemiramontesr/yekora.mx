@@ -7,6 +7,8 @@ export default [
   {
     ignores: [
       'dist/**',
+      // FC 008 F5: the API release bundle (apps/api/build.ts) inlines every dependency.
+      'apps/api/dist/**',
       'build/**',
       '.next/**',
       // Static export output (next build with output: 'export').

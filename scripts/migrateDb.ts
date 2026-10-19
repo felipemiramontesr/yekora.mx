@@ -14,6 +14,9 @@
  *   bun scripts/migrateDb.ts --plan       read-only: print `[PLAN] tables=<n>` and
  *                                         `[PLAN] pending=<n>`, fail on tampering; changes nothing
  *                                         (db-migrations.yml decides the backup with it)
+ *   bun scripts/migrateDb.ts --target <file>   apply only that migration, refusing if an
+ *                                         earlier one is pending (production, one per run;
+ *                                         combinable with --plan)
  *   bun scripts/migrateDb.ts --seed-dev   also load migrations/seed_dev.sql (localhost only)
  *   bun scripts/migrateDb.ts --down 001   run 001_down.sql and unregister 001 (localhost only)
  *
@@ -26,8 +29,10 @@ import {
   decide,
   isLocalHost,
   isYekoraDatabase,
+  MIGRATION_NAME,
   migrationChecksum,
   pendingOrder,
+  stepsToApply,
 } from './lib/migrations';
 
 const MIGRATIONS_DIR = join(process.cwd(), 'migrations');
@@ -93,6 +98,22 @@ async function rollback(
   console.log(`[OK] rolled back ${number}`);
 }
 
+/**
+ * The migration named by `--target <file>`, or undefined. The name is checked against the
+ * canonical pattern before any connection, so nothing else ever reaches the file system or SQL.
+ */
+function targetArgument(args: readonly string[]): string | undefined {
+  const index = args.indexOf('--target');
+  if (index === -1) return undefined;
+  const target = args[index + 1] ?? '';
+  if (!MIGRATION_NAME.test(target)) {
+    throw new Error(
+      `--target must be NNN_V<version>_FC<nnn>-F<n>_<YYYYMMDD>_<description>.sql, got "${target}"`
+    );
+  }
+  return target;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const host = requiredEnv('DB_HOST');
@@ -101,6 +122,7 @@ async function main(): Promise<void> {
     throw new Error(`DB_NAME must be a Yekora database, refusing ${database}`);
   }
   const planOnly = args.includes('--plan');
+  const target = targetArgument(args);
   // Development-only actions are refused before any connection is even opened.
   if (args.includes('--down')) assertLocal(host, 'Rollback');
   if (args.includes('--seed-dev')) assertLocal(host, 'The development seed');
@@ -144,20 +166,19 @@ async function main(): Promise<void> {
         `checksum mismatch, applied migrations were edited: ${tampered.map((s) => s.file).join(', ')}`
       );
     }
+    const toApply = stepsToApply(plan, target);
     if (planOnly) {
       for (const step of plan)
         console.log(`[PLAN] ${step.decision} ${step.file}`);
+      if (target) console.log(`[PLAN] target=${target}`);
       console.log(`[PLAN] tables=${Number(tables)}`);
-      console.log(
-        `[PLAN] pending=${plan.filter((step) => step.decision === 'apply').length}`
-      );
+      console.log(`[PLAN] pending=${toApply.length}`);
       return;
     }
-    for (const step of plan) {
-      if (step.decision === 'skip') {
-        console.log(`[SKIP] ${step.file} (already applied, same checksum)`);
-        continue;
-      }
+    if (toApply.length === 0) {
+      console.log('[SKIP] nothing to apply (already applied, same checksum)');
+    }
+    for (const step of toApply) {
       await connection.query(step.sql);
       await connection.query(
         'INSERT INTO schema_migrations (filename, checksum_sha256) VALUES (?, ?)',
@@ -172,9 +193,8 @@ async function main(): Promise<void> {
       );
       console.log('[SEED] seed_dev.sql (local development data)');
     }
-    const applied = plan.filter((step) => step.decision === 'apply').length;
     console.log(
-      `[OK] migrations: ${applied} applied, ${plan.length - applied} skipped.`
+      `[OK] migrations: ${toApply.length} applied, ${plan.length - toApply.length} not applied by this run.`
     );
   } finally {
     await connection.end();

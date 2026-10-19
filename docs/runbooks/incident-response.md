@@ -40,6 +40,8 @@ When D and S are both false, triage between SEV-2 and SEV-4 by user impact.
 3. Load `https://yekora.mx/` and `https://yekora.mx/en/` in a browser. A wrong path must show
    the branded 404 with status 404.
 4. Check hPanel for hosting status and notices.
+5. FC 008: `https://apiv1.yekora.mx/health` shows the API's commit (`sha`) and whether MariaDB
+   answers (`db: connected`, or `503 degraded` with `db: unreachable`).
 
 ## Procedure A — site down or broken after a deploy (rollback)
 
@@ -105,6 +107,36 @@ Log it as an Ω BREAK. Never upload into a nested `public_html/`: the key's root
    - H post with the timeline;
    - an entry in the forensic log (F);
    - a post-incident note.
+
+## Procedure D — catalog API down or wrong (FC 008)
+
+The site keeps working without the API: the catalog pages are static HTML built from a snapshot
+of the API. Only the next deploy needs it, because the build reads the catalog from the API and
+fails (keeping the previous site online) when it cannot.
+
+| Symptom                                    | Action                                                                                                                                             |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/health` does not answer, or answers 5xx  | Ω restarts the Node.js app in hPanel (Websites → apiv1.yekora.mx → restart). Then re-check `/health`                                               |
+| `/health` 503 with `db: unreachable`       | MariaDB is down or its credentials changed: check hPanel → Databases, then the app's environment variables (`DB_*`). Never paste them in chat or H |
+| `/health` shows an older `sha` than `main` | Hostinger did not pull `api-release`. Check that the app tracks branch `api-release`, redeploy it in hPanel, and re-run the `api-release` job      |
+| `/v1/exchange-rate` 503                    | No Banxico FIX stored yet (or `BANXICO_TOKEN` missing or revoked). Prices still show in MXN; fix the token in the app's environment                |
+
+**Rollback of the API:** revert the bad commit on `main` (Procedure A). The pipeline publishes the
+reverted bundle to `api-release` and the smoke test checks that `/health` reports its SHA. Hostinger
+never builds: what runs is always a bundle certified by CI.
+
+## Procedure E — production database (FC 008)
+
+- **Migrations** only run through `db-migrations.yml`: Ω starts the `yekora-db` runner
+  (`C:\actions-runner-yekora\run.cmd`), dispatches the workflow with the migration file name and
+  approves `production-db`. Every run first takes an encrypted backup (artifact, 7 days).
+- **Restore a backup** (Ω only, the key never leaves Ω's password manager):
+  1. Download the artifact `backup_pre_<migration>_<time>.sql.gz.enc` from the run.
+  2. Decrypt and restore it into a scratch database first, never straight into production:
+     `openssl enc -d -aes-256-cbc -pbkdf2 -pass env:DB_BACKUP_ENCRYPTION_KEY -in <file> | gunzip > dump.sql`
+  3. Check the row counts, then load it into production from the whitelisted PC.
+- **RTO:** measured only locally so far (F1 rehearsal, `scripts/restoreDbBackup.ts`). The production
+  measurement is pending (K-12).
 
 ## After an incident (SEV-1 and SEV-2)
 

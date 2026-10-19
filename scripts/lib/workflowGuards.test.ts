@@ -87,6 +87,16 @@ describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
     ]);
   });
 
+  it('flags a run title that does not name the migration file', () => {
+    const tampered = migrations.replace(
+      'run-name: 🏛️ ${{ inputs.migration_file }}',
+      'run-name: 🏛️ DB migrations'
+    );
+    expect(migrationsWorkflowViolations(tampered, OWNER)).toEqual([
+      'the run title must name the migration file (Archon convention)',
+    ]);
+  });
+
   it('flags a workflow without triggers', () => {
     expect(migrationsWorkflowViolations('name: x\n', OWNER)[0]).toBe(
       'triggers must be workflow_dispatch only, found: none'

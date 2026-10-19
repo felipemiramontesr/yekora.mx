@@ -7,6 +7,8 @@ import {
   MIGRATION_NAME,
   migrationChecksum,
   pendingOrder,
+  stepsToApply,
+  type MigrationDecision,
 } from './migrations';
 
 describe('migration names', () => {
@@ -107,6 +109,52 @@ describe('isYekoraDatabase (never touch other projects on a shared server)', () 
     'u123456789_yekoraprod',
   ])('%s is refused', (name) => {
     expect(isYekoraDatabase(name)).toBe(false);
+  });
+});
+
+describe('stepsToApply (one named migration per production run, in order)', () => {
+  const A = '001_V0.4.0_FC008-F1_20261018_create_catalog_schema.sql';
+  const B = '002_V0.5.0_FC009-F1_20261101_add_orders.sql';
+  const C = '003_V0.5.0_FC009-F2_20261102_add_payments.sql';
+  const plan = (
+    a: MigrationDecision,
+    b: MigrationDecision,
+    c: MigrationDecision
+  ) => [
+    { file: A, decision: a },
+    { file: B, decision: b },
+    { file: C, decision: c },
+  ];
+
+  it('applies every pending migration without a target (local development)', () => {
+    expect(
+      stepsToApply(plan('skip', 'apply', 'apply')).map((s) => s.file)
+    ).toEqual([B, C]);
+  });
+
+  it('applies only the target when everything before it is applied', () => {
+    expect(
+      stepsToApply(plan('skip', 'apply', 'apply'), B).map((s) => s.file)
+    ).toEqual([B]);
+  });
+
+  it('is a safe no-op when the target was already applied unchanged', () => {
+    expect(stepsToApply(plan('skip', 'skip', 'apply'), B)).toEqual([]);
+  });
+
+  it('refuses a target while an earlier migration is pending', () => {
+    expect(() => stepsToApply(plan('skip', 'apply', 'apply'), C)).toThrow(
+      `apply ${B} first: migrations run in order`
+    );
+  });
+
+  it('refuses a target that is not a migration of the folder', () => {
+    expect(() =>
+      stepsToApply(
+        plan('skip', 'skip', 'skip'),
+        '009_V9.9.9_FC999-F1_20991231_ghost.sql'
+      )
+    ).toThrow('is not a canonical migration in migrations/');
   });
 });
 
