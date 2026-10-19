@@ -3,7 +3,11 @@
  * Scans named exports in app/, components/ and lib/ and fails when one is not referenced
  * by any other non-test source file.
  * Whitelist: App Router convention files (page, layout, route, …) are wired by the framework,
- * not by imports, and so are the route segment exports listed in FRAMEWORK_EXPORTS. Both lists\n * live in scripts/lib/sourceFiles.ts, shared with the TSDoc gate (FC 006).
+ * not by imports, and so are the route segment exports listed in FRAMEWORK_EXPORTS. Both lists
+ * live in scripts/lib/sourceFiles.ts, shared with the TSDoc gate (FC 006).
+ * FC 008: the scripts that `bun run build` runs (package.json "build", e.g. the catalog snapshot)
+ * are part of the product build, so they count as consumers. They are not scanned themselves,
+ * and no other script counts.
  * FC 003 F2: also fails when a file in public/ is not referenced by its URL path from any
  * non-test source file, since everything in public/ is published to yekora.mx. Server
  * configuration files (SERVER_FILES) are read by Apache, not by the site.
@@ -72,6 +76,17 @@ const files = productSourceFiles(root);
 const contents = new Map(
   files.map((file) => [file, readFileSync(file, 'utf8')])
 );
+const buildScript: string =
+  JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts?.build ??
+  '';
+const buildEntries = [
+  ...buildScript.matchAll(/\bbun (scripts\/\S+\.ts)\b/g),
+].map(([, script]) => join(root, script));
+// Sources plus build entry points: everything an export or a public/ file may be used by.
+const consumers = new Map([
+  ...contents,
+  ...buildEntries.map((file) => [file, readFileSync(file, 'utf8')] as const),
+]);
 const orphans: string[] = [];
 
 for (const [file, source] of contents) {
@@ -79,7 +94,7 @@ for (const [file, source] of contents) {
   for (const name of namedExports(source)) {
     if (FRAMEWORK_EXPORTS.has(name)) continue;
     const usage = new RegExp(`\\b${name.replaceAll('$', '\\$')}\\b`);
-    const used = [...contents].some(
+    const used = [...consumers].some(
       ([other, text]) => other !== file && usage.test(text)
     );
     if (!used) orphans.push(`${relative(root, file)} → ${name}`);
@@ -92,7 +107,7 @@ const publicFiles = walk(join(root, PUBLIC_DIR)).filter(
 );
 for (const file of publicFiles) {
   const urlPath = `/${relative(join(root, PUBLIC_DIR), file).replaceAll('\\', '/')}`;
-  const used = [...contents.values()].some((text) => text.includes(urlPath));
+  const used = [...consumers.values()].some((text) => text.includes(urlPath));
   if (!used) orphans.push(`${relative(root, file)} → not referenced`);
 }
 
@@ -104,5 +119,5 @@ if (orphans.length > 0) {
   process.exit(1);
 }
 console.log(
-  `[OK] DC4 no dead exports across ${files.length} source file(s) and no unreferenced public/ file across ${publicFiles.length}.`
+  `[OK] DC4 no dead exports across ${files.length} source file(s) (+${buildEntries.length} build script(s) as consumers) and no unreferenced public/ file across ${publicFiles.length}.`
 );

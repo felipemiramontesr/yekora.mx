@@ -11,7 +11,7 @@ interface HeaderProps {
   messages: Messages;
 }
 
-// Disciplines, About and the catalog placeholder, shared by the desktop bar and the mobile menu.
+// Disciplines, About and the catalog, shared by the desktop bar and the mobile menu.
 function NavItems({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <>
@@ -34,21 +34,20 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
         </a>
       </li>
       <li>
-        {/* No catalog route exists yet: a label, never a link that 404s. */}
-        <span aria-disabled="true" className="opacity-70">
-          {messages.header.catalog}{' '}
-          <span className="rounded-full border border-ocre px-2 py-0.5 text-xs">
-            {messages.header.comingSoon}
-          </span>
-        </span>
+        <a
+          href={routeFor('catalog', locale)}
+          className="tap-target underline-offset-4 hover:underline"
+        >
+          {messages.header.catalog}
+        </a>
       </li>
     </>
   );
 }
 
 /**
- * Site header: brand lockup linking home, the discipline anchors, About, the catalog placeholder
- * and the language switcher. From xl (1280 px) a single bar; below, a menu built on native
+ * Site header: brand lockup linking home, the discipline anchors, About, the catalog and the
+ * language switcher. From xl (1280 px) a single bar; below, a menu built on native
  * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
  */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {

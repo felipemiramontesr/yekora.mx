@@ -9,7 +9,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join, relative, sep } from 'node:path';
 
 /** Product source roots; scripts/ and e2e/ are tooling, not product code. */
-export const SOURCE_DIRS = ['app', 'components', 'lib'];
+export const SOURCE_DIRS = ['app', 'components', 'lib', 'apps/api/src'];
 
 /** File extensions that hold product source. */
 export const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);

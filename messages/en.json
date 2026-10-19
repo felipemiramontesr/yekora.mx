@@ -300,8 +300,7 @@
     "navLabel": "Main navigation",
     "menu": "Menu",
     "about": "About us",
-    "catalog": "Catalog",
-    "comingSoon": "Coming soon"
+    "catalog": "Catalog"
   },
   "disciplines": {
     "senderismo": "Hiking",
@@ -391,5 +390,43 @@
     "title": "You are out of coverage",
     "lede": "We could not load this page because your device has no internet connection. The pages you already visited are still available.",
     "retry": "Try again"
+  },
+  "catalog": {
+    "metaTitle": "Catalog | YĒKORA",
+    "title": "Catalog",
+    "lede": "Outdoor gear chosen for what it really does, for every discipline and every level.",
+    "comingSoon": {
+      "badge": "Coming soon",
+      "title": "We are preparing the catalog",
+      "text": "We are choosing the gear piece by piece, with the same care we put into choosing a route. In the meantime, explore the disciplines we support.",
+      "cta": "See the disciplines"
+    },
+    "filters": {
+      "label": "Filter and sort",
+      "discipline": "Discipline",
+      "level": "Level",
+      "allDisciplines": "All disciplines",
+      "allLevels": "All levels",
+      "sort": "Sort by",
+      "sortName": "Name",
+      "sortPriceAsc": "Price: low to high",
+      "sortPriceDesc": "Price: high to low",
+      "results": { "one": "1 product", "other": "{count} products" },
+      "empty": "No product matches these filters.",
+      "reset": "Clear filters"
+    },
+    "product": {
+      "back": "Back to the catalog",
+      "discipline": "Discipline",
+      "level": "Level",
+      "inStock": "In stock",
+      "outOfStock": "Out of stock",
+      "sku": "SKU"
+    },
+    "price": {
+      "currencyNote": "Prices in Mexican pesos (MXN).",
+      "usdReference": "≈ {usd}",
+      "fxNote": "US dollar reference at Banxico's FIX exchange rate of {date} ({rate} MXN per USD). You pay in Mexican pesos."
+    }
   }
 }

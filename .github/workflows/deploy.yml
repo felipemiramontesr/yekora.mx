@@ -60,6 +60,10 @@ jobs:
       - name: TSDoc Coverage (blocking — every exported declaration documented)
         if: matrix.shard == 1
         run: bun run check:tsdoc
+      - name: Build API bundle (apps/api, esbuild → dist/index.js)
+        # Proves the Hostinger entry point bundles; the deploy artifact comes in FC 008 F5.
+        if: matrix.shard == 1
+        run: bun run --cwd apps/api build
       - name: Upload TSC Result
         if: matrix.shard == 1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -150,7 +154,11 @@ jobs:
               }
             });
           "
-      - name: Build static export (out/)
+      - name: Build static export (out/) with the E2E catalog fixture
+        # FC 008: three fictitious e2e- products, canonical row 485000 MXN / 18.5000 → 26216 USD.
+        # This out/ is only tested, never deployed: the deploy job builds its own.
+        env:
+          CATALOG_FIXTURE: e2e/fixtures/catalog.json
         run: bun run build
       - name: Serve out/ with Apache (httpd 2.4 + mod_rewrite + .htaccess, as on Hostinger)
         # The suite runs against what Hostinger serves, not the dev server (FC 003 F2).
@@ -251,6 +259,10 @@ jobs:
           echo "a08=$?" >> "$GITHUB_OUTPUT"
       - name: DC4 — Dead Exports Guard (blocking)
         run: bun scripts/checkDeadExports.ts
+      - name: ADR 0007 — No ENUM/SET in migrations (blocking)
+        run: bun scripts/checkNoEnum.ts
+      - name: OWASP A03 — Static, parameterized SQL in the API (blocking)
+        run: bun scripts/checkNoRawSql.ts
       - name: Gate 2 — Diff-Scoped Quality (blocking)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -305,7 +317,20 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Build static export (out/)
+        # FC 008: without CATALOG_API_URL the catalog is empty and shows «Próximamente»; the API
+        # source is wired in F5, once apiv1.yekora.mx exists.
         run: bun run build
+      - name: 🛡️ A1 guard — no fictitious product reaches production
+        # FC 008 Does NOT: fictitious products in production. E2E fixture slugs start with e2e-
+        # and local seed slugs with dev-; either one in out/ aborts the deploy.
+        run: |
+          leaked=$(find out/catalogo out/en/catalog -mindepth 1 -maxdepth 1 -type d \( -name 'e2e-*' -o -name 'dev-*' \) 2>/dev/null)
+          if [ -n "$leaked" ]; then
+            echo "FATAL: fictitious product pages in out/:"
+            echo "$leaked"
+            exit 1
+          fi
+          echo "OK: no fictitious product page in out/"
       - name: Stamp the build with its commit (out/version.txt, out/sw.js)
         # FC 007: the service worker only updates in browsers when its bytes change, so the
         # commit SHA replaces the __BUILD_SHA__ marker; its cache name changes on every deploy.

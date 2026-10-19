@@ -5,6 +5,12 @@ node_modules/
 .next/
 out/
 
+# api bundle (built in CI, published as an artifact; never committed)
+apps/api/dist/
+
+# catalog snapshot (FC 008): written by scripts/buildCatalog.ts before each build
+.catalog/
+
 # env / secrets
 .env
 .env*.local

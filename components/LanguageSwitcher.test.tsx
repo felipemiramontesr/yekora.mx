@@ -41,6 +41,19 @@ describe('LanguageSwitcher', () => {
     expect(globe?.closest('a')).toBeNull();
   });
 
+  it('keeps the same product on a product page (FC 008)', () => {
+    pathname.current = '/catalogo/arnes-alpino/';
+    render(
+      <LanguageSwitcher
+        locale="es-MX"
+        messages={getMessages('es-MX').languageSwitcher}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'English' }).getAttribute('href')
+    ).toBe('/en/catalog/arnes-alpino/');
+  });
+
   it('falls back to the locale root when the path is unknown', () => {
     pathname.current = null;
     render(

@@ -17,4 +17,10 @@ AddType application/manifest+json .webmanifest
   <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
   </FilesMatch>
+
+  # Content Security Policy (FC 008, OWASP A05), on every answer including the 404 page.
+  # Everything is served from this origin; the only other origin is the catalog API. Next.js
+  # inlines its bootstrap scripts and styles in the static export, hence 'unsafe-inline'.
+  # scripts/serveStatic.ts reads this exact line, so the local E2E runs under the same policy.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>

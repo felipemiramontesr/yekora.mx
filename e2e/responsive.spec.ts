@@ -32,6 +32,10 @@ const PAGES = [
   // Offline fallback pages (FC 007).
   '/offline/',
   '/en/offline/',
+  // Catalog (FC 008): 17 routes × 6 viewports = 102 cells. Production ships no product page
+  // yet, so product pages are checked in catalog.spec.ts, not here.
+  '/catalogo/',
+  '/en/catalog/',
   // Branded 404 (FC 004): any unknown path.
   '/no-existe/',
 ];

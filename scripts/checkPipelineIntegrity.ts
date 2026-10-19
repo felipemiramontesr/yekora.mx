@@ -3,11 +3,22 @@
  *   a) deploy.yml is the only CI workflow: sonar.yml and l-verify.yml must not exist.
  *   b) Critical actions in deploy.yml (checkout, setup-bun, sonarqube, trufflehog) are pinned by full SHA.
  *   c) bun.lock exists and matches package.json (`bun install --frozen-lockfile --dry-run`).
+ *   d) FC 008 · R1 / T1.2: db-migrations.yml is triggered by workflow_dispatch only, runs in
+ *      production-db, checks the actor and pins every action (scripts/lib/workflowGuards.ts).
+ *   e) FC 008 · R1: no workflow other than db-migrations.yml mentions self-hosted.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  mentionsSelfHosted,
+  migrationsWorkflowViolations,
+} from './lib/workflowGuards';
+
+/** GitHub login of GrayMan (Ω), the only actor allowed to migrate production. */
+const OWNER = 'felipemiramontesr';
+const MIGRATIONS_WORKFLOW = 'db-migrations.yml';
 
 const root = process.cwd();
 const workflowsDir = join(root, '.github', 'workflows');
@@ -47,6 +58,24 @@ if (existsSync(deployPath)) {
   failures.push('b) .github/workflows/deploy.yml is missing');
 }
 
+const migrationsPath = join(workflowsDir, MIGRATIONS_WORKFLOW);
+if (existsSync(migrationsPath)) {
+  for (const violation of migrationsWorkflowViolations(
+    readFileSync(migrationsPath, 'utf8'),
+    OWNER
+  )) {
+    failures.push(`d) ${MIGRATIONS_WORKFLOW}: ${violation}`);
+  }
+}
+for (const name of readdirSync(workflowsDir)) {
+  if (name === MIGRATIONS_WORKFLOW || !/\.ya?ml$/.test(name)) continue;
+  if (mentionsSelfHosted(readFileSync(join(workflowsDir, name), 'utf8'))) {
+    failures.push(
+      `e) ${name} targets a self-hosted runner (only ${MIGRATIONS_WORKFLOW} may)`
+    );
+  }
+}
+
 if (existsSync(join(root, 'bun.lock'))) {
   // process.execPath is the bun binary running this script: no lookup through PATH.
   const frozen = spawnSync(
@@ -68,5 +97,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: single workflow, pinned actions, lockfile in sync.'
+  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, lockfile in sync, migrations workflow manual-only and the only one on self-hosted.'
 );

@@ -32,9 +32,10 @@ describe('Header', () => {
     expect(html).toContain('href="/en/about/"');
   });
 
-  it('shows the catalog as coming soon, never as a link', () => {
-    expect(html).toContain('Coming soon');
+  it('links the catalog in the current language (FC 008)', () => {
+    expect(html).toContain('href="/en/catalog/"');
     expect(html).not.toContain('/catalogo');
+    expect(html).not.toContain('Coming soon');
   });
 
   it('renders the mobile menu without client JavaScript', () => {
@@ -49,6 +50,6 @@ describe('Header', () => {
     );
     expect(spanish).toContain('href="/#canonismo"');
     expect(spanish).toContain('Cañonismo');
-    expect(spanish).toContain('Próximamente');
+    expect(spanish).toContain('href="/catalogo/"');
   });
 });

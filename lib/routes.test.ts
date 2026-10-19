@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { pageFromPath, pageMetadata, routeFor, siteMetadata } from './routes';
+import {
+  pageMetadata,
+  productMetadata,
+  productPath,
+  routeFor,
+  siteMetadata,
+  translatePath,
+} from './routes';
 
 describe('routes', () => {
   it('puts Spanish at the root and English under /en/ with translated slugs', () => {
@@ -11,11 +18,47 @@ describe('routes', () => {
     expect(routeFor('offline', 'en')).toBe('/en/offline/');
   });
 
-  it('finds the page of a path in either language, with or without the final slash', () => {
-    expect(pageFromPath('/privacidad/')).toBe('privacy');
-    expect(pageFromPath('/en/privacy')).toBe('privacy');
-    expect(pageFromPath('/en/')).toBe('home');
-    expect(pageFromPath('/does-not-exist/')).toBe('home');
+  it('translates a path to the same page in the other language, with or without the final slash', () => {
+    expect(translatePath('/privacidad/', 'en')).toBe('/en/privacy/');
+    expect(translatePath('/en/privacy', 'es-MX')).toBe('/privacidad/');
+    expect(translatePath('/en/', 'es-MX')).toBe('/');
+    expect(translatePath('/does-not-exist/', 'en')).toBe('/en/');
+    expect(translatePath('/catalogo/', 'en')).toBe('/en/catalog/');
+  });
+
+  it('keeps the product when translating a product page (FC 008)', () => {
+    expect(productPath('arnes-alpino', 'es-MX')).toBe(
+      '/catalogo/arnes-alpino/'
+    );
+    expect(translatePath('/catalogo/arnes-alpino/', 'en')).toBe(
+      '/en/catalog/arnes-alpino/'
+    );
+    expect(translatePath('/en/catalog/arnes-alpino', 'es-MX')).toBe(
+      '/catalogo/arnes-alpino/'
+    );
+    expect(translatePath('/en/catalog/arnes-alpino/', 'en')).toBe(
+      '/en/catalog/arnes-alpino/'
+    );
+  });
+
+  it('builds product metadata from the product, with hreflang to the same product', () => {
+    expect(
+      productMetadata(
+        { slug: 'arnes-alpino', name: 'Alpine harness', description: 'Light.' },
+        'en'
+      )
+    ).toEqual({
+      title: 'Alpine harness | YĒKORA',
+      description: 'Light.',
+      alternates: {
+        canonical: '/en/catalog/arnes-alpino/',
+        languages: {
+          'es-MX': '/catalogo/arnes-alpino/',
+          en: '/en/catalog/arnes-alpino/',
+          'x-default': '/catalogo/arnes-alpino/',
+        },
+      },
+    });
   });
 
   it('builds page metadata: canonical in its language, hreflang pair, Spanish x-default', () => {
@@ -37,6 +80,7 @@ describe('routes', () => {
     expect(pageMetadata('cookies', 'es-MX').title).toBe(
       'Política de cookies | YĒKORA'
     );
+    expect(pageMetadata('catalog', 'en').title).toBe('Catalog | YĒKORA');
   });
 
   it('builds site metadata with the absolute base URL', () => {

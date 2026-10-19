@@ -300,8 +300,7 @@
     "navLabel": "Navegación principal",
     "menu": "Menú",
     "about": "Nosotros",
-    "catalog": "Catálogo",
-    "comingSoon": "Próximamente"
+    "catalog": "Catálogo"
   },
   "disciplines": {
     "senderismo": "Senderismo",
@@ -391,5 +390,43 @@
     "title": "Estás fuera de cobertura",
     "lede": "No pudimos cargar esta página porque tu dispositivo no tiene conexión a internet. Las páginas que ya visitaste siguen disponibles.",
     "retry": "Reintentar"
+  },
+  "catalog": {
+    "metaTitle": "Catálogo | YĒKORA",
+    "title": "Catálogo",
+    "lede": "Equipo outdoor elegido por su función real, para cada disciplina y cada nivel.",
+    "comingSoon": {
+      "badge": "Próximamente",
+      "title": "Estamos preparando el catálogo",
+      "text": "Estamos seleccionando el equipo pieza por pieza, con la misma exigencia con la que elegimos una ruta. Mientras tanto, conoce las disciplinas que acompañamos.",
+      "cta": "Ver disciplinas"
+    },
+    "filters": {
+      "label": "Filtrar y ordenar",
+      "discipline": "Disciplina",
+      "level": "Nivel",
+      "allDisciplines": "Todas las disciplinas",
+      "allLevels": "Todos los niveles",
+      "sort": "Ordenar por",
+      "sortName": "Nombre",
+      "sortPriceAsc": "Precio: menor a mayor",
+      "sortPriceDesc": "Precio: mayor a menor",
+      "results": { "one": "1 producto", "other": "{count} productos" },
+      "empty": "Ningún producto coincide con estos filtros.",
+      "reset": "Quitar filtros"
+    },
+    "product": {
+      "back": "Volver al catálogo",
+      "discipline": "Disciplina",
+      "level": "Nivel",
+      "inStock": "Disponible",
+      "outOfStock": "Agotado",
+      "sku": "SKU"
+    },
+    "price": {
+      "currencyNote": "Precios en pesos mexicanos (MXN).",
+      "usdReference": "≈ {usd}",
+      "fxNote": "Referencia en dólares con el tipo de cambio FIX de Banxico del {date} ({rate} MXN por USD). El cobro se hace en pesos mexicanos."
+    }
   }
 }

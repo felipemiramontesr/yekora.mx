@@ -40,6 +40,29 @@ test('the service worker and manifest are never cached by HTTP', async ({
   );
 });
 
+// FC 008 (OWASP A05): the exact policy of the FC, on pages and on the 404 alike.
+test('every answer carries the Content-Security-Policy of FC 008', async ({
+  request,
+}) => {
+  const policy =
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  for (const path of ['/', '/catalogo/', '/en/catalog/', '/no-existe/']) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.headers()['content-security-policy']).toBe(policy);
+  }
+});
+
+// FC 008: an empty catalog's placeholder page is deleted after the build, so its path is a
+// real 404, never a 404 body served with 200.
+test('the empty-catalog placeholder path is a real 404', async ({
+  request,
+}) => {
+  for (const path of ['/catalogo/__none__/', '/en/catalog/__none__/']) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status()).toBe(404);
+  }
+});
+
 test('folders without an index are never listed', async ({ request }) => {
   const response = await request.get('/brand/', { maxRedirects: 0 });
   expect(response.status()).toBe(403);

@@ -13,6 +13,7 @@ export default defineConfig({
       'app/**/*.{test,spec}.{ts,tsx}',
       'components/**/*.{test,spec}.{ts,tsx}',
       'lib/**/*.{test,spec}.{ts,tsx}',
+      'apps/api/src/**/*.{test,spec}.ts',
       // CI gate rules (scripts/lib) are tested too, but stay out of product coverage below.
       'scripts/**/*.{test,spec}.ts',
     ],
@@ -26,11 +27,15 @@ export default defineConfig({
         'app/**/*.{ts,tsx}',
         'components/**/*.{ts,tsx}',
         'lib/**/*.{ts,tsx}',
+        'apps/api/src/**/*.ts',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',
         'components/**/*.{test,spec}.{ts,tsx}',
         'lib/**/*.{test,spec}.{ts,tsx}',
+        'apps/api/src/**/*.{test,spec}.ts',
+        // Process wiring only (node dist/index.js on Hostinger); its logic is start() in index.ts.
+        'apps/api/src/server.ts',
       ],
       thresholds: {
         lines: 100,

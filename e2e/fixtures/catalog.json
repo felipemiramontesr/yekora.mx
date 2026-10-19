@@ -1,0 +1,97 @@
+{
+  "exchangeRate": {
+    "series": "SF43718",
+    "date": "2026-10-16",
+    "rate": "18.5000"
+  },
+  "products": {
+    "es-MX": [
+      {
+        "sku": "E2E-0001",
+        "slug": "e2e-arnes-alpino",
+        "name": "Arnés alpino (prueba E2E)",
+        "description": "Producto ficticio de la suite E2E. Nunca se publica.",
+        "discipline": "escalada",
+        "disciplineName": "Escalada",
+        "level": "avanzado",
+        "levelName": "Avanzado",
+        "priceMxnCents": 485000,
+        "priceUsdCents": 26216,
+        "inStock": true,
+        "images": []
+      },
+      {
+        "sku": "E2E-0002",
+        "slug": "e2e-mochila-ligera-28l",
+        "name": "Mochila ligera 28 L (prueba E2E)",
+        "description": "Producto ficticio de la suite E2E. Nunca se publica.",
+        "discipline": "senderismo",
+        "disciplineName": "Senderismo",
+        "level": "principiante",
+        "levelName": "Principiante",
+        "priceMxnCents": 185000,
+        "priceUsdCents": 10000,
+        "inStock": true,
+        "images": []
+      },
+      {
+        "sku": "E2E-0003",
+        "slug": "e2e-tenis-trail",
+        "name": "Tenis de trail (prueba E2E)",
+        "description": "Producto ficticio de la suite E2E. Nunca se publica.",
+        "discipline": "trail-running",
+        "disciplineName": "Trail running",
+        "level": "intermedio",
+        "levelName": "Intermedio",
+        "priceMxnCents": 259900,
+        "priceUsdCents": 14049,
+        "inStock": false,
+        "images": []
+      }
+    ],
+    "en": [
+      {
+        "sku": "E2E-0001",
+        "slug": "e2e-arnes-alpino",
+        "name": "Alpine harness (E2E test)",
+        "description": "Fictitious product of the E2E suite. Never published.",
+        "discipline": "escalada",
+        "disciplineName": "Climbing",
+        "level": "avanzado",
+        "levelName": "Advanced",
+        "priceMxnCents": 485000,
+        "priceUsdCents": 26216,
+        "inStock": true,
+        "images": []
+      },
+      {
+        "sku": "E2E-0002",
+        "slug": "e2e-mochila-ligera-28l",
+        "name": "Light backpack 28 L (E2E test)",
+        "description": "Fictitious product of the E2E suite. Never published.",
+        "discipline": "senderismo",
+        "disciplineName": "Hiking",
+        "level": "principiante",
+        "levelName": "Beginner",
+        "priceMxnCents": 185000,
+        "priceUsdCents": 10000,
+        "inStock": true,
+        "images": []
+      },
+      {
+        "sku": "E2E-0003",
+        "slug": "e2e-tenis-trail",
+        "name": "Trail shoes (E2E test)",
+        "description": "Fictitious product of the E2E suite. Never published.",
+        "discipline": "trail-running",
+        "disciplineName": "Trail running",
+        "level": "intermedio",
+        "levelName": "Intermediate",
+        "priceMxnCents": 259900,
+        "priceUsdCents": 14049,
+        "inStock": false,
+        "images": []
+      }
+    ]
+  }
+}

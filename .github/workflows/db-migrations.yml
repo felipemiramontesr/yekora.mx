@@ -1,0 +1,196 @@
+# ============================================================
+# 🏛️ DB Migrations (PROD) — FC 008 F4 (Archon FC 064 model, adapted)
+#
+# Applies the pending migrations of migrations/ to Yekora's production MariaDB on Hostinger,
+# only when GrayMan (Ω) dispatches it and approves it. Never runs by itself.
+#
+# T1.2 · MigrationAllowed ⟺ D ∧ E ∧ O ∧ A
+#   D = workflow_dispatch on main (the only trigger; checkPipelineIntegrity fails on any other)
+#   E = environment production-db with its secrets (checked before connecting)
+#   O = GrayMan's approval: production-db has him as required reviewer (GitHub settings)
+#   A = actor is the sovereign owner (job `authorize`, on a GitHub-hosted runner, so an
+#       unauthorized dispatch never reaches the self-hosted machine)
+#
+# R1 (public repo + self-hosted runner, accepted by Ω with conditions): the `yekora-db` runner is
+# Ω's PC, whose IP is the only one Hostinger Remote MySQL accepts. It is started by hand only to
+# migrate and stopped afterwards; fork pull requests need Ω's approval ("Require approval for all
+# external contributors"); no other workflow may mention self-hosted (A08 gate).
+#
+# Same migrator as local development (scripts/migrateDb.ts, T1.3): SHA-256 registry, idempotent,
+# aborts on an edited migration before touching anything. Runner prerequisites (as Archon's):
+# Git for Windows (bash, gzip, openssl) and C:\xampp\mysql\bin (mysqldump) on the PATH.
+# The summary carries aggregate counts only, never data rows. Passwords travel in the
+# environment (MYSQL_PWD), never on a command line, and database secrets reach only the steps
+# that connect, never checkout, Bun setup or the dependency install.
+# ============================================================
+
+name: 🏛️ DB Migrations (PROD)
+run-name: 🏛️ DB migrations · @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrations-prod
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: 🔐 Authorize (T1.2 · D ∧ A)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Only GrayMan, only main, only by hand
+        env:
+          ACTOR: ${{ github.actor }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          [ "$EVENT" = "workflow_dispatch" ] || { echo "::error::D: trigger $EVENT is not workflow_dispatch"; exit 1; }
+          [ "$REF" = "refs/heads/main" ] || { echo "::error::D: ref $REF is not main"; exit 1; }
+          [ "$ACTOR" = "felipemiramontesr" ] || { echo "::error::A: actor $ACTOR is not the sovereign owner"; exit 1; }
+          echo "✅ D ∧ A: workflow_dispatch on main by $ACTOR"
+
+  migrate:
+    name: 🏛️ Backup and migrate
+    needs: authorize
+    runs-on: [self-hosted, yekora-db]
+    # O: GrayMan approves this environment before the job starts.
+    environment: production-db
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Environment secrets present (T1.2 · E)
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_BACKUP_ENCRYPTION_KEY: ${{ secrets.DB_BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in DB_HOST DB_USER DB_PASSWORD DB_NAME DB_BACKUP_ENCRYPTION_KEY; do
+            [ -n "${!name:-}" ] || missing="$missing $name"
+          done
+          [ -z "$missing" ] || { echo "::error::E: production-db is missing:$missing"; exit 1; }
+          echo "✅ E: production-db secrets present"
+
+      - name: Plan (read-only · T1.3 checksums)
+        id: plan
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          set -euo pipefail
+          bun scripts/migrateDb.ts --plan | tee plan.txt
+          echo "tables=$(sed -n 's/^\[PLAN\] tables=//p' plan.txt)" >> "$GITHUB_OUTPUT"
+          echo "pending=$(sed -n 's/^\[PLAN\] pending=//p' plan.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Encrypted backup (mysqldump → gzip → AES-256-CBC), verified
+        id: backup
+        if: steps.plan.outputs.pending != '0'
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_BACKUP_ENCRYPTION_KEY: ${{ secrets.DB_BACKUP_ENCRYPTION_KEY }}
+          TABLES: ${{ steps.plan.outputs.tables }}
+        run: |
+          set -euo pipefail
+          FILE="backup_pre_migration_$(date -u +%Y%m%dT%H%M%SZ).sql.gz.enc"
+          MYSQL_PWD="$DB_PASSWORD" mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" \
+            --single-transaction --routines --triggers "$DB_NAME" \
+            | gzip \
+            | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:DB_BACKUP_ENCRYPTION_KEY -out "$FILE"
+          # Integrity: the file must decrypt and end with mysqldump's completion line.
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:DB_BACKUP_ENCRYPTION_KEY -in "$FILE" \
+            | gunzip | tail -c 300 | grep -q -- '-- Dump completed' \
+            || { echo "::error::Backup does not decrypt to a complete dump — nothing was applied"; exit 1; }
+          SIZE=$(stat -c%s "$FILE")
+          # FC 008: a backup under 1 KB aborts. Only exception: a database with no tables at all
+          # (the very first migration), whose complete dump is legitimately tiny.
+          if [ "$TABLES" != "0" ] && [ "$SIZE" -lt 1024 ]; then
+            echo "::error::Backup suspiciously small (${SIZE} bytes) — nothing was applied"
+            exit 1
+          fi
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "✅ Encrypted backup verified: $FILE (${SIZE} bytes, ${TABLES} tables)"
+
+      - name: Upload backup artifact (7 days)
+        if: steps.plan.outputs.pending != '0'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.backup.outputs.file }}
+          path: ${{ steps.backup.outputs.file }}
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Apply migrations
+        id: apply
+        if: steps.plan.outputs.pending != '0' && steps.backup.outcome == 'success'
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: bun scripts/migrateDb.ts
+
+      - name: Verify (idempotent registry and seeded references — aggregates only)
+        id: verify
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          set -euo pipefail
+          bun scripts/migrateDb.ts --plan | tee verify.txt
+          grep -q '^\[PLAN\] pending=0$' verify.txt || { echo "::error::Migrations still pending after apply"; exit 1; }
+          q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -N -B "$DB_NAME" -e "$1"; }
+          CATEGORIES=$(q "SELECT COUNT(*) FROM categories WHERE slug IN ('senderismo','montana','escalada','canonismo','trail-running')")
+          LEVELS=$(q "SELECT COUNT(*) FROM experience_levels WHERE slug IN ('principiante','intermedio','avanzado','expedicion')")
+          PRODUCTS=$(q "SELECT COUNT(*) FROM products")
+          echo "categories=$CATEGORIES" >> "$GITHUB_OUTPUT"
+          echo "levels=$LEVELS" >> "$GITHUB_OUTPUT"
+          echo "products=$PRODUCTS" >> "$GITHUB_OUTPUT"
+          [ "$CATEGORIES" = "5" ] && [ "$LEVELS" = "4" ] \
+            || { echo "::error::Reference data incomplete: $CATEGORIES/5 disciplines, $LEVELS/4 levels"; exit 1; }
+          echo "✅ 5/5 disciplines · 4/4 levels · $PRODUCTS products"
+
+      - name: Summary (aggregates only)
+        if: always()
+        run: |
+          {
+            echo "### 🏛️ DB migrations — production"
+            echo ""
+            echo "| Step | Result |"
+            echo "| :--- | :--- |"
+            echo "| Plan (T1.3) | ${{ steps.plan.outcome }} — ${{ steps.plan.outputs.pending || '?' }} pending, ${{ steps.plan.outputs.tables || '?' }} tables before |"
+            echo "| Encrypted backup | ${{ steps.backup.outcome }} — \`${{ steps.backup.outputs.file || 'n/a' }}\` (${{ steps.backup.outputs.size || 0 }} bytes) |"
+            echo "| Apply | ${{ steps.apply.outcome }} |"
+            echo "| Verify | ${{ steps.verify.outcome }} — disciplines ${{ steps.verify.outputs.categories || '?' }}/5 · levels ${{ steps.verify.outputs.levels || '?' }}/4 · products ${{ steps.verify.outputs.products || '?' }} |"
+            echo "| Actor | ${{ github.actor }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

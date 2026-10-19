@@ -6,8 +6,16 @@ vi.mock('next/font/google', () => ({
   Inter: () => ({ variable: 'inter-variable' }),
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => null }));
+// The real snapshot depends on the last local build; pages here render the empty catalog.
+vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/catalog/snapshot')>();
+  return { ...actual, loadSnapshot: () => actual.EMPTY_SNAPSHOT };
+});
 
 import Layout, { metadata as layoutMeta } from './layout';
+import Catalog, { metadata as CatalogMeta } from './catalogo/page';
+import * as ProductPage from './catalogo/[slug]/page';
 import Home, { metadata as HomeMeta } from './page';
 import About, { metadata as AboutMeta } from './nosotros/page';
 import Privacy, { metadata as PrivacyMeta } from './privacidad/page';
@@ -66,6 +74,21 @@ describe('es-MX routes', () => {
     expect(OfflineMeta.alternates?.canonical).toBe('/offline/');
     expect(OfflineMeta.robots).toEqual({ index: false, follow: false });
     expect(renderToStaticMarkup(<Offline />)).toContain('<h1');
+  });
+
+  it('catalog is canonical at /catalogo/ and shows «Próximamente» while empty', () => {
+    expect(CatalogMeta.alternates?.canonical).toBe('/catalogo/');
+    expect(CatalogMeta.alternates?.languages).toMatchObject({
+      en: '/en/catalog/',
+    });
+    expect(renderToStaticMarkup(<Catalog />)).toContain('Próximamente');
+  });
+
+  it('product pages exist only for the snapshot slugs (static export)', () => {
+    expect(ProductPage.dynamicParams).toBe(false);
+    expect(ProductPage.generateStaticParams()).toEqual([{ slug: '__none__' }]);
+    expect(typeof ProductPage.default).toBe('function');
+    expect(typeof ProductPage.generateMetadata).toBe('function');
   });
 
   it('home shows the brand promise', () => {

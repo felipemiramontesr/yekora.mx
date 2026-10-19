@@ -47,9 +47,11 @@ test('disciplines are anchors inside the current language', async ({
   await nav.getByRole('link', { name: 'Escalada' }).click();
   await expect(page).toHaveURL(/\/#escalada$/);
   await expect(page.locator('#escalada')).toBeVisible();
-  // The catalog does not exist yet: a label, not a link.
-  await expect(nav.getByText('Próximamente')).toBeVisible();
-  await expect(nav.getByRole('link', { name: /Catálogo/ })).toHaveCount(0);
+  // FC 008: the catalog is a real page now, linked in the current language.
+  await expect(nav.getByRole('link', { name: 'Catálogo' })).toHaveAttribute(
+    'href',
+    '/catalogo/'
+  );
 });
 
 test('switching language opens the same page in the other language, with no cookie', async ({

@@ -1,0 +1,122 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  decide,
+  isLocalHost,
+  isYekoraDatabase,
+  MIGRATION_NAME,
+  migrationChecksum,
+  pendingOrder,
+} from './migrations';
+
+describe('migration names', () => {
+  it('accepts only the canonical scheme and orders by number', () => {
+    expect(
+      pendingOrder([
+        '002_V0.4.1_FC009-F2_20261101_add_stock_index.sql',
+        'seed_dev.sql',
+        '001_down.sql',
+        '001_V0.4.0_FC008-F1_20261018_create_catalog_schema.sql',
+        '003_bad name.sql',
+        '004_V0.5.0_FC010-F1_20261201_Upper.sql',
+      ])
+    ).toEqual([
+      '001_V0.4.0_FC008-F1_20261018_create_catalog_schema.sql',
+      '002_V0.4.1_FC009-F2_20261101_add_stock_index.sql',
+    ]);
+  });
+
+  it('keeps every real migration of the repo canonical', () => {
+    const sql = readdirSync('migrations').filter(
+      (name) => name.endsWith('.sql') && !['seed_dev.sql'].includes(name)
+    );
+    const migrations = sql.filter((name) => !name.endsWith('_down.sql'));
+    expect(migrations.length).toBeGreaterThan(0);
+    for (const name of migrations) expect(name).toMatch(MIGRATION_NAME);
+  });
+});
+
+describe('checksums', () => {
+  it('ignores CRLF vs LF, so Windows and Linux agree', () => {
+    expect(migrationChecksum('SELECT 1;\r\nSELECT 2;\r\n')).toBe(
+      migrationChecksum('SELECT 1;\nSELECT 2;\n')
+    );
+  });
+
+  it('changes when the SQL changes', () => {
+    expect(migrationChecksum('SELECT 1;')).not.toBe(
+      migrationChecksum('SELECT 2;')
+    );
+    expect(migrationChecksum('')).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+// T1.3 · R: an applied migration is skipped if unchanged and aborts the run if altered.
+describe('decide (T1.3)', () => {
+  it.each([
+    ['abc', undefined, 'apply'],
+    ['abc', 'abc', 'skip'],
+    ['abc', 'def', 'tampered'],
+  ] as const)(
+    'checksum %s vs registry %s → %s',
+    (checksum, registered, decision) => {
+      expect(decide(checksum, registered)).toBe(decision);
+    }
+  );
+});
+
+describe('isLocalHost (dev data and rollbacks never reach production)', () => {
+  it.each(['localhost', '127.0.0.1', '::1', ' LOCALHOST '])(
+    '%s is local',
+    (host) => {
+      expect(isLocalHost(host)).toBe(true);
+    }
+  );
+  it.each(['srv1234.hstgr.io', 'db.example.com', 'localhost.evil.com', ''])(
+    '%s is not local',
+    (host) => {
+      expect(isLocalHost(host)).toBe(false);
+    }
+  );
+});
+
+describe('isYekoraDatabase (never touch other projects on a shared server)', () => {
+  it.each([
+    'yekora_dev',
+    'yekora_restore',
+    'yekora_prod_2026',
+    // Hostinger prefixes every database with the account id.
+    'u123456789_yekora',
+    'u123456789_yekora_prod',
+  ])('%s is Yekora', (name) => {
+    expect(isYekoraDatabase(name)).toBe(true);
+  });
+  it.each([
+    'archon',
+    'dreamtek',
+    'mysql',
+    'yekora',
+    'yekora_',
+    'YEKORA_DEV',
+    'yekora_dev; DROP',
+    // Other projects on the same Hostinger account, or a malformed prefix.
+    'u123456789_archon',
+    'u123456789_yekora_',
+    'u_yekora',
+    'x123_yekora',
+    'u123456789_yekoraprod',
+  ])('%s is refused', (name) => {
+    expect(isYekoraDatabase(name)).toBe(false);
+  });
+});
+
+describe('the dev seed', () => {
+  it('only touches dev rows (fictitious SKUs)', () => {
+    const seed = readFileSync('migrations/seed_dev.sql', 'utf8');
+    const skus = [...seed.matchAll(/'(DEV-\d{4}|[A-Z]+-\d+)'/g)].map(
+      (m) => m[1]
+    );
+    expect(skus.length).toBeGreaterThan(0);
+    for (const sku of skus) expect(sku).toMatch(/^DEV-\d{4}$/);
+  });
+});

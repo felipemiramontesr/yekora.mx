@@ -1,3 +1,4 @@
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import sonarjs from 'eslint-plugin-sonarjs';
 
@@ -27,7 +28,13 @@ export default [
       sourceType: 'module',
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    rules: { 'no-unused-vars': 'warn' },
+    plugins: { '@typescript-eslint': tsPlugin },
+    // The core rule flags parameter names inside type signatures (interfaces, function types)
+    // as unused; the TypeScript-aware rule understands them and still catches real unused code.
+    rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'warn',
+    },
   },
   // Same rule set SonarQube Cloud applies, so issues surface before the push.
   sonarjs.configs.recommended,

@@ -1,0 +1,5 @@
+# FC 008: declaring the apps/api workspace would switch Bun 1.3 to its "isolated" linker, a layout
+# Next.js 15 cannot resolve its own dependencies from (styled-jsx). Pin the hoisted layout every
+# FC before 008 was built and deployed with, so local, CI and deploy installs stay identical.
+[install]
+linker = "hoisted"

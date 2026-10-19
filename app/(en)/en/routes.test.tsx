@@ -6,8 +6,16 @@ vi.mock('next/font/google', () => ({
   Inter: () => ({ variable: 'inter-variable' }),
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => null }));
+// The real snapshot depends on the last local build; pages here render the empty catalog.
+vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/catalog/snapshot')>();
+  return { ...actual, loadSnapshot: () => actual.EMPTY_SNAPSHOT };
+});
 
 import Layout, { metadata as layoutMeta } from './layout';
+import Catalog, { metadata as CatalogMeta } from './catalog/page';
+import * as ProductPage from './catalog/[slug]/page';
 import Home, { metadata as HomeMeta } from './page';
 import About, { metadata as AboutMeta } from './about/page';
 import Privacy, { metadata as PrivacyMeta } from './privacy/page';
@@ -52,6 +60,19 @@ describe('en routes', () => {
   it('terms is canonical at /en/terms/', () => {
     expect(TermsMeta.alternates?.canonical).toBe('/en/terms/');
     expect(renderToStaticMarkup(<Terms />)).toContain('<h1');
+  });
+
+  it('catalog is canonical at /en/catalog/ and shows «Coming soon» while empty', () => {
+    expect(CatalogMeta.alternates?.canonical).toBe('/en/catalog/');
+    expect(CatalogMeta.title).toBe('Catalog | YĒKORA');
+    expect(renderToStaticMarkup(<Catalog />)).toContain('Coming soon');
+  });
+
+  it('product pages exist only for the snapshot slugs (static export)', () => {
+    expect(ProductPage.dynamicParams).toBe(false);
+    expect(ProductPage.generateStaticParams()).toEqual([{ slug: '__none__' }]);
+    expect(typeof ProductPage.default).toBe('function');
+    expect(typeof ProductPage.generateMetadata).toBe('function');
   });
 
   it('home shows the brand promise', () => {

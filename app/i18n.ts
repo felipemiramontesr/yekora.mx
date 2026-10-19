@@ -50,3 +50,13 @@ export const disciplines = [
 
 /** Slug of one discipline. */
 export type Discipline = (typeof disciplines)[number];
+
+/**
+ * Whether a slug is one of the five disciplines. Catalog references come from the database
+ * (ADR 0007), so a discipline added there later is valid data without a pictogram of its own.
+ *
+ * @param slug - Discipline slug from the catalog.
+ */
+export function isDiscipline(slug: string): slug is Discipline {
+  return (disciplines as readonly string[]).includes(slug);
+}

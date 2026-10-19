@@ -3,7 +3,7 @@
 import { Globe } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { locales, type Locale, type Messages } from '@/app/i18n';
-import { pageFromPath, routeFor } from '@/lib/routes';
+import { routeFor, translatePath } from '@/lib/routes';
 
 /** Props of {@link LanguageSwitcher}. */
 interface LanguageSwitcherProps {
@@ -21,8 +21,9 @@ export function LanguageSwitcher({
   locale,
   messages,
 }: Readonly<LanguageSwitcherProps>) {
-  // Same page in the other language: Spanish and English slugs differ, so map through the route table.
-  const page = pageFromPath(usePathname() ?? routeFor('home', locale));
+  // Same page in the other language: Spanish and English slugs differ, so map through the route
+  // table (a product page keeps its slug and swaps the catalog prefix).
+  const pathname = usePathname() ?? routeFor('home', locale);
   return (
     <nav
       aria-label={messages.label}
@@ -32,7 +33,7 @@ export function LanguageSwitcher({
       {locales.map((target) => (
         <a
           key={target}
-          href={routeFor(page, target)}
+          href={translatePath(pathname, target)}
           hrefLang={target}
           lang={target}
           aria-current={target === locale ? 'true' : undefined}

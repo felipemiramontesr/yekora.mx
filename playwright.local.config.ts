@@ -33,6 +33,8 @@ export default defineConfig({
     ? undefined
     : {
         command: 'bun run build && bun scripts/serveStatic.ts 3100',
+        // FC 008: the catalog suite builds from the fixture (deploy.yml sets the same in CI).
+        env: { CATALOG_FIXTURE: 'e2e/fixtures/catalog.json' },
         url: 'http://localhost:3100',
         reuseExistingServer: false,
         timeout: 180_000,

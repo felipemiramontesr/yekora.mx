@@ -3,20 +3,28 @@
  * Hostinger's Apache serves plain files: a folder answers with its index.html and an unknown
  * path answers with 404.html and status 404.
  * The .htaccess rules are not reimplemented here: CI runs the same suite against httpd:2.4.
+ * One exception: the Content-Security-Policy (FC 008) is read from public/.htaccess and sent on
+ * every answer, so a CSP violation fails the local suite too, not only CI.
  * CLI: `bun scripts/serveStatic.ts [port]` (default 3100, bound to localhost only).
  */
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 
 const root = join(process.cwd(), 'out');
 const port = Number(process.argv[2] ?? 3100);
+const csp = /Header always set Content-Security-Policy "([^"]+)"/.exec(
+  readFileSync(join(process.cwd(), 'public', '.htaccess'), 'utf8')
+)?.[1];
+if (!csp)
+  throw new Error('public/.htaccess has no Content-Security-Policy line');
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.webmanifest': 'application/manifest+json',
   '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
@@ -38,6 +46,7 @@ createServer((request, response) => {
   response.writeHead(file === undefined ? 404 : 200, {
     'Content-Type':
       CONTENT_TYPES[extname(served)] ?? 'application/octet-stream',
+    'Content-Security-Policy': csp,
   });
   createReadStream(served).pipe(response);
 }).listen(port, 'localhost', () => {
