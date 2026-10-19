@@ -12,76 +12,20 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+// One contract for both ends (FC 009, ADR 0008: shared Zod schemas): the browser stores and
+// validates exactly what this route accepts and answers, so the two can never drift apart.
+import {
+  cartLinesSchema,
+  cartQuoteSchema,
+} from '../../../../lib/cart/cartTypes';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { quoteCart } from '../services/cartQuote';
 import type { Db } from '../services/db';
 import type { CurrentRate } from '../services/exchangeRate';
 
-const MAX_LINES = 50;
-
-const requestSchema = z
-  .object({
-    items: z
-      .array(
-        z
-          .object({
-            sku: z.string().min(1).max(64),
-            quantity: z.number().int().min(1).max(99),
-          })
-          .strict()
-      )
-      .max(MAX_LINES),
-  })
-  .strict()
-  .refine(
-    ({ items }) => new Set(items.map((item) => item.sku)).size === items.length,
-    { message: 'Each SKU may appear only once' }
-  );
+const requestSchema = z.object({ items: cartLinesSchema }).strict();
 
 const lang = z.enum(['es-MX', 'en']).default('es-MX');
-
-const cents = z.number().int();
-const responseSchema = z.object({
-  items: z.array(
-    z.object({
-      sku: z.string(),
-      slug: z.string().nullable(),
-      name: z.string().nullable(),
-      quantity: cents.min(1),
-      unitPriceMxnCents: cents.positive().nullable(),
-      lineTotalMxnCents: cents.nonnegative().nullable(),
-      lineBaseMxnCents: cents.nonnegative().nullable(),
-      lineTaxMxnCents: cents.nonnegative().nullable(),
-      stockStatus: z.enum([
-        'available',
-        'low_stock',
-        'out_of_stock',
-        'unavailable',
-      ]),
-      availableQuantity: cents.min(0).max(99),
-      purchasable: z.boolean(),
-    })
-  ),
-  summary: z
-    .object({
-      subtotalMxnCents: cents.nonnegative(),
-      taxMxnCents: cents.nonnegative(),
-      totalMxnCents: cents.nonnegative(),
-      totalItems: cents.nonnegative(),
-      referenceUsdCents: cents.nonnegative().nullable(),
-      exchangeRate: z
-        .object({ series: z.string(), date: z.string(), rate: z.string() })
-        .nullable(),
-    })
-    // T1.3: the VAT breakdown always adds up to the total.
-    .refine((s) => s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents),
-  warnings: z.array(
-    z.object({
-      sku: z.string(),
-      code: z.enum(['unavailable', 'out_of_stock', 'insufficient_stock']),
-    })
-  ),
-});
 
 /** Dependencies of the cart route. */
 interface CartDeps {
@@ -127,7 +71,7 @@ export function registerCartRoutes(app: FastifyInstance, deps: CartDeps): void {
         await deps.rate(),
         language.data
       );
-      return responseSchema.parse(quote);
+      return cartQuoteSchema.parse(quote);
     }
   );
 }

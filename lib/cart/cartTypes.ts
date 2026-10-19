@@ -1,5 +1,7 @@
 /**
- * Cart contract shared by the store, the quote client and the UI (FC 009 F2, ADR 0008).
+ * Cart contract shared by the store, the quote client, the UI and the API route
+ * (apps/api/src/routes/cart.ts), so browser and server validate with the same schemas
+ * (FC 009, ADR 0008). It depends on Zod only, so the API bundle can import it.
  *
  * The browser keeps SKUs and quantities only: no amounts and no personal data (T1.4,
  * LFPDPPP). Amounts always come from the API quote, which this module also validates, so a
@@ -35,7 +37,9 @@ export const cartLinesSchema = z
       .strict()
   )
   .max(MAX_LINES)
-  .refine((lines) => new Set(lines.map((l) => l.sku)).size === lines.length);
+  .refine((lines) => new Set(lines.map((l) => l.sku)).size === lines.length, {
+    message: 'Each SKU may appear only once',
+  });
 
 const cents = z.number().int();
 
