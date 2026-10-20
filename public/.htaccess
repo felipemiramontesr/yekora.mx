@@ -23,4 +23,13 @@ AddType application/manifest+json .webmanifest
   # inlines its bootstrap scripts and styles in the static export, hence 'unsafe-inline'.
   # scripts/serveStatic.ts reads this exact line, so the local E2E runs under the same policy.
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+  # Transport and browser hardening (FC 010, OWASP A02/A05), also on every answer.
+  # HTTP → HTTPS is already a 301 at Hostinger's CDN, in front of Apache, so there is no rewrite
+  # here: behind that proxy Apache may not see HTTPS and could loop, and the CI httpd is plain
+  # HTTP. HSTS is sent over HTTPS only by browsers' rules; no `preload` until Ω authorizes it.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>

@@ -247,10 +247,13 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: all-results
-      - name: Run A04/A06/A08 real checks (OWASP evidence, no fixed text)
+      - name: Run A03/A04/A06/A08 real checks (OWASP evidence, no fixed text)
         id: owasp_scripts
+        # Exit codes feed the dashboard, which fails the job on any red or missing one (T1.4).
         run: |
           set +e
+          bun scripts/checkNoRawSql.ts
+          echo "a03=$?" >> "$GITHUB_OUTPUT"
           bun scripts/checkSecureDesignGates.ts
           echo "a04=$?" >> "$GITHUB_OUTPUT"
           bun scripts/dependencyAuditGate.ts
@@ -261,8 +264,6 @@ jobs:
         run: bun scripts/checkDeadExports.ts
       - name: ADR 0007 — No ENUM/SET in migrations (blocking)
         run: bun scripts/checkNoEnum.ts
-      - name: OWASP A03 — Static, parameterized SQL in the API (blocking)
-        run: bun scripts/checkNoRawSql.ts
       - name: Gate 2 — Diff-Scoped Quality (blocking)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -283,6 +284,7 @@ jobs:
           E2E_RESULT: ${{ needs.e2e-validation.result }}
           SONAR_RESULT: ${{ needs.sonar-scan.result }}
           SECURITY_RESULT: ${{ needs.security-scan.result }}
+          A03_EXIT: ${{ steps.owasp_scripts.outputs.a03 }}
           A04_EXIT: ${{ steps.owasp_scripts.outputs.a04 }}
           A06_EXIT: ${{ steps.owasp_scripts.outputs.a06 }}
           A08_EXIT: ${{ steps.owasp_scripts.outputs.a08 }}
@@ -492,7 +494,20 @@ jobs:
           NOT_FOUND=$(curl -sS -o /tmp/404.html -w '%{http_code}' "https://yekora.mx/ruta-inexistente-$GITHUB_SHA/")
           echo "unknown path → $NOT_FOUND"
           if [ "$NOT_FOUND" != "404" ] || ! grep -q 'Ruta no encontrada' /tmp/404.html; then exit 1; fi
-          echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English, its favicon and the branded 404."
+          # FC 010 (OWASP A02/A05): plain HTTP is a 301 to HTTPS (Hostinger's CDN), and the live
+          # answer carries HSTS and the hardening headers of public/.htaccess.
+          REDIRECT=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' http://yekora.mx/catalogo/)
+          echo "http://yekora.mx/catalogo/ → $REDIRECT"
+          if [ "$REDIRECT" != "301 https://yekora.mx/catalogo/" ]; then exit 1; fi
+          curl -fsSI https://yekora.mx/ | tr -d '\r' | tr '[:upper:]' '[:lower:]' > /tmp/headers.txt
+          for header in \
+            'strict-transport-security: max-age=31536000; includesubdomains' \
+            'x-content-type-options: nosniff' \
+            'referrer-policy: strict-origin-when-cross-origin' \
+            'permissions-policy: camera=(), microphone=(), geolocation=()'; do
+            grep -qxF "$header" /tmp/headers.txt || { echo "FATAL: missing '$header'"; exit 1; }
+          done
+          echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English, its favicon, the branded 404, HTTPS only and its hardening headers."
 
       - name: Remove the SSH key from the runner
         if: always()

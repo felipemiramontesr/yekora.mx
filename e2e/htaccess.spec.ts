@@ -52,6 +52,23 @@ test('every answer carries the Content-Security-Policy of FC 008', async ({
   }
 });
 
+// FC 010 (OWASP A02/A05): transport and browser hardening, on pages, the cart and the 404 alike.
+test('every answer carries the hardening headers of FC 010', async ({
+  request,
+}) => {
+  for (const path of ['/', '/catalogo/', '/en/cart/', '/no-existe/']) {
+    const headers = (await request.get(path, { maxRedirects: 0 })).headers();
+    expect(headers['strict-transport-security']).toBe(
+      'max-age=31536000; includeSubDomains'
+    );
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(headers['permissions-policy']).toBe(
+      'camera=(), microphone=(), geolocation=()'
+    );
+  }
+});
+
 // FC 008: an empty catalog's placeholder page is deleted after the build, so its path is a
 // real 404, never a 404 body served with 200.
 test('the empty-catalog placeholder path is a real 404', async ({

@@ -18,7 +18,8 @@
 #
 # Same migrator as local development (scripts/migrateDb.ts, T1.3): SHA-256 registry, idempotent,
 # aborts on an edited migration before touching anything. Runner prerequisites (as Archon's):
-# Git for Windows (bash, gzip, openssl) and C:\xampp\mysql\bin (mysqldump) on the PATH.
+# Git for Windows (bash, gzip) and C:\xampp\mysql\bin (mysqldump) on the PATH. Since FC 010 the
+# backup is encrypted by scripts/backupCrypto.ts (AES-256-GCM), not by openssl.
 # The summary carries aggregate counts only, never data rows. Passwords travel in the
 # environment (MYSQL_PWD), never on a command line, and database secrets reach only the steps
 # that connect, never checkout, Bun setup or the dependency install.
@@ -126,7 +127,7 @@ jobs:
           echo "tables=$(sed -n 's/^\[PLAN\] tables=//p' plan.txt)" >> "$GITHUB_OUTPUT"
           echo "pending=$(sed -n 's/^\[PLAN\] pending=//p' plan.txt)" >> "$GITHUB_OUTPUT"
 
-      - name: Encrypted backup (mysqldump → gzip → AES-256-CBC), verified
+      - name: Encrypted backup (mysqldump → gzip → AES-256-GCM, YEKORA_GCM_V1), verified
         id: backup
         if: steps.plan.outputs.pending != '0'
         env:
@@ -143,11 +144,11 @@ jobs:
           MYSQL_PWD="$DB_PASSWORD" mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" \
             --single-transaction --routines --triggers "$DB_NAME" \
             | gzip \
-            | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:DB_BACKUP_ENCRYPTION_KEY -out "$FILE"
-          # Integrity: the file must decrypt and end with mysqldump's completion line.
-          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:DB_BACKUP_ENCRYPTION_KEY -in "$FILE" \
-            | gunzip | tail -c 300 | grep -q -- '-- Dump completed' \
-            || { echo "::error::Backup does not decrypt to a complete dump — nothing was applied"; exit 1; }
+            | bun scripts/backupCrypto.ts encrypt --out "$FILE"
+          # FC 010 (YekoraALE): authenticated encryption, key from DB_BACKUP_ENCRYPTION_KEY only.
+          # Integrity: the GCM tag must verify and the dump must end with mysqldump's completion line.
+          bun scripts/backupCrypto.ts decrypt --in "$FILE" --verify \
+            || { echo "::error::Backup does not authenticate to a complete dump — nothing was applied"; exit 1; }
           SIZE=$(stat -c%s "$FILE")
           # FC 008: a backup under 1 KB aborts. Only exception: a database with no tables at all
           # (the very first migration), whose complete dump is legitimately tiny.

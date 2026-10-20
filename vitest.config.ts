@@ -28,6 +28,10 @@ export default defineConfig({
         'components/**/*.{ts,tsx}',
         'lib/**/*.{ts,tsx}',
         'apps/api/src/**/*.ts',
+        // FC 010 (YekoraALE): backup encryption is held to product coverage, unlike the gate rules.
+        'scripts/lib/backupCrypto.ts',
+        // FC 010: the certification logic is the trust anchor of the dashboard; same bar.
+        'scripts/lib/certification.ts',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',

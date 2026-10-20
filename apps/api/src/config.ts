@@ -32,7 +32,7 @@ const schema = z.object({
       'must be a Yekora database'
     ),
   BANXICO_TOKEN: z.string().optional(),
-  API_VERSION: z.string().default('0.5.2'),
+  API_VERSION: z.string().default('0.6.0'),
   GIT_SHA: z.string().default('dev'),
 });
 

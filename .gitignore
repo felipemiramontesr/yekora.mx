@@ -35,7 +35,7 @@ test-results.xml
 # Law and brokers stay on disk. Product remote does not receive them.
 protocols/
 l-harness.config.json
-owaspCoverageMap.json
+# owaspCoverageMap.json is versioned since FC 010: the CI dashboard computes every row from its evidence.
 L_HARNESS_NOTICE.md
 scripts/verifyL.mjs
 scripts/hPost.mjs

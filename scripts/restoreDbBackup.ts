@@ -1,16 +1,22 @@
 /**
  * Encrypted backup and restore rehearsal (FC 008 F1: RTO target < 15 min, measured here).
  *
- * The backup is byte-compatible with the production migrations workflow and Archon's:
- * `mysqldump --single-transaction --routines --triggers | gzip | openssl enc -aes-256-cbc
- * -pbkdf2 -salt`. The restore is its exact inverse. `--rehearse` runs both against local
- * databases, then compares every table's row count between source and restored copy and prints
- * the timings. That measurement is the RTO evidence.
+ * The backup is the production migrations workflow's: `mysqldump --single-transaction
+ * --routines --triggers | gzip`, encrypted since FC 010 in the authenticated `YEKORA_GCM_V1`
+ * format (scripts/lib/backupCrypto.ts, AES-256-GCM). `--rehearse` runs backup and restore
+ * against local databases, then compares every table's row count between source and restored
+ * copy and prints the timings. That measurement is the RTO evidence.
+ *
+ * The restore reads the format from the file's first bytes. A `YEKORA_GCM_V1` file is first
+ * decrypted to a temporary file and loaded only after its tag verified, so a wrong key or an
+ * altered byte never reaches the database. Earlier backups (`Salted__`, openssl `aes-256-cbc
+ * -pbkdf2`, FC 008–009) are still restored through openssl.
  *
  * Environment (Bun loads .env.local): DB_HOST (localhost only), DB_PORT, DB_USER, DB_PASSWORD,
  * DB_NAME, RESTORE_DB_NAME (scratch database, must differ from DB_NAME),
  * DB_BACKUP_ENCRYPTION_KEY, MYSQL_BIN (folder with mysql and mysqldump, e.g. C:\xampp\mysql\bin),
- * OPENSSL_BIN (openssl executable, e.g. C:\Program Files\Git\usr\bin\openssl.exe).
+ * and OPENSSL_BIN (openssl executable, e.g. C:\Program Files\Git\usr\bin\openssl.exe) only to
+ * restore a legacy openssl backup.
  * Executables come from explicit paths, never from PATH. Passwords travel in the child
  * environment (MYSQL_PWD, -pass env:), never on the command line.
  *
@@ -26,12 +32,26 @@
  * @module
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  createReadStream,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 import mysql from 'mysql2/promise';
+import {
+  BACKUP_MAGIC,
+  decryptToFile,
+  encryptToFile,
+  isGcmBackup,
+} from './lib/backupCrypto';
 import { isLocalHost, isYekoraDatabase } from './lib/migrations';
 
 /** Reads a required variable; fails with its name only, never its value. */
@@ -56,15 +76,11 @@ const password = process.env.DB_PASSWORD ?? '';
 const source = requiredEnv('DB_NAME');
 const target = requiredEnv('RESTORE_DB_NAME');
 const mysqlBin = requiredEnv('MYSQL_BIN');
-const openssl = requiredEnv('OPENSSL_BIN');
-const childEnv = {
-  ...process.env,
-  MYSQL_PWD: password,
-  // A production backup is opened with the production key, never with the local one.
-  BACKUP_KEY: requiredEnv(
-    fromFile === undefined ? 'DB_BACKUP_ENCRYPTION_KEY' : 'RESTORE_BACKUP_KEY'
-  ),
-};
+// A production backup is opened with the production key, never with the local one.
+const backupKey = requiredEnv(
+  fromFile === undefined ? 'DB_BACKUP_ENCRYPTION_KEY' : 'RESTORE_BACKUP_KEY'
+);
+const childEnv = { ...process.env, MYSQL_PWD: password, BACKUP_KEY: backupKey };
 const connectionArgs = ['-h', host, '-P', port, '-u', user];
 
 /** Waits for a child process and turns a non-zero exit into an error naming the tool. */
@@ -79,7 +95,7 @@ function exited(name: string, child: ReturnType<typeof spawn>): Promise<void> {
   });
 }
 
-/** mysqldump | gzip | openssl enc → file. Same flags as the production workflow. */
+/** mysqldump | gzip | AES-256-GCM → file. Same pipeline as the production workflow. */
 async function backup(file: string): Promise<void> {
   const dump = spawn(
     join(mysqlBin, 'mysqldump'),
@@ -92,33 +108,58 @@ async function backup(file: string): Promise<void> {
     ],
     { env: childEnv, stdio: ['ignore', 'pipe', 'inherit'] }
   );
-  const encrypt = spawn(
-    openssl,
-    [
-      'enc',
-      '-aes-256-cbc',
-      '-pbkdf2',
-      '-salt',
-      '-pass',
-      'env:BACKUP_KEY',
-      '-out',
-      file,
-    ],
-    { env: childEnv, stdio: ['pipe', 'inherit', 'inherit'] }
-  );
   await Promise.all([
-    pipeline(dump.stdout!, createGzip(), encrypt.stdin!),
+    encryptToFile(dump.stdout!.pipe(createGzip()), file, backupKey),
     exited('mysqldump', dump),
-    exited('openssl', encrypt),
   ]);
   if (statSync(file).size < 1024)
     throw new Error('backup is suspiciously small (< 1 KB)');
 }
 
-/** openssl enc -d | gunzip | mysql → target database. Exact inverse of backup(). */
+/** Whether the file starts with the YEKORA_GCM_V1 magic (else: legacy openssl). */
+function isAuthenticatedBackup(file: string): boolean {
+  const head = Buffer.alloc(BACKUP_MAGIC.length);
+  const fd = openSync(file, 'r');
+  try {
+    readSync(fd, head, 0, head.length, 0);
+  } finally {
+    closeSync(fd);
+  }
+  return isGcmBackup(head);
+}
+
+/** gzipped dump on disk | gunzip | mysql → target database. */
+async function load(gzFile: string): Promise<void> {
+  const client = spawn(join(mysqlBin, 'mysql'), [...connectionArgs, target], {
+    env: childEnv,
+    stdio: ['pipe', 'inherit', 'inherit'],
+  });
+  await Promise.all([
+    pipeline(createReadStream(gzFile), createGunzip(), client.stdin!),
+    exited('mysql', client),
+  ]);
+}
+
+/**
+ * Inverse of backup(). A YEKORA_GCM_V1 file is authenticated in full into a temporary file before
+ * mysql reads a byte of it; a legacy openssl file keeps its FC 008 path.
+ */
 async function restore(file: string): Promise<void> {
+  if (!isAuthenticatedBackup(file)) return restoreLegacy(file);
+  const workDir = mkdtempSync(join(tmpdir(), 'yekora-decrypt-'));
+  const gzFile = join(workDir, 'backup.sql.gz');
+  try {
+    await decryptToFile(file, gzFile, backupKey);
+    await load(gzFile);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+/** openssl enc -d | gunzip | mysql: backups taken before FC 010 (`Salted__`, AES-256-CBC). */
+async function restoreLegacy(file: string): Promise<void> {
   const decrypt = spawn(
-    openssl,
+    requiredEnv('OPENSSL_BIN'),
     [
       'enc',
       '-d',
