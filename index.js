@@ -80906,7 +80906,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.6.1"),
+  API_VERSION: external_exports.string().default("0.7.0"),
   GIT_SHA: external_exports.string().default("dev")
 });
 function loadConfig(env2) {
@@ -80949,6 +80949,10 @@ var cartLinesSchema = external_exports.array(
 ).max(MAX_LINES).refine((lines) => new Set(lines.map((l) => l.sku)).size === lines.length, {
   message: "Each SKU may appear only once"
 });
+var destinationSchema = external_exports.object({
+  stateCode: external_exports.string().regex(/^[A-Z]{3}$/, "State code must be 3 capital letters"),
+  postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits").optional()
+}).strict();
 var cents = external_exports.number().int();
 var cartQuoteSchema = external_exports.object({
   items: external_exports.array(
@@ -80972,13 +80976,25 @@ var cartQuoteSchema = external_exports.object({
     })
   ),
   summary: external_exports.object({
+    itemsBaseMxnCents: cents.nonnegative(),
+    itemsTaxMxnCents: cents.nonnegative(),
+    itemsTotalMxnCents: cents.nonnegative(),
+    // FC 011: null without a destination; a zero charge when no rule covers it.
+    shippingCode: external_exports.enum(["STANDARD_RATE", "FREE_SHIPPING", "UNSERVICEABLE_DESTINATION"]).nullable(),
+    shippingBaseMxnCents: cents.nonnegative().nullable(),
+    shippingTaxMxnCents: cents.nonnegative().nullable(),
+    shippingTotalMxnCents: cents.nonnegative().nullable(),
+    serviceable: external_exports.boolean(),
+    freeShippingRemainingMxnCents: cents.nonnegative().nullable(),
     subtotalMxnCents: cents.nonnegative(),
     taxMxnCents: cents.nonnegative(),
     totalMxnCents: cents.nonnegative(),
     totalItems: cents.nonnegative(),
     referenceUsdCents: cents.nonnegative().nullable(),
     exchangeRate: external_exports.object({ series: external_exports.string(), date: external_exports.string(), rate: external_exports.string() }).nullable()
-  }).refine((s) => s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents),
+  }).refine(
+    (s) => s.itemsBaseMxnCents + s.itemsTaxMxnCents === s.itemsTotalMxnCents && (s.shippingBaseMxnCents ?? 0) + (s.shippingTaxMxnCents ?? 0) === (s.shippingTotalMxnCents ?? 0) && s.subtotalMxnCents === s.itemsBaseMxnCents + (s.shippingBaseMxnCents ?? 0) && s.taxMxnCents === s.itemsTaxMxnCents + (s.shippingTaxMxnCents ?? 0) && s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents
+  ),
   warnings: external_exports.array(
     external_exports.object({
       sku: external_exports.string(),
@@ -80988,6 +81004,10 @@ var cartQuoteSchema = external_exports.object({
 });
 
 // src/lib/money.ts
+function splitVat(totalMxnCents) {
+  const base = Math.round(totalMxnCents * 100 / 116);
+  return { base, tax: totalMxnCents - base };
+}
 function usdCents(priceMxnCents, fix) {
   if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
   return Math.round(priceMxnCents / fix);
@@ -80996,10 +81016,6 @@ function usdCents(priceMxnCents, fix) {
 // src/services/cartQuote.ts
 var LOW_STOCK = 5;
 var MAX_QUANTITY2 = 99;
-function splitVat(totalMxnCents) {
-  const base = Math.round(totalMxnCents * 100 / 116);
-  return { base, tax: totalMxnCents - base };
-}
 function stockStatus(stock) {
   if (stock <= 0) return "out_of_stock";
   return stock < LOW_STOCK ? "low_stock" : "available";
@@ -81050,7 +81066,7 @@ function quoteLine(line, row, lang3) {
     counted: purchasable ? { base, tax, total } : void 0
   };
 }
-function buildQuote(lines, rows, rate, lang3) {
+function buildQuote(lines, rows, rate, lang3, shipping = null) {
   const bySku = new Map(rows.map((row) => [row.sku, row]));
   const items = [];
   const warnings = [];
@@ -81075,24 +81091,88 @@ function buildQuote(lines, rows, rate, lang3) {
       summary.totalItems += quoted.quantity;
     }
   }
+  const totalMxnCents = summary.totalMxnCents + (shipping?.total ?? 0);
   const fix = rate ? Number(rate.rate) : null;
-  const referenceUsdCents = summary.totalMxnCents > 0 ? usdCents(summary.totalMxnCents, fix) : null;
+  const referenceUsdCents = totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
   return {
     items,
-    summary: { ...summary, referenceUsdCents, exchangeRate: rate },
+    summary: {
+      itemsBaseMxnCents: summary.subtotalMxnCents,
+      itemsTaxMxnCents: summary.taxMxnCents,
+      itemsTotalMxnCents: summary.totalMxnCents,
+      shippingCode: shipping?.code ?? null,
+      shippingBaseMxnCents: shipping?.base ?? null,
+      shippingTaxMxnCents: shipping?.tax ?? null,
+      shippingTotalMxnCents: shipping?.total ?? null,
+      serviceable: shipping?.code !== "UNSERVICEABLE_DESTINATION",
+      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
+      subtotalMxnCents: summary.subtotalMxnCents + (shipping?.base ?? 0),
+      taxMxnCents: summary.taxMxnCents + (shipping?.tax ?? 0),
+      totalMxnCents,
+      totalItems: summary.totalItems,
+      referenceUsdCents,
+      exchangeRate: rate
+    },
     warnings
   };
 }
-async function quoteCart(db, lines, rate, lang3) {
-  const rows = lines.length === 0 ? [] : await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+async function readProducts(db, lines) {
+  if (lines.length === 0) return [];
+  return db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
     [lines.map((line) => line.sku)]
   );
-  return buildQuote(lines, rows, rate, lang3);
+}
+async function quoteCart(db, lines, rate, lang3) {
+  return buildQuote(lines, await readProducts(db, lines), rate, lang3);
+}
+async function quoteCartToDestination(db, lines, rate, lang3, destination, provider) {
+  const rows = await readProducts(db, lines);
+  const products = buildQuote(lines, rows, rate, lang3);
+  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
+    return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
+  }
+  const bySku = new Map(rows.map((row) => [row.sku, row]));
+  const shipment = await provider.quote({
+    stateCode: destination.stateCode,
+    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
+    lines: lines.map((line) => {
+      const row = bySku.get(line.sku);
+      return {
+        quantity: line.quantity,
+        weightGrams: Number(row.weight_grams),
+        lengthMm: Number(row.length_mm),
+        widthMm: Number(row.width_mm),
+        heightMm: Number(row.height_mm),
+        classId: Number(row.shipping_class_id)
+      };
+    })
+  });
+  if (shipment.code === "INVALID_DESTINATION") {
+    return { ok: false, code: "INVALID_DESTINATION" };
+  }
+  const shipping = shipment.serviceable ? {
+    code: shipment.code,
+    base: shipment.baseMxnCents,
+    tax: shipment.taxMxnCents,
+    total: shipment.totalMxnCents,
+    remaining: shipment.freeShippingRemainingMxnCents
+  } : {
+    code: "UNSERVICEABLE_DESTINATION",
+    base: 0,
+    tax: 0,
+    total: 0,
+    remaining: null
+  };
+  return { ok: true, quote: buildQuote(lines, rows, rate, lang3, shipping) };
 }
 
 // src/routes/cart.ts
-var requestSchema = external_exports.object({ items: cartLinesSchema }).strict();
+var requestSchema = external_exports.object({ items: cartLinesSchema, destination: destinationSchema.optional() }).strict();
+var REJECTION_TITLE = {
+  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
+  INVALID_DESTINATION: "Invalid destination"
+};
 var lang = external_exports.enum(["es-MX", "en"]).default("es-MX");
 function registerCartRoutes(app, deps) {
   app.post(
@@ -81115,13 +81195,25 @@ function registerCartRoutes(app, deps) {
           )
         );
       }
-      const quote = await quoteCart(
+      const { items, destination } = body.data;
+      const rate = await deps.rate();
+      if (destination === void 0) {
+        return cartQuoteSchema.parse(
+          await quoteCart(deps.db, items, rate, language.data)
+        );
+      }
+      const result = await quoteCartToDestination(
         deps.db,
-        body.data.items,
-        await deps.rate(),
-        language.data
+        items,
+        rate,
+        language.data,
+        destination,
+        deps.shipping
       );
-      return cartQuoteSchema.parse(quote);
+      if (!result.ok) {
+        return reply.code(400).type(PROBLEM_TYPE).send(problem(400, REJECTION_TITLE[result.code], result.code));
+      }
+      return cartQuoteSchema.parse(result.quote);
     }
   );
 }
@@ -81258,6 +81350,152 @@ function registerExchangeRateRoute(app, rate) {
   });
 }
 
+// src/services/dimensioning.ts
+var VOLUMETRIC_DIVISOR = BigInt(5e3);
+function toSafeNumber(value) {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new RangeError("purchase weight exceeds the exact integer range");
+  }
+  return Number(value);
+}
+function purchaseWeight(lines) {
+  let physical = BigInt(0);
+  let volume = BigInt(0);
+  for (const line of lines) {
+    const quantity = BigInt(line.quantity);
+    physical += BigInt(line.weightGrams) * quantity;
+    volume += BigInt(line.lengthMm) * BigInt(line.widthMm) * BigInt(line.heightMm) * quantity;
+  }
+  const volumetric = (volume + VOLUMETRIC_DIVISOR - BigInt(1)) / VOLUMETRIC_DIVISOR;
+  const chargeable = physical > volumetric ? physical : volumetric;
+  return {
+    physicalGrams: toSafeNumber(physical),
+    volumetricGrams: toSafeNumber(volumetric),
+    chargeableGrams: toSafeNumber(chargeable)
+  };
+}
+
+// src/services/shippingEngine.ts
+function purchaseClass(classIds, ranks) {
+  let best = null;
+  for (const rank of ranks) {
+    if (classIds.includes(rank.id) && (best === null || rank.rank > best.rank)) {
+      best = rank;
+    }
+  }
+  return best?.id ?? null;
+}
+function inRange(value, min, max) {
+  return min !== null && value >= min && (max === null || value < max);
+}
+var MATCHERS = {
+  FLAT_RATE: () => true,
+  ZONE_RATE: (rule, facts) => rule.zoneId === facts.zoneId,
+  ZONE_CLASS_RATE: (rule, facts) => rule.zoneId === facts.zoneId && rule.classId === facts.classId,
+  CHARGEABLE_WEIGHT: (rule, facts) => inRange(facts.chargeableGrams, rule.minWeightGrams, rule.maxWeightGrams),
+  ORDER_TOTAL: (rule, facts) => inRange(
+    facts.itemsTotalMxnCents,
+    rule.minItemsTotalMxnCents,
+    rule.maxItemsTotalMxnCents
+  )
+};
+function isStrategyCode(code) {
+  return Object.hasOwn(MATCHERS, code);
+}
+function coveringRule(strategy, rules, facts) {
+  if (!isStrategyCode(strategy)) return null;
+  const matches = MATCHERS[strategy];
+  let best = null;
+  for (const rule of rules) {
+    if (!matches(rule, facts)) continue;
+    const cheaper = best === null || rule.rateMxnCents < best.rateMxnCents || rule.rateMxnCents === best.rateMxnCents && rule.id < best.id;
+    if (cheaper) best = rule;
+  }
+  return best;
+}
+function evaluateShipping(config, rules, facts) {
+  const rule = config === null ? null : coveringRule(config.strategy, rules, facts);
+  if (config === null || rule === null) {
+    return { serviceable: false, code: "UNSERVICEABLE_DESTINATION" };
+  }
+  const threshold = config.freeShippingThresholdMxnCents;
+  const free = config.freeShippingActive && threshold !== null && facts.itemsTotalMxnCents >= threshold;
+  const totalMxnCents = free ? 0 : rule.rateMxnCents;
+  const { base, tax } = splitVat(totalMxnCents);
+  const remaining = config.freeShippingActive && threshold !== null ? Math.max(threshold - facts.itemsTotalMxnCents, 0) : null;
+  return {
+    serviceable: true,
+    code: free ? "FREE_SHIPPING" : "STANDARD_RATE",
+    strategy: config.strategy,
+    ruleId: rule.id,
+    totalMxnCents,
+    baseMxnCents: base,
+    taxMxnCents: tax,
+    freeShippingRemainingMxnCents: remaining
+  };
+}
+
+// src/services/shippingRates.ts
+function toRule(row) {
+  return {
+    id: row.id,
+    zoneId: row.zone_id,
+    classId: row.shipping_class_id,
+    minWeightGrams: row.min_weight_grams,
+    maxWeightGrams: row.max_weight_grams,
+    minItemsTotalMxnCents: row.min_items_total_mxn_cents,
+    maxItemsTotalMxnCents: row.max_items_total_mxn_cents,
+    rateMxnCents: row.rate_mxn_cents
+  };
+}
+function createTableRateProvider(db) {
+  return {
+    async quote(request) {
+      const [zone] = await db.query(
+        "SELECT id FROM shipping_zones WHERE code = ? AND is_active = 1",
+        [request.stateCode]
+      );
+      if (zone === void 0)
+        return { serviceable: false, code: "INVALID_DESTINATION" };
+      const [row] = await db.query(
+        `SELECT s.id AS strategy_id, s.code AS strategy, c.is_free_shipping_active,
+           c.free_shipping_threshold_mxn_cents
+         FROM shipping_configs c
+         JOIN shipping_strategies s ON s.id = c.active_strategy_id
+         WHERE c.id = 1 AND s.is_active = 1`
+      );
+      if (row === void 0) {
+        return { serviceable: false, code: "UNSERVICEABLE_DESTINATION" };
+      }
+      const config = {
+        strategy: row.strategy,
+        freeShippingActive: row.is_free_shipping_active === 1,
+        freeShippingThresholdMxnCents: row.free_shipping_threshold_mxn_cents
+      };
+      const [classes, rules] = await Promise.all([
+        db.query(
+          "SELECT id, class_rank FROM shipping_classes"
+        ),
+        db.query(
+          `SELECT id, zone_id, shipping_class_id, min_weight_grams, max_weight_grams,
+             min_items_total_mxn_cents, max_items_total_mxn_cents, rate_mxn_cents
+           FROM shipping_rules WHERE strategy_id = ? AND is_active = 1`,
+          [row.strategy_id]
+        )
+      ]);
+      return evaluateShipping(config, rules.map(toRule), {
+        zoneId: zone.id,
+        classId: purchaseClass(
+          request.lines.map((line) => line.classId),
+          classes.map((c) => ({ id: c.id, rank: c.class_rank }))
+        ),
+        chargeableGrams: purchaseWeight(request.lines).chargeableGrams,
+        itemsTotalMxnCents: request.itemsTotalMxnCents
+      });
+    }
+  };
+}
+
 // src/app.ts
 async function buildApp(deps) {
   const app = (0, import_fastify.default)({
@@ -81287,7 +81525,11 @@ async function buildApp(deps) {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
-  registerCartRoutes(app, { db: deps.db, rate: deps.rate });
+  registerCartRoutes(app, {
+    db: deps.db,
+    rate: deps.rate,
+    shipping: createTableRateProvider(deps.db)
+  });
   registerExchangeRateRoute(app, deps.rate);
   return app;
 }
@@ -81399,7 +81641,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "d4e1d5d42bfe9df479f8a176f83af1e949fecfc6" : void 0;
+var sha = true ? "b176213f3b60a564ab3e56a7d722c9e76be08d32" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
