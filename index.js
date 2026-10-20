@@ -80906,7 +80906,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.6.0"),
+  API_VERSION: external_exports.string().default("0.6.1"),
   GIT_SHA: external_exports.string().default("dev")
 });
 function loadConfig(env2) {
@@ -81399,7 +81399,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "61ea15170f2f93a5ce45787bca911d51c5043553" : void 0;
+var sha = true ? "d4e1d5d42bfe9df479f8a176f83af1e949fecfc6" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
