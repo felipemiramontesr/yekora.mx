@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { quoteCart } from './cartQuote';
+import { quoteCart, quoteCartToDestination } from './cartQuote';
 import type { Db } from './db';
+import type { ShipmentRequest, ShippingRateProvider } from './shippingPort';
 
 const FIX = { series: 'SF43718', date: '2026-10-19', rate: '18.5000' };
 
@@ -11,6 +12,11 @@ interface Row {
   name_en: string;
   price_mxn_cents: number;
   stock: number;
+  weight_grams: number;
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  shipping_class_id: number;
 }
 
 function product(sku: string, price: number, stock: number): Row {
@@ -21,6 +27,11 @@ function product(sku: string, price: number, stock: number): Row {
     name_en: `Product ${sku}`,
     price_mxn_cents: price,
     stock,
+    weight_grams: 1000,
+    length_mm: 100,
+    width_mm: 200,
+    height_mm: 300,
+    shipping_class_id: 2,
   };
 }
 
@@ -246,6 +257,15 @@ describe('quoteCart', () => {
     await expect(quoteCart(db, [], FIX, 'en')).resolves.toEqual({
       items: [],
       summary: {
+        itemsBaseMxnCents: 0,
+        itemsTaxMxnCents: 0,
+        itemsTotalMxnCents: 0,
+        shippingCode: null,
+        shippingBaseMxnCents: null,
+        shippingTaxMxnCents: null,
+        shippingTotalMxnCents: null,
+        serviceable: true,
+        freeShippingRemainingMxnCents: null,
         subtotalMxnCents: 0,
         taxMxnCents: 0,
         totalMxnCents: 0,
@@ -256,5 +276,196 @@ describe('quoteCart', () => {
       warnings: [],
     });
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('quoteCartToDestination (FC 011 · T1.1 in order V → D → R)', () => {
+  /** Provider double: records each request and answers what the test sets. */
+  function provider(
+    answer: Awaited<ReturnType<ShippingRateProvider['quote']>>
+  ) {
+    const requests: ShipmentRequest[] = [];
+    return {
+      requests,
+      shipping: {
+        quote: async (request: ShipmentRequest) => {
+          requests.push(request);
+          return answer;
+        },
+      } satisfies ShippingRateProvider,
+    };
+  }
+  const standard = {
+    serviceable: true as const,
+    code: 'STANDARD_RATE' as const,
+    strategy: 'FLAT_RATE',
+    ruleId: 1,
+    totalMxnCents: 15000,
+    baseMxnCents: 12931,
+    taxMxnCents: 2069,
+    freeShippingRemainingMxnCents: null,
+  };
+  const toZac = (
+    lines: { sku: string; quantity: number }[],
+    rows: Row[],
+    shipping: ShippingRateProvider
+  ) =>
+    quoteCartToDestination(
+      catalog(rows).db,
+      lines,
+      FIX,
+      'es-MX',
+      { stateCode: 'ZAC' },
+      shipping
+    );
+
+  it('V ⊥: empty, unknown, inactive or short-stocked carts are refused without asking for a rate', async () => {
+    const { shipping, requests } = provider(standard);
+    const carts: Array<[{ sku: string; quantity: number }[], Row[]]> = [
+      [[], []],
+      [[{ sku: 'X', quantity: 1 }], []],
+      [[{ sku: 'A', quantity: 3 }], [product('A', 1160, 2)]],
+      [
+        [
+          { sku: 'A', quantity: 1 },
+          { sku: 'B', quantity: 1 },
+        ],
+        [product('A', 1160, 5), product('B', 1160, 0)],
+      ],
+    ];
+    for (const [lines, rows] of carts) {
+      await expect(toZac(lines, rows, shipping)).resolves.toEqual({
+        ok: false,
+        code: 'EMPTY_OR_UNAVAILABLE_CART',
+      });
+    }
+    expect(requests).toEqual([]);
+  });
+
+  it('V ⊤ D ⊥: the provider does not know the state → INVALID_DESTINATION', async () => {
+    const { shipping } = provider({
+      serviceable: false,
+      code: 'INVALID_DESTINATION',
+    });
+    await expect(
+      toZac([{ sku: 'A', quantity: 1 }], [product('A', 1160, 5)], shipping)
+    ).resolves.toEqual({ ok: false, code: 'INVALID_DESTINATION' });
+  });
+
+  it('asks once for the whole purchase: state, items total with VAT and every line physical data', async () => {
+    const { shipping, requests } = provider(standard);
+    await toZac(
+      [
+        { sku: 'B', quantity: 2 },
+        { sku: 'A', quantity: 1 },
+      ],
+      [product('A', 1160, 5), product('B', 35, 5)],
+      shipping
+    );
+    expect(requests).toEqual([
+      {
+        stateCode: 'ZAC',
+        itemsTotalMxnCents: 1230, // 2 × 35 + 1160
+        lines: [
+          {
+            quantity: 2,
+            weightGrams: 1000,
+            lengthMm: 100,
+            widthMm: 200,
+            heightMm: 300,
+            classId: 2,
+          },
+          {
+            quantity: 1,
+            weightGrams: 1000,
+            lengthMm: 100,
+            widthMm: 200,
+            heightMm: 300,
+            classId: 2,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('R ⊥: not covered → serviceable false, a zero shipping line, totals = items', async () => {
+    const { shipping } = provider({
+      serviceable: false,
+      code: 'UNSERVICEABLE_DESTINATION',
+    });
+    const result = await toZac(
+      [{ sku: 'A', quantity: 1 }],
+      [product('A', 1160, 5)],
+      shipping
+    );
+    expect(result.ok && result.quote.summary).toMatchObject({
+      itemsTotalMxnCents: 1160,
+      shippingCode: 'UNSERVICEABLE_DESTINATION',
+      shippingTotalMxnCents: 0,
+      serviceable: false,
+      subtotalMxnCents: 1000,
+      taxMxnCents: 160,
+      totalMxnCents: 1160,
+    });
+  });
+
+  it('R ⊤: grand totals add the shipping line, and still add up', async () => {
+    const { shipping } = provider(standard);
+    const result = await toZac(
+      [{ sku: 'A', quantity: 3 }],
+      [product('A', 1160, 5)],
+      shipping
+    );
+    expect(result.ok && result.quote.summary).toMatchObject({
+      itemsBaseMxnCents: 3000,
+      itemsTaxMxnCents: 480,
+      itemsTotalMxnCents: 3480,
+      shippingCode: 'STANDARD_RATE',
+      shippingBaseMxnCents: 12931,
+      shippingTaxMxnCents: 2069,
+      shippingTotalMxnCents: 15000,
+      serviceable: true,
+      freeShippingRemainingMxnCents: null,
+      subtotalMxnCents: 15931,
+      taxMxnCents: 2549,
+      totalMxnCents: 18480,
+      referenceUsdCents: 999, // round(18 480 / 18.5)
+    });
+  });
+
+  it('free shipping keeps the code and a zero line', async () => {
+    const { shipping } = provider({
+      ...standard,
+      code: 'FREE_SHIPPING',
+      totalMxnCents: 0,
+      baseMxnCents: 0,
+      taxMxnCents: 0,
+    });
+    const result = await toZac(
+      [{ sku: 'A', quantity: 1 }],
+      [product('A', 1160, 5)],
+      shipping
+    );
+    expect(result.ok && result.quote.summary).toMatchObject({
+      shippingCode: 'FREE_SHIPPING',
+      shippingTotalMxnCents: 0,
+      totalMxnCents: 1160,
+    });
+  });
+
+  it('reads physical data in the same static query as the price', async () => {
+    const { db, query } = catalog([product('A', 1160, 5)]);
+    await quoteCartToDestination(
+      db,
+      [{ sku: 'A', quantity: 1 }],
+      FIX,
+      'es-MX',
+      { stateCode: 'ZAC' },
+      provider(standard).shipping
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).toContain(
+      'p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id'
+    );
   });
 });

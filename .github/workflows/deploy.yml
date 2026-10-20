@@ -362,7 +362,20 @@ jobs:
             -d '{"items":[]}' \
             | jq -e '.items == [] and .warnings == [] and .summary.totalMxnCents == 0 and .summary.subtotalMxnCents == 0 and .summary.taxMxnCents == 0' > /dev/null \
             || { echo "FATAL: /v1/cart/quote does not quote the empty cart"; exit 1; }
-          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate 200 · cart quote OK"
+          # FC 011: an unknown SKU makes the quote read products with the physical columns of
+          # migration 002 (a missing column is a 500). Without a destination it is a 200 with an
+          # `unavailable` warning; with one, T1.1 V refuses it with a 400 problem.
+          curl -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+            -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
+            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}]}' \
+            | jq -e '.warnings == [{"sku":"SMOKE-NONE","code":"unavailable"}] and .summary.shippingCode == null and .summary.serviceable == true' > /dev/null \
+            || { echo "FATAL: /v1/cart/quote without destination"; exit 1; }
+          SHIP=$(curl -sS -o /tmp/ship.json -w '%{http_code}' -X POST https://apiv1.yekora.mx/v1/cart/quote \
+            -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
+            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}],"destination":{"stateCode":"ZAC"}}')
+          [ "$SHIP" = "400" ] && jq -e '.detail == "EMPTY_OR_UNAVAILABLE_CART"' /tmp/ship.json > /dev/null \
+            || { echo "FATAL: /v1/cart/quote with destination → $SHIP $(cat /tmp/ship.json)"; exit 1; }
+          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate 200 · cart quote OK · shipping quote OK"
 
   hostinger-deployment:
     name: 🚀 Deployment to Hostinger

@@ -14,11 +14,19 @@
  * total never promises what cannot be sold. Static SQL with `?` placeholders only (T1.1 of
  * FC 008): mysql2 expands the SKU array of `IN (?)` with escaping.
  *
+ * Shipping (FC 011): without a destination the quote is the products alone (shipping null,
+ * serviceable). With one, {@link quoteCartToDestination} applies truth table T1.1 in order:
+ * V the cart is quotable (at least one line, every line purchasable) else
+ * EMPTY_OR_UNAVAILABLE_CART; D the state is a known zone else INVALID_DESTINATION; R a rule
+ * covers the purchase else 200 with UNSERVICEABLE_DESTINATION and a zero charge. The charge is
+ * one more line of the summary, split with the same VAT rule, and the grand totals add it.
+ *
  * @module
  */
-import { usdCents } from '../lib/money';
+import { splitVat, usdCents } from '../lib/money';
 import type { Db } from './db';
 import type { CurrentRate } from './exchangeRate';
+import type { ShippingRateProvider } from './shippingPort';
 
 /** Stock below this is reported as low (FC 009 T1.2). */
 const LOW_STOCK = 5;
@@ -39,6 +47,11 @@ interface QuoteRow {
   name_en: string;
   price_mxn_cents: number;
   stock: number;
+  weight_grams: number;
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  shipping_class_id: number;
 }
 
 /** One requested line: what the browser keeps (no amounts). */
@@ -64,10 +77,38 @@ interface QuotedLine {
   purchasable: boolean;
 }
 
+/** Effect of the shipping evaluation shown with the quote. */
+type ShippingCode =
+  'STANDARD_RATE' | 'FREE_SHIPPING' | 'UNSERVICEABLE_DESTINATION';
+
+/** Charge of the shipment, already split; null when no destination was given. */
+type ShippingLine = {
+  code: ShippingCode;
+  base: number;
+  tax: number;
+  total: number;
+  remaining: number | null;
+} | null;
+
 /** The whole quote. */
 interface CartQuote {
   items: QuotedLine[];
   summary: {
+    /** Purchasable lines only: base, VAT and total with VAT. */
+    itemsBaseMxnCents: number;
+    itemsTaxMxnCents: number;
+    itemsTotalMxnCents: number;
+    /** Null without a destination; otherwise the T1.1/T1.2 effect. */
+    shippingCode: ShippingCode | null;
+    /** Charge split like a product line; null without a destination, 0 when not covered. */
+    shippingBaseMxnCents: number | null;
+    shippingTaxMxnCents: number | null;
+    shippingTotalMxnCents: number | null;
+    /** False only when a destination was given and no rule covers it. */
+    serviceable: boolean;
+    /** Items total still missing for free shipping; null when it does not apply. */
+    freeShippingRemainingMxnCents: number | null;
+    /** Grand totals: items plus shipping. */
     subtotalMxnCents: number;
     taxMxnCents: number;
     totalMxnCents: number;
@@ -77,17 +118,6 @@ interface CartQuote {
     exchangeRate: CurrentRate | null;
   };
   warnings: { sku: string; code: QuoteWarningCode }[];
-}
-
-/**
- * Splits a net amount into its base and the 16 % VAT it carries, in integer cents.
- *
- * @param totalMxnCents - Net amount (VAT included).
- * @returns Base and tax; they always add up to the total.
- */
-function splitVat(totalMxnCents: number): { base: number; tax: number } {
-  const base = Math.round((totalMxnCents * 100) / 116);
-  return { base, tax: totalMxnCents - base };
 }
 
 function stockStatus(stock: number): StockStatus {
@@ -158,13 +188,15 @@ function quoteLine(
  * @param rows - Active products found for those SKUs.
  * @param rate - Current FIX, or null.
  * @param lang - Language of the product names.
- * @returns Lines in request order, totals over purchasable lines, and warnings.
+ * @param shipping - Priced shipment, or null without a destination.
+ * @returns Lines in request order, totals over purchasable lines plus shipping, and warnings.
  */
 function buildQuote(
   lines: readonly RequestedLine[],
   rows: readonly QuoteRow[],
   rate: CurrentRate | null,
-  lang: 'es-MX' | 'en'
+  lang: 'es-MX' | 'en',
+  shipping: ShippingLine = null
 ): CartQuote {
   const bySku = new Map(rows.map((row) => [row.sku, row]));
   const items: QuotedLine[] = [];
@@ -190,21 +222,50 @@ function buildQuote(
       summary.totalItems += quoted.quantity;
     }
   }
+  const totalMxnCents = summary.totalMxnCents + (shipping?.total ?? 0);
   // An empty total has no reference: the cart shows nothing to convert.
   const fix = rate ? Number(rate.rate) : null;
   const referenceUsdCents =
-    summary.totalMxnCents > 0 ? usdCents(summary.totalMxnCents, fix) : null;
+    totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
   return {
     items,
-    summary: { ...summary, referenceUsdCents, exchangeRate: rate },
+    summary: {
+      itemsBaseMxnCents: summary.subtotalMxnCents,
+      itemsTaxMxnCents: summary.taxMxnCents,
+      itemsTotalMxnCents: summary.totalMxnCents,
+      shippingCode: shipping?.code ?? null,
+      shippingBaseMxnCents: shipping?.base ?? null,
+      shippingTaxMxnCents: shipping?.tax ?? null,
+      shippingTotalMxnCents: shipping?.total ?? null,
+      serviceable: shipping?.code !== 'UNSERVICEABLE_DESTINATION',
+      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
+      subtotalMxnCents: summary.subtotalMxnCents + (shipping?.base ?? 0),
+      taxMxnCents: summary.taxMxnCents + (shipping?.tax ?? 0),
+      totalMxnCents,
+      totalItems: summary.totalItems,
+      referenceUsdCents,
+      exchangeRate: rate,
+    },
     warnings,
   };
 }
 
+/** Reads the active products of the requested SKUs in one static, parameterized query. */
+async function readProducts(
+  db: Db,
+  lines: readonly RequestedLine[]
+): Promise<QuoteRow[]> {
+  if (lines.length === 0) return [];
+  return db.query<QuoteRow>(
+    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
+    [lines.map((line) => line.sku)]
+  );
+}
+
 /**
- * Quotes a cart against the catalog: one static, parameterized query for every SKU at once.
- * Inactive products, or products whose discipline or level is retired, read as unavailable,
- * exactly as the catalog hides them.
+ * Quotes a cart against the catalog, products only (no destination: shipping null). Inactive
+ * products, or products whose discipline or level is retired, read as unavailable, exactly as
+ * the catalog hides them.
  *
  * @param db - Database port.
  * @param lines - Validated lines (unique SKUs).
@@ -217,12 +278,75 @@ export async function quoteCart(
   rate: CurrentRate | null,
   lang: 'es-MX' | 'en'
 ): Promise<CartQuote> {
-  const rows =
-    lines.length === 0
-      ? []
-      : await db.query<QuoteRow>(
-          'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
-          [lines.map((line) => line.sku)]
-        );
-  return buildQuote(lines, rows, rate, lang);
+  return buildQuote(lines, await readProducts(db, lines), rate, lang);
+}
+
+/** Why a quote with a destination is refused (T1.1 rows with HTTP 400). */
+type DestinationRejection = 'EMPTY_OR_UNAVAILABLE_CART' | 'INVALID_DESTINATION';
+
+/**
+ * Quotes a cart with its shipping to a destination (FC 011, T1.1 in order V, D, R). The same
+ * quote as {@link quoteCart} plus one shipping line, priced once for the whole purchase by the
+ * provider; the browser never sends an amount.
+ *
+ * @param db - Database port.
+ * @param lines - Validated lines (unique SKUs).
+ * @param rate - Current FIX, or null.
+ * @param lang - Language of the product names.
+ * @param destination - State code (ISO 3166-2:MX without MX-) and optional postal code.
+ * @param provider - Source of shipping rates.
+ * @returns The quote, or the T1.1 rejection when the cart or the state cannot be quoted.
+ */
+export async function quoteCartToDestination(
+  db: Db,
+  lines: readonly RequestedLine[],
+  rate: CurrentRate | null,
+  lang: 'es-MX' | 'en',
+  destination: { stateCode: string; postalCode?: string },
+  provider: ShippingRateProvider
+): Promise<
+  { ok: true; quote: CartQuote } | { ok: false; code: DestinationRejection }
+> {
+  const rows = await readProducts(db, lines);
+  const products = buildQuote(lines, rows, rate, lang);
+  // V: at least one line and every line purchasable now; checked before the destination.
+  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
+    return { ok: false, code: 'EMPTY_OR_UNAVAILABLE_CART' };
+  }
+  const bySku = new Map(rows.map((row) => [row.sku, row]));
+  const shipment = await provider.quote({
+    stateCode: destination.stateCode,
+    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
+    lines: lines.map((line) => {
+      // V guarantees every line was read: a purchasable line has its row.
+      const row = bySku.get(line.sku) as QuoteRow;
+      return {
+        quantity: line.quantity,
+        weightGrams: Number(row.weight_grams),
+        lengthMm: Number(row.length_mm),
+        widthMm: Number(row.width_mm),
+        heightMm: Number(row.height_mm),
+        classId: Number(row.shipping_class_id),
+      };
+    }),
+  });
+  if (shipment.code === 'INVALID_DESTINATION') {
+    return { ok: false, code: 'INVALID_DESTINATION' };
+  }
+  const shipping: ShippingLine = shipment.serviceable
+    ? {
+        code: shipment.code,
+        base: shipment.baseMxnCents,
+        tax: shipment.taxMxnCents,
+        total: shipment.totalMxnCents,
+        remaining: shipment.freeShippingRemainingMxnCents,
+      }
+    : {
+        code: 'UNSERVICEABLE_DESTINATION',
+        base: 0,
+        tax: 0,
+        total: 0,
+        remaining: null,
+      };
+  return { ok: true, quote: buildQuote(lines, rows, rate, lang, shipping) };
 }

@@ -9,7 +9,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import type { Db } from './db';
@@ -73,6 +73,19 @@ const emptyDb: Db = {
   ping: async () => undefined,
   close: async () => undefined,
 };
+
+// Pay Fastify's cold start once with its own budget (as app.test.ts does), so the first case
+// keeps its 5 s even on a loaded machine or CI runner.
+beforeAll(async () => {
+  const warm = await buildApp({
+    config,
+    db: emptyDb,
+    rate: async () => null,
+    logger: false,
+  });
+  await warm.inject('/health');
+  await warm.close();
+}, 30_000);
 
 afterEach(async () => {
   await app.close();

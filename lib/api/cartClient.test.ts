@@ -19,6 +19,15 @@ const QUOTE: CartQuote = {
     },
   ],
   summary: {
+    itemsBaseMxnCents: 3000,
+    itemsTaxMxnCents: 480,
+    itemsTotalMxnCents: 3480,
+    shippingCode: null,
+    shippingBaseMxnCents: null,
+    shippingTaxMxnCents: null,
+    shippingTotalMxnCents: null,
+    serviceable: true,
+    freeShippingRemainingMxnCents: null,
     subtotalMxnCents: 3000,
     taxMxnCents: 480,
     totalMxnCents: 3480,
@@ -72,6 +81,7 @@ describe('quote requests', () => {
       status: 'ready',
       quote: QUOTE,
       error: null,
+      shippingIssue: null,
     });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://apiv1.yekora.mx/v1/cart/quote?lang=en');
@@ -103,6 +113,7 @@ describe('quote requests', () => {
       status: 'error',
       quote: null,
       error: reason,
+      shippingIssue: null,
     });
   });
 
@@ -124,6 +135,7 @@ describe('quote requests', () => {
       status: 'error',
       quote: null,
       error: 'timeout',
+      shippingIssue: null,
     });
   });
 });
@@ -162,12 +174,14 @@ describe('createQuoter', () => {
       status: 'loading',
       quote: QUOTE,
       error: null,
+      shippingIssue: null,
     });
     await vi.advanceTimersByTimeAsync(300);
     expect(quoter.getSnapshot()).toEqual({
       status: 'error',
       quote: QUOTE,
       error: 'offline',
+      shippingIssue: null,
     });
   });
 
@@ -183,6 +197,7 @@ describe('createQuoter', () => {
       status: 'ready',
       quote: QUOTE,
       error: null,
+      shippingIssue: null,
     });
   });
 
@@ -195,6 +210,115 @@ describe('createQuoter', () => {
       status: 'idle',
       quote: null,
       error: null,
+      shippingIssue: null,
+    });
+  });
+});
+
+describe('shipping to a delivery state (FC 011)', () => {
+  const PROBLEM = (detail: string) => ({
+    type: 'about:blank',
+    title: 'Refused',
+    status: 400,
+    detail,
+  });
+
+  /** fetch answering a 400 with `detail` when a destination is sent, the quote otherwise. */
+  const refusing = (detail: string) =>
+    vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as {
+          destination?: unknown;
+        };
+        return body.destination
+          ? new Response(JSON.stringify(PROBLEM(detail)), { status: 400 })
+          : new Response(JSON.stringify(QUOTE), { status: 200 });
+      }
+    );
+
+  it('sends the state code with the lines, and nothing else', async () => {
+    const fetchMock = answer(QUOTE);
+    vi.stubGlobal('fetch', fetchMock);
+    const quoter = createQuoter();
+    quoter.request(LINES, 'es-MX', 'ZAC');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      items: LINES,
+      destination: { stateCode: 'ZAC' },
+    });
+    expect(quoter.getSnapshot()).toMatchObject({
+      status: 'ready',
+      shippingIssue: null,
+    });
+  });
+
+  it.each([
+    ['EMPTY_OR_UNAVAILABLE_CART', 'cart_unavailable'],
+    ['INVALID_DESTINATION', 'invalid_destination'],
+  ])(
+    'after a 400 %s it shows the products-only quote and says why',
+    async (detail, issue) => {
+      const fetchMock = refusing(detail);
+      vi.stubGlobal('fetch', fetchMock);
+      const quoter = createQuoter();
+      quoter.request(LINES, 'es-MX', 'ZAC');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+        items: LINES,
+      });
+      expect(quoter.getSnapshot()).toEqual({
+        status: 'ready',
+        quote: QUOTE,
+        error: null,
+        shippingIssue: issue,
+      });
+    }
+  );
+
+  it('treats any other 400 with a state as a server error, without retrying', async () => {
+    for (const body of [PROBLEM('SOMETHING_ELSE'), { detail: 7 }, 'not json']) {
+      const fetchMock = answer(body, 400);
+      vi.stubGlobal('fetch', fetchMock);
+      const quoter = createQuoter();
+      quoter.request(LINES, 'es-MX', 'ZAC');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(quoter.getSnapshot()).toMatchObject({
+        status: 'error',
+        error: 'server',
+      });
+    }
+  });
+
+  it('keeps a 400 without a state a plain server error', async () => {
+    vi.stubGlobal('fetch', answer(PROBLEM('INVALID_DESTINATION'), 400));
+    const quoter = await quoted();
+    expect(quoter.getSnapshot()).toMatchObject({
+      status: 'error',
+      error: 'server',
+    });
+  });
+
+  it('reports the fallback failing like any failed quote', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return calls === 1
+          ? new Response(JSON.stringify(PROBLEM('INVALID_DESTINATION')), {
+              status: 400,
+            })
+          : new Response('{}', { status: 503 });
+      })
+    );
+    const quoter = createQuoter();
+    quoter.request(LINES, 'es-MX', 'ZAC');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(quoter.getSnapshot()).toMatchObject({
+      status: 'error',
+      error: 'server',
     });
   });
 });

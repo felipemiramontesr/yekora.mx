@@ -20,6 +20,7 @@ import {
 import { getMessages, type Locale } from '@/app/i18n';
 import type { QuoteState } from '@/lib/api/cartClient';
 import { getCartStore } from '@/lib/cart/cartStore';
+import { getDestinationStore } from '@/lib/cart/destinationStore';
 import type { CartQuote } from '@/lib/cart/cartTypes';
 import { AddToCartButton } from './AddToCartButton';
 import { CartButton } from './CartButton';
@@ -88,6 +89,15 @@ function quoteOf(items: { sku: string; quantity: number }[]): CartQuote {
   return {
     items: lines,
     summary: {
+      itemsBaseMxnCents: subtotal,
+      itemsTaxMxnCents: tax,
+      itemsTotalMxnCents: total,
+      shippingCode: null,
+      shippingBaseMxnCents: null,
+      shippingTaxMxnCents: null,
+      shippingTotalMxnCents: null,
+      serviceable: true,
+      freeShippingRemainingMxnCents: null,
       subtotalMxnCents: subtotal,
       taxMxnCents: tax,
       totalMxnCents: total,
@@ -97,6 +107,24 @@ function quoteOf(items: { sku: string; quantity: number }[]): CartQuote {
     },
     warnings,
   };
+}
+
+/** Renders the summary alone with a given quote state and delivery state. */
+function renderSummary(
+  state: QuoteState,
+  locale: Locale = 'es-MX',
+  stateCode: string | null = null
+) {
+  return render(
+    <CartSummary
+      locale={locale}
+      state={state}
+      stateCode={stateCode}
+      onStateChange={() => undefined}
+      messages={getMessages(locale).cart}
+      priceMessages={getMessages(locale).catalog.price}
+    />
+  );
 }
 
 function apiAnswering() {
@@ -137,6 +165,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   getCartStore().clearCart();
+  getDestinationStore().setState(null);
   vi.stubGlobal('fetch', apiAnswering());
 });
 
@@ -238,7 +267,8 @@ describe('cart contents with a live quote', () => {
     const view = within(panel());
     await waitFor(() => expect(view.getByText('Tienda')).toBeTruthy());
     expect(view.getByText('$11.60 MXN c/u')).toBeTruthy();
-    expect(view.getAllByText('$34.80 MXN')).toHaveLength(2); // line and total
+    // Line, products total with VAT (FC 011) and grand total: no shipping chosen yet.
+    expect(view.getAllByText('$34.80 MXN')).toHaveLength(3);
     expect(view.getByText('$30.00 MXN')).toBeTruthy(); // subtotal before VAT
     expect(view.getByText('$4.80 MXN')).toBeTruthy(); // VAT
     expect(view.getByText('3 piezas')).toBeTruthy();
@@ -357,15 +387,7 @@ describe('the last unit', () => {
 describe('CartSummary states', () => {
   const es = getMessages('es-MX');
   const quote = quoteOf([{ sku: 'TENT', quantity: 1 }]);
-  const show = (state: QuoteState, locale: Locale = 'es-MX') =>
-    render(
-      <CartSummary
-        locale={locale}
-        state={state}
-        messages={getMessages(locale).cart}
-        priceMessages={getMessages(locale).catalog.price}
-      />
-    );
+  const show = renderSummary;
 
   it.each([
     [{ status: 'loading', quote, error: null }, es.cart.summary.updating],
@@ -378,7 +400,7 @@ describe('CartSummary states', () => {
   });
 
   it('shows no totals before the first quote, and no USD without a reference', () => {
-    show({ status: 'loading', quote: null, error: null });
+    show({ status: 'loading', quote: null, error: null, shippingIssue: null });
     expect(screen.queryByText(/MXN/)).toBeNull();
     cleanup();
     show(
@@ -389,6 +411,7 @@ describe('CartSummary states', () => {
           summary: { ...quote.summary, referenceUsdCents: null },
         },
         error: null,
+        shippingIssue: null,
       },
       'en'
     );
@@ -412,5 +435,169 @@ describe('the quote in the background', () => {
       ).toBeTruthy()
     );
     expect(view.getByText('TENT')).toBeTruthy();
+  });
+});
+
+/** A quote with its shipping line, priced and split like the API does (FC 011). */
+function withShipping(
+  quote: CartQuote,
+  code: NonNullable<CartQuote['summary']['shippingCode']>,
+  total: number,
+  remaining: number | null = null
+): CartQuote {
+  const base = Math.round((total * 100) / 116);
+  const { summary } = quote;
+  return {
+    ...quote,
+    summary: {
+      ...summary,
+      shippingCode: code,
+      shippingBaseMxnCents: base,
+      shippingTaxMxnCents: total - base,
+      shippingTotalMxnCents: total,
+      serviceable: code !== 'UNSERVICEABLE_DESTINATION',
+      freeShippingRemainingMxnCents: remaining,
+      subtotalMxnCents: summary.itemsBaseMxnCents + base,
+      taxMxnCents: summary.itemsTaxMxnCents + total - base,
+      totalMxnCents: summary.itemsTotalMxnCents + total,
+    },
+  };
+}
+
+describe('shipping in the cart (FC 011)', () => {
+  const ship = getMessages('es-MX').cart.shipping;
+  const select = (view: ReturnType<typeof within>) =>
+    view.getByRole('combobox', { name: ship.stateLabel });
+
+  it('offers the 32 states, prices shipping for the chosen one and remembers only its code', async () => {
+    const api = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as {
+        items: { sku: string; quantity: number }[];
+        destination?: { stateCode: string };
+      };
+      const quote = quoteOf(body.items);
+      return new Response(
+        JSON.stringify(
+          body.destination ? withShipping(quote, 'STANDARD_RATE', 15000) : quote
+        ),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', api);
+    getCartStore().addItem('TENT');
+    showButton();
+    fireEvent.click(cartLink());
+    const view = within(panel());
+    await waitFor(() => expect(view.getByText(ship.pending)).toBeTruthy());
+    expect(select(view).querySelectorAll('option')).toHaveLength(33);
+
+    fireEvent.change(select(view), { target: { value: 'ZAC' } });
+    await waitFor(() => expect(view.getByText('$150.00 MXN')).toBeTruthy());
+    expect(view.getByText('$161.60 MXN')).toBeTruthy(); // 11.60 + 150.00
+    expect(localStorage.getItem('yekora_shipping_state_v1')).toBe('ZAC');
+    const last = JSON.parse(String(api.mock.calls.at(-1)?.[1].body));
+    // Only the state code travels: never a postal code, never an amount.
+    expect(last).toEqual({
+      items: [{ sku: 'TENT', quantity: 1 }],
+      destination: { stateCode: 'ZAC' },
+    });
+
+    fireEvent.change(select(view), { target: { value: '' } });
+    await waitFor(() => expect(view.getByText(ship.pending)).toBeTruthy());
+    expect(localStorage.getItem('yekora_shipping_state_v1')).toBeNull();
+  });
+
+  it('keeps the cart and explains why when the API refuses to price shipping', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body)) as {
+          items: { sku: string; quantity: number }[];
+          destination?: unknown;
+        };
+        return body.destination
+          ? new Response(
+              JSON.stringify({
+                type: 'about:blank',
+                title: 'Cart cannot be quoted',
+                status: 400,
+                detail: 'EMPTY_OR_UNAVAILABLE_CART',
+              }),
+              { status: 400 }
+            )
+          : new Response(JSON.stringify(quoteOf(body.items)), { status: 200 });
+      })
+    );
+    getDestinationStore().setState('ZAC');
+    getCartStore().addItem('PACK', 3); // only 2 in stock
+    showButton();
+    fireEvent.click(cartLink());
+    const view = within(panel());
+    await waitFor(() =>
+      expect(view.getByText(ship.cartUnavailable)).toBeTruthy()
+    );
+    expect(view.getByText('Mochila')).toBeTruthy(); // the products quote is still shown
+  });
+});
+
+describe('CartSummary shipping row (FC 011)', () => {
+  const base = quoteOf([{ sku: 'TENT', quantity: 1 }]);
+  const ready = (
+    quote: CartQuote,
+    shippingIssue: QuoteState['shippingIssue'] = null
+  ) => ({ status: 'ready', quote, error: null, shippingIssue }) as QuoteState;
+  const row = () => document.querySelector('[data-shipping]')?.textContent;
+
+  it('names the state it cannot ship to, in each language, with a zero charge', () => {
+    const quote = withShipping(base, 'UNSERVICEABLE_DESTINATION', 0);
+    renderSummary(ready(quote), 'es-MX', 'CMX');
+    expect(row()).toBe('Por el momento no enviamos a Ciudad de México.');
+    cleanup();
+    renderSummary(ready(quote), 'en', 'CMX');
+    expect(row()).toBe("We don't ship to Mexico City at the moment.");
+  });
+
+  it('says free and confirms it when the threshold is reached', () => {
+    renderSummary(
+      ready(withShipping(base, 'FREE_SHIPPING', 0, 0)),
+      'es-MX',
+      'ZAC'
+    );
+    expect(row()).toBe('Gratis');
+    expect(screen.getByText('Tu envío es gratis.')).toBeTruthy();
+    expect(document.querySelector('progress')).toBeNull();
+  });
+
+  it('shows the progress toward free shipping with what is still missing', () => {
+    renderSummary(
+      ready(withShipping(base, 'STANDARD_RATE', 15000, 38840)),
+      'es-MX',
+      'ZAC'
+    );
+    expect(
+      screen.getByText('Te faltan $388.40 MXN para el envío gratis.')
+    ).toBeTruthy();
+    const bar = screen.getByRole('progressbar', {
+      name: 'Te faltan $388.40 MXN para el envío gratis.',
+    });
+    expect(bar.getAttribute('value')).toBe('1160');
+    expect(bar.getAttribute('max')).toBe('40000');
+  });
+
+  it('asks to choose the state again when the API did not know the stored one', () => {
+    renderSummary(ready(base, 'invalid_destination'), 'es-MX', 'ZAC');
+    expect(row()).toBe(getMessages('es-MX').cart.shipping.invalidState);
+  });
+
+  it('waits for a state before pricing, and falls back to the code for an unknown name', () => {
+    renderSummary(ready(base), 'es-MX', null);
+    expect(row()).toBe(getMessages('es-MX').cart.shipping.pending);
+    cleanup();
+    renderSummary(
+      ready(withShipping(base, 'UNSERVICEABLE_DESTINATION', 0)),
+      'es-MX',
+      'XYZ'
+    );
+    expect(row()).toBe('Por el momento no enviamos a XYZ.');
   });
 });

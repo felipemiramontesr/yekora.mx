@@ -8,6 +8,12 @@
  * warning (HTTP 200), so the cart can tell the buyer. The answer is validated too before it
  * leaves. This route has its own, stricter rate limit (60/min per IP) and a small body limit.
  *
+ * FC 011: one canonical quote for cart and checkout, no parallel shipping route. With an
+ * optional `destination` the same answer adds the shipping line (T1.1): a cart that is not
+ * quotable or an unknown state is a 400 problem whose `detail` is the machine code
+ * (EMPTY_OR_UNAVAILABLE_CART, INVALID_DESTINATION); a destination no rule covers is a 200 with
+ * `serviceable: false`.
+ *
  * @module
  */
 import type { FastifyInstance } from 'fastify';
@@ -17,13 +23,23 @@ import { z } from 'zod';
 import {
   cartLinesSchema,
   cartQuoteSchema,
+  destinationSchema,
 } from '../../../../lib/cart/cartTypes';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
-import { quoteCart } from '../services/cartQuote';
+import { quoteCart, quoteCartToDestination } from '../services/cartQuote';
 import type { Db } from '../services/db';
 import type { CurrentRate } from '../services/exchangeRate';
+import type { ShippingRateProvider } from '../services/shippingPort';
 
-const requestSchema = z.object({ items: cartLinesSchema }).strict();
+const requestSchema = z
+  .object({ items: cartLinesSchema, destination: destinationSchema.optional() })
+  .strict();
+
+/** Title of each T1.1 rejection; the code itself travels as the problem detail. */
+const REJECTION_TITLE = {
+  EMPTY_OR_UNAVAILABLE_CART: 'Cart cannot be quoted',
+  INVALID_DESTINATION: 'Invalid destination',
+} as const;
 
 const lang = z.enum(['es-MX', 'en']).default('es-MX');
 
@@ -33,13 +49,15 @@ interface CartDeps {
   db: Db;
   /** Current FIX (cached), or null when none is stored. */
   rate: () => Promise<CurrentRate | null>;
+  /** Source of shipping rates (FC 011). */
+  shipping: ShippingRateProvider;
 }
 
 /**
  * Registers the cart quote route.
  *
  * @param app - Fastify instance.
- * @param deps - Database and FIX provider.
+ * @param deps - Database, FIX provider and shipping rates.
  */
 export function registerCartRoutes(app: FastifyInstance, deps: CartDeps): void {
   app.post(
@@ -65,13 +83,28 @@ export function registerCartRoutes(app: FastifyInstance, deps: CartDeps): void {
             )
           );
       }
-      const quote = await quoteCart(
+      const { items, destination } = body.data;
+      const rate = await deps.rate();
+      if (destination === undefined) {
+        return cartQuoteSchema.parse(
+          await quoteCart(deps.db, items, rate, language.data)
+        );
+      }
+      const result = await quoteCartToDestination(
         deps.db,
-        body.data.items,
-        await deps.rate(),
-        language.data
+        items,
+        rate,
+        language.data,
+        destination,
+        deps.shipping
       );
-      return cartQuoteSchema.parse(quote);
+      if (!result.ok) {
+        return reply
+          .code(400)
+          .type(PROBLEM_TYPE)
+          .send(problem(400, REJECTION_TITLE[result.code], result.code));
+      }
+      return cartQuoteSchema.parse(result.quote);
     }
   );
 }

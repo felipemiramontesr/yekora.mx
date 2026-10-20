@@ -12,6 +12,10 @@ import type { Locale } from '@/app/i18n';
 import { createQuoter, type QuoteState } from '@/lib/api/cartClient';
 import type { CartLine } from '@/lib/cart/cartTypes';
 import { getCartStore, getServerCartSnapshot } from '@/lib/cart/cartStore';
+import {
+  getDestinationStore,
+  getServerDestinationSnapshot,
+} from '@/lib/cart/destinationStore';
 
 /** Window event that asks the header's cart panel to open. */
 const OPEN_EVENT = 'yekora:cart-open';
@@ -30,15 +34,36 @@ export function useCartLines(): readonly CartLine[] {
 }
 
 /**
+ * The delivery state the buyer chose (FC 011), remembered between visits and shared by every
+ * tab, with the function that changes it. Prerendered pages see none.
+ *
+ * @returns The state code (or null) and its setter.
+ */
+export function useDeliveryState(): [
+  string | null,
+  (code: string | null) => void,
+] {
+  const store = getDestinationStore();
+  const code = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    getServerDestinationSnapshot
+  );
+  return [code, store.setState];
+}
+
+/**
  * Live quote of the given lines: re-quoted after edits (debounced), keeping the last good
- * quote while updating or after a failure.
+ * quote while updating or after a failure. With a delivery state it also prices shipping.
  *
  * @param lines - Current cart lines.
  * @param locale - Language of the product names.
+ * @param stateCode - Delivery state, or null for products only.
  */
 export function useCartQuote(
   lines: readonly CartLine[],
-  locale: Locale
+  locale: Locale,
+  stateCode: string | null = null
 ): QuoteState {
   const [quoter] = useState(createQuoter);
   const state = useSyncExternalStore(
@@ -47,8 +72,8 @@ export function useCartQuote(
     quoter.getSnapshot
   );
   useEffect(() => {
-    quoter.request(lines, locale);
-  }, [quoter, lines, locale]);
+    quoter.request(lines, locale, stateCode);
+  }, [quoter, lines, locale, stateCode]);
   return state;
 }
 

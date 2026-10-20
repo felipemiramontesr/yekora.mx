@@ -5,7 +5,7 @@ import type { Locale, Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 import { CartItemRow } from './CartItemRow';
 import { CartSummary } from './CartSummary';
-import { useCartLines, useCartQuote } from './useCart';
+import { useCartLines, useCartQuote, useDeliveryState } from './useCart';
 
 /** Props of {@link CartContents}. */
 interface CartContentsProps {
@@ -28,7 +28,8 @@ export function CartContents({
   priceMessages,
 }: Readonly<CartContentsProps>) {
   const lines = useCartLines();
-  const state = useCartQuote(lines, locale);
+  const [stateCode, setStateCode] = useDeliveryState();
+  const state = useCartQuote(lines, locale, stateCode);
   if (lines.length === 0) {
     return (
       <div data-cart-empty className="flex flex-col items-start gap-4 py-6">
@@ -61,6 +62,8 @@ export function CartContents({
       <CartSummary
         locale={locale}
         state={state}
+        stateCode={stateCode}
+        onStateChange={setStateCode}
         messages={messages}
         priceMessages={priceMessages}
       />

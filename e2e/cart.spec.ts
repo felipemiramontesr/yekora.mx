@@ -5,6 +5,9 @@ import fixture from './fixtures/catalog.json' with { type: 'json' };
  * FC 009 F3 · Guest cart. Built from e2e/fixtures/catalog.json (fictitious e2e- products).
  * The quote API is intercepted in the browser and answered with the server's own formula
  * (apps/api/src/services/cartQuote.ts), so no test ever reaches production.
+ *
+ * FC 011 · Shipping: the interceptor also emulates the rate tables (one flat-by-state rule set
+ * and free shipping from a threshold) and truth table T1.1 (400 when a line cannot be bought).
  */
 
 const STOCK: Record<string, number> = {
@@ -13,6 +16,58 @@ const STOCK: Record<string, number> = {
   'E2E-0003': 0, // trail shoes · out of stock
 };
 const FIX = fixture.exchangeRate;
+
+/** Rate tables of the interceptor: ZONE_RATE per state, free from $10 000 with VAT. */
+const RATES: Record<string, number> = { ZAC: 15000, CMX: 9900 };
+const FREE_FROM = 1_000_000;
+
+type Quote = ReturnType<typeof quoteFor>;
+
+/** Adds the shipping line exactly as the API does, or the T1.1 refusal. */
+function shipTo(quote: Quote, stateCode: string) {
+  if (quote.items.length === 0 || quote.items.some((i) => !i.purchasable)) {
+    return {
+      status: 400,
+      body: {
+        type: 'about:blank',
+        title: 'Cart cannot be quoted',
+        status: 400,
+        detail: 'EMPTY_OR_UNAVAILABLE_CART',
+      },
+    };
+  }
+  const items = quote.summary.itemsTotalMxnCents;
+  const rate = RATES[stateCode];
+  const covered = rate !== undefined;
+  const free = covered && items >= FREE_FROM;
+  const total = covered && !free ? rate : 0;
+  const base = Math.round((total * 100) / 116);
+  let code = 'UNSERVICEABLE_DESTINATION';
+  if (covered) code = free ? 'FREE_SHIPPING' : 'STANDARD_RATE';
+  const grand = quote.summary.itemsTotalMxnCents + total;
+  return {
+    status: 200,
+    body: {
+      ...quote,
+      summary: {
+        ...quote.summary,
+        shippingCode: code,
+        shippingBaseMxnCents: base,
+        shippingTaxMxnCents: total - base,
+        shippingTotalMxnCents: total,
+        serviceable: covered,
+        freeShippingRemainingMxnCents: covered
+          ? Math.max(FREE_FROM - items, 0)
+          : null,
+        subtotalMxnCents: quote.summary.itemsBaseMxnCents + base,
+        taxMxnCents: quote.summary.itemsTaxMxnCents + total - base,
+        totalMxnCents: grand,
+        referenceUsdCents:
+          grand > 0 ? Math.round(grand / Number(FIX.rate)) : null,
+      },
+    },
+  };
+}
 
 function quoteFor(items: { sku: string; quantity: number }[], lang: string) {
   const products =
@@ -74,6 +129,16 @@ function quoteFor(items: { sku: string; quantity: number }[], lang: string) {
   return {
     items: lines,
     summary: {
+      // FC 011: products only; no destination yet, so no shipping line.
+      itemsBaseMxnCents: totals.subtotalMxnCents,
+      itemsTaxMxnCents: totals.taxMxnCents,
+      itemsTotalMxnCents: totals.totalMxnCents,
+      shippingCode: null,
+      shippingBaseMxnCents: null,
+      shippingTaxMxnCents: null,
+      shippingTotalMxnCents: null,
+      serviceable: true,
+      freeShippingRemainingMxnCents: null,
       ...totals,
       referenceUsdCents:
         totals.totalMxnCents > 0
@@ -92,14 +157,22 @@ async function mockQuoteApi(page: Page, mode: 'ok' | 'down' = 'ok') {
       if (mode === 'down') return route.abort('connectionrefused');
       const lang =
         new URL(route.request().url()).searchParams.get('lang') ?? 'es-MX';
-      const { items } = route.request().postDataJSON() as {
+      const { items, destination } = route.request().postDataJSON() as {
         items: { sku: string; quantity: number }[];
+        destination?: { stateCode: string };
       };
+      const quote = quoteFor(items, lang);
+      const answer = destination
+        ? shipTo(quote, destination.stateCode)
+        : { status: 200, body: quote };
       return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
+        status: answer.status,
+        contentType:
+          answer.status === 200
+            ? 'application/json'
+            : 'application/problem+json',
         headers: { 'access-control-allow-origin': 'http://localhost:3100' },
-        body: JSON.stringify(quoteFor(items, lang)),
+        body: JSON.stringify(answer.body),
       });
     }
   );
@@ -281,4 +354,118 @@ test('the cart panel and page run under the CSP without a violation', async ({
   await page.goto('/carrito/');
   await expect(page.locator('main')).toContainText('$4,850.00 MXN');
   expect(violations).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------------------------
+// FC 011 · Shipping
+// ---------------------------------------------------------------------------------------------
+
+/** Opens /carrito/ (or /en/cart/) with these lines already in the pack. */
+async function packWith(
+  page: Page,
+  lines: { sku: string; quantity: number }[],
+  path = '/carrito/'
+) {
+  await page.addInitScript((stored) => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem('yekora_cart_v1', stored);
+      sessionStorage.setItem('seeded', '1');
+    }
+  }, JSON.stringify(lines));
+  await page.goto(path);
+}
+
+const summary = (page: Page) =>
+  page.locator('main').getByRole('region', { name: /Resumen|Summary/ });
+
+test('prices shipping for the chosen state, keeps only its code and frees it from the threshold', async ({
+  page,
+}) => {
+  await packWith(page, [{ sku: 'E2E-0001', quantity: 1 }]);
+  const box = summary(page);
+  await expect(box).toContainText(
+    'El costo de envío se calcula al ingresar tu dirección de entrega.'
+  );
+  await expect(
+    box.getByLabel('Estado de entrega').locator('option')
+  ).toHaveCount(33);
+
+  await box.getByLabel('Estado de entrega').selectOption('ZAC');
+  await expect(box.locator('[data-shipping]')).toHaveText('$150.00 MXN');
+  await expect(box).toContainText('$4,850.00 MXN'); // products with VAT
+  await expect(box).toContainText('$5,000.00 MXN'); // total with shipping
+  await expect(box).toContainText(
+    'Te faltan $5,150.00 MXN para el envío gratis.'
+  );
+  expect(
+    await page.evaluate(() => localStorage.getItem('yekora_shipping_state_v1'))
+  ).toBe('ZAC');
+
+  // The state survives a visit; the postal code is never asked for nor kept.
+  await page.reload();
+  await expect(box.getByLabel('Estado de entrega')).toHaveValue('ZAC');
+  await expect(box.locator('[data-shipping]')).toHaveText('$150.00 MXN');
+
+  // 3 harnesses = $14 550: above the threshold, shipping is free.
+  await page
+    .locator('main')
+    .getByLabel(/Cantidad/)
+    .first()
+    .fill('3');
+  await expect(box.locator('[data-shipping]')).toHaveText('Gratis');
+  await expect(box).toContainText('Tu envío es gratis.');
+  const keys = await page.evaluate(() => Object.keys(localStorage).sort());
+  expect(keys).toEqual(['yekora_cart_v1', 'yekora_shipping_state_v1']);
+});
+
+test('says plainly when a state has no shipping, and in English names it', async ({
+  page,
+}) => {
+  await packWith(page, [{ sku: 'E2E-0001', quantity: 1 }]);
+  await summary(page).getByLabel('Estado de entrega').selectOption('JAL');
+  await expect(summary(page).locator('[data-shipping]')).toHaveText(
+    'Por el momento no enviamos a Jalisco.'
+  );
+  await page.goto('/en/cart/');
+  await summary(page).getByLabel('Delivery state').selectOption('CMX');
+  await expect(summary(page).locator('[data-shipping]')).toHaveText(
+    '$99.00 MXN'
+  );
+  await summary(page).getByLabel('Delivery state').selectOption('YUC');
+  await expect(summary(page).locator('[data-shipping]')).toHaveText(
+    "We don't ship to Yucatán at the moment."
+  );
+});
+
+test('keeps the pack usable when a line cannot be bought and asks to adjust it', async ({
+  page,
+}) => {
+  await packWith(page, [{ sku: 'E2E-0002', quantity: 3 }]); // only 2 left
+  await summary(page).getByLabel('Estado de entrega').selectOption('ZAC');
+  await expect(summary(page).locator('[data-shipping]')).toHaveText(
+    'Ajusta tu mochila para calcular el envío.'
+  );
+  await expect(page.locator('main')).toContainText('Solo quedan 2');
+});
+
+test.describe('shipping summary on the narrowest phone of the RWD gate (360 px)', () => {
+  // Same viewport and rules as mobile-portrait in responsive.spec.ts, here with a filled pack.
+  test.use({ viewport: { width: 360, height: 800 } });
+
+  test('the selector and the longest shipping sentence fit without horizontal scroll', async ({
+    page,
+  }) => {
+    await packWith(page, [{ sku: 'E2E-0001', quantity: 1 }], '/en/cart/');
+    const state = summary(page).getByLabel('Delivery state');
+    await state.selectOption('BCS');
+    await expect(summary(page).locator('[data-shipping]')).toHaveText(
+      "We don't ship to Baja California Sur at the moment."
+    );
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(1); // H_SCROLL_TOLERANCE_PX of responsive.spec.ts
+    const box = await state.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44); // MIN_TOUCH_TARGET_PX
+  });
 });

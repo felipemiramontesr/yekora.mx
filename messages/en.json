@@ -135,7 +135,7 @@
           "paragraphs": [
             "The site only uses first-party technical cookies. We use no third-party, advertising or analytics cookies. Details are in the Cookie policy.",
             "We also keep a technical copy of the site files in your browser (Cache Storage) so it works offline. It holds no personal data.",
-            "If you add products to your pack, we keep in your browser (local storage, «yekora_cart_v1») only the code of each product and its quantity. It is not a cookie, holds no personal data and is never sent to third parties; the details are in the Cookie policy."
+            "If you add products to your pack, we keep in your browser (local storage, «yekora_cart_v1») only the code of each product and its quantity. It is not a cookie, holds no personal data and is never sent to third parties; the details are in the Cookie policy. If you choose your state to calculate shipping, we also keep («yekora_shipping_state_v1») only the code of that state; never your postal code or your address."
           ]
         },
         {
@@ -166,7 +166,8 @@
           "title": "Your pack (cart)",
           "paragraphs": [
             "If you add products to your pack, the site keeps in your browser, in local storage under the name «yekora_cart_v1», only the code of each product and the quantity you chose, so it is still there on your next visit.",
-            "It is not a cookie, holds no personal data, is not used to track you and is never sent to third parties. Prices and stock are always checked on our server. It is erased when you empty your pack, or from the site data in your browser."
+            "It is not a cookie, holds no personal data, is not used to track you and is never sent to third parties. Prices and stock are always checked on our server. It is erased when you empty your pack, or from the site data in your browser.",
+            "If you choose your delivery state to calculate shipping, the site also keeps, under the name «yekora_shipping_state_v1», only the code of that state (for example, ZAC), to remember it between visits. It never keeps your postal code or your address. It is deleted when you clear the state in your pack or from the site data in your browser."
           ]
         },
         {
@@ -473,6 +474,19 @@
       "updating": "Updating prices and stock…",
       "offline": "Offline: prices and stock will update when you reconnect.",
       "failed": "We could not update the prices right now. The last confirmed ones are shown."
+    },
+    "shipping": {
+      "stateLabel": "Delivery state",
+      "choose": "Choose your state",
+      "items": "Products (VAT included)",
+      "row": "Shipping",
+      "pending": "Shipping is calculated once you enter your delivery address.",
+      "free": "Free",
+      "unserviceable": "We don't ship to {state} at the moment.",
+      "cartUnavailable": "Adjust your pack to calculate shipping.",
+      "invalidState": "Choose your state to calculate shipping.",
+      "freeProgress": "{amount} more for free shipping.",
+      "freeGranted": "Your shipping is free."
     }
   }
 }

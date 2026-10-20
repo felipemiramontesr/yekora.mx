@@ -41,6 +41,23 @@ export const cartLinesSchema = z
     message: 'Each SKU may appear only once',
   });
 
+/**
+ * Destination of a quote (FC 011): the state as its ISO 3166-2:MX code without the MX- prefix
+ * (format only; the API decides whether it is a known zone) and an optional 5-digit postal code,
+ * reserved for postal-code zones and never stored in the browser (only the state is).
+ */
+export const destinationSchema = z
+  .object({
+    stateCode: z
+      .string()
+      .regex(/^[A-Z]{3}$/, 'State code must be 3 capital letters'),
+    postalCode: z
+      .string()
+      .regex(/^\d{5}$/, 'Postal code must be 5 digits')
+      .optional(),
+  })
+  .strict();
+
 const cents = z.number().int();
 
 /** Quote answered by `POST /v1/cart/quote` (apps/api/src/routes/cart.ts). */
@@ -67,6 +84,18 @@ export const cartQuoteSchema = z.object({
   ),
   summary: z
     .object({
+      itemsBaseMxnCents: cents.nonnegative(),
+      itemsTaxMxnCents: cents.nonnegative(),
+      itemsTotalMxnCents: cents.nonnegative(),
+      // FC 011: null without a destination; a zero charge when no rule covers it.
+      shippingCode: z
+        .enum(['STANDARD_RATE', 'FREE_SHIPPING', 'UNSERVICEABLE_DESTINATION'])
+        .nullable(),
+      shippingBaseMxnCents: cents.nonnegative().nullable(),
+      shippingTaxMxnCents: cents.nonnegative().nullable(),
+      shippingTotalMxnCents: cents.nonnegative().nullable(),
+      serviceable: z.boolean(),
+      freeShippingRemainingMxnCents: cents.nonnegative().nullable(),
       subtotalMxnCents: cents.nonnegative(),
       taxMxnCents: cents.nonnegative(),
       totalMxnCents: cents.nonnegative(),
@@ -76,8 +105,18 @@ export const cartQuoteSchema = z.object({
         .object({ series: z.string(), date: z.string(), rate: z.string() })
         .nullable(),
     })
-    // T1.3: never show a breakdown that does not add up.
-    .refine((s) => s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents),
+    // T1.3 (FC 009) and T2 (FC 011): never show a breakdown that does not add up, for the
+    // items, for the shipping line and for the grand total that adds both.
+    .refine(
+      (s) =>
+        s.itemsBaseMxnCents + s.itemsTaxMxnCents === s.itemsTotalMxnCents &&
+        (s.shippingBaseMxnCents ?? 0) + (s.shippingTaxMxnCents ?? 0) ===
+          (s.shippingTotalMxnCents ?? 0) &&
+        s.subtotalMxnCents ===
+          s.itemsBaseMxnCents + (s.shippingBaseMxnCents ?? 0) &&
+        s.taxMxnCents === s.itemsTaxMxnCents + (s.shippingTaxMxnCents ?? 0) &&
+        s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents
+    ),
   warnings: z.array(
     z.object({
       sku: z.string(),

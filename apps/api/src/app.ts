@@ -22,6 +22,7 @@ import { registerCatalogRoutes } from './routes/catalog';
 import { registerExchangeRateRoute } from './routes/exchangeRate';
 import type { Db } from './services/db';
 import type { CurrentRate } from './services/exchangeRate';
+import { createTableRateProvider } from './services/shippingRates';
 
 /** Everything the application needs, injected by index.ts or by tests. */
 interface AppDeps {
@@ -78,7 +79,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
-  registerCartRoutes(app, { db: deps.db, rate: deps.rate });
+  // FC 011: shipping is priced from the rate tables of the same database (no network in v1).
+  registerCartRoutes(app, {
+    db: deps.db,
+    rate: deps.rate,
+    shipping: createTableRateProvider(deps.db),
+  });
   registerExchangeRateRoute(app, deps.rate);
   return app;
 }

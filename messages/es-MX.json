@@ -135,7 +135,7 @@
           "paragraphs": [
             "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies.",
             "También guardamos en tu navegador una copia técnica de los archivos del sitio (Cache Storage) para que funcione sin conexión. No contiene datos personales.",
-            "Si agregas productos a tu mochila, guardamos en tu navegador (almacenamiento local, «yekora_cart_v1») solo el código de cada producto y su cantidad. No es una cookie, no contiene datos personales y no se envía a terceros; el detalle está en la Política de cookies."
+            "Si agregas productos a tu mochila, guardamos en tu navegador (almacenamiento local, «yekora_cart_v1») solo el código de cada producto y su cantidad. No es una cookie, no contiene datos personales y no se envía a terceros; el detalle está en la Política de cookies. Si eliges tu estado para calcular el envío, guardamos también («yekora_shipping_state_v1») solo la clave de ese estado; nunca tu código postal ni tu dirección."
           ]
         },
         {
@@ -166,7 +166,8 @@
           "title": "Tu mochila (carrito)",
           "paragraphs": [
             "Si agregas productos a tu mochila, el sitio guarda en tu navegador, con almacenamiento local bajo el nombre «yekora_cart_v1», solo el código de cada producto y la cantidad que elegiste, para conservarla entre visitas.",
-            "No es una cookie, no contiene datos personales, no sirve para rastrearte y no se envía a terceros. Los precios y las existencias se consultan siempre en nuestro servidor. Se borra al vaciar tu mochila o desde los datos del sitio en tu navegador."
+            "No es una cookie, no contiene datos personales, no sirve para rastrearte y no se envía a terceros. Los precios y las existencias se consultan siempre en nuestro servidor. Se borra al vaciar tu mochila o desde los datos del sitio en tu navegador.",
+            "Si eliges tu estado de entrega para calcular el envío, el sitio guarda además, bajo el nombre «yekora_shipping_state_v1», solo la clave de ese estado (por ejemplo, ZAC), para recordarlo entre visitas. Nunca guarda tu código postal ni tu dirección. Se borra al quitar el estado en tu mochila o desde los datos del sitio en tu navegador."
           ]
         },
         {
@@ -476,6 +477,19 @@
       "updating": "Actualizando precios y existencias…",
       "offline": "Sin conexión: los precios y existencias se actualizarán al reconectar.",
       "failed": "No pudimos actualizar los precios ahora. Se muestran los últimos confirmados."
+    },
+    "shipping": {
+      "stateLabel": "Estado de entrega",
+      "choose": "Elige tu estado",
+      "items": "Productos (IVA incluido)",
+      "row": "Envío",
+      "pending": "El costo de envío se calcula al ingresar tu dirección de entrega.",
+      "free": "Gratis",
+      "unserviceable": "Por el momento no enviamos a {state}.",
+      "cartUnavailable": "Ajusta tu mochila para calcular el envío.",
+      "invalidState": "Elige tu estado para calcular el envío.",
+      "freeProgress": "Te faltan {amount} para el envío gratis.",
+      "freeGranted": "Tu envío es gratis."
     }
   }
 }
