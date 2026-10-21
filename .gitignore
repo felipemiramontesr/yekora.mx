@@ -34,6 +34,9 @@ test-results.xml
 # --- Protocol L · governancePublish=local-only ---
 # Law and brokers stay on disk. Product remote does not receive them.
 protocols/
+# Local drafts (e.g. hPost --file) never belong in the product repo (Ω, 100–102_AN). Drafts go to
+# the system temp or protocols/tmp/; this only guards the root against a stray one.
+/scratch/
 l-harness.config.json
 # owaspCoverageMap.json is versioned since FC 010: the CI dashboard computes every row from its evidence.
 L_HARNESS_NOTICE.md

@@ -80,7 +80,7 @@ Rollback is a revert commit through the same pipeline; see `docs/runbooks/incide
 
 ## Governance
 
-Work follows **Protocol L** (V.1.9.15-core): every product change is a signed feature contract
+Work follows **Protocol L** (V.1.9.16-core): every product change is a signed feature contract
 with phased delivery, tests in the same commit, and an O ∧ L ∧ R seal before it is final.
 Commit subjects follow `V.MAJOR.MINOR.PATCH_FC_<n>_<Description>` with `SemVer:` and `FC:`
 trailers. The governance workspace (`protocols/`) is kept locally and is not part of this

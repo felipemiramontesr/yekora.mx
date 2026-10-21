@@ -2,7 +2,7 @@
 
 > Local notes below/above the L-HARNESS markers are preserved by `l sync-hosts`.
 
-<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.15-core do-not-edit-inside -->
+<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.16-core do-not-edit-inside -->
 ---
 description: GrayMan L-Harness Protocol L boot rules
 globs:
@@ -13,7 +13,7 @@ alwaysApply: true
 
 - **SSOT:** `protocols/north-star/001_NS_ProtocolL.md` — L wins over this rule file
 - **NO SIGNED FC = NO PRODUCT CODE**
-- Protocol V.1.9.15-core · Official https://github.com/GrayMan/l-harness
+- Protocol V.1.9.16-core · Official https://github.com/GrayMan/l-harness
 - Start: read L + `protocols/north-star/002_NS_Handoff.md` delta
 - Conduct: A1–A3, A0=Ω only, ROE, OWASP Top 10 map honesty
 - KAE: Learned(L)=⊤ + KAE START ACK + L_pin before product work; else HALT

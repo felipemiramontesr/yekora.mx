@@ -38,13 +38,13 @@ SonarQube Cloud. Cada FC queda impecable o no pasa. Ley en `sonar-quality-gate.j
 
 `bun run test:coverage` falla por debajo de 100. El workflow `.github/workflows/sonar.yml` espera el Quality Gate. Secreto `SONAR_TOKEN`. Cero `NOSONAR`. El código de `app/` no se saca del denominador.
 <!-- L-HARNESS: managed region added by l sync-hosts — edit outside markers only -->
-<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.15-core do-not-edit-inside -->
+<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.16-core do-not-edit-inside -->
 
 # GrayMan L-Harness — AGENTS.md (host boot)
 
 **SSOT (law):** `protocols/north-star/001_NS_ProtocolL.md`  
 **Handoff:** `protocols/north-star/002_NS_Handoff.md`  
-**Harness:** 1.6.0 · **L protocol:** V.1.9.15-core  
+**Harness:** 1.6.0 · **L protocol:** V.1.9.16-core  
 **Official repo:** https://github.com/GrayMan/l-harness  
 **Ω:** GrayMan (verified=true)
 

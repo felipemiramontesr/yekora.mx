@@ -6,12 +6,12 @@
 
 SonarQube Cloud. Un FC que no quede en A, con 0 issues y cobertura 100, no pasa. Ver `sonar-quality-gate.json` y `AGENTS.md`.
 
-<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.15-core do-not-edit-inside -->
+<!-- L-HARNESS:BEGIN protocolVersion=V.1.9.16-core do-not-edit-inside -->
 
 # GrayMan L-Harness — Claude Code instructions
 
 > **SSOT:** `protocols/north-star/001_NS_ProtocolL.md` — if this file and L diverge, **L prevails**.  
-> Protocol V.1.9.15-core · Harness 1.6.0 · Official: https://github.com/GrayMan/l-harness
+> Protocol V.1.9.16-core · Harness 1.6.0 · Official: https://github.com/GrayMan/l-harness
 
 ## North Star
 
