@@ -117,3 +117,31 @@ export function isLocalHost(host: string): boolean {
 export function isYekoraDatabase(name: string): boolean {
   return /^(?:u\d+_yekora(?:_[a-z0-9_]+)?|yekora_[a-z0-9_]+)$/.test(name);
 }
+
+/**
+ * The verification counters of a migration (FC 015 §4): `NNN_verify.sql` next to it, like
+ * `NNN_down.sql`. Its name never matches MIGRATION_NAME, so it is never applied as a migration.
+ *
+ * @param migration - Canonical migration file name.
+ * @returns e.g. `003_verify.sql` for `003_V0.8.0_…sql`.
+ */
+export function verifyFileFor(migration: string): string {
+  return `${migration.slice(0, 3)}_verify.sql`;
+}
+
+/**
+ * One line of verification counters for the log and the workflow summary: aggregates only.
+ *
+ * @param migration - Canonical migration file name.
+ * @param counters - The single row its verify query returned.
+ * @returns e.g. `[VERIFY] 001 disciplines=5 levels=4 products=3`.
+ */
+export function formatCounters(
+  migration: string,
+  counters: Readonly<Record<string, unknown>>
+): string {
+  const pairs = Object.entries(counters).map(
+    ([name, value]) => `${name}=${String(value)}`
+  );
+  return `[VERIFY] ${migration.slice(0, 3)} ${pairs.join(' ')}`;
+}

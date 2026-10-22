@@ -20,6 +20,10 @@
 # aborts on an edited migration before touching anything. Runner prerequisites (as Archon's):
 # Git for Windows (bash, gzip) and C:\xampp\mysql\bin (mysqldump) on the PATH. Since FC 010 the
 # backup is encrypted by scripts/backupCrypto.ts (AES-256-GCM), not by openssl.
+# FC 015 (K-31, Archon's Rule 23): every run, apply or skip, publishes production's schema
+# fingerprint (scripts/dbParityCheck.ts, information_schema only) and the migration's counters
+# (migrations/NNN_verify.sql), and ends with its T1.2 verdict (M ∧ P ∧ B). Compare locally with
+# `bun scripts/dbParityCheck.ts --expect "<md5> (<n> elementos)"`.
 # The summary carries aggregate counts only, never data rows. Passwords travel in the
 # environment (MYSQL_PWD), never on a command line, and database secrets reach only the steps
 # that connect, never checkout, Bun setup or the dependency install.
@@ -113,7 +117,19 @@ jobs:
           [ -z "$missing" ] || { echo "::error::E: production-db is missing:$missing"; exit 1; }
           echo "✅ E: production-db secrets present"
 
-      - name: Plan (read-only · T1.3 checksums)
+      # FC 015 · its T1.2, letter M: the database answers before anything else is decided. Read-only: it only
+      # computes the schema fingerprint (information_schema), which the summary does not show.
+      - name: Connect (read-only · FC 015 T1.2 · M)
+        id: connect
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: bun scripts/dbParityCheck.ts > /dev/null
+
+      - name: Plan (read-only · T1.3 checksums · FC 015 T1.2 · P)
         id: plan
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
@@ -124,8 +140,11 @@ jobs:
         run: |
           set -euo pipefail
           bun scripts/migrateDb.ts --plan --target "$MIGRATION_FILE" | tee plan.txt
+          PENDING=$(sed -n 's/^\[PLAN\] pending=//p' plan.txt)
           echo "tables=$(sed -n 's/^\[PLAN\] tables=//p' plan.txt)" >> "$GITHUB_OUTPUT"
-          echo "pending=$(sed -n 's/^\[PLAN\] pending=//p' plan.txt)" >> "$GITHUB_OUTPUT"
+          echo "pending=$PENDING" >> "$GITHUB_OUTPUT"
+          # FC 015: a registered migration is a skip; dispatching it is a parity check.
+          if [ "$PENDING" = "0" ]; then echo "decision=skip"; else echo "decision=apply"; fi >> "$GITHUB_OUTPUT"
 
       - name: Encrypted backup (mysqldump → gzip → AES-256-GCM, YEKORA_GCM_V1), verified
         id: backup
@@ -169,19 +188,25 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      - name: Apply migrations
+      # FC 015 T1.2 · B: an apply needs the verified backup; a skip changes nothing and runs only to print the
+      # migration's counters (NNN_verify.sql, aggregates only).
+      - name: Apply (or skip) and verification counters
         id: apply
-        if: steps.plan.outputs.pending != '0' && steps.backup.outcome == 'success'
+        if: steps.plan.outputs.decision == 'skip' || steps.backup.outcome == 'success'
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT || '3306' }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
-        run: bun scripts/migrateDb.ts --target "$MIGRATION_FILE"
+        run: |
+          set -euo pipefail
+          bun scripts/migrateDb.ts --target "$MIGRATION_FILE" | tee apply.txt
+          grep '^\[VERIFY\]' apply.txt > counters.txt || true
 
-      - name: Verify (idempotent registry and seeded references — aggregates only)
-        id: verify
+      - name: Registered in schema_migrations (T1.3 · R)
+        id: record
+        if: steps.apply.outcome == 'success'
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT || '3306' }}
@@ -191,29 +216,72 @@ jobs:
         run: |
           set -euo pipefail
           bun scripts/migrateDb.ts --plan --target "$MIGRATION_FILE" | tee verify.txt
-          grep -q '^\[PLAN\] pending=0$' verify.txt || { echo "::error::Migrations still pending after apply"; exit 1; }
-          q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -N -B "$DB_NAME" -e "$1"; }
-          CATEGORIES=$(q "SELECT COUNT(*) FROM categories WHERE slug IN ('senderismo','montana','escalada','canonismo','trail-running')")
-          LEVELS=$(q "SELECT COUNT(*) FROM experience_levels WHERE slug IN ('principiante','intermedio','avanzado','expedicion')")
-          PRODUCTS=$(q "SELECT COUNT(*) FROM products")
-          echo "categories=$CATEGORIES" >> "$GITHUB_OUTPUT"
-          echo "levels=$LEVELS" >> "$GITHUB_OUTPUT"
-          echo "products=$PRODUCTS" >> "$GITHUB_OUTPUT"
-          [ "$CATEGORIES" = "5" ] && [ "$LEVELS" = "4" ] \
-            || { echo "::error::Reference data incomplete: $CATEGORIES/5 disciplines, $LEVELS/4 levels"; exit 1; }
-          echo "✅ 5/5 disciplines · 4/4 levels · $PRODUCTS products"
+          grep -q '^\[PLAN\] pending=0$' verify.txt || { echo "::error::Migration not registered after apply"; exit 1; }
+          echo "✅ $MIGRATION_FILE registered with its SHA-256"
 
-      - name: Summary (aggregates only)
-        if: always()
+      # FC 015 · Archon's Rule 23: production's schema fingerprint, with the same query and code as
+      # the local check (scripts/dbParityCheck.ts). Only information_schema; an MD5 and a count.
+      # Runs on apply and on skip, so dispatching a registered migration is a parity check.
+      - name: Schema fingerprint (Rule 23 · aggregate hash only)
+        id: fingerprint
+        if: always() && steps.connect.outcome == 'success' && steps.plan.outcome == 'success' && steps.apply.outcome != 'failure'
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || '3306' }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
+          set -euo pipefail
+          LINE=$(bun scripts/dbParityCheck.ts)
+          HASH=${LINE%% *}
+          COUNT=${LINE#* (}; COUNT=${COUNT% elementos)}
+          case "$HASH" in *[!0-9a-f]* | "" ) echo "::error::Unexpected fingerprint"; exit 1 ;; esac
+          case "$COUNT" in *[!0-9]* | "" ) echo "::error::Unexpected fingerprint"; exit 1 ;; esac
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "elements=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "✅ Huella de esquema PROD: $HASH ($COUNT elementos)"
+
+      - name: Summary (aggregates only · FC 015 T1.2 verdict)
+        if: always()
+        env:
+          AUTHORIZE: ${{ needs.authorize.result }}
+          CONNECT: ${{ steps.connect.outcome }}
+          PLAN: ${{ steps.plan.outcome }}
+          DECISION: ${{ steps.plan.outputs.decision }}
+          BACKUP: ${{ steps.backup.outcome }}
+          BACKUP_FILE: ${{ steps.backup.outputs.file }}
+          BACKUP_SIZE: ${{ steps.backup.outputs.size }}
+          APPLY: ${{ steps.apply.outcome }}
+          RECORD: ${{ steps.record.outcome }}
+          FINGERPRINT: ${{ steps.fingerprint.outcome }}
+          HASH: ${{ steps.fingerprint.outputs.hash }}
+          ELEMENTS: ${{ steps.fingerprint.outputs.elements }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -uo pipefail
+          # FC 015 T1.2 is decided by the tested pure gate (scripts/lib/dbParity.ts), not re-written in bash.
+          VERDICT=$(bun -e 'import { workflowVerdict } from "./scripts/lib/dbParity.ts"; const e = process.env; console.log(workflowVerdict({ connect: e.CONNECT ?? "", plan: e.PLAN ?? "", decision: e.DECISION ?? "", backup: e.BACKUP ?? "", apply: e.APPLY ?? "", fingerprint: e.FINGERPRINT ?? "" }))' 2>/dev/null || echo "DB_CONNECTION_FAILED")
           {
-            echo "### 🏛️ $MIGRATION_FILE — production"
+            echo "### 🏛️ DB Migration — $MIGRATION_FILE"
             echo ""
-            echo "| Step | Result |"
+            echo "| Campo | Valor |"
             echo "| :--- | :--- |"
-            echo "| Plan (T1.3) | ${{ steps.plan.outcome }} — ${{ steps.plan.outputs.pending || '?' }} pending, ${{ steps.plan.outputs.tables || '?' }} tables before |"
-            echo "| Encrypted backup | ${{ steps.backup.outcome }} — \`${{ steps.backup.outputs.file || 'n/a' }}\` (${{ steps.backup.outputs.size || 0 }} bytes) |"
-            echo "| Apply | ${{ steps.apply.outcome }} |"
-            echo "| Verify | ${{ steps.verify.outcome }} — disciplines ${{ steps.verify.outputs.categories || '?' }}/5 · levels ${{ steps.verify.outputs.levels || '?' }}/4 · products ${{ steps.verify.outputs.products || '?' }} |"
-            echo "| Actor | ${{ github.actor }} |"
+            echo "| Migración | \`$MIGRATION_FILE\` |"
+            echo "| Validación (T1.3 · F) | ${AUTHORIZE} |"
+            echo "| Registro (T1.3) | ${PLAN:-n/a} — decisión \`${DECISION:-n/a}\` |"
+            echo "| Backup cifrado (FC 015 T1.2 · B) | ${BACKUP:-skipped} — \`${BACKUP_FILE:-n/a}\` (${BACKUP_SIZE:-0} bytes) |"
+            echo "| Aplicación | ${APPLY:-skipped} |"
+            echo "| Registrada en schema_migrations | ${RECORD:-skipped} |"
+            echo "| Huella de esquema PROD (Regla 23) | \`${HASH:-n/a}\` (${ELEMENTS:-0} elementos) — comparar: \`bun scripts/dbParityCheck.ts --expect \"<huella>\"\` |"
+            echo "| Veredicto (FC 015 T1.2) | \`$VERDICT\` |"
+            echo "| Actor | ${ACTOR} |"
+            echo ""
+            if [ -s counters.txt ]; then
+              echo "#### Verificación (contadores agregados de la migración)"
+              echo '```'
+              cat counters.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+          [ "$VERDICT" = "FINGERPRINT_PUBLISHED" ]

@@ -20,19 +20,25 @@
  *   bun scripts/migrateDb.ts --seed-dev   also load migrations/seed_dev.sql (localhost only)
  *   bun scripts/migrateDb.ts --down 001   run 001_down.sql and unregister 001 (localhost only)
  *
+ * After a run that is not `--plan`, each migration of the run (the target, or every one) that has a
+ * `NNN_verify.sql` prints its aggregate counters as `[VERIFY] NNN name=value …` (FC 015 §4), whether it
+ * was applied now or found registered. The workflow summary shows those lines.
+ *
  * @module
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import mysql from 'mysql2/promise';
 import {
   decide,
+  formatCounters,
   isLocalHost,
   isYekoraDatabase,
   MIGRATION_NAME,
   migrationChecksum,
   pendingOrder,
   stepsToApply,
+  verifyFileFor,
 } from './lib/migrations';
 
 const MIGRATIONS_DIR = join(process.cwd(), 'migrations');
@@ -79,6 +85,21 @@ async function readRegistry(
   return new Map(
     rows.map((row) => [String(row.filename), String(row.checksum_sha256)])
   );
+}
+
+/** Prints the verification counters of each migration that has a NNN_verify.sql (read-only). */
+async function printCounters(
+  connection: mysql.Connection,
+  migrations: readonly string[]
+): Promise<void> {
+  for (const migration of migrations) {
+    const file = join(MIGRATIONS_DIR, verifyFileFor(migration));
+    if (!existsSync(file)) continue;
+    const [[counters]] = await connection.query<mysql.RowDataPacket[]>(
+      readFileSync(file, 'utf8')
+    );
+    console.log(formatCounters(migration, counters));
+  }
 }
 
 /** Runs NNN_down.sql and unregisters migration NNN (localhost only, checked by the caller). */
@@ -193,6 +214,10 @@ async function main(): Promise<void> {
       );
       console.log('[SEED] seed_dev.sql (local development data)');
     }
+    await printCounters(
+      connection,
+      target === undefined ? plan.map((step) => step.file) : [target]
+    );
     console.log(
       `[OK] migrations: ${toApply.length} applied, ${plan.length - toApply.length} not applied by this run.`
     );

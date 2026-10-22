@@ -32,6 +32,8 @@ export default defineConfig({
         'scripts/lib/backupCrypto.ts',
         // FC 010: the certification logic is the trust anchor of the dashboard; same bar.
         'scripts/lib/certification.ts',
+        // FC 015 (K-31): the parity gate decides whether production matches local; same bar.
+        'scripts/lib/dbParity.ts',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',

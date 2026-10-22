@@ -133,8 +133,55 @@ export function migrationsWorkflowViolations(
   if (!workflow.includes(`[ "$ACTOR" = "${owner}" ]`)) {
     violations.push(`the actor guard for ${owner} is missing`);
   }
+  violations.push(...parityViolations(lines, workflow));
   for (const uses of unpinnedActions(workflow)) {
     violations.push(`${uses} is not pinned by full commit SHA`);
+  }
+  return violations;
+}
+
+/**
+ * FC 015 (K-31, Archon's Rule 23): the migrations workflow publishes production's schema
+ * fingerprint on every run, apply or skip, with the tested CLI, and decides its T1.2 verdict
+ * with the tested pure gate.
+ */
+function parityViolations(
+  lines: readonly string[],
+  workflow: string
+): string[] {
+  const violations: string[] = [];
+  if (!lines.includes('LINE=$(bun scripts/dbParityCheck.ts)')) {
+    violations.push(
+      'the schema fingerprint must come from scripts/dbParityCheck.ts'
+    );
+  }
+  if (
+    !lines.includes(
+      "if: always() && steps.connect.outcome == 'success' && steps.plan.outcome == 'success' && steps.apply.outcome != 'failure'"
+    )
+  ) {
+    violations.push('the schema fingerprint must run on apply and on skip');
+  }
+  if (
+    !lines.includes(
+      "if: steps.plan.outputs.decision == 'skip' || steps.backup.outcome == 'success'"
+    )
+  ) {
+    violations.push(
+      'an apply must wait for the backup, and a skip must still print its counters'
+    );
+  }
+  if (!workflow.includes('| Huella de esquema PROD (Regla 23) |')) {
+    violations.push('the summary must print the Rule 23 fingerprint line');
+  }
+  if (
+    !workflow.includes(
+      'import { workflowVerdict } from "./scripts/lib/dbParity.ts"'
+    )
+  ) {
+    violations.push(
+      'the T1.2 verdict must come from workflowVerdict (scripts/lib/dbParity.ts)'
+    );
   }
   return violations;
 }

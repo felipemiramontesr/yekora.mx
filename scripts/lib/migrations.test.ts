@@ -2,12 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   decide,
+  formatCounters,
   isLocalHost,
   isYekoraDatabase,
   MIGRATION_NAME,
   migrationChecksum,
   pendingOrder,
   stepsToApply,
+  verifyFileFor,
   type MigrationDecision,
 } from './migrations';
 
@@ -32,7 +34,10 @@ describe('migration names', () => {
     const sql = readdirSync('migrations').filter(
       (name) => name.endsWith('.sql') && !['seed_dev.sql'].includes(name)
     );
-    const migrations = sql.filter((name) => !name.endsWith('_down.sql'));
+    // Rollbacks and verification counters (FC 015) sit next to their migration by number.
+    const migrations = sql.filter(
+      (name) => !name.endsWith('_down.sql') && !name.endsWith('_verify.sql')
+    );
     expect(migrations.length).toBeGreaterThan(0);
     for (const name of migrations) expect(name).toMatch(MIGRATION_NAME);
   });
@@ -166,5 +171,23 @@ describe('the dev seed', () => {
     );
     expect(skus.length).toBeGreaterThan(0);
     for (const sku of skus) expect(sku).toMatch(/^DEV-\d{4}$/);
+  });
+});
+
+describe('verification counters (FC 015 §4)', () => {
+  it('pairs each migration with NNN_verify.sql, like NNN_down.sql', () => {
+    expect(
+      verifyFileFor('003_V0.8.0_FC012-F0_20261021_orders_and_payments.sql')
+    ).toBe('003_verify.sql');
+  });
+
+  it('prints one line of name=value pairs, in the order of the query', () => {
+    expect(
+      formatCounters('001_V0.4.0_FC008-F1_20261018_create_catalog_schema.sql', {
+        disciplines: 5,
+        levels: 4,
+        products: '3',
+      })
+    ).toBe('[VERIFY] 001 disciplines=5 levels=4 products=3');
   });
 });

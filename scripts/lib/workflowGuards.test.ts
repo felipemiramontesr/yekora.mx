@@ -133,6 +133,44 @@ describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
     ]);
   });
 
+  it.each([
+    [
+      'a fingerprint computed another way',
+      'LINE=$(bun scripts/dbParityCheck.ts)',
+      'LINE=$(mysql < scripts/sql/schemaFingerprint.sql)',
+      'the schema fingerprint must come from scripts/dbParityCheck.ts',
+    ],
+    [
+      'a fingerprint skipped on a skip run',
+      "if: always() && steps.connect.outcome == 'success'",
+      "if: steps.plan.outputs.decision == 'apply' && steps.connect.outcome == 'success'",
+      'the schema fingerprint must run on apply and on skip',
+    ],
+    [
+      'an apply that does not wait for the backup',
+      "if: steps.plan.outputs.decision == 'skip' || steps.backup.outcome == 'success'",
+      'if: always()',
+      'an apply must wait for the backup, and a skip must still print its counters',
+    ],
+    [
+      'a summary without the Rule 23 line',
+      '| Huella de esquema PROD (Regla 23) |',
+      '| Huella |',
+      'the summary must print the Rule 23 fingerprint line',
+    ],
+    [
+      'a verdict re-written in bash',
+      'import { workflowVerdict } from "./scripts/lib/dbParity.ts"',
+      'import { other } from "./x.ts"',
+      'the T1.2 verdict must come from workflowVerdict (scripts/lib/dbParity.ts)',
+    ],
+  ])('FC 015 · flags %s', (_case, from, to, violation) => {
+    expect(migrations).toContain(from);
+    expect(
+      migrationsWorkflowViolations(migrations.replace(from, to), OWNER)
+    ).toEqual([violation]);
+  });
+
   it('flags a workflow without triggers', () => {
     expect(migrationsWorkflowViolations('name: x\n', OWNER)[0]).toBe(
       'triggers must be workflow_dispatch only, found: none'
