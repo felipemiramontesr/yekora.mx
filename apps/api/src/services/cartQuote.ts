@@ -10,7 +10,8 @@
  *   lineTax   = lineTotal − lineBase                  (so base + tax = total, by construction)
  *
  * Only lines that can be bought now count toward the totals (active product, stock covers the
- * quantity). The rest come back flagged with a warning and the quantity that is left, so the
+ * quantity). Stock here is what is free to sell: units held by pending checkouts (FC 012,
+ * `reserved_stock`) are not offered again. The rest come back flagged with a warning and the quantity that is left, so the
  * total never promises what cannot be sold. Static SQL with `?` placeholders only (T1.1 of
  * FC 008): mysql2 expands the SKU array of `IN (?)` with escaping.
  *
@@ -257,7 +258,7 @@ async function readProducts(
 ): Promise<QuoteRow[]> {
   if (lines.length === 0) return [];
   return db.query<QuoteRow>(
-    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
+    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
     [lines.map((line) => line.sku)]
   );
 }

@@ -30,6 +30,14 @@ const ROUTE_MAP = {
   catalog: { 'es-MX': '/catalogo/', en: '/en/catalog/' },
   // Guest cart (FC 009); noindex: its content lives in the visitor's browser.
   cart: { 'es-MX': '/carrito/', en: '/en/cart/' },
+  // Checkout and its return pages (FC 012); noindex. The return paths are the ones the API
+  // gives the processors (CHECKOUT_RETURN_PATHS, checked equal in lib/routes.test.ts).
+  checkout: { 'es-MX': '/checkout/', en: '/en/checkout/' },
+  checkoutSuccess: { 'es-MX': '/checkout/exito/', en: '/en/checkout/success/' },
+  checkoutCancel: {
+    'es-MX': '/checkout/cancelado/',
+    en: '/en/checkout/cancel/',
+  },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 /** A page that exists in every language (key of the route map). */
@@ -96,6 +104,11 @@ function pageTitle(messages: Messages, page: Page): string {
   if (page === 'offline') return messages.offline.metaTitle;
   if (page === 'catalog') return messages.catalog.metaTitle;
   if (page === 'cart') return messages.cart.metaTitle;
+  if (page === 'checkout') return messages.checkout.metaTitle;
+  if (page === 'checkoutSuccess')
+    return messages.checkout.return.success.metaTitle;
+  if (page === 'checkoutCancel')
+    return messages.checkout.return.cancel.metaTitle;
   return messages.legal[page].metaTitle;
 }
 

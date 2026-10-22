@@ -8,7 +8,7 @@
  */
 import { buildApp } from './app';
 import { loadConfig } from './config';
-import { createDb, type Db } from './services/db';
+import { createDb } from './services/db';
 import { currentRate } from './services/exchangeRate';
 
 /**
@@ -23,7 +23,7 @@ export async function start(
   makeDb: typeof createDb = createDb
 ): Promise<{ address: string; stop: () => Promise<void> }> {
   const config = loadConfig(env);
-  const db: Db = makeDb(config.db);
+  const db = makeDb(config.db);
   const app = await buildApp({
     config,
     db,

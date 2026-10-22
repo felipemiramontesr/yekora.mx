@@ -11,7 +11,7 @@ describe('LegalDocument', () => {
       <LegalDocument legal={legal} document={legal.terms} />
     );
     expect(html).toContain('<h1');
-    expect(html).toContain('Última actualización: 17 de octubre de 2026');
+    expect(html).toContain('Última actualización: 21 de octubre de 2026');
     expect(html).not.toContain('role="note"');
     expect(html.match(/<h2/g)).toHaveLength(legal.terms.sections.length);
   });

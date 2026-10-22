@@ -9,7 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
-import type { Db } from '../services/db';
+import type { Db, Transactional } from '../services/db';
 
 // The whole public surface. A new route, method or prefix changes this text and fails the test,
 // so nothing is exposed without updating the inventory in the same commit.
@@ -18,7 +18,13 @@ const INVENTORY = [
   '├── /v1/catalog (GET, HEAD)',
   '│   └── /:slug (GET, HEAD)',
   '├── /v1/cart/quote (POST)',
+  // FC 012: guest checkout and the buyer's order view (token-protected, no account).
+  '├── /v1/checkout (POST)',
   '├── /v1/exchange-rate (GET, HEAD)',
+  '├── /v1/orders/:order_number (GET, HEAD)',
+  // FC 012: payment notifications, accepted only with the processor's signature.
+  '├── /v1/webhooks/stripe (POST)',
+  '├── /v1/webhooks/mercadopago (POST)',
   '└── * (OPTIONS)',
   '',
 ].join('\n');
@@ -39,9 +45,13 @@ const AUTH_PLUGINS = [
   '@fastify/oauth2',
 ];
 
-const emptyDb: Db = {
+const emptyDb: Db & Transactional = {
   query: async <Row>() => [] as Row[],
   ping: async () => undefined,
+  // Runs the work on this same fake: no real transaction is needed in memory.
+  transaction(work) {
+    return work(this);
+  },
   close: async () => undefined,
 };
 
@@ -66,7 +76,7 @@ afterAll(async () => {
 });
 
 describe('A01 closed route inventory', () => {
-  it('exposes exactly the public read routes and the cart quote', () => {
+  it('exposes exactly the public read routes, the cart quote, the checkout, the order view and the payment webhooks', () => {
     expect(app.printRoutes({ commonPrefix: false })).toBe(INVENTORY);
   });
 

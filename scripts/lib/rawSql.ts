@@ -84,6 +84,12 @@ export const ALLOWLIST: readonly AllowlistEntry[] = [
     reason:
       'FC 008 F2 — Db.query adapter: forwards to the mysql2 pool the SQL its callers pass, and every caller is checked by this guard; values stay in the params array.',
   },
+  {
+    file: 'apps/api/src/services/db.ts',
+    argument: 'sql',
+    reason:
+      'FC 012 F2 — transaction adapter: the same forwarding as Db.query, on the connection that holds the transaction; its callers are checked by this guard too.',
+  },
 ];
 
 /**

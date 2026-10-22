@@ -92,7 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Última actualización",
-    "updated": "17 de octubre de 2026",
+    "updated": "21 de octubre de 2026",
     "privacy": {
       "metaTitle": "Aviso de privacidad | YĒKORA",
       "title": "Aviso de privacidad y manejo de datos personales",
@@ -106,21 +106,29 @@
         {
           "title": "Datos personales que tratamos",
           "paragraphs": [
-            "En esta etapa el sitio es informativo: no tiene formularios, cuentas de usuario ni compras en línea, y no te pedimos datos que te identifiquen.",
+            "Si compras en el sitio, te pedimos tu nombre completo, correo electrónico, teléfono y dirección de entrega, y tu consentimiento expreso con una casilla antes de pagar. No te pedimos datos sensibles. Los datos de tu tarjeta o de tu cuenta los capturas directamente en la página de Stripe o de Mercado Pago y nunca llegan a YĒKORA.",
             "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos una sola cookie técnica propia, descrita en la Política de cookies."
           ]
         },
         {
           "title": "Finalidades",
           "paragraphs": [
-            "Finalidades primarias, necesarias para el sitio: mostrarte el contenido en el idioma de la página que visitas, recordar que ya leíste el aviso de cookies, conservar en tu navegador los productos que agregas a tu mochila y proteger el sitio frente a usos indebidos.",
+            "Finalidades primarias, necesarias para la relación contigo: procesar, cobrar y entregar tu pedido; contactarte sobre él; atender cambios, devoluciones y garantías; cumplir obligaciones legales y fiscales; mostrarte el contenido en el idioma de la página que visitas; recordar que ya leíste el aviso de cookies; conservar en tu navegador los productos que agregas a tu mochila, y proteger el sitio frente a usos indebidos.",
             "Finalidades secundarias: ninguna. No usamos tus datos para publicidad, perfiles comerciales ni analítica."
           ]
         },
         {
           "title": "Transferencias",
           "paragraphs": [
-            "No transferimos tus datos personales a terceros. El proveedor de alojamiento del sitio actúa como encargado y solo trata los datos técnicos por cuenta del responsable."
+            "Para cobrar tu pedido usamos el procesador de pago que elijas: Stripe para tarjeta y efectivo en OXXO, y Mercado Pago para transferencia SPEI y saldo de Mercado Pago. Solo les enviamos el número de pedido y el monto; lo que captures en su página lo tratan conforme a sus propios avisos de privacidad.",
+            "Para entregar tu pedido compartimos con la empresa de mensajería solo tu nombre, teléfono y dirección de entrega. El proveedor de alojamiento del sitio actúa como encargado y trata los datos por cuenta del responsable. Fuera de estos casos no transferimos tus datos personales a terceros."
+          ]
+        },
+        {
+          "title": "Seguridad y conservación",
+          "paragraphs": [
+            "Guardamos tu nombre, correo, teléfono y dirección cifrados (AES-256-GCM) en nuestra base de datos, con llaves exclusivas para ese fin. Para localizar tus pedidos usamos una huella criptográfica de tu correo, no el correo legible.",
+            "Conservamos los datos de cada pedido el tiempo necesario para cumplirlo, atender garantías y devoluciones y cumplir nuestras obligaciones legales y fiscales; después los eliminamos."
           ]
         },
         {
@@ -135,13 +143,14 @@
           "paragraphs": [
             "El sitio solo usa cookies técnicas propias. No usamos cookies de terceros, de publicidad ni de analítica. El detalle está en la Política de cookies.",
             "También guardamos en tu navegador una copia técnica de los archivos del sitio (Cache Storage) para que funcione sin conexión. No contiene datos personales.",
-            "Si agregas productos a tu mochila, guardamos en tu navegador (almacenamiento local, «yekora_cart_v1») solo el código de cada producto y su cantidad. No es una cookie, no contiene datos personales y no se envía a terceros; el detalle está en la Política de cookies. Si eliges tu estado para calcular el envío, guardamos también («yekora_shipping_state_v1») solo la clave de ese estado; nunca tu código postal ni tu dirección."
+            "Si agregas productos a tu mochila, guardamos en tu navegador (almacenamiento local, «yekora_cart_v1») solo el código de cada producto y su cantidad. No es una cookie, no contiene datos personales y no se envía a terceros; el detalle está en la Política de cookies. Si eliges tu estado para calcular el envío, guardamos también («yekora_shipping_state_v1») solo la clave de ese estado; nunca tu código postal ni tu dirección.",
+            "Al iniciar un pago guardamos en esa pestaña de tu navegador (almacenamiento de sesión, «yekora_order_access_v1») el número de pedido, una clave de acceso a su estado y el enlace a la página de pago, para mostrarte cómo va tu pedido al volver. No contiene tus datos de contacto ni de pago y se borra al cerrar la pestaña."
           ]
         },
         {
           "title": "Cambios a este aviso",
           "paragraphs": [
-            "Cuando cambie este aviso, por ejemplo al habilitar compras en línea, publicaremos la nueva versión en esta página con su fecha de actualización antes de recabar nuevos datos."
+            "Cuando cambie este aviso publicaremos la nueva versión en esta página con su fecha de actualización."
           ]
         }
       ]
@@ -168,6 +177,13 @@
             "Si agregas productos a tu mochila, el sitio guarda en tu navegador, con almacenamiento local bajo el nombre «yekora_cart_v1», solo el código de cada producto y la cantidad que elegiste, para conservarla entre visitas.",
             "No es una cookie, no contiene datos personales, no sirve para rastrearte y no se envía a terceros. Los precios y las existencias se consultan siempre en nuestro servidor. Se borra al vaciar tu mochila o desde los datos del sitio en tu navegador.",
             "Si eliges tu estado de entrega para calcular el envío, el sitio guarda además, bajo el nombre «yekora_shipping_state_v1», solo la clave de ese estado (por ejemplo, ZAC), para recordarlo entre visitas. Nunca guarda tu código postal ni tu dirección. Se borra al quitar el estado en tu mochila o desde los datos del sitio en tu navegador."
+          ]
+        },
+        {
+          "title": "Tu pedido",
+          "paragraphs": [
+            "Al iniciar un pago, el sitio guarda en esa pestaña de tu navegador, con almacenamiento de sesión bajo el nombre «yekora_order_access_v1», el número de tu pedido, una clave de acceso a su estado y el enlace a la página de pago, para mostrarte cómo va tu pedido cuando vuelves del procesador.",
+            "No es una cookie, no contiene tus datos de contacto ni de pago y no se envía a terceros: la clave solo viaja a nuestro servidor para consultar tu pedido. Se borra sola al cerrar la pestaña."
           ]
         },
         {
@@ -235,7 +251,10 @@
         {
           "title": "Compras en línea",
           "paragraphs": [
-            "Por ahora el sitio no vende productos en línea. Antes de habilitar compras publicaremos las condiciones de venta, envío, devoluciones y garantías, conforme al capítulo VIII Bis de la Ley Federal de Protección al Consumidor y a la norma NMX-COE-001-SCFI-2018."
+            "Puedes comprar como invitado, sin crear una cuenta. Antes de pagar ves el precio de cada producto con IVA incluido, el costo de envío a tu estado y el total en pesos mexicanos (MXN). El total se calcula en nuestro servidor y es el monto que pagas.",
+            "Formas de pago: tarjeta de crédito o débito y efectivo en OXXO, procesados por Stripe; transferencia SPEI y saldo de Mercado Pago, procesados por Mercado Pago. Pagas en la página segura del procesador; YĒKORA no recibe ni guarda los datos de tu tarjeta.",
+            "Al iniciar el pago apartamos tus productos según el método: 60 minutos con tarjeta o saldo de Mercado Pago, 24 horas con SPEI y 72 horas con OXXO. Tu pedido queda confirmado cuando el procesador confirma el pago; si el plazo termina sin pago, el pedido vence y liberamos los productos sin ningún cargo.",
+            "Si un pago llega después de que el pedido venció, lo revisamos y te contactamos para entregarte el pedido o reembolsarte. Las condiciones de envío, cambios, devoluciones y garantías están en la página Envíos y devoluciones, conforme al capítulo VIII Bis de la Ley Federal de Protección al Consumidor y a la norma NMX-COE-001-SCFI-2018."
           ]
         },
         {
@@ -420,7 +439,10 @@
       "sortName": "Nombre",
       "sortPriceAsc": "Precio: menor a mayor",
       "sortPriceDesc": "Precio: mayor a menor",
-      "results": { "one": "1 producto", "other": "{count} productos" },
+      "results": {
+        "one": "1 producto",
+        "other": "{count} productos"
+      },
       "empty": "Ningún producto coincide con estos filtros.",
       "reset": "Quitar filtros"
     },
@@ -444,9 +466,13 @@
     "metaTitle": "Tu mochila | YĒKORA",
     "title": "Tu mochila",
     "open": "Abrir tu mochila",
-    "count": { "one": "1 producto", "other": "{count} productos" },
+    "count": {
+      "one": "1 producto",
+      "other": "{count} productos"
+    },
     "close": "Cerrar",
     "viewFull": "Ver mochila completa",
+    "toCheckout": "Continuar al pago",
     "added": "Agregado a tu mochila",
     "empty": {
       "title": "Tu mochila está vacía",
@@ -472,7 +498,10 @@
       "subtotal": "Subtotal sin IVA",
       "tax": "IVA (16 %)",
       "total": "Total con IVA",
-      "items": { "one": "1 pieza", "other": "{count} piezas" },
+      "items": {
+        "one": "1 pieza",
+        "other": "{count} piezas"
+      },
       "usdReference": "≈ {usd}",
       "updating": "Actualizando precios y existencias…",
       "offline": "Sin conexión: los precios y existencias se actualizarán al reconectar.",
@@ -490,6 +519,131 @@
       "invalidState": "Elige tu estado para calcular el envío.",
       "freeProgress": "Te faltan {amount} para el envío gratis.",
       "freeGranted": "Tu envío es gratis."
+    }
+  },
+  "checkout": {
+    "metaTitle": "Finalizar compra | YĒKORA",
+    "title": "Finalizar compra",
+    "intro": "Compra como invitado: no necesitas crear una cuenta.",
+    "backToCart": "Volver a tu mochila",
+    "empty": {
+      "title": "Tu mochila está vacía",
+      "text": "Agrega equipo a tu mochila para continuar con tu compra.",
+      "cta": "Ver catálogo"
+    },
+    "contact": {
+      "legend": "Datos de contacto",
+      "name": "Nombre completo",
+      "email": "Correo electrónico",
+      "emailHint": "Lo usamos solo para contactarte sobre este pedido.",
+      "phone": "Teléfono",
+      "phoneHint": "10 dígitos, sin espacios."
+    },
+    "address": {
+      "legend": "Dirección de entrega",
+      "street": "Calle",
+      "exteriorNumber": "Número exterior",
+      "interiorNumber": "Número interior (opcional)",
+      "neighborhood": "Colonia",
+      "municipality": "Municipio o alcaldía",
+      "state": "Estado",
+      "postalCode": "Código postal",
+      "references": "Referencias para la entrega (opcional)"
+    },
+    "method": {
+      "legend": "Método de pago",
+      "hold": "Apartamos tus productos mientras completas el pago.",
+      "options": {
+        "CARD": {
+          "label": "Tarjeta de crédito o débito",
+          "detail": "Pagas al momento en la página segura de Stripe."
+        },
+        "OXXO": {
+          "label": "Efectivo en OXXO",
+          "detail": "Recibes una ficha de pago de Stripe y pagas en cualquier OXXO a más tardar el día siguiente."
+        },
+        "SPEI": {
+          "label": "Transferencia SPEI",
+          "detail": "Mercado Pago te da los datos para transferir desde tu banco en las siguientes 24 horas."
+        },
+        "MERCADO_PAGO_BALANCE": {
+          "label": "Saldo de Mercado Pago",
+          "detail": "Pagas con tu cuenta de Mercado Pago."
+        }
+      }
+    },
+    "consent": {
+      "before": "He leído y acepto el ",
+      "privacy": "Aviso de privacidad",
+      "and": " y los ",
+      "terms": "Términos y condiciones",
+      "after": "."
+    },
+    "errors": {
+      "summary": "Revisa los campos marcados.",
+      "name": "Escribe tu nombre completo.",
+      "email": "Escribe un correo válido, por ejemplo nombre@correo.com.",
+      "phone": "Escribe tu teléfono a 10 dígitos.",
+      "required": "Completa este campo.",
+      "state": "Elige tu estado.",
+      "postalCode": "Escribe un código postal de 5 dígitos.",
+      "method": "Elige cómo quieres pagar.",
+      "consent": "Para continuar, acepta el Aviso de privacidad y los Términos y condiciones."
+    },
+    "pay": "Ir a pagar {total}",
+    "submitting": "Preparando tu pago seguro…",
+    "notReady": {
+      "quote": "Calculando el total de tu mochila…",
+      "shipping": "Elige un estado al que enviemos para calcular el total.",
+      "stock": "Ajusta tu mochila: hay productos sin existencias suficientes.",
+      "failed": "No pudimos calcular el total. Revisa tu conexión."
+    },
+    "secure": "Pagas en la página segura de Stripe o de Mercado Pago. YĒKORA nunca recibe ni guarda los datos de tu tarjeta.",
+    "outcome": {
+      "SERVICE_UNAVAILABLE": "Los pagos no están disponibles en este momento. Intenta de nuevo en unos minutos.",
+      "INVALID_REQUEST": "No pudimos procesar tu solicitud. Recarga la página e intenta de nuevo.",
+      "INVALID_SHIPPING_ADDRESS": "Revisa tu dirección de entrega.",
+      "PRIVACY_CONSENT_REQUIRED": "Para continuar, acepta el Aviso de privacidad y los Términos y condiciones.",
+      "EMPTY_OR_UNAVAILABLE_CART": "Tu mochila tiene productos que ya no están disponibles. Revísala antes de pagar.",
+      "UNSERVICEABLE_DESTINATION": "Por el momento no enviamos a ese estado.",
+      "PRICE_CHANGED": "Los precios o el envío cambiaron. Revisa el nuevo total antes de pagar.",
+      "INSUFFICIENT_STOCK": "Alguien acaba de llevarse una de tus piezas. Revisa tu mochila.",
+      "offline": "Sin conexión. Revisa tu internet e intenta de nuevo.",
+      "timeout": "El servidor tardó demasiado en responder. Intenta de nuevo.",
+      "server": "No pudimos iniciar tu pago. Intenta de nuevo.",
+      "invalid": "No pudimos iniciar tu pago. Intenta de nuevo."
+    },
+    "return": {
+      "success": {
+        "metaTitle": "Tu pedido | YĒKORA",
+        "title": "Tu pedido"
+      },
+      "cancel": {
+        "metaTitle": "Pago no completado | YĒKORA",
+        "title": "No se completó el pago"
+      },
+      "loading": "Consultando tu pedido…",
+      "order": "Pedido {number}",
+      "method": "Método de pago",
+      "items": "Productos (IVA incluido)",
+      "shipping": "Envío",
+      "total": "Total",
+      "status": {
+        "PENDING_PAYMENT": "Estamos esperando la confirmación de tu pago.",
+        "PAID": "¡Pago confirmado! Ya estamos preparando tu pedido para enviarlo.",
+        "EXPIRED": "El plazo para pagar este pedido terminó y liberamos los productos. No se hizo ningún cargo.",
+        "CANCELLED": "Este pedido se canceló. No se hizo ningún cargo.",
+        "REFUNDED": "Este pedido fue reembolsado.",
+        "NEEDS_REVIEW": "Recibimos un pago que estamos revisando. Nos pondremos en contacto contigo."
+      },
+      "confirming": "Esta página se actualiza sola en cuanto el procesador confirme el pago.",
+      "payBefore": "Completa tu pago antes del {date}. Mientras tanto, tus productos siguen apartados.",
+      "resume": "Volver a la página de pago",
+      "missing": "No encontramos un pedido reciente en esta pestaña del navegador.",
+      "failed": "No pudimos consultar tu pedido en este momento.",
+      "retry": "Consultar de nuevo",
+      "toCatalog": "Seguir explorando",
+      "toCart": "Volver a tu mochila"
     }
   }
 }

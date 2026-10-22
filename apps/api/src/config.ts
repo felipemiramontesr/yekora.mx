@@ -4,9 +4,18 @@
  * Production fails closed (ADR 0006, R4): missing database settings stop the process before it
  * listens, instead of running half-configured. Secrets are read here and never logged.
  *
+ * Payments (FC 012, 092_AN §2): PAYMENTS_MODE is declared, never inferred. In `sandbox` only
+ * test keys are accepted and in `live` only live keys, so a mixed set stops the start instead
+ * of charging with the wrong account. A processor needs both of its secrets or none, and the
+ * checkout needs its three secrets (personal-data key and two peppers) or none. Without them
+ * the checkout answers 503: closed, never half-open (T1.1 K).
+ *
  * @module
  */
 import { z } from 'zod';
+import { parsePiiKey } from './services/checkoutCrypto';
+import type { MercadoPagoSecrets } from './services/mercadoPagoAdapter';
+import type { StripeSecrets } from './services/stripeAdapter';
 
 /** Origins allowed by CORS: the public site and the two local servers (dev and E2E). */
 export const CORS_ORIGINS = [
@@ -32,9 +41,51 @@ const schema = z.object({
       'must be a Yekora database'
     ),
   BANXICO_TOKEN: z.string().optional(),
-  API_VERSION: z.string().default('0.7.6'),
+  API_VERSION: z.string().default('0.8.0'),
   GIT_SHA: z.string().default('dev'),
+  PAYMENTS_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
+  SITE_URL: z.url().default('https://yekora.mx'),
+  API_PUBLIC_URL: z.url().default('https://apiv1.yekora.mx'),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  MP_ACCESS_TOKEN: z.string().optional(),
+  MP_WEBHOOK_SECRET: z.string().optional(),
+  CHECKOUT_PII_KEY: z.string().optional(),
+  CUSTOMER_EMAIL_HMAC_PEPPER: z.string().optional(),
+  ORDER_TOKEN_PEPPER: z.string().optional(),
 });
+
+/** Key prefixes each mode accepts (Stripe secret or restricted keys; Mercado Pago tokens). */
+const KEY_PREFIXES = {
+  sandbox: { stripe: ['sk_test_', 'rk_test_'], mercadoPago: ['TEST-'] },
+  live: { stripe: ['sk_live_', 'rk_live_'], mercadoPago: ['APP_USR-'] },
+} as const;
+
+/** The checkout's own secrets (FC 012), all three or none. */
+export interface CheckoutSecrets {
+  /** AES-256-GCM key of personal data (CHECKOUT_PII_KEY, 32 bytes). */
+  piiKey: Buffer;
+  /** Pepper of the e-mail lookup HMAC (CUSTOMER_EMAIL_HMAC_PEPPER). */
+  emailPepper: string;
+  /** Pepper of the order access token HMAC (ORDER_TOKEN_PEPPER). */
+  tokenPepper: string;
+}
+
+/** Payment settings of this deployment. */
+export interface PaymentsConfig {
+  /** Declared mode: test keys only in `sandbox`, live keys only in `live`. */
+  mode: 'sandbox' | 'live';
+  /** Public site, for the processors' return URLs. */
+  siteUrl: string;
+  /** Public API, for the processors' webhook URLs. */
+  apiUrl: string;
+  /** Stripe account, or null when not configured. */
+  stripe: StripeSecrets | null;
+  /** Mercado Pago application, or null when not configured. */
+  mercadoPago: MercadoPagoSecrets | null;
+  /** Checkout secrets, or null when not configured. */
+  checkout: CheckoutSecrets | null;
+}
 
 /** Database connection settings. */
 export interface DbConfig {
@@ -66,6 +117,74 @@ export interface ApiConfig {
   version: string;
   /** Deployed commit, reported by /health and checked by the deploy smoke test. */
   sha: string;
+  /** Payment processors and checkout secrets (FC 012). */
+  payments: PaymentsConfig;
+}
+
+/** A pair of secrets that must be configured together, or null when both are absent. */
+function pair(name: string, a?: string, b?: string): [string, string] | null {
+  if (!a && !b) return null;
+  if (!a || !b) throw new Error(`${name} needs both of its secrets or none`);
+  return [a, b];
+}
+
+/** Refuses a key whose prefix does not belong to the declared mode (092_AN §2). */
+function checkMode(
+  name: string,
+  key: string,
+  prefixes: readonly string[]
+): void {
+  if (!prefixes.some((prefix) => key.startsWith(prefix))) {
+    throw new Error(`${name} does not match PAYMENTS_MODE`);
+  }
+}
+
+function loadPayments(parsed: z.infer<typeof schema>): PaymentsConfig {
+  const mode = parsed.PAYMENTS_MODE;
+  const prefixes = KEY_PREFIXES[mode];
+  const stripe = pair(
+    'Stripe',
+    parsed.STRIPE_SECRET_KEY,
+    parsed.STRIPE_WEBHOOK_SECRET
+  );
+  if (stripe) checkMode('STRIPE_SECRET_KEY', stripe[0], prefixes.stripe);
+  const mercadoPago = pair(
+    'Mercado Pago',
+    parsed.MP_ACCESS_TOKEN,
+    parsed.MP_WEBHOOK_SECRET
+  );
+  if (mercadoPago)
+    checkMode('MP_ACCESS_TOKEN', mercadoPago[0], prefixes.mercadoPago);
+  const key = parsed.CHECKOUT_PII_KEY;
+  const peppers = pair(
+    'The checkout',
+    parsed.CUSTOMER_EMAIL_HMAC_PEPPER,
+    parsed.ORDER_TOKEN_PEPPER
+  );
+  if (Boolean(key) !== Boolean(peppers)) {
+    throw new Error('The checkout needs its three secrets or none');
+  }
+  if (peppers && peppers.some((pepper) => pepper.length < 32)) {
+    throw new Error('Checkout peppers must be at least 32 characters');
+  }
+  return {
+    mode,
+    siteUrl: parsed.SITE_URL.replace(/\/$/, ''),
+    apiUrl: parsed.API_PUBLIC_URL.replace(/\/$/, ''),
+    stripe: stripe && { apiKey: stripe[0], webhookSecret: stripe[1] },
+    mercadoPago: mercadoPago && {
+      accessToken: mercadoPago[0],
+      webhookSecret: mercadoPago[1],
+    },
+    checkout:
+      key && peppers
+        ? {
+            piiKey: parsePiiKey(key),
+            emailPepper: peppers[0],
+            tokenPepper: peppers[1],
+          }
+        : null,
+  };
 }
 
 /**
@@ -95,5 +214,6 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
     banxicoToken: parsed.BANXICO_TOKEN || undefined,
     version: parsed.API_VERSION,
     sha: parsed.GIT_SHA,
+    payments: loadPayments(parsed),
   };
 }

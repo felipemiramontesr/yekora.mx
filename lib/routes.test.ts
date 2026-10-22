@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CHECKOUT_RETURN_PATHS } from './checkout/checkoutTypes';
 import {
   pageMetadata,
   productMetadata,
@@ -16,6 +17,24 @@ describe('routes', () => {
     expect(routeFor('about', 'en')).toBe('/en/about/');
     expect(routeFor('terms', 'en')).toBe('/en/terms/');
     expect(routeFor('offline', 'en')).toBe('/en/offline/');
+  });
+
+  it('serves the return pages exactly where the API sends the processors (FC 012)', () => {
+    for (const locale of ['es-MX', 'en'] as const) {
+      expect(routeFor('checkoutSuccess', locale)).toBe(
+        CHECKOUT_RETURN_PATHS[locale].success
+      );
+      expect(routeFor('checkoutCancel', locale)).toBe(
+        CHECKOUT_RETURN_PATHS[locale].cancel
+      );
+    }
+    expect(routeFor('checkout', 'es-MX')).toBe('/checkout/');
+    expect(translatePath('/checkout/exito/', 'en')).toBe(
+      '/en/checkout/success/'
+    );
+    expect(translatePath('/en/checkout/cancel', 'es-MX')).toBe(
+      '/checkout/cancelado/'
+    );
   });
 
   it('translates a path to the same page in the other language, with or without the final slash', () => {

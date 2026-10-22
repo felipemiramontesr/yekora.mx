@@ -16,6 +16,9 @@ vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
 import Layout, { metadata as layoutMeta } from './layout';
 import Catalog, { metadata as CatalogMeta } from './catalogo/page';
 import Cart, { metadata as CartMeta } from './carrito/page';
+import Checkout, { metadata as CheckoutMeta } from './checkout/page';
+import Success, { metadata as SuccessMeta } from './checkout/exito/page';
+import Cancel, { metadata as CancelMeta } from './checkout/cancelado/page';
 import * as ProductPage from './catalogo/[slug]/page';
 import Home, { metadata as HomeMeta } from './page';
 import About, { metadata as AboutMeta } from './nosotros/page';
@@ -93,6 +96,32 @@ describe('es-MX routes', () => {
     expect(html).toContain('Tu mochila');
     expect(html).toContain('Tu mochila está vacía');
   });
+
+  it('checkout is at /checkout/, never indexed, and prerenders the empty state', () => {
+    expect(CheckoutMeta.alternates?.canonical).toBe('/checkout/');
+    expect(CheckoutMeta.alternates?.languages).toMatchObject({
+      en: '/en/checkout/',
+    });
+    expect(CheckoutMeta.title).toBe('Finalizar compra | YĒKORA');
+    expect(CheckoutMeta.robots).toEqual({ index: false, follow: false });
+    const html = renderToStaticMarkup(<Checkout />);
+    expect(html).toContain('<h1');
+    expect(html).toContain('Tu mochila está vacía');
+  });
+
+  it.each([
+    ['/checkout/exito/', SuccessMeta, Success, 'Tu pedido'],
+    ['/checkout/cancelado/', CancelMeta, Cancel, 'No se completó el pago'],
+  ])(
+    'return page %s is never indexed and prerenders while it reads the order',
+    (path, meta, Page, title) => {
+      expect(meta.alternates?.canonical).toBe(path);
+      expect(meta.robots).toEqual({ index: false, follow: false });
+      const html = renderToStaticMarkup(<Page />);
+      expect(html).toContain(title);
+      expect(html).toContain('Consultando tu pedido');
+    }
+  );
 
   it('product pages exist only for the snapshot slugs (static export)', () => {
     expect(ProductPage.dynamicParams).toBe(false);

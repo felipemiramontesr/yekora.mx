@@ -16,6 +16,9 @@ vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
 import Layout, { metadata as layoutMeta } from './layout';
 import Catalog, { metadata as CatalogMeta } from './catalog/page';
 import Cart, { metadata as CartMeta } from './cart/page';
+import Checkout, { metadata as CheckoutMeta } from './checkout/page';
+import Success, { metadata as SuccessMeta } from './checkout/success/page';
+import Cancel, { metadata as CancelMeta } from './checkout/cancel/page';
 import * as ProductPage from './catalog/[slug]/page';
 import Home, { metadata as HomeMeta } from './page';
 import About, { metadata as AboutMeta } from './about/page';
@@ -75,6 +78,28 @@ describe('en routes', () => {
     expect(CartMeta.robots).toEqual({ index: false, follow: false });
     expect(renderToStaticMarkup(<Cart />)).toContain('Your pack is empty');
   });
+
+  it('checkout is at /en/checkout/, never indexed, and prerenders the empty state', () => {
+    expect(CheckoutMeta.alternates?.canonical).toBe('/en/checkout/');
+    expect(CheckoutMeta.title).toBe('Checkout | YĒKORA');
+    expect(CheckoutMeta.robots).toEqual({ index: false, follow: false });
+    expect(renderToStaticMarkup(<Checkout />)).toContain('Your pack is empty');
+  });
+
+  it.each([
+    ['/en/checkout/success/', SuccessMeta, Success, 'Your order'],
+    ['/en/checkout/cancel/', CancelMeta, Cancel, 'Payment not completed'],
+  ])(
+    'return page %s is never indexed and prerenders while it reads the order',
+    (path, meta, Page, title) => {
+      expect(meta.alternates?.canonical).toBe(path);
+      expect(meta.title).toBe(`${title} | YĒKORA`);
+      expect(meta.robots).toEqual({ index: false, follow: false });
+      const html = renderToStaticMarkup(<Page />);
+      expect(html).toContain(title);
+      expect(html).toContain('Checking your order');
+    }
+  );
 
   it('product pages exist only for the snapshot slugs (static export)', () => {
     expect(ProductPage.dynamicParams).toBe(false);

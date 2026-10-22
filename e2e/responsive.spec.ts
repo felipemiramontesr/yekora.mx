@@ -39,6 +39,13 @@ const PAGES = [
   // Cart (FC 009): 19 routes × 6 viewports = 114 cells.
   '/carrito/',
   '/en/cart/',
+  // Checkout and its return pages (FC 012): 25 routes × 6 viewports = 150 cells.
+  '/checkout/',
+  '/en/checkout/',
+  '/checkout/exito/',
+  '/checkout/cancelado/',
+  '/en/checkout/success/',
+  '/en/checkout/cancel/',
   // Branded 404 (FC 004): any unknown path.
   '/no-existe/',
 ];

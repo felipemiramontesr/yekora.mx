@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
-import type { Db } from '../services/db';
+import type { Db, Transactional } from '../services/db';
 
 const config = loadConfig({
   DB_HOST: '127.0.0.1',
@@ -21,7 +21,7 @@ interface ShippingTables {
  * Catalog with one tent (net 1 160 cents, 10 in stock, 3.8 kg boxed) behind the Db port, plus
  * the shipping tables of migration 002 answered by statement.
  */
-function cartDb(shipping: ShippingTables = {}): Db {
+function cartDb(shipping: ShippingTables = {}): Db & Transactional {
   const rows = [
     {
       sku: 'TENT',
@@ -78,6 +78,10 @@ function cartDb(shipping: ShippingTables = {}): Db {
       return rows.filter((row) => skus.includes(row.sku)) as Row[];
     },
     ping: async () => undefined,
+    // Runs the work on this same fake: no real transaction is needed in memory.
+    transaction(work) {
+      return work(this);
+    },
     close: async () => undefined,
   };
 }

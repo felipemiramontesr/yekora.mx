@@ -12,7 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
-import type { Db } from './db';
+import type { Db, Transactional } from './db';
 
 // Random per run: the test proves the value never shows up, whatever it is.
 const DB_PASSWORD = randomUUID();
@@ -40,7 +40,7 @@ let app: FastifyInstance;
 let output: string[] = [];
 
 /** Builds the API with the production logger and captures everything it writes. */
-async function loggedApp(db: Db): Promise<FastifyInstance> {
+async function loggedApp(db: Db & Transactional): Promise<FastifyInstance> {
   output = [];
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     output.push(String(chunk));
@@ -68,9 +68,13 @@ function completed(url: string): LogLine | undefined {
   );
 }
 
-const emptyDb: Db = {
+const emptyDb: Db & Transactional = {
   query: async <Row>() => [] as Row[],
   ping: async () => undefined,
+  // Runs the work on this same fake: no real transaction is needed in memory.
+  transaction(work) {
+    return work(this);
+  },
   close: async () => undefined,
 };
 
@@ -133,7 +137,7 @@ describe('A09 security rejections leave a structured trail', () => {
   });
 
   it('logs a server failure at error level and tells the client nothing about it', async () => {
-    const failing: Db = {
+    const failing: Db & Transactional = {
       ...emptyDb,
       query: async () => {
         throw new Error('ER_ACCESS_DENIED_ERROR: SELECT p.sku FROM products p');

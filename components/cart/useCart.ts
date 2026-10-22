@@ -59,11 +59,13 @@ export function useDeliveryState(): [
  * @param lines - Current cart lines.
  * @param locale - Language of the product names.
  * @param stateCode - Delivery state, or null for products only.
+ * @param revision - Bump it to re-quote unchanged lines (the checkout does after a 409).
  */
 export function useCartQuote(
   lines: readonly CartLine[],
   locale: Locale,
-  stateCode: string | null = null
+  stateCode: string | null = null,
+  revision = 0
 ): QuoteState {
   const [quoter] = useState(createQuoter);
   const state = useSyncExternalStore(
@@ -73,7 +75,7 @@ export function useCartQuote(
   );
   useEffect(() => {
     quoter.request(lines, locale, stateCode);
-  }, [quoter, lines, locale, stateCode]);
+  }, [quoter, lines, locale, stateCode, revision]);
   return state;
 }
 

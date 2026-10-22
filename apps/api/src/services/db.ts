@@ -5,6 +5,9 @@
  * no ORM, no query builder, no string concatenation (OWASP A03, truth table T1.1). The
  * `scripts/checkNoRawSql.ts` guard enforces it on every `query(...)` call in apps/api/src.
  * Routes and repositories depend on {@link Db}, so tests run without a database.
+ * FC 012: work that must commit or roll back as a whole (stock reservation and the order it
+ * belongs to, a payment and its order transition) runs through {@link Transactional}, on one
+ * pooled connection.
  *
  * @module
  */
@@ -27,13 +30,28 @@ export interface Db {
   close(): Promise<void>;
 }
 
+/** One connection inside a transaction: the same parameterized `query` as {@link Db}. */
+export type TxQuery = Pick<Db, 'query'>;
+
+/** A database that can run all-or-nothing work. */
+export interface Transactional {
+  /**
+   * Runs `work` in one transaction on one connection: commits when it resolves, rolls back
+   * when it throws (and rethrows), and always returns the connection to the pool.
+   *
+   * @param work - Statements to run atomically.
+   * @returns What `work` returned.
+   */
+  transaction<T>(work: (tx: TxQuery) => Promise<T>): Promise<T>;
+}
+
 /**
  * Creates the pooled MariaDB adapter.
  *
  * @param config - Connection settings from {@link loadConfig}.
- * @returns A {@link Db} backed by a mysql2 pool of 10 connections.
+ * @returns A {@link Db} with transactions, backed by a mysql2 pool of 10 connections.
  */
-export function createDb(config: DbConfig): Db {
+export function createDb(config: DbConfig): Db & Transactional {
   const pool = mysql.createPool({
     ...config,
     connectionLimit: 10,
@@ -49,6 +67,26 @@ export function createDb(config: DbConfig): Db {
     },
     async ping() {
       await pool.query('SELECT 1');
+    },
+    async transaction(work) {
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        const result = await work({
+          async query<Row>(sql: string, params: readonly unknown[] = []) {
+            const [rows] = await connection.query(sql, params as unknown[]);
+            return rows as Row[];
+          },
+        });
+        await connection.commit();
+        connection.release();
+        return result;
+      } catch (error) {
+        // Release in both paths without `finally`: the connection goes back to the pool either way.
+        await connection.rollback();
+        connection.release();
+        throw error;
+      }
     },
     async close() {
       await pool.end();

@@ -67,6 +67,13 @@ export function CartContents({
         messages={messages}
         priceMessages={priceMessages}
       />
+      {/* FC 012: the checkout re-checks stock and shipping itself; it is always reachable. */}
+      <a
+        href={routeFor('checkout', locale)}
+        className="inline-flex min-h-12 items-center justify-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
+      >
+        {messages.toCheckout}
+      </a>
     </div>
   );
 }

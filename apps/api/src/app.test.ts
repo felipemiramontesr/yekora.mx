@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app';
 import { loadConfig } from './config';
 import type { ProductRow } from './services/catalog';
-import type { Db } from './services/db';
+import type { Db, Transactional } from './services/db';
 import type { CurrentRate } from './services/exchangeRate';
 
 const config = loadConfig({
@@ -40,7 +40,7 @@ const image = {
 };
 
 /** In-memory catalog behind the Db port: one product with one image. */
-function catalogDb(products: ProductRow[] = [tent]): Db {
+function catalogDb(products: ProductRow[] = [tent]): Db & Transactional {
   return {
     async query<Row>(sql: string, params: readonly unknown[] = []) {
       if (sql.startsWith('SELECT COUNT'))
@@ -52,6 +52,10 @@ function catalogDb(products: ProductRow[] = [tent]): Db {
       return products as Row[];
     },
     ping: async () => undefined,
+    // Runs the work on this same fake: no real transaction is needed in memory.
+    transaction(work) {
+      return work(this);
+    },
     close: async () => undefined,
   };
 }
@@ -59,7 +63,7 @@ function catalogDb(products: ProductRow[] = [tent]): Db {
 let app: FastifyInstance;
 
 async function makeApp(
-  db: Db = catalogDb(),
+  db: Db & Transactional = catalogDb(),
   rate: () => Promise<CurrentRate | null> = async () => FIX,
   logger = false
 ) {
@@ -84,7 +88,7 @@ describe('GET /health', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       status: 'ok',
-      version: '0.7.6',
+      version: '0.8.0',
       sha: 'dev',
       db: 'connected',
     });
@@ -302,7 +306,9 @@ describe('errors', () => {
         throw failure;
       },
     };
-    const res = await (await makeApp(db as Db)).inject('/v1/catalog');
+    const res = await (
+      await makeApp(db as Db & Transactional)
+    ).inject('/v1/catalog');
     expect(res.statusCode).toBe(500);
     expect(res.json()).toEqual({
       type: 'about:blank',
@@ -338,5 +344,85 @@ describe('errors', () => {
     write.mockRestore();
     expect(logged).toContain('"url":"/health"');
     expect(logged).not.toContain('s3cret');
+  });
+});
+
+describe('payment processors (FC 012 wiring)', () => {
+  const checkoutSecrets = {
+    CHECKOUT_PII_KEY: Buffer.alloc(32, 3).toString('base64'),
+    CUSTOMER_EMAIL_HMAC_PEPPER: 'e'.repeat(32),
+    ORDER_TOKEN_PEPPER: 't'.repeat(32),
+  };
+
+  /** No orders at all: enough for requests that stop in T1.1 or find nothing. */
+  const emptyDb: Db & Transactional = {
+    ...catalogDb(),
+    query: async <Row>() => [] as Row[],
+    transaction(work) {
+      return work(this);
+    },
+  };
+
+  async function paymentsApp(env: Record<string, string> = {}) {
+    app = await buildApp({
+      config: loadConfig({
+        DB_HOST: '127.0.0.1',
+        DB_USER: 'root',
+        DB_NAME: 'yekora_dev',
+        ...checkoutSecrets,
+        ...env,
+      }),
+      db: emptyDb,
+      rate: async () => FIX,
+      logger: false,
+    });
+    return app;
+  }
+
+  /** Status of a checkout that stops in T1.1: 503 when K = ⊥, 400 once the processor exists. */
+  async function checkoutStatus(env: Record<string, string>, method: string) {
+    const res = await (
+      await paymentsApp(env)
+    ).inject({
+      method: 'POST',
+      url: '/v1/checkout',
+      payload: { method },
+    });
+    await app.close();
+    return res.statusCode;
+  }
+
+  it('builds only the processors whose secrets are configured', async () => {
+    const stripe = {
+      STRIPE_SECRET_KEY: 'sk_test_1',
+      STRIPE_WEBHOOK_SECRET: 'whsec_1',
+    };
+    const mercadoPago = {
+      MP_ACCESS_TOKEN: 'TEST-1',
+      MP_WEBHOOK_SECRET: 'mp_1',
+    };
+    const statuses = [
+      await checkoutStatus(stripe, 'CARD'),
+      await checkoutStatus(stripe, 'SPEI'),
+      await checkoutStatus(mercadoPago, 'OXXO'),
+      await checkoutStatus(mercadoPago, 'MERCADO_PAGO_BALANCE'),
+    ];
+    expect(statuses).toEqual([400, 503, 503, 400]);
+    app = await buildApp({
+      config,
+      db: catalogDb(),
+      rate: async () => FIX,
+      logger: false,
+    });
+  });
+
+  it('reads orders with the real clock by default', async () => {
+    const res = await (
+      await paymentsApp()
+    ).inject({
+      url: '/v1/orders/YEK-2026-AB12CD34',
+      headers: { authorization: `Bearer ${'k'.repeat(43)}` },
+    });
+    expect(res.statusCode).toBe(404);
   });
 });

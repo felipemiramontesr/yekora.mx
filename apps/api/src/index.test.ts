@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import type { Db } from './services/db';
+import type { Db, Transactional } from './services/db';
 
 const pool = {
   query: vi.fn(async () => [[], []]),
@@ -17,9 +17,13 @@ const env = {
   HOST: '127.0.0.1',
 };
 
-const idleDb = (): Db => ({
+const idleDb = (): Db & Transactional => ({
   query: async () => [],
   ping: async () => undefined,
+  // Runs the work on this same fake: no real transaction is needed in memory.
+  transaction(work) {
+    return work(this);
+  },
   close: async () => undefined,
 });
 
@@ -32,9 +36,13 @@ beforeAll(async () => {
 
 describe('start', () => {
   it('listens over HTTP with the injected database and stops cleanly', async () => {
-    const db: Db = {
+    const db: Db & Transactional = {
       query: vi.fn(async () => []),
       ping: vi.fn(async () => undefined),
+      // Runs the work on this same fake: no real transaction is needed in memory.
+      transaction(work) {
+        return work(this);
+      },
       close: vi.fn(async () => undefined),
     };
     const { address, stop } = await start(env, () => db);

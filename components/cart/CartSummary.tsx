@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type SelectHTMLAttributes } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import type { QuoteState } from '@/lib/api/cartClient';
 import { MEXICAN_STATES } from '@/lib/cart/mxStates';
@@ -18,6 +18,8 @@ interface CartSummaryProps {
   messages: Messages['cart'];
   /** `catalog.price` texts (currency and FIX notes). */
   priceMessages: Messages['catalog']['price'];
+  /** Whether to show the state selector; the checkout asks for the state in its address. */
+  stateSelect?: boolean;
 }
 
 type Totals = NonNullable<QuoteState['quote']>['summary'];
@@ -56,6 +58,55 @@ function shippingText(
   return formatMoney(Number(totals.shippingTotalMxnCents), 'MXN', locale);
 }
 
+/** Props of {@link StateSelect}. */
+interface StateSelectProps {
+  /** Element id, for its label. */
+  id: string;
+  /** Language of the state names. */
+  locale: Locale;
+  /** Chosen state code, or null. */
+  value: string | null;
+  /** Changes (or clears, with null) the state. */
+  onChange: (code: string | null) => void;
+  /** Text of the empty option. */
+  placeholder: string;
+  /** Extra attributes of the select (validation state, autocomplete). */
+  extra?: Omit<
+    SelectHTMLAttributes<HTMLSelectElement>,
+    'id' | 'value' | 'onChange'
+  >;
+}
+
+/**
+ * The 32 Mexican states as a select, shared by the cart summary and the checkout address: both
+ * edit the same remembered delivery state (FC 012: the checkout address prevails).
+ */
+export function StateSelect({
+  id,
+  locale,
+  value,
+  onChange,
+  placeholder,
+  extra,
+}: Readonly<StateSelectProps>) {
+  return (
+    <select
+      id={id}
+      value={value ?? ''}
+      onChange={(event) => onChange(event.target.value || null)}
+      className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
+      {...extra}
+    >
+      <option value="">{placeholder}</option>
+      {MEXICAN_STATES.map((option) => (
+        <option key={option.code} value={option.code}>
+          {locale === 'en' ? option.en : option.es}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /**
  * Totals of the cart as the server quoted them (FC 009, LFPC 7 Bis; shipping FC 011): the
  * delivery state selector, the products with VAT, the shipping line, then subtotal before VAT,
@@ -70,6 +121,7 @@ export function CartSummary({
   onStateChange,
   messages,
   priceMessages,
+  stateSelect = true,
 }: Readonly<CartSummaryProps>) {
   const titleId = useId();
   const selectId = useId();
@@ -90,24 +142,20 @@ export function CartSummary({
       <h2 id={titleId} className="text-lg font-semibold">
         {summary.title}
       </h2>
-      <div className="mt-3 flex flex-col gap-1">
-        <label htmlFor={selectId} className="text-sm font-medium">
-          {shipping.stateLabel}
-        </label>
-        <select
-          id={selectId}
-          value={stateCode ?? ''}
-          onChange={(event) => onStateChange(event.target.value || null)}
-          className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
-        >
-          <option value="">{shipping.choose}</option>
-          {MEXICAN_STATES.map((option) => (
-            <option key={option.code} value={option.code}>
-              {locale === 'en' ? option.en : option.es}
-            </option>
-          ))}
-        </select>
-      </div>
+      {stateSelect && (
+        <div className="mt-3 flex flex-col gap-1">
+          <label htmlFor={selectId} className="text-sm font-medium">
+            {shipping.stateLabel}
+          </label>
+          <StateSelect
+            id={selectId}
+            locale={locale}
+            value={stateCode}
+            onChange={onStateChange}
+            placeholder={shipping.choose}
+          />
+        </div>
+      )}
       {totals && (
         <>
           <p className="mt-3 text-sm text-petroleo/80">
