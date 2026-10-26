@@ -42,7 +42,7 @@ const snapshotSchema = z
   // Each product page links its translation (hreflang): both languages must list the same slugs.
   .refine(
     ({ products }) => slugList(products['es-MX']) === slugList(products.en),
-    { message: 'es-MX and en must list the same products' }
+    { error: 'es-MX and en must list the same products' }
   );
 
 /** Slugs of a product list in a stable order, to compare two languages regardless of order. */

@@ -1,0 +1,41 @@
+# FC 016 (K-32) · Dependabot with Archon's policy: grouped, weekly dependency updates.
+#
+# The repository uses Bun with a text `bun.lock`, so the ecosystem is `bun`, not `npm` (with
+# `npm` Dependabot would not update `bun.lock` and its PRs would break the CI's
+# `--frozen-lockfile`). One entry at the root covers the workspaces of the root package.json
+# (apps/api).
+#
+# Every PR runs the same product CI as a push (deploy.yml also triggers on pull_request: tests,
+# Security Audit, Sonar, E2E) and is merged by hand under Protocol L: Dependabot never merges on
+# its own. Its PRs only see "Dependabot secrets", so SONAR_TOKEN must be registered there before
+# the first Monday (docs/security/dependency-triage.md §5). Security updates are a repository
+# setting (Settings → Code security → Dependabot security updates).
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    # No major jumps in routine updates: a major is decided with its own FC (as zod 3 → 4 in
+    # FC 016). Only `update-types`, no `versions`, so security updates and the daily audit are
+    # untouched.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      production-patches:
+        dependency-type: production
+        update-types:
+          - patch

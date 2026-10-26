@@ -31,9 +31,10 @@ import type { Db } from '../services/db';
 import type { CurrentRate } from '../services/exchangeRate';
 import type { ShippingRateProvider } from '../services/shippingPort';
 
-const requestSchema = z
-  .object({ items: cartLinesSchema, destination: destinationSchema.optional() })
-  .strict();
+const requestSchema = z.strictObject({
+  items: cartLinesSchema,
+  destination: destinationSchema.optional(),
+});
 
 /** Title of each T1.1 rejection; the code itself travels as the problem detail. */
 const REJECTION_TITLE = {

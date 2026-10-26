@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  auditCronViolations,
+  dependabotViolations,
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
@@ -175,5 +177,116 @@ describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
     expect(migrationsWorkflowViolations('name: x\n', OWNER)[0]).toBe(
       'triggers must be workflow_dispatch only, found: none'
     );
+  });
+});
+
+const auditCron = readFileSync(
+  '.github/workflows/dependency-audit-cron.yml',
+  'utf8'
+);
+const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
+
+describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
+  it('the real dependency-audit-cron.yml is conformant', () => {
+    expect(auditCronViolations(auditCron)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a push trigger',
+      'workflow_dispatch:',
+      'workflow_dispatch:\n  push:',
+      'triggers must be schedule and workflow_dispatch, found: push, schedule, workflow_dispatch',
+    ],
+    [
+      'a floating runner',
+      'runs-on: ubuntu-24.04',
+      'runs-on: ubuntu-latest',
+      'every job must run on ubuntu-24.04',
+    ],
+    [
+      'an unpinned action',
+      'actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd',
+      'actions/checkout@v5',
+      'actions/checkout@v5 is not pinned by full commit SHA',
+    ],
+    [
+      'another audit command',
+      'run: bun scripts/dependencyAuditGate.ts',
+      'run: bun audit',
+      'it must run scripts/dependencyAuditGate.ts',
+    ],
+    [
+      'an Issue opened on every run',
+      'if: failure()',
+      'if: always()',
+      'the security Issue must be opened only when the audit fails',
+    ],
+  ])('flags %s', (_case, from, to, violation) => {
+    expect(auditCron).toContain(from);
+    expect(auditCronViolations(auditCron.replace(from, to))).toEqual([
+      violation,
+    ]);
+  });
+
+  it('flags a self-hosted runner, which also fails the runner rule', () => {
+    expect(
+      auditCronViolations(
+        auditCron.replace(
+          'runs-on: ubuntu-24.04',
+          'runs-on: [self-hosted, yekora-db]'
+        )
+      )
+    ).toEqual([
+      'every job must run on ubuntu-24.04',
+      'it must never target a self-hosted runner',
+    ]);
+  });
+
+  it('flags a workflow without triggers or jobs', () => {
+    expect(auditCronViolations('name: x\n')).toEqual([
+      'triggers must be schedule and workflow_dispatch, found: none',
+      'every job must run on ubuntu-24.04',
+      'it must run scripts/dependencyAuditGate.ts',
+      'the security Issue must be opened only when the audit fails',
+    ]);
+  });
+});
+
+describe('dependabotViolations (FC 016 · Archon policy, T2)', () => {
+  it('the real dependabot.yml is conformant', () => {
+    expect(dependabotViolations(dependabot)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'the npm ecosystem (would not update bun.lock)',
+      '- package-ecosystem: bun',
+      '- package-ecosystem: npm',
+      'the ecosystem must be bun (it updates bun.lock)',
+    ],
+    [
+      'majors allowed',
+      '- version-update:semver-major',
+      '- version-update:semver-patch',
+      'major updates must be ignored for every dependency',
+    ],
+    [
+      'majors ignored for one package only',
+      "- dependency-name: '*'",
+      "- dependency-name: 'next'",
+      'major updates must be ignored for every dependency',
+    ],
+    [
+      'a missing group',
+      'production-patches:',
+      'production-everything:',
+      'the group production-patches is missing',
+    ],
+  ])('flags %s', (_case, from, to, violation) => {
+    expect(dependabot).toContain(from);
+    expect(dependabotViolations(dependabot.replace(from, to))).toEqual([
+      violation,
+    ]);
   });
 });

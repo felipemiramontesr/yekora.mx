@@ -7,12 +7,16 @@
  *      production-db, checks the actor and pins every action (scripts/lib/workflowGuards.ts).
  *   e) FC 008 · R1: no workflow other than db-migrations.yml mentions self-hosted.
  *   f) FC 009 · K-13: the apiv1 smoke test and the catalog read of deploy.yml are always on.
+ *   g) FC 016 · K-32: dependency-audit-cron.yml runs the audit gate daily on ubuntu-24.04 with
+ *      pinned actions, and dependabot.yml keeps Archon's policy (bun, no majors, two groups).
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  auditCronViolations,
+  dependabotViolations,
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
@@ -83,6 +87,27 @@ for (const name of readdirSync(workflowsDir)) {
   }
 }
 
+const auditCronPath = join(workflowsDir, 'dependency-audit-cron.yml');
+if (existsSync(auditCronPath)) {
+  for (const violation of auditCronViolations(
+    readFileSync(auditCronPath, 'utf8')
+  )) {
+    failures.push(`g) dependency-audit-cron.yml: ${violation}`);
+  }
+} else {
+  failures.push('g) .github/workflows/dependency-audit-cron.yml is missing');
+}
+const dependabotPath = join(root, '.github', 'dependabot.yml');
+if (existsSync(dependabotPath)) {
+  for (const violation of dependabotViolations(
+    readFileSync(dependabotPath, 'utf8')
+  )) {
+    failures.push(`g) dependabot.yml: ${violation}`);
+  }
+} else {
+  failures.push('g) .github/dependabot.yml is missing');
+}
+
 if (existsSync(join(root, 'bun.lock'))) {
   // process.execPath is the bun binary running this script: no lookup through PATH.
   const frozen = spawnSync(
@@ -104,5 +129,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, lockfile in sync, migrations workflow manual-only and the only one on self-hosted.'
+  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
 );

@@ -185,3 +185,76 @@ function parityViolations(
   }
   return violations;
 }
+
+/**
+ * Every violation of the daily dependency audit (FC 016, K-32, A08). It runs the product's
+ * audit gate on a public runner only, with pinned actions, on a schedule or by hand, and touches
+ * the `security` Issue only when the gate fails.
+ *
+ * @param workflow - Text of dependency-audit-cron.yml.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function auditCronViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const triggers = workflowTriggers(workflow).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  if (triggers.join() !== 'schedule,workflow_dispatch') {
+    violations.push(
+      `triggers must be schedule and workflow_dispatch, found: ${triggers.join(', ') || 'none'}`
+    );
+  }
+  const runners = workflow
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('runs-on:'))
+    .map((line) => line.slice('runs-on:'.length).trim());
+  if (
+    runners.length === 0 ||
+    runners.some((runner) => runner !== 'ubuntu-24.04')
+  ) {
+    violations.push('every job must run on ubuntu-24.04');
+  }
+  if (mentionsSelfHosted(workflow)) {
+    violations.push('it must never target a self-hosted runner');
+  }
+  for (const uses of unpinnedActions(workflow)) {
+    violations.push(`${uses} is not pinned by full commit SHA`);
+  }
+  if (!workflow.includes('run: bun scripts/dependencyAuditGate.ts')) {
+    violations.push('it must run scripts/dependencyAuditGate.ts');
+  }
+  if (!workflow.includes('if: failure()')) {
+    violations.push(
+      'the security Issue must be opened only when the audit fails'
+    );
+  }
+  return violations;
+}
+
+/**
+ * Every violation of the Dependabot policy (FC 016, Archon's model): the `bun` ecosystem, no
+ * major jumps for any dependency, and the two groups.
+ *
+ * @param config - Text of .github/dependabot.yml.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function dependabotViolations(config: string): string[] {
+  const violations: string[] = [];
+  const lines = config.split(/\r?\n/).map((line) => line.trim());
+  if (!lines.includes('- package-ecosystem: bun')) {
+    violations.push('the ecosystem must be bun (it updates bun.lock)');
+  }
+  const ignoresMajors =
+    lines.includes("- dependency-name: '*'") &&
+    lines.includes('- version-update:semver-major');
+  if (!ignoresMajors) {
+    violations.push('major updates must be ignored for every dependency');
+  }
+  for (const group of ['dev-dependencies:', 'production-patches:']) {
+    if (!lines.includes(group)) {
+      violations.push(`the group ${group.slice(0, -1)} is missing`);
+    }
+  }
+  return violations;
+}

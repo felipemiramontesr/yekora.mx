@@ -84,7 +84,7 @@ describe('GET /health', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       status: 'ok',
-      version: '0.7.3',
+      version: '0.7.4',
       sha: 'dev',
       db: 'connected',
     });

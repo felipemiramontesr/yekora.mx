@@ -29,16 +29,14 @@ export interface CartLine {
 /** Stored cart: unique SKUs, bounded size. Anything else is discarded as corrupt. */
 export const cartLinesSchema = z
   .array(
-    z
-      .object({
-        sku: z.string().min(1).max(64),
-        quantity: z.number().int().min(1).max(MAX_QUANTITY),
-      })
-      .strict()
+    z.strictObject({
+      sku: z.string().min(1).max(64),
+      quantity: z.number().int().min(1).max(MAX_QUANTITY),
+    })
   )
   .max(MAX_LINES)
   .refine((lines) => new Set(lines.map((l) => l.sku)).size === lines.length, {
-    message: 'Each SKU may appear only once',
+    error: 'Each SKU may appear only once',
   });
 
 /**
@@ -46,17 +44,15 @@ export const cartLinesSchema = z
  * (format only; the API decides whether it is a known zone) and an optional 5-digit postal code,
  * reserved for postal-code zones and never stored in the browser (only the state is).
  */
-export const destinationSchema = z
-  .object({
-    stateCode: z
-      .string()
-      .regex(/^[A-Z]{3}$/, 'State code must be 3 capital letters'),
-    postalCode: z
-      .string()
-      .regex(/^\d{5}$/, 'Postal code must be 5 digits')
-      .optional(),
-  })
-  .strict();
+export const destinationSchema = z.strictObject({
+  stateCode: z
+    .string()
+    .regex(/^[A-Z]{3}$/, 'State code must be 3 capital letters'),
+  postalCode: z
+    .string()
+    .regex(/^\d{5}$/, 'Postal code must be 5 digits')
+    .optional(),
+});
 
 const cents = z.number().int();
 
