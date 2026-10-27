@@ -37,7 +37,7 @@
     },
     "apps/api": {
       "name": "@yekora/api",
-      "version": "0.7.5",
+      "version": "0.7.6",
       "dependencies": {
         "@fastify/cors": "^11",
         "@fastify/helmet": "^13",
@@ -52,7 +52,7 @@
     },
   },
   "overrides": {
-    "postcss": "^8.5.23",
+    "postcss": "^8.5.31",
     "tinypool": "^2.1.2",
   },
   "packages": {
