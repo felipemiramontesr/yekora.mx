@@ -37,7 +37,7 @@
     },
     "apps/api": {
       "name": "@yekora/api",
-      "version": "0.7.4",
+      "version": "0.7.5",
       "dependencies": {
         "@fastify/cors": "^11",
         "@fastify/helmet": "^13",

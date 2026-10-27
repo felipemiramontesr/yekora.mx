@@ -17,7 +17,7 @@ describe('loadConfig', () => {
         database: 'yekora_dev',
       },
       banxicoToken: undefined,
-      version: '0.7.4',
+      version: '0.7.5',
       sha: 'dev',
     });
   });

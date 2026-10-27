@@ -2,7 +2,7 @@
   "name": "@yekora/api",
   "private": true,
   "type": "module",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "YĒKORA catalog API (FC 008): Fastify on Node 24, MariaDB with hand-written parameterized SQL, no ORM.",
   "engines": {
     "node": ">=24.0.0"
