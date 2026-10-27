@@ -175,10 +175,9 @@ export function createMercadoPagoAdapter(
       } catch {
         return null;
       }
-      const type =
-        typeof event.type === 'string'
-          ? event.type
-          : String(event.action ?? 'unknown');
+      let type = 'unknown';
+      if (typeof event.type === 'string') type = event.type;
+      else if (typeof event.action === 'string') type = event.action;
       // The notification id identifies the delivery of this event; without one, the payment id
       // plus the action is the most stable key the body offers.
       const eventId =

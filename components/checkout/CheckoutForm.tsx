@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useId, useState } from 'react';
+import { type SubmitEvent, useId, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { type CheckoutFailure, submitCheckout } from '@/lib/api/checkoutClient';
 import {
@@ -154,7 +154,7 @@ export function CheckoutForm({
   const update = (field: keyof CheckoutValues) => (value: string) =>
     setValues((current) => ({ ...current, [field]: value }));
 
-  async function pay(event: FormEvent<HTMLFormElement>) {
+  async function pay(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const check = validateCheckout({
       values,
@@ -167,7 +167,9 @@ export function CheckoutForm({
     if (!check.ok) {
       setErrors(check.errors);
       // Every refusal names a field: the buyer's lines and total come from the cart itself.
-      const [first] = FIELD_ORDER.filter((field) => check.errors[field]);
+      const first = FIELD_ORDER.find(
+        (field) => check.errors[field]
+      ) as FieldName;
       document.getElementById(focusTarget(base, first))?.focus();
       return;
     }

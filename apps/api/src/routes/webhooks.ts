@@ -35,7 +35,8 @@ export async function registerWebhookRoutes(
   app: FastifyInstance,
   deps: WebhookDeps
 ): Promise<void> {
-  await app.register(async (scope) => {
+  // Callback-style plugin: registration is synchronous, so it signals the end with `done`.
+  await app.register((scope, _options, done) => {
     scope.removeAllContentTypeParsers();
     scope.addContentTypeParser(
       '*',
@@ -56,5 +57,6 @@ export async function registerWebhookRoutes(
           .send(problem(outcome.status, TITLES[outcome.code], outcome.code));
       });
     }
+    done();
   });
 }

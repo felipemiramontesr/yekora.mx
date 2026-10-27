@@ -120,8 +120,10 @@ export function PaymentMethodPicker({
           <label
             key={code}
             htmlFor={`${id}-${code}`}
-            className="flex cursor-pointer gap-3 rounded-lg border border-petroleo/20 bg-white/60 p-4 has-checked:border-petroleo has-checked:bg-white"
+            className="grid cursor-pointer grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg border border-petroleo/20 bg-white/60 p-4 has-checked:border-petroleo has-checked:bg-white"
           >
+            {/* Flat grid (input spanning both rows, then the two texts) keeps the label text a
+                direct child, so its accessible name is found without nesting. */}
             <input
               id={`${id}-${code}`}
               type="radio"
@@ -129,12 +131,10 @@ export function PaymentMethodPicker({
               value={code}
               checked={value === code}
               onChange={() => onChange(code)}
-              className="mt-1 size-5 shrink-0 accent-petroleo"
+              className="row-span-2 mt-1 size-5 shrink-0 accent-petroleo"
             />
-            <span className="flex flex-col gap-1">
-              <span className="font-medium">{option.label}</span>
-              <span className="text-sm text-petroleo/80">{option.detail}</span>
-            </span>
+            <span className="font-medium">{option.label}</span>
+            <span className="text-sm text-petroleo/80">{option.detail}</span>
           </label>
         );
       })}

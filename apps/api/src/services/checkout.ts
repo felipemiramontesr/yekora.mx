@@ -143,20 +143,24 @@ async function reserveLines(
   tx: TxQuery,
   lines: readonly { sku: string; quantity: number }[]
 ): Promise<Map<string, number>> {
-  const ids = new Map<string, number>();
-  for (const line of lines) {
-    const result = await tx.query(
-      'UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?',
-      [line.quantity, line.sku, line.quantity]
-    );
-    if (affected(result) !== 1) throw new InsufficientStock();
-    const [row] = await tx.query<{ id: number }>(
-      'SELECT id FROM products WHERE sku = ?',
-      [line.sku]
-    );
-    ids.set(line.sku, row.id);
-  }
-  return ids;
+  // One transaction connection runs its queries in order, so the lines still reserve one after
+  // another. Every line settles before the verdict, so the rollback never races a pending query.
+  const reserved = await Promise.all(
+    lines.map(async (line) => {
+      const result = await tx.query(
+        'UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?',
+        [line.quantity, line.sku, line.quantity]
+      );
+      if (affected(result) !== 1) return null;
+      const [row] = await tx.query<{ id: number }>(
+        'SELECT id FROM products WHERE sku = ?',
+        [line.sku]
+      );
+      return [line.sku, row.id] as const;
+    })
+  );
+  if (reserved.includes(null)) throw new InsufficientStock();
+  return new Map(reserved as (readonly [string, number])[]);
 }
 
 /** Cancels an order whose payment session could not be created, returning its stock. */
@@ -306,10 +310,11 @@ async function persist(
         ]
       );
       const id = (inserted as unknown as { insertId: number }).insertId;
-      for (const item of quote.items) {
-        await tx.query(
-          'INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [
+      // One multi-row insert: mysql2 expands `VALUES ?` from the nested array, escaping each value.
+      await tx.query(
+        'INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?',
+        [
+          quote.items.map((item) => [
             id,
             productIds.get(item.sku),
             item.sku,
@@ -318,9 +323,9 @@ async function persist(
             item.lineBaseMxnCents,
             item.lineTaxMxnCents,
             item.lineTotalMxnCents,
-          ]
-        );
-      }
+          ]),
+        ]
+      );
       return id;
     });
   } catch (error) {

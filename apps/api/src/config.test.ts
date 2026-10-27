@@ -17,7 +17,7 @@ describe('loadConfig', () => {
         database: 'yekora_dev',
       },
       banxicoToken: undefined,
-      version: '0.8.0',
+      version: '0.8.1',
       sha: 'dev',
       // FC 012: sandbox by default and nothing configured, so the checkout stays closed (503).
       payments: {

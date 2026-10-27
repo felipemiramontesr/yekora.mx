@@ -199,14 +199,18 @@ function memoryDb(
     ['INSERT INTO orders', insertOrder],
     [
       'INSERT INTO order_items',
+      // Multi-row insert: the only parameter is the array of rows.
       (p) => {
-        state.items.push({
-          orderId: p[0] as number,
-          productId: p[1] as number,
-          quantity: p[3] as number,
-          params: p,
-        });
-        return { affectedRows: 1 };
+        const rows = p[0] as unknown[][];
+        for (const row of rows) {
+          state.items.push({
+            orderId: row[0] as number,
+            productId: row[1] as number,
+            quantity: row[3] as number,
+            params: row,
+          });
+        }
+        return { affectedRows: rows.length };
       },
     ],
     [
