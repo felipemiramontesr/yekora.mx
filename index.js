@@ -819,30 +819,30 @@ var require_vary = __commonJS({
         throw new TypeError("Fieldname contains invalid characters.");
       }
     }
-    function parse3(header) {
-      header = header.trim().toLowerCase();
+    function parse3(header3) {
+      header3 = header3.trim().toLowerCase();
       const result = [];
-      if (header.length === 0) {
-      } else if (header.indexOf(",") === -1) {
-        result.push(header);
+      if (header3.length === 0) {
+      } else if (header3.indexOf(",") === -1) {
+        result.push(header3);
       } else {
-        const il = header.length;
+        const il = header3.length;
         let i = 0;
         let pos = 0;
         let char;
         for (i; i < il; ++i) {
-          char = header[i];
+          char = header3[i];
           if (char === " ") {
             pos = i + 1;
           } else if (char === ",") {
             if (pos !== i) {
-              result.push(header.slice(pos, i));
+              result.push(header3.slice(pos, i));
             }
             pos = i + 1;
           }
         }
         if (pos !== i) {
-          result.push(header.slice(pos, i));
+          result.push(header3.slice(pos, i));
         }
       }
       return result;
@@ -851,32 +851,32 @@ var require_vary = __commonJS({
       const headerCache = new FifoCache(1e3);
       validateFieldname(fieldname);
       return function(reply) {
-        let header = reply.getHeader("Vary");
-        if (!header) {
+        let header3 = reply.getHeader("Vary");
+        if (!header3) {
           reply.header("Vary", fieldname);
           return;
         }
-        if (header === "*") {
+        if (header3 === "*") {
           return;
         }
         if (fieldname === "*") {
           reply.header("Vary", "*");
           return;
         }
-        if (Array.isArray(header)) {
-          header = header.join(", ");
+        if (Array.isArray(header3)) {
+          header3 = header3.join(", ");
         }
-        if (headerCache.get(header) === void 0) {
-          const vals = parse3(header);
+        if (headerCache.get(header3) === void 0) {
+          const vals = parse3(header3);
           if (vals.indexOf("*") !== -1) {
-            headerCache.set(header, "*");
+            headerCache.set(header3, "*");
           } else if (vals.indexOf(fieldname.toLowerCase()) === -1) {
-            headerCache.set(header, header + ", " + fieldname);
+            headerCache.set(header3, header3 + ", " + fieldname);
           } else {
-            headerCache.set(header, null);
+            headerCache.set(header3, null);
           }
         }
-        const cached2 = headerCache.get(header);
+        const cached2 = headerCache.get(header3);
         if (cached2 !== null) {
           reply.header("Vary", cached2);
         }
@@ -1737,7 +1737,7 @@ var require_helmet = __commonJS({
 var require_helmet2 = __commonJS({
   "../../node_modules/@fastify/helmet/index.js"(exports2, module2) {
     "use strict";
-    var { randomBytes } = require("node:crypto");
+    var { randomBytes: randomBytes2 } = require("node:crypto");
     var fp = require_fastify_plugin();
     var helmet2 = require_helmet();
     async function fastifyHelmet(fastify, options) {
@@ -1791,8 +1791,8 @@ var require_helmet2 = __commonJS({
     async function replyDecorators(request, reply, configuration, enableCSP) {
       if (enableCSP) {
         reply.cspNonce = {
-          script: randomBytes(16).toString("hex"),
-          style: randomBytes(16).toString("hex")
+          script: randomBytes2(16).toString("hex"),
+          style: randomBytes2(16).toString("hex")
         };
       }
       reply.helmet = function(opts) {
@@ -15864,17 +15864,17 @@ var require_reply = __commonJS({
       const req = reply.request;
       if (reply[kReplyTrailers] !== null) {
         const trailerHeaders = Object.keys(reply[kReplyTrailers]);
-        let header = "";
+        let header3 = "";
         for (const trailerName of trailerHeaders) {
           if (typeof reply[kReplyTrailers][trailerName] !== "function") continue;
-          header += " ";
-          header += trailerName;
+          header3 += " ";
+          header3 += trailerName;
         }
-        if (header !== "") {
+        if (header3 !== "") {
           if (!isHttp2Reply(reply)) {
             reply.header("Transfer-Encoding", "chunked");
           }
-          reply.header("Trailer", header.trim());
+          reply.header("Trailer", header3.trim());
         } else {
           reply[kReplyTrailers] = null;
         }
@@ -16242,35 +16242,35 @@ var require_forwarded = __commonJS({
       if (!req) {
         throw new TypeError("argument req is required");
       }
-      const header = req.headers["x-forwarded-for"];
+      const header3 = req.headers["x-forwarded-for"];
       const socketAddr = req.socket.remoteAddress;
-      if (!header || typeof header !== "string") {
+      if (!header3 || typeof header3 !== "string") {
         return [socketAddr];
-      } else if (header.indexOf(",") === -1) {
-        const remote = header.trim();
+      } else if (header3.indexOf(",") === -1) {
+        const remote = header3.trim();
         return remote.length ? [socketAddr, remote] : [socketAddr];
       } else {
-        return parse3(header, socketAddr);
+        return parse3(header3, socketAddr);
       }
     }
-    function parse3(header, socketAddr) {
+    function parse3(header3, socketAddr) {
       const result = [socketAddr];
-      let end = header.length;
+      let end = header3.length;
       let start2 = end;
       let char;
       let i;
       for (i = end - 1; i >= 0; --i) {
-        char = header[i];
+        char = header3[i];
         if (char === " " || char === "	") {
           start2 === end && (start2 = end = i);
         } else if (char === ",") {
-          start2 !== end && result.push(header.slice(start2, end));
+          start2 !== end && result.push(header3.slice(start2, end));
           start2 = end = i;
         } else {
           start2 = i;
         }
       }
-      start2 !== end && result.push(header.substring(start2, end));
+      start2 !== end && result.push(header3.substring(start2, end));
       return result;
     }
     module2.exports = forwarded;
@@ -17683,13 +17683,13 @@ var require_context = __commonJS({
       this.server = server;
     }
     function defaultSchemaErrorFormatter(errors, dataVar) {
-      let text = "";
+      let text2 = "";
       const separator = ", ";
       for (let i = 0; i !== errors.length; ++i) {
         const e = errors[i];
-        text += dataVar + (e.instancePath || "") + " " + e.message + separator;
+        text2 += dataVar + (e.instancePath || "") + " " + e.message + separator;
       }
-      return new Error(text.slice(0, -separator.length));
+      return new Error(text2.slice(0, -separator.length));
     }
     module2.exports = Context;
   }
@@ -17702,20 +17702,20 @@ var require_secure_json_parse = __commonJS({
     var hasBuffer = typeof Buffer !== "undefined";
     var suspectProtoRx = /"(?:_|\\u005[Ff])(?:_|\\u005[Ff])(?:p|\\u0070)(?:r|\\u0072)(?:o|\\u006[Ff])(?:t|\\u0074)(?:o|\\u006[Ff])(?:_|\\u005[Ff])(?:_|\\u005[Ff])"\s*:/;
     var suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/;
-    function _parse3(text, reviver, options) {
+    function _parse3(text2, reviver, options) {
       if (options == null) {
         if (reviver !== null && typeof reviver === "object") {
           options = reviver;
           reviver = void 0;
         }
       }
-      if (hasBuffer && Buffer.isBuffer(text)) {
-        text = text.toString();
+      if (hasBuffer && Buffer.isBuffer(text2)) {
+        text2 = text2.toString();
       }
-      if (text && text.charCodeAt(0) === 65279) {
-        text = text.slice(1);
+      if (text2 && text2.charCodeAt(0) === 65279) {
+        text2 = text2.slice(1);
       }
-      const obj = JSON.parse(text, reviver);
+      const obj = JSON.parse(text2, reviver);
       if (obj === null || typeof obj !== "object") {
         return obj;
       }
@@ -17725,15 +17725,15 @@ var require_secure_json_parse = __commonJS({
         return obj;
       }
       if (protoAction !== "ignore" && constructorAction !== "ignore") {
-        if (suspectProtoRx.test(text) === false && suspectConstructorRx.test(text) === false) {
+        if (suspectProtoRx.test(text2) === false && suspectConstructorRx.test(text2) === false) {
           return obj;
         }
       } else if (protoAction !== "ignore" && constructorAction === "ignore") {
-        if (suspectProtoRx.test(text) === false) {
+        if (suspectProtoRx.test(text2) === false) {
           return obj;
         }
       } else {
-        if (suspectConstructorRx.test(text) === false) {
+        if (suspectConstructorRx.test(text2) === false) {
           return obj;
         }
       }
@@ -17771,21 +17771,21 @@ var require_secure_json_parse = __commonJS({
       }
       return obj;
     }
-    function parse3(text, reviver, options) {
+    function parse3(text2, reviver, options) {
       const { stackTraceLimit } = Error;
       Error.stackTraceLimit = 0;
       try {
-        return _parse3(text, reviver, options);
+        return _parse3(text2, reviver, options);
       } finally {
         Error.stackTraceLimit = stackTraceLimit;
       }
     }
-    function safeParse3(text, reviver) {
+    function safeParse3(text2, reviver) {
       const { stackTraceLimit } = Error;
       Error.stackTraceLimit = 0;
       let result;
       try {
-        result = _parse3(text, reviver, { safe: true });
+        result = _parse3(text2, reviver, { safe: true });
       } catch {
         result = void 0;
       } finally {
@@ -22744,7 +22744,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -32927,7 +32927,7 @@ var require_core3 = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -40423,7 +40423,7 @@ var require_core5 = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -53370,13 +53370,13 @@ Content-Disposition: form-data`;
             yield textEncoder.encode(`${normalizeLinefeeds(value)}\r
 `);
           } else {
-            let header = `${prefix}; name="${escape2(normalizeLinefeeds(name))}"`;
-            value.name && (header += `; filename="${escape2(value.name)}"`);
-            header += `\r
+            let header3 = `${prefix}; name="${escape2(normalizeLinefeeds(name))}"`;
+            value.name && (header3 += `; filename="${escape2(value.name)}"`);
+            header3 += `\r
 Content-Type: ${value.type || "application/octet-stream"}\r
 \r
 `;
-            yield textEncoder.encode(header);
+            yield textEncoder.encode(header3);
             if (value.stream) {
               yield* value.stream();
             } else {
@@ -53548,14 +53548,14 @@ var require_request2 = __commonJS({
       if (payload && !payloadResume && !Object.hasOwn(this.headers, "content-length")) {
         this.headers["content-length"] = (Buffer.isBuffer(payload) ? payload.length : Buffer.byteLength(payload)).toString();
       }
-      for (const header of Object.keys(this.headers)) {
-        const rawValues = multiValueHeaders.get(header);
+      for (const header3 of Object.keys(this.headers)) {
+        const rawValues = multiValueHeaders.get(header3);
         if (rawValues !== void 0) {
           for (const value of rawValues) {
-            this.rawHeaders.push(header, value);
+            this.rawHeaders.push(header3, value);
           }
         } else {
-          this.rawHeaders.push(header, this.headers[header]);
+          this.rawHeaders.push(header3, this.headers[header3]);
         }
       }
       this._lightMyRequest = {
@@ -66241,12 +66241,12 @@ var require_helpers2 = __commonJS({
       const REQUIRE_TERMINATOR = "";
       highlightFn = require(`cardinal${REQUIRE_TERMINATOR}`).highlight;
     } catch {
-      highlightFn = (text) => {
+      highlightFn = (text2) => {
         if (!cardinalRecommended) {
           console.log("For nicer debug output consider install cardinal@^2.0.0");
           cardinalRecommended = true;
         }
-        return text;
+        return text2;
       };
     }
     function printDebugWithCode(msg, code) {
@@ -72865,17 +72865,17 @@ var require_query2 = __commonJS({
           }
           return this.done();
         }
-        let row;
+        let row2;
         try {
-          row = this._rowParser.next(packet, this._currentFields, this.options);
+          row2 = this._rowParser.next(packet, this._currentFields, this.options);
         } catch (err) {
           this._localStreamError = err;
           return this.doneInsert(null);
         }
         if (this.onResult) {
-          this._currentRows.push(row);
+          this._currentRows.push(row2);
         } else {
-          this.emit("result", row, this._resultIndex);
+          this.emit("result", row2, this._resultIndex);
         }
         return _Query.prototype.row;
       }
@@ -72899,12 +72899,12 @@ var require_query2 = __commonJS({
             stream.emit("end");
           }
         });
-        const onResult = (row, index) => {
+        const onResult = (row2, index) => {
           if (stream.destroyed) return;
-          if (!stream.push(row)) {
+          if (!stream.push(row2)) {
             this._connection && this._connection.pause();
           }
-          stream.emit("result", row, index);
+          stream.emit("result", row2, index);
         };
         const onFields = (fields) => {
           if (stream.destroyed) return;
@@ -73586,10 +73586,10 @@ var require_prepare = __commonJS({
         return _Prepare.prototype.prepareHeader;
       }
       prepareHeader(packet, connection) {
-        const header = new Packets.PreparedStatementHeader(packet);
-        this.id = header.id;
-        this.fieldCount = header.fieldCount;
-        this.parameterCount = header.parameterCount;
+        const header3 = new Packets.PreparedStatementHeader(packet);
+        this.id = header3.id;
+        this.fieldCount = header3.fieldCount;
+        this.parameterCount = header3.parameterCount;
         if (this.parameterCount > 0) {
           return _Prepare.prototype.readParameter;
         }
@@ -73871,8 +73871,8 @@ var require_binlog_dump2 = __commonJS({
           return null;
         }
         packet.readInt8();
-        const header = new BinlogEventHeader(packet);
-        const EventParser = eventParsers[header.eventType];
+        const header3 = new BinlogEventHeader(packet);
+        const EventParser = eventParsers[header3.eventType];
         let event;
         if (EventParser) {
           event = new EventParser(packet);
@@ -73881,7 +73881,7 @@ var require_binlog_dump2 = __commonJS({
             name: "UNKNOWN"
           };
         }
-        event.header = header;
+        event.header = header3;
         this.emit("event", event);
         return _BinlogDump.prototype.binlogData;
       }
@@ -74658,7 +74658,7 @@ var require_connection = __commonJS({
       writePacket(packet) {
         const MAX_PACKET_LENGTH = 16777215;
         const length = packet.length();
-        let chunk, offset, header;
+        let chunk, offset, header3;
         if (length < MAX_PACKET_LENGTH) {
           packet.writeHeader(this.sequenceId);
           if (this.config.debug) {
@@ -74683,9 +74683,9 @@ var require_connection = __commonJS({
           for (offset = 4; offset < 4 + length; offset += MAX_PACKET_LENGTH) {
             chunk = packet.buffer.slice(offset, offset + MAX_PACKET_LENGTH);
             if (chunk.length === MAX_PACKET_LENGTH) {
-              header = Buffer.from([255, 255, 255, this.sequenceId]);
+              header3 = Buffer.from([255, 255, 255, this.sequenceId]);
             } else {
-              header = Buffer.from([
+              header3 = Buffer.from([
                 chunk.length & 255,
                 chunk.length >> 8 & 255,
                 chunk.length >> 16 & 255,
@@ -74693,7 +74693,7 @@ var require_connection = __commonJS({
               ]);
             }
             this._bumpSequenceId(1);
-            this.write(header);
+            this.write(header3);
             this.write(chunk);
           }
         }
@@ -75280,10 +75280,10 @@ var require_connection = __commonJS({
       }
       writeTextResult(rows, columns, binary = false) {
         this.writeColumns(columns);
-        rows.forEach((row) => {
+        rows.forEach((row2) => {
           const arrayRow = new Array(columns.length);
           columns.forEach((column) => {
-            arrayRow.push(row[column.name]);
+            arrayRow.push(row2[column.name]);
           });
           if (binary) {
             this.writeBinaryRow(arrayRow);
@@ -79988,10 +79988,10 @@ function isValidJWT(token, algorithm = null) {
     const tokensParts = token.split(".");
     if (tokensParts.length !== 3)
       return false;
-    const [header] = tokensParts;
-    if (!header)
+    const [header3] = tokensParts;
+    if (!header3)
       return false;
-    const parsedHeader = JSON.parse(atob(header));
+    const parsedHeader = JSON.parse(atob(header3));
     if ("typ" in parsedHeader && parsedHeader?.typ !== "JWT")
       return false;
     if (!parsedHeader.alg)
@@ -86203,8 +86203,8 @@ function ko_default() {
 }
 
 // ../../node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -96570,6 +96570,53 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// src/services/checkoutCrypto.ts
+var import_node_crypto = require("node:crypto");
+var FORMAT_V1 = 1;
+var IV_BYTES = 12;
+var TAG_BYTES = 16;
+var KEY_BYTES = 32;
+var ORDER_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function parsePiiKey(base643) {
+  const key = Buffer.from(base643, "base64");
+  if (key.length !== KEY_BYTES || key.toString("base64") !== base643) {
+    throw new Error("CHECKOUT_PII_KEY must be 32 random bytes in base64");
+  }
+  return key;
+}
+function additionalData(orderNumber, field) {
+  return Buffer.from(`${orderNumber}|${field}`, "utf8");
+}
+function encryptPii(key, orderNumber, field, value) {
+  const iv = (0, import_node_crypto.randomBytes)(IV_BYTES);
+  const cipher = (0, import_node_crypto.createCipheriv)("aes-256-gcm", key, iv, {
+    authTagLength: TAG_BYTES
+  });
+  cipher.setAAD(additionalData(orderNumber, field));
+  const body = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  return Buffer.concat([
+    Buffer.from([FORMAT_V1]),
+    iv,
+    body,
+    cipher.getAuthTag()
+  ]);
+}
+function emailHmac(pepper, email3) {
+  return (0, import_node_crypto.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
+}
+function tokenHash(pepper, token) {
+  return (0, import_node_crypto.createHmac)("sha256", pepper).update(token, "utf8").digest();
+}
+function newAccessToken() {
+  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
+}
+function newOrderNumber(now) {
+  let tail = "";
+  for (let i = 0; i < 8; i += 1)
+    tail += ORDER_ALPHABET[(0, import_node_crypto.randomInt)(ORDER_ALPHABET.length)];
+  return `YEK-${now.getUTCFullYear()}-${tail}`;
+}
+
 // src/config.ts
 var CORS_ORIGINS = [
   "https://yekora.mx",
@@ -96591,9 +96638,77 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.7.6"),
-  GIT_SHA: external_exports.string().default("dev")
+  API_VERSION: external_exports.string().default("0.8.1"),
+  GIT_SHA: external_exports.string().default("dev"),
+  PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
+  SITE_URL: external_exports.url().default("https://yekora.mx"),
+  API_PUBLIC_URL: external_exports.url().default("https://apiv1.yekora.mx"),
+  STRIPE_SECRET_KEY: external_exports.string().optional(),
+  STRIPE_WEBHOOK_SECRET: external_exports.string().optional(),
+  MP_ACCESS_TOKEN: external_exports.string().optional(),
+  MP_WEBHOOK_SECRET: external_exports.string().optional(),
+  CHECKOUT_PII_KEY: external_exports.string().optional(),
+  CUSTOMER_EMAIL_HMAC_PEPPER: external_exports.string().optional(),
+  ORDER_TOKEN_PEPPER: external_exports.string().optional()
 });
+var KEY_PREFIXES = {
+  sandbox: { stripe: ["sk_test_", "rk_test_"], mercadoPago: ["TEST-"] },
+  live: { stripe: ["sk_live_", "rk_live_"], mercadoPago: ["APP_USR-"] }
+};
+function pair(name, a, b) {
+  if (!a && !b) return null;
+  if (!a || !b) throw new Error(`${name} needs both of its secrets or none`);
+  return [a, b];
+}
+function checkMode(name, key, prefixes) {
+  if (!prefixes.some((prefix) => key.startsWith(prefix))) {
+    throw new Error(`${name} does not match PAYMENTS_MODE`);
+  }
+}
+function loadPayments(parsed) {
+  const mode = parsed.PAYMENTS_MODE;
+  const prefixes = KEY_PREFIXES[mode];
+  const stripe = pair(
+    "Stripe",
+    parsed.STRIPE_SECRET_KEY,
+    parsed.STRIPE_WEBHOOK_SECRET
+  );
+  if (stripe) checkMode("STRIPE_SECRET_KEY", stripe[0], prefixes.stripe);
+  const mercadoPago = pair(
+    "Mercado Pago",
+    parsed.MP_ACCESS_TOKEN,
+    parsed.MP_WEBHOOK_SECRET
+  );
+  if (mercadoPago)
+    checkMode("MP_ACCESS_TOKEN", mercadoPago[0], prefixes.mercadoPago);
+  const key = parsed.CHECKOUT_PII_KEY;
+  const peppers = pair(
+    "The checkout",
+    parsed.CUSTOMER_EMAIL_HMAC_PEPPER,
+    parsed.ORDER_TOKEN_PEPPER
+  );
+  if (Boolean(key) !== Boolean(peppers)) {
+    throw new Error("The checkout needs its three secrets or none");
+  }
+  if (peppers?.some((pepper) => pepper.length < 32)) {
+    throw new Error("Checkout peppers must be at least 32 characters");
+  }
+  return {
+    mode,
+    siteUrl: parsed.SITE_URL.replace(/\/$/, ""),
+    apiUrl: parsed.API_PUBLIC_URL.replace(/\/$/, ""),
+    stripe: stripe && { apiKey: stripe[0], webhookSecret: stripe[1] },
+    mercadoPago: mercadoPago && {
+      accessToken: mercadoPago[0],
+      webhookSecret: mercadoPago[1]
+    },
+    checkout: key && peppers ? {
+      piiKey: parsePiiKey(key),
+      emailPepper: peppers[0],
+      tokenPepper: peppers[1]
+    } : null
+  };
+}
 function loadConfig(env2) {
   const parsed = schema.parse(env2);
   const isProduction = parsed.NODE_ENV === "production";
@@ -96613,7 +96728,8 @@ function loadConfig(env2) {
     },
     banxicoToken: parsed.BANXICO_TOKEN || void 0,
     version: parsed.API_VERSION,
-    sha: parsed.GIT_SHA
+    sha: parsed.GIT_SHA,
+    payments: loadPayments(parsed)
   };
 }
 
@@ -96705,8 +96821,8 @@ function stockStatus(stock) {
   if (stock <= 0) return "out_of_stock";
   return stock < LOW_STOCK ? "low_stock" : "available";
 }
-function quoteLine(line, row, lang3) {
-  if (!row) {
+function quoteLine(line, row2, lang4) {
+  if (!row2) {
     return {
       quoted: {
         sku: line.sku,
@@ -96724,8 +96840,8 @@ function quoteLine(line, row, lang3) {
       warning: "unavailable"
     };
   }
-  const unit = Number(row.price_mxn_cents);
-  const stock = Number(row.stock);
+  const unit = Number(row2.price_mxn_cents);
+  const stock = Number(row2.stock);
   const total = unit * line.quantity;
   const { base, tax } = splitVat(total);
   const status = stockStatus(stock);
@@ -96735,9 +96851,9 @@ function quoteLine(line, row, lang3) {
   else if (!purchasable) warning = "insufficient_stock";
   return {
     quoted: {
-      sku: row.sku,
-      slug: row.slug,
-      name: lang3 === "en" ? row.name_en : row.name_es,
+      sku: row2.sku,
+      slug: row2.slug,
+      name: lang4 === "en" ? row2.name_en : row2.name_es,
       quantity: line.quantity,
       unitPriceMxnCents: unit,
       lineTotalMxnCents: total,
@@ -96751,8 +96867,8 @@ function quoteLine(line, row, lang3) {
     counted: purchasable ? { base, tax, total } : void 0
   };
 }
-function buildQuote(lines, rows, rate, lang3, shipping = null) {
-  const bySku = new Map(rows.map((row) => [row.sku, row]));
+function buildQuote(lines, rows, rate, lang4, shipping = null) {
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
   const items = [];
   const warnings = [];
   const summary = {
@@ -96765,7 +96881,7 @@ function buildQuote(lines, rows, rate, lang3, shipping = null) {
     const { quoted, warning, counted } = quoteLine(
       line,
       bySku.get(line.sku),
-      lang3
+      lang4
     );
     items.push(quoted);
     if (warning) warnings.push({ sku: line.sku, code: warning });
@@ -96804,32 +96920,32 @@ function buildQuote(lines, rows, rate, lang3, shipping = null) {
 async function readProducts(db, lines) {
   if (lines.length === 0) return [];
   return db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
     [lines.map((line) => line.sku)]
   );
 }
-async function quoteCart(db, lines, rate, lang3) {
-  return buildQuote(lines, await readProducts(db, lines), rate, lang3);
+async function quoteCart(db, lines, rate, lang4) {
+  return buildQuote(lines, await readProducts(db, lines), rate, lang4);
 }
-async function quoteCartToDestination(db, lines, rate, lang3, destination, provider) {
+async function quoteCartToDestination(db, lines, rate, lang4, destination, provider) {
   const rows = await readProducts(db, lines);
-  const products = buildQuote(lines, rows, rate, lang3);
+  const products = buildQuote(lines, rows, rate, lang4);
   if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
     return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
   }
-  const bySku = new Map(rows.map((row) => [row.sku, row]));
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
   const shipment = await provider.quote({
     stateCode: destination.stateCode,
     itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
     lines: lines.map((line) => {
-      const row = bySku.get(line.sku);
+      const row2 = bySku.get(line.sku);
       return {
         quantity: line.quantity,
-        weightGrams: Number(row.weight_grams),
-        lengthMm: Number(row.length_mm),
-        widthMm: Number(row.width_mm),
-        heightMm: Number(row.height_mm),
-        classId: Number(row.shipping_class_id)
+        weightGrams: Number(row2.weight_grams),
+        lengthMm: Number(row2.length_mm),
+        widthMm: Number(row2.width_mm),
+        heightMm: Number(row2.height_mm),
+        classId: Number(row2.shipping_class_id)
       };
     })
   });
@@ -96849,7 +96965,7 @@ async function quoteCartToDestination(db, lines, rate, lang3, destination, provi
     total: 0,
     remaining: null
   };
-  return { ok: true, quote: buildQuote(lines, rows, rate, lang3, shipping) };
+  return { ok: true, quote: buildQuote(lines, rows, rate, lang4, shipping) };
 }
 
 // src/routes/cart.ts
@@ -96956,20 +97072,20 @@ var listQuery = external_exports.object({
   page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
   pageSize: external_exports.coerce.number().int().min(1).max(48).default(24)
 });
-function present(row, language, fix) {
+function present(row2, language, fix) {
   const english = language === "en";
   return {
-    sku: row.sku,
-    slug: row.slug,
-    name: english ? row.name_en : row.name_es,
-    description: english ? row.description_en : row.description_es,
-    discipline: row.discipline,
-    disciplineName: english ? row.discipline_name_en : row.discipline_name_es,
-    level: row.level,
-    levelName: english ? row.level_name_en : row.level_name_es,
-    priceMxnCents: Number(row.price_mxn_cents),
-    priceUsdCents: usdCents(Number(row.price_mxn_cents), fix),
-    inStock: Number(row.stock) > 0
+    sku: row2.sku,
+    slug: row2.slug,
+    name: english ? row2.name_en : row2.name_es,
+    description: english ? row2.description_en : row2.description_es,
+    discipline: row2.discipline,
+    disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
+    level: row2.level,
+    levelName: english ? row2.level_name_en : row2.level_name_es,
+    priceMxnCents: Number(row2.price_mxn_cents),
+    priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
+    inStock: Number(row2.stock) > 0
   };
 }
 function registerCatalogRoutes(app, deps) {
@@ -96989,7 +97105,7 @@ function registerCatalogRoutes(app, deps) {
     ]);
     const fix = rate ? Number(rate.rate) : null;
     return {
-      items: items.map((row) => present(row, query.lang, fix)),
+      items: items.map((row2) => present(row2, query.lang, fix)),
       page: query.page,
       pageSize: query.pageSize,
       total,
@@ -97021,6 +97137,376 @@ function registerCatalogRoutes(app, deps) {
   });
 }
 
+// ../../lib/cart/mxStates.ts
+var MEXICAN_STATES = [
+  { code: "AGU", es: "Aguascalientes", en: "Aguascalientes" },
+  { code: "BCN", es: "Baja California", en: "Baja California" },
+  { code: "BCS", es: "Baja California Sur", en: "Baja California Sur" },
+  { code: "CAM", es: "Campeche", en: "Campeche" },
+  { code: "CHP", es: "Chiapas", en: "Chiapas" },
+  { code: "CHH", es: "Chihuahua", en: "Chihuahua" },
+  { code: "CMX", es: "Ciudad de M\xE9xico", en: "Mexico City" },
+  { code: "COA", es: "Coahuila", en: "Coahuila" },
+  { code: "COL", es: "Colima", en: "Colima" },
+  { code: "DUR", es: "Durango", en: "Durango" },
+  { code: "MEX", es: "Estado de M\xE9xico", en: "State of Mexico" },
+  { code: "GUA", es: "Guanajuato", en: "Guanajuato" },
+  { code: "GRO", es: "Guerrero", en: "Guerrero" },
+  { code: "HID", es: "Hidalgo", en: "Hidalgo" },
+  { code: "JAL", es: "Jalisco", en: "Jalisco" },
+  { code: "MIC", es: "Michoac\xE1n", en: "Michoac\xE1n" },
+  { code: "MOR", es: "Morelos", en: "Morelos" },
+  { code: "NAY", es: "Nayarit", en: "Nayarit" },
+  { code: "NLE", es: "Nuevo Le\xF3n", en: "Nuevo Le\xF3n" },
+  { code: "OAX", es: "Oaxaca", en: "Oaxaca" },
+  { code: "PUE", es: "Puebla", en: "Puebla" },
+  { code: "QUE", es: "Quer\xE9taro", en: "Quer\xE9taro" },
+  { code: "ROO", es: "Quintana Roo", en: "Quintana Roo" },
+  { code: "SLP", es: "San Luis Potos\xED", en: "San Luis Potos\xED" },
+  { code: "SIN", es: "Sinaloa", en: "Sinaloa" },
+  { code: "SON", es: "Sonora", en: "Sonora" },
+  { code: "TAB", es: "Tabasco", en: "Tabasco" },
+  { code: "TAM", es: "Tamaulipas", en: "Tamaulipas" },
+  { code: "TLA", es: "Tlaxcala", en: "Tlaxcala" },
+  { code: "VER", es: "Veracruz", en: "Veracruz" },
+  { code: "YUC", es: "Yucat\xE1n", en: "Yucat\xE1n" },
+  { code: "ZAC", es: "Zacatecas", en: "Zacatecas" }
+];
+
+// ../../lib/checkout/checkoutTypes.ts
+var PAYMENT_METHOD_CODES = [
+  "CARD",
+  "OXXO",
+  "SPEI",
+  "MERCADO_PAGO_BALANCE"
+];
+var STATE_CODES = new Set(MEXICAN_STATES.map((state) => state.code));
+var text = (max) => external_exports.string().trim().min(1).max(max);
+var customerSchema = external_exports.strictObject({
+  name: external_exports.string().trim().min(3).max(120),
+  // Trimmed first, then checked as an e-mail (Zod 4 format schema).
+  email: external_exports.string().trim().pipe(external_exports.email().max(254)),
+  phone: external_exports.string().regex(/^\d{10}$/, "Phone must be 10 digits")
+});
+var shippingAddressSchema = external_exports.strictObject({
+  street: text(120),
+  exteriorNumber: text(20),
+  interiorNumber: external_exports.string().trim().max(20).optional(),
+  neighborhood: text(120),
+  municipality: text(120),
+  stateCode: external_exports.string().refine((code) => STATE_CODES.has(code), "Unknown Mexican state"),
+  postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits"),
+  references: external_exports.string().trim().max(200).optional()
+});
+var checkoutRequestSchema = external_exports.strictObject({
+  items: cartLinesSchema,
+  method: external_exports.enum(PAYMENT_METHOD_CODES),
+  customer: customerSchema,
+  address: shippingAddressSchema,
+  privacyConsent: external_exports.boolean(),
+  /** Total with shipping the buyer saw, MXN cents: compared, never charged. */
+  expectedTotalMxnCents: external_exports.number().int().nonnegative()
+});
+var checkoutSessionSchema = external_exports.object({
+  orderNumber: external_exports.string(),
+  /** Order access token: kept by the browser for the return page, never sent to a processor. */
+  accessToken: external_exports.string(),
+  /** Hosted payment page (Stripe or Mercado Pago). */
+  redirectUrl: external_exports.url(),
+  /** End of the stock reservation, ISO 8601. */
+  expiresAt: external_exports.string(),
+  totalMxnCents: external_exports.number().int().positive()
+});
+var ORDER_STATUS_CODES = [
+  "PENDING_PAYMENT",
+  "PAID",
+  "EXPIRED",
+  "CANCELLED",
+  "REFUNDED",
+  "NEEDS_REVIEW"
+];
+var orderViewSchema = external_exports.object({
+  orderNumber: external_exports.string(),
+  status: external_exports.enum(ORDER_STATUS_CODES),
+  method: external_exports.enum(PAYMENT_METHOD_CODES),
+  itemsTotalMxnCents: external_exports.number().int().nonnegative(),
+  shippingTotalMxnCents: external_exports.number().int().nonnegative(),
+  totalMxnCents: external_exports.number().int().positive(),
+  /** End of the payment window, ISO 8601. */
+  expiresAt: external_exports.string(),
+  /** When the payment was settled, ISO 8601, or null. */
+  paidAt: external_exports.string().nullable()
+});
+var CHECKOUT_RETURN_PATHS = {
+  "es-MX": { success: "/checkout/exito/", cancel: "/checkout/cancelado/" },
+  en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
+};
+
+// src/services/checkout.ts
+var PROCESSOR_OF = {
+  CARD: "STRIPE",
+  OXXO: "STRIPE",
+  SPEI: "MERCADO_PAGO",
+  MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
+};
+var refuse = (status, code) => ({ ok: false, status, code });
+function affected(result) {
+  return result.affectedRows;
+}
+async function expireOverdueOrders(db, now) {
+  return db.transaction(async (tx) => {
+    const overdue = await tx.query(
+      "SELECT id FROM orders WHERE status_id = 1 AND expires_at < ? FOR UPDATE",
+      [now]
+    );
+    if (overdue.length === 0) return 0;
+    const ids = overdue.map((row2) => row2.id);
+    await tx.query(
+      "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
+      [ids]
+    );
+    await tx.query(
+      "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
+      [ids]
+    );
+    return ids.length;
+  });
+}
+var InsufficientStock = class extends Error {
+};
+async function reserveLines(tx, lines) {
+  const reserved = await Promise.all(
+    lines.map(async (line) => {
+      const result = await tx.query(
+        "UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?",
+        [line.quantity, line.sku, line.quantity]
+      );
+      if (affected(result) !== 1) return null;
+      const [row2] = await tx.query(
+        "SELECT id FROM products WHERE sku = ?",
+        [line.sku]
+      );
+      return [line.sku, row2.id];
+    })
+  );
+  if (reserved.includes(null)) throw new InsufficientStock();
+  return new Map(reserved);
+}
+async function cancelOrder(db, orderId) {
+  await db.transaction(async (tx) => {
+    const result = await tx.query(
+      "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
+      [orderId]
+    );
+    if (affected(result) !== 1) return;
+    await tx.query(
+      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
+      [orderId]
+    );
+  });
+}
+function methodOf(body) {
+  const method = body?.method;
+  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
+}
+function admit(deps, body) {
+  const method = methodOf(body);
+  if (method === null) return refuse(400, "INVALID_REQUEST");
+  const processorCode = PROCESSOR_OF[method];
+  const processor = deps.processors[processorCode];
+  const secrets = deps.payments.checkout;
+  if (processor === void 0 || secrets === null) {
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
+  const parsed = checkoutRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const buyerData = parsed.error.issues.some(
+      (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
+    );
+    return refuse(
+      400,
+      buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
+    );
+  }
+  if (!parsed.data.privacyConsent) {
+    return refuse(400, "PRIVACY_CONSENT_REQUIRED");
+  }
+  return { request: parsed.data, method, processorCode, processor, secrets };
+}
+async function price(deps, request, lang4) {
+  const quoted = await quoteCartToDestination(
+    deps.db,
+    request.items,
+    await deps.rate(),
+    lang4,
+    {
+      stateCode: request.address.stateCode,
+      postalCode: request.address.postalCode
+    },
+    deps.shipping
+  );
+  if (!quoted.ok) {
+    return refuse(
+      400,
+      quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
+    );
+  }
+  const { shippingCode, totalMxnCents } = quoted.quote.summary;
+  if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
+    return refuse(400, "UNSERVICEABLE_DESTINATION");
+  }
+  if (totalMxnCents !== request.expectedTotalMxnCents) {
+    return refuse(409, "PRICE_CHANGED");
+  }
+  return quoted.quote;
+}
+async function persist(deps, admitted, quote, order) {
+  const { request, secrets } = admitted;
+  const { customer, address } = request;
+  const summary = quote.summary;
+  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
+  try {
+    return await deps.db.transaction(async (tx) => {
+      const productIds = await reserveLines(tx, request.items);
+      const inserted = await tx.query(
+        "INSERT INTO orders (order_number, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
+        [
+          order.orderNumber,
+          order.methodId,
+          summary.itemsBaseMxnCents,
+          summary.itemsTaxMxnCents,
+          summary.itemsTotalMxnCents,
+          summary.shippingBaseMxnCents,
+          summary.shippingTaxMxnCents,
+          summary.shippingTotalMxnCents,
+          summary.totalMxnCents,
+          seal("customer_name", customer.name),
+          seal("customer_email", customer.email),
+          seal("customer_phone", customer.phone),
+          seal("shipping_address", JSON.stringify(address)),
+          emailHmac(secrets.emailPepper, customer.email),
+          tokenHash(secrets.tokenPepper, order.accessToken),
+          order.now,
+          order.expiresAt,
+          deps.payments.mode === "sandbox" ? 1 : 0,
+          address.stateCode
+        ]
+      );
+      const id = inserted.insertId;
+      await tx.query(
+        "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
+        [
+          quote.items.map((item) => [
+            id,
+            productIds.get(item.sku),
+            item.sku,
+            item.quantity,
+            item.unitPriceMxnCents,
+            item.lineBaseMxnCents,
+            item.lineTaxMxnCents,
+            item.lineTotalMxnCents
+          ])
+        ]
+      );
+      return id;
+    });
+  } catch (error62) {
+    if (error62 instanceof InsufficientStock) {
+      return refuse(409, "INSUFFICIENT_STOCK");
+    }
+    throw error62;
+  }
+}
+async function createCheckout(deps, body, lang4) {
+  const admitted = admit(deps, body);
+  if ("ok" in admitted) return admitted;
+  const now = deps.now();
+  await expireOverdueOrders(deps.db, now);
+  const quote = await price(deps, admitted.request, lang4);
+  if ("ok" in quote) return quote;
+  const [methodRow] = await deps.db.query(
+    "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
+    [admitted.method]
+  );
+  if (methodRow === void 0) return refuse(503, "SERVICE_UNAVAILABLE");
+  const order = {
+    orderNumber: newOrderNumber(now),
+    accessToken: newAccessToken(),
+    methodId: methodRow.id,
+    now,
+    expiresAt: new Date(
+      now.getTime() + Number(methodRow.hold_minutes) * 6e4
+    )
+  };
+  const orderId = await persist(deps, admitted, quote, order);
+  if (typeof orderId !== "number") return orderId;
+  const paths = CHECKOUT_RETURN_PATHS[lang4];
+  const webhook = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
+  const total = quote.summary.totalMxnCents;
+  try {
+    const session = await admitted.processor.createSession({
+      orderNumber: order.orderNumber,
+      method: admitted.method,
+      totalMxnCents: total,
+      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
+      expiresAt: order.expiresAt,
+      now,
+      successUrl: `${deps.payments.siteUrl}${paths.success}`,
+      cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
+      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook}`
+    });
+    await deps.db.query(
+      "UPDATE orders SET processor_reference = ? WHERE id = ?",
+      [session.reference, orderId]
+    );
+    return {
+      ok: true,
+      session: {
+        orderNumber: order.orderNumber,
+        accessToken: order.accessToken,
+        redirectUrl: session.redirectUrl,
+        expiresAt: order.expiresAt.toISOString(),
+        totalMxnCents: total
+      }
+    };
+  } catch {
+    await cancelOrder(deps.db, orderId);
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
+}
+
+// src/routes/checkout.ts
+var lang3 = external_exports.enum(["es-MX", "en"]).default("es-MX");
+var TITLES = {
+  INVALID_REQUEST: "Invalid checkout request",
+  SERVICE_UNAVAILABLE: "Payments unavailable",
+  INVALID_SHIPPING_ADDRESS: "Invalid shipping address",
+  PRIVACY_CONSENT_REQUIRED: "Privacy consent required",
+  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
+  UNSERVICEABLE_DESTINATION: "Destination not served",
+  PRICE_CHANGED: "Prices changed",
+  INSUFFICIENT_STOCK: "Insufficient stock"
+};
+function registerCheckoutRoutes(app, deps) {
+  app.post(
+    "/v1/checkout",
+    {
+      bodyLimit: 16 * 1024,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } }
+    },
+    async (request, reply) => {
+      const language = lang3.safeParse(
+        request.query.lang
+      );
+      const outcome = language.success ? await createCheckout(deps, request.body, language.data) : { ok: false, status: 400, code: "INVALID_REQUEST" };
+      if (!outcome.ok) {
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES[outcome.code], outcome.code));
+      }
+      return reply.code(201).send(checkoutSessionSchema.parse(outcome.session));
+    }
+  );
+}
+
 // src/routes/exchangeRate.ts
 function registerExchangeRateRoute(app, rate) {
   app.get("/v1/exchange-rate", async (_request, reply) => {
@@ -97036,6 +97522,383 @@ function registerExchangeRateRoute(app, rate) {
     }
     return current;
   });
+}
+
+// src/routes/orders.ts
+var import_node_crypto2 = require("node:crypto");
+var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
+var BEARER = /^Bearer ([\w-]{43})$/;
+function registerOrderRoutes(app, deps) {
+  app.get(
+    "/v1/orders/:order_number",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+      const secrets = deps.payments.checkout;
+      if (secrets === null) {
+        return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
+      }
+      const { order_number: orderNumber } = request.params;
+      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
+      if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
+        return notFound();
+      await expireOverdueOrders(deps.db, deps.now());
+      const [row2] = await deps.db.query(
+        "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+        [orderNumber]
+      );
+      if (row2 === void 0 || !(0, import_node_crypto2.timingSafeEqual)(
+        Buffer.from(row2.access_token_hash),
+        tokenHash(secrets.tokenPepper, token)
+      )) {
+        return notFound();
+      }
+      return orderViewSchema.parse({
+        orderNumber: row2.order_number,
+        status: row2.status,
+        method: row2.method,
+        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
+        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
+        totalMxnCents: Number(row2.total_mxn_cents),
+        expiresAt: new Date(row2.expires_at).toISOString(),
+        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
+      });
+    }
+  );
+}
+
+// src/services/settlement.ts
+var row = (code, nextStatusId, alert, sellsStock = false) => ({
+  code,
+  httpStatus: code === "STATE_CONFLICT_ANOMALY" ? 500 : 200,
+  nextStatusId,
+  alert,
+  sellsStock
+});
+var CONFLICT = row("STATE_CONFLICT_ANOMALY", null, true);
+var T1_4 = {
+  "100": row("ORDER_PAID", 2, false, true),
+  "010": row("ALREADY_PAID", null, false),
+  "001": row("LATE_PAYMENT_NEEDS_REVIEW", 6, true),
+  "000": row("PAYMENT_NEEDS_REVIEW_ALERT", null, true),
+  "110": CONFLICT,
+  "101": CONFLICT,
+  "011": CONFLICT,
+  "111": CONFLICT
+};
+function settle2(pending, sameSettled, late) {
+  return T1_4[`${Number(pending)}${Number(sameSettled)}${Number(late)}`];
+}
+
+// src/services/webhooks.ts
+var PROCESSOR_ID = {
+  STRIPE: 1,
+  MERCADO_PAGO: 2
+};
+var SETTLING_TYPES = {
+  STRIPE: [
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded"
+  ],
+  MERCADO_PAGO: ["payment"]
+};
+var STATUS = { PENDING: 1, PAID: 2, EXPIRED: 3, CANCELLED: 4 };
+async function recordEvent(tx, record2) {
+  const { payment, order } = record2.reconciliation;
+  try {
+    await tx.query(
+      "INSERT INTO payment_events (processor_id, event_id, event_type, order_id, processor_status, amount_mxn_cents, currency, resulting_status_id, is_alert, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        record2.processorId,
+        record2.event.eventId,
+        record2.event.type,
+        order?.id ?? null,
+        payment?.processorStatus ?? null,
+        payment?.amountMxnCents ?? null,
+        payment?.currency ?? null,
+        record2.resultingStatusId,
+        record2.alert ? 1 : 0,
+        record2.isTest ? 1 : 0
+      ]
+    );
+  } catch (error62) {
+    if (error62.code === "ER_DUP_ENTRY") return false;
+    throw error62;
+  }
+  return true;
+}
+async function reconcile(deps, code, processor, event) {
+  if (event.resourceId === null || !SETTLING_TYPES[code].includes(event.type)) {
+    return { payment: null, order: null, confirmed: false };
+  }
+  const payment = await processor.fetchPayment(event.resourceId);
+  const [order] = await deps.db.query(
+    "SELECT o.id, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ?",
+    [payment.orderNumber, PROCESSOR_ID[code]]
+  );
+  const confirmed = payment.paid && order !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order.total_mxn_cents);
+  return { payment, order: order ?? null, confirmed };
+}
+function settleOrder(deps, base, order) {
+  const resourceId = base.event.resourceId;
+  return deps.db.transaction(async (tx) => {
+    const [current] = await tx.query(
+      "SELECT status_id, payment_resource_id FROM orders WHERE id = ? FOR UPDATE",
+      [order.id]
+    );
+    const status = Number(current.status_id);
+    const row2 = settle2(
+      status === STATUS.PENDING,
+      status === STATUS.PAID && current.payment_resource_id === resourceId,
+      status === STATUS.EXPIRED || status === STATUS.CANCELLED
+    );
+    const recorded = await recordEvent(tx, {
+      ...base,
+      resultingStatusId: row2.nextStatusId ?? status,
+      alert: row2.alert
+    });
+    if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
+    if (row2.nextStatusId !== null) {
+      await tx.query(
+        "UPDATE orders SET status_id = ?, paid_at = ?, payment_resource_id = ? WHERE id = ?",
+        [row2.nextStatusId, deps.now(), resourceId, order.id]
+      );
+    }
+    if (row2.sellsStock) {
+      await tx.query(
+        "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity, p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
+        [order.id]
+      );
+    }
+    return { status: row2.httpStatus, code: row2.code };
+  });
+}
+async function receiveWebhook(deps, code, input2) {
+  const processor = deps.processors[code];
+  if (processor === void 0) {
+    return { status: 503, code: "SERVICE_UNAVAILABLE" };
+  }
+  const event = processor.verifyWebhook({ ...input2, now: deps.now() });
+  if (event === null) return { status: 401, code: "INVALID_SIGNATURE" };
+  const processorId = PROCESSOR_ID[code];
+  const [seen] = await deps.db.query(
+    "SELECT id FROM payment_events WHERE processor_id = ? AND event_id = ?",
+    [processorId, event.eventId]
+  );
+  if (seen !== void 0) return { status: 200, code: "IDEMPOTENT_IGNORED" };
+  let reconciliation;
+  try {
+    reconciliation = await reconcile(deps, code, processor, event);
+  } catch {
+    return { status: 503, code: "SERVICE_UNAVAILABLE" };
+  }
+  const base = {
+    processorId,
+    event,
+    reconciliation,
+    isTest: deps.payments.mode === "sandbox"
+  };
+  if (!reconciliation.confirmed) {
+    const recorded = await deps.db.transaction(
+      (tx) => recordEvent(tx, {
+        ...base,
+        resultingStatusId: null,
+        // Paid but matching no order of ours, or another amount or currency: someone must look.
+        alert: reconciliation.payment?.paid === true
+      })
+    );
+    return recorded ? { status: 200, code: "PAYMENT_UNCONFIRMED" } : { status: 200, code: "IDEMPOTENT_IGNORED" };
+  }
+  return settleOrder(deps, base, reconciliation.order);
+}
+
+// src/routes/webhooks.ts
+var ROUTES = [
+  ["stripe", "STRIPE"],
+  ["mercadopago", "MERCADO_PAGO"]
+];
+var TITLES2 = {
+  INVALID_SIGNATURE: "Invalid signature",
+  SERVICE_UNAVAILABLE: "Payments unavailable",
+  STATE_CONFLICT_ANOMALY: "Order state conflict"
+};
+async function registerWebhookRoutes(app, deps) {
+  await app.register((scope, _options, done) => {
+    scope.removeAllContentTypeParsers();
+    scope.addContentTypeParser(
+      "*",
+      { parseAs: "buffer", bodyLimit: 64 * 1024 },
+      (_request, body, done2) => done2(null, body)
+    );
+    for (const [path, code] of ROUTES) {
+      scope.post(`/v1/webhooks/${path}`, async (request, reply) => {
+        const outcome = await receiveWebhook(deps, code, {
+          rawBody: request.body ?? Buffer.alloc(0),
+          headers: request.headers,
+          query: request.query
+        });
+        if (outcome.status === 200) return { code: outcome.code };
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES2[outcome.code], outcome.code));
+      });
+    }
+    done();
+  });
+}
+
+// src/services/mercadoPagoAdapter.ts
+var import_node_crypto3 = require("node:crypto");
+
+// src/services/paymentPort.ts
+var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
+var PaymentProcessorError = class extends Error {
+  /**
+   * @param message - Safe description (processor and HTTP status at most).
+   */
+  constructor(message) {
+    super(message);
+    this.name = "PaymentProcessorError";
+  }
+};
+function remoteDeadline(expiresAt) {
+  return new Date(expiresAt.getTime() - REMOTE_EXPIRY_MARGIN_MS);
+}
+
+// src/services/mercadoPagoAdapter.ts
+var MP_API = "https://api.mercadopago.com";
+var TIMEOUT_MS = 1e4;
+var PAYMENT_TYPES = [
+  "credit_card",
+  "debit_card",
+  "prepaid_card",
+  "ticket",
+  "atm",
+  "bank_transfer",
+  "account_money",
+  "digital_currency"
+];
+var TYPE_OF = {
+  SPEI: "bank_transfer",
+  MERCADO_PAGO_BALANCE: "account_money"
+};
+function header(headers, name) {
+  const value = headers[name];
+  return (Array.isArray(value) ? value[0] : value) ?? "";
+}
+function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
+  async function call(path, init) {
+    const answer = await fetchImpl(`${MP_API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${secrets.accessToken}`,
+        "Content-Type": "application/json"
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!answer.ok) {
+      throw new PaymentProcessorError(`Mercado Pago: HTTP ${answer.status}`);
+    }
+    return answer.json();
+  }
+  return {
+    async createSession(request) {
+      const type = TYPE_OF[request.method];
+      if (type === void 0) {
+        throw new PaymentProcessorError(
+          `Mercado Pago: unsupported method ${request.method}`
+        );
+      }
+      const remoteExpiresAt = remoteDeadline(request.expiresAt);
+      if (remoteExpiresAt <= request.now) {
+        throw new PaymentProcessorError(
+          "Mercado Pago: the order hold is too short"
+        );
+      }
+      const until = remoteExpiresAt.toISOString();
+      const body = await call("/checkout/preferences", {
+        method: "POST",
+        body: JSON.stringify({
+          items: [
+            {
+              id: request.orderNumber,
+              title: request.description,
+              quantity: 1,
+              currency_id: "MXN",
+              unit_price: request.totalMxnCents / 100
+            }
+          ],
+          external_reference: request.orderNumber,
+          back_urls: {
+            success: request.successUrl,
+            pending: request.successUrl,
+            failure: request.cancelUrl
+          },
+          auto_return: "approved",
+          notification_url: request.notificationUrl,
+          expires: true,
+          expiration_date_from: request.now.toISOString(),
+          expiration_date_to: until,
+          date_of_expiration: until,
+          payment_methods: {
+            excluded_payment_types: PAYMENT_TYPES.filter((t) => t !== type).map(
+              (id) => ({ id })
+            ),
+            installments: 1
+          }
+        })
+      });
+      if (typeof body.id !== "string" || typeof body.init_point !== "string") {
+        throw new PaymentProcessorError(
+          "Mercado Pago: unexpected preference answer"
+        );
+      }
+      return {
+        reference: body.id,
+        redirectUrl: body.init_point,
+        remoteExpiresAt
+      };
+    },
+    verifyWebhook({ rawBody, headers, query }) {
+      const parts = header(headers, "x-signature").split(",").map((part) => part.trim().split("=", 2));
+      const ts = parts.find(([key]) => key === "ts")?.[1] ?? "";
+      const given = parts.find(([key]) => key === "v1")?.[1] ?? "";
+      const requestId = header(headers, "x-request-id");
+      const dataId = (query["data.id"] ?? "").toLowerCase();
+      if (ts === "" || requestId === "" || dataId === "") return null;
+      const expected = (0, import_node_crypto3.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const received = Buffer.from(given, "hex");
+      if (received.length !== expected.length || !(0, import_node_crypto3.timingSafeEqual)(received, expected)) {
+        return null;
+      }
+      let event;
+      try {
+        event = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        return null;
+      }
+      let type = "unknown";
+      if (typeof event.type === "string") type = event.type;
+      else if (typeof event.action === "string") type = event.action;
+      const eventId = typeof event.id === "string" || typeof event.id === "number" ? String(event.id) : `${type}:${dataId}`;
+      return { eventId, type, resourceId: dataId };
+    },
+    async fetchPayment(paymentId) {
+      const payment = await call(
+        `/v1/payments/${encodeURIComponent(paymentId)}`,
+        {
+          method: "GET"
+        }
+      );
+      const status = typeof payment.status === "string" ? payment.status : "unknown";
+      const amount = typeof payment.transaction_amount === "number" && Number.isFinite(payment.transaction_amount) ? Math.round(payment.transaction_amount * 100) : null;
+      return {
+        paid: status === "approved",
+        amountMxnCents: amount,
+        currency: typeof payment.currency_id === "string" ? payment.currency_id.toUpperCase() : null,
+        orderNumber: typeof payment.external_reference === "string" ? payment.external_reference : null,
+        processorStatus: status
+      };
+    }
+  };
 }
 
 // src/services/dimensioning.ts
@@ -97124,16 +97987,16 @@ function evaluateShipping(config2, rules, facts) {
 }
 
 // src/services/shippingRates.ts
-function toRule(row) {
+function toRule(row2) {
   return {
-    id: row.id,
-    zoneId: row.zone_id,
-    classId: row.shipping_class_id,
-    minWeightGrams: row.min_weight_grams,
-    maxWeightGrams: row.max_weight_grams,
-    minItemsTotalMxnCents: row.min_items_total_mxn_cents,
-    maxItemsTotalMxnCents: row.max_items_total_mxn_cents,
-    rateMxnCents: row.rate_mxn_cents
+    id: row2.id,
+    zoneId: row2.zone_id,
+    classId: row2.shipping_class_id,
+    minWeightGrams: row2.min_weight_grams,
+    maxWeightGrams: row2.max_weight_grams,
+    minItemsTotalMxnCents: row2.min_items_total_mxn_cents,
+    maxItemsTotalMxnCents: row2.max_items_total_mxn_cents,
+    rateMxnCents: row2.rate_mxn_cents
   };
 }
 function createTableRateProvider(db) {
@@ -97145,20 +98008,20 @@ function createTableRateProvider(db) {
       );
       if (zone === void 0)
         return { serviceable: false, code: "INVALID_DESTINATION" };
-      const [row] = await db.query(
+      const [row2] = await db.query(
         `SELECT s.id AS strategy_id, s.code AS strategy, c.is_free_shipping_active,
            c.free_shipping_threshold_mxn_cents
          FROM shipping_configs c
          JOIN shipping_strategies s ON s.id = c.active_strategy_id
          WHERE c.id = 1 AND s.is_active = 1`
       );
-      if (row === void 0) {
+      if (row2 === void 0) {
         return { serviceable: false, code: "UNSERVICEABLE_DESTINATION" };
       }
       const config2 = {
-        strategy: row.strategy,
-        freeShippingActive: row.is_free_shipping_active === 1,
-        freeShippingThresholdMxnCents: row.free_shipping_threshold_mxn_cents
+        strategy: row2.strategy,
+        freeShippingActive: row2.is_free_shipping_active === 1,
+        freeShippingThresholdMxnCents: row2.free_shipping_threshold_mxn_cents
       };
       const [classes, rules] = await Promise.all([
         db.query(
@@ -97168,7 +98031,7 @@ function createTableRateProvider(db) {
           `SELECT id, zone_id, shipping_class_id, min_weight_grams, max_weight_grams,
              min_items_total_mxn_cents, max_items_total_mxn_cents, rate_mxn_cents
            FROM shipping_rules WHERE strategy_id = ? AND is_active = 1`,
-          [row.strategy_id]
+          [row2.strategy_id]
         )
       ]);
       return evaluateShipping(config2, rules.map(toRule), {
@@ -97184,7 +98047,162 @@ function createTableRateProvider(db) {
   };
 }
 
+// src/services/stripeAdapter.ts
+var import_node_crypto4 = require("node:crypto");
+var STRIPE_API = "https://api.stripe.com/v1";
+var TIMEOUT_MS2 = 1e4;
+var MIN_SESSION_MS = 30 * 60 * 1e3;
+var MAX_SESSION_MS = 24 * 60 * 60 * 1e3;
+var SIGNATURE_TOLERANCE_S = 300;
+var MEXICO_CITY_OFFSET_MS = -6 * 60 * 60 * 1e3;
+function oxxoVoucherEnd(now) {
+  const local = new Date(now.getTime() + MEXICO_CITY_OFFSET_MS);
+  const endLocal = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate() + 1,
+    23,
+    59,
+    59
+  );
+  return new Date(endLocal - MEXICO_CITY_OFFSET_MS);
+}
+function sessionExpiry(request) {
+  const now = request.now.getTime();
+  const latest = Math.min(
+    remoteDeadline(request.expiresAt).getTime(),
+    now + MAX_SESSION_MS
+  );
+  if (latest - now < MIN_SESSION_MS) {
+    throw new PaymentProcessorError(
+      "Stripe: the order hold is too short for a session"
+    );
+  }
+  return new Date(latest);
+}
+function sessionForm(request, expiresAt) {
+  const form = new URLSearchParams({
+    mode: "payment",
+    "payment_method_types[0]": request.method === "OXXO" ? "oxxo" : "card",
+    "line_items[0][quantity]": "1",
+    "line_items[0][price_data][currency]": "mxn",
+    "line_items[0][price_data][unit_amount]": String(request.totalMxnCents),
+    "line_items[0][price_data][product_data][name]": request.description,
+    client_reference_id: request.orderNumber,
+    "metadata[order_number]": request.orderNumber,
+    success_url: request.successUrl,
+    cancel_url: request.cancelUrl,
+    expires_at: String(Math.floor(expiresAt.getTime() / 1e3)),
+    // Always charge in MXN: Adaptive Pricing would show and settle a foreign buyer's local
+    // currency, and reconciliation (T1.3 R) only accepts the exact total in MXN. Sent on every
+    // session so a dashboard toggle can never turn it back on.
+    "adaptive_pricing[enabled]": "false"
+  });
+  if (request.method === "OXXO") {
+    form.set("payment_method_options[oxxo][expires_after_days]", "1");
+  }
+  return form;
+}
+function header2(headers, name) {
+  const value = headers[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+function sameHex(expected, given) {
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(given, "hex");
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto4.timingSafeEqual)(a, b);
+}
+function createStripeAdapter(secrets, fetchImpl = fetch) {
+  async function call(path, init) {
+    const answer = await fetchImpl(`${STRIPE_API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${secrets.apiKey}`,
+        ...init.headers
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS2)
+    });
+    if (!answer.ok) {
+      throw new PaymentProcessorError(`Stripe: HTTP ${answer.status}`);
+    }
+    return answer.json();
+  }
+  return {
+    async createSession(request) {
+      if (request.method !== "CARD" && request.method !== "OXXO") {
+        throw new PaymentProcessorError(
+          `Stripe: unsupported method ${request.method}`
+        );
+      }
+      const expiresAt = sessionExpiry(request);
+      const remoteExpiresAt = request.method === "OXXO" ? oxxoVoucherEnd(request.now) : expiresAt;
+      if (remoteExpiresAt > remoteDeadline(request.expiresAt)) {
+        throw new PaymentProcessorError(
+          "Stripe: the voucher would outlive the order hold"
+        );
+      }
+      const body = await call("/checkout/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: sessionForm(request, expiresAt).toString()
+      });
+      if (typeof body.id !== "string" || typeof body.url !== "string") {
+        throw new PaymentProcessorError("Stripe: unexpected session answer");
+      }
+      return { reference: body.id, redirectUrl: body.url, remoteExpiresAt };
+    },
+    verifyWebhook({ rawBody, headers, now }) {
+      const signature = header2(headers, "stripe-signature") ?? "";
+      const parts = signature.split(",").map((part) => part.split("=", 2));
+      const timestamp = parts.find(([key]) => key === "t")?.[1] ?? "";
+      const candidates = parts.filter(([key]) => key === "v1").map(([, value]) => value ?? "");
+      const seconds = Number(timestamp);
+      if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
+        return null;
+      }
+      const expected = (0, import_node_crypto4.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      if (!candidates.some((candidate) => sameHex(expected, candidate)))
+        return null;
+      let event;
+      try {
+        event = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        return null;
+      }
+      if (typeof event.id !== "string" || typeof event.type !== "string")
+        return null;
+      const resource = event.data?.object?.id;
+      return {
+        eventId: event.id,
+        type: event.type,
+        resourceId: typeof resource === "string" ? resource : null
+      };
+    },
+    async fetchPayment(sessionId) {
+      const session = await call(
+        `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "GET" }
+      );
+      const status = typeof session.payment_status === "string" ? session.payment_status : "unknown";
+      return {
+        paid: status === "paid",
+        amountMxnCents: Number.isInteger(session.amount_total) ? session.amount_total : null,
+        currency: typeof session.currency === "string" ? session.currency.toUpperCase() : null,
+        orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
+        processorStatus: status
+      };
+    }
+  };
+}
+
 // src/app.ts
+function configuredProcessors(config2) {
+  const { stripe, mercadoPago } = config2.payments;
+  return {
+    ...stripe && { STRIPE: createStripeAdapter(stripe) },
+    ...mercadoPago && { MERCADO_PAGO: createMercadoPagoAdapter(mercadoPago) }
+  };
+}
 async function buildApp(deps) {
   const app = (0, import_fastify.default)({
     logger: deps.logger && {
@@ -97213,12 +98231,30 @@ async function buildApp(deps) {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
-  registerCartRoutes(app, {
+  const shipping = createTableRateProvider(deps.db);
+  registerCartRoutes(app, { db: deps.db, rate: deps.rate, shipping });
+  registerExchangeRateRoute(app, deps.rate);
+  const now = deps.now ?? (() => /* @__PURE__ */ new Date());
+  const processors = deps.processors ?? configuredProcessors(deps.config);
+  registerCheckoutRoutes(app, {
     db: deps.db,
     rate: deps.rate,
-    shipping: createTableRateProvider(deps.db)
+    shipping,
+    processors,
+    payments: deps.config.payments,
+    now
   });
-  registerExchangeRateRoute(app, deps.rate);
+  registerOrderRoutes(app, {
+    db: deps.db,
+    payments: deps.config.payments,
+    now
+  });
+  await registerWebhookRoutes(app, {
+    db: deps.db,
+    processors,
+    payments: deps.config.payments,
+    now
+  });
   return app;
 }
 
@@ -97240,6 +98276,25 @@ function createDb(config2) {
     },
     async ping() {
       await pool.query("SELECT 1");
+    },
+    async transaction(work) {
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        const result = await work({
+          async query(sql, params = []) {
+            const [rows] = await connection.query(sql, params);
+            return rows;
+          }
+        });
+        await connection.commit();
+        connection.release();
+        return result;
+      } catch (error62) {
+        await connection.rollback();
+        connection.release();
+        throw error62;
+      }
     },
     async close() {
       await pool.end();
@@ -97281,15 +98336,15 @@ async function fetchLatestFix(token, fetchImpl = fetch, timeoutMs = 3e3) {
 // src/services/exchangeRate.ts
 var REFRESH_MS = 60 * 60 * 1e3;
 async function latestStored(db) {
-  const [row] = await db.query(
+  const [row2] = await db.query(
     "SELECT DATE_FORMAT(determination_date, '%Y-%m-%d') AS determination_date, rate_decimal, fetched_at FROM exchange_rates WHERE series_id = ? ORDER BY determination_date DESC LIMIT 1",
     [FIX_SERIES]
   );
-  return row;
+  return row2;
 }
 async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix = fetchLatestFix) {
-  let row = await latestStored(db);
-  const stale = !row || now.getTime() - new Date(row.fetched_at).getTime() > REFRESH_MS;
+  let row2 = await latestStored(db);
+  const stale = !row2 || now.getTime() - new Date(row2.fetched_at).getTime() > REFRESH_MS;
   if (token && stale) {
     try {
       const fix = await fetchFix(token);
@@ -97297,14 +98352,14 @@ async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix
         "INSERT INTO exchange_rates (series_id, determination_date, rate_decimal, fetched_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE rate_decimal = VALUES(rate_decimal), fetched_at = VALUES(fetched_at)",
         [FIX_SERIES, fix.date, fix.rate, now]
       );
-      row = await latestStored(db);
+      row2 = await latestStored(db);
     } catch {
     }
   }
-  return row ? {
+  return row2 ? {
     series: FIX_SERIES,
-    date: row.determination_date,
-    rate: String(row.rate_decimal)
+    date: row2.determination_date,
+    rate: String(row2.rate_decimal)
   } : null;
 }
 
@@ -97329,7 +98384,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "d8ec92a805f76a9f5e35307b0d2ad2a0ca0160b9" : void 0;
+var sha = true ? "ea74bae090a7b2dc21747f6949013f27c3428cc1" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
