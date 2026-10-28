@@ -96638,7 +96638,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.8.1"),
+  API_VERSION: external_exports.string().default("0.8.2"),
   GIT_SHA: external_exports.string().default("dev"),
   PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
   SITE_URL: external_exports.url().default("https://yekora.mx"),
@@ -98050,6 +98050,7 @@ function createTableRateProvider(db) {
 // src/services/stripeAdapter.ts
 var import_node_crypto4 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
+var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS2 = 1e4;
 var MIN_SESSION_MS = 30 * 60 * 1e3;
 var MAX_SESSION_MS = 24 * 60 * 60 * 1e3;
@@ -98118,6 +98119,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       ...init,
       headers: {
         Authorization: `Bearer ${secrets.apiKey}`,
+        "Stripe-Version": STRIPE_VERSION,
         ...init.headers
       },
       signal: AbortSignal.timeout(TIMEOUT_MS2)
@@ -98384,7 +98386,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "ea74bae090a7b2dc21747f6949013f27c3428cc1" : void 0;
+var sha = true ? "a23ac75c85f403c83fae320f89e6c5fa2d585aa0" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
