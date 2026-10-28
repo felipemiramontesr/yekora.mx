@@ -420,7 +420,9 @@ describe('OrderStatus (return pages)', () => {
     expect(screen.getByText('Pedido YEK-2026-AB12CD34')).toBeTruthy();
     expect(screen.getByText('Tarjeta de crédito o débito')).toBeTruthy();
     expect(screen.getByText(/2,000\.00/)).toBeTruthy();
-    expect(getCartStore().getSnapshot()).toEqual([]);
+    // The cart is emptied by a passive effect, which can flush after the text is already on
+    // screen: wait for it instead of reading the store once (the CI flake of FC 012 F5).
+    await waitFor(() => expect(getCartStore().getSnapshot()).toEqual([]));
     expect(
       screen.queryByRole('button', { name: 'Volver a la página de pago' })
     ).toBeNull();
