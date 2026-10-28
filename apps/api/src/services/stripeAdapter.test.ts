@@ -47,6 +47,7 @@ describe('createSession (Checkout Session, fixed host)', () => {
     expect(init?.method).toBe('POST');
     expect(init?.headers).toMatchObject({
       Authorization: 'Bearer sk_test_key',
+      'Stripe-Version': '2026-03-25.dahlia',
       'Content-Type': 'application/x-www-form-urlencoded',
     });
     const form = sentForm(fetchMock);
@@ -284,6 +285,10 @@ describe('fetchPayment (reconciliation)', () => {
       'https://api.stripe.com/v1/checkout/sessions/cs_test%2F1'
     );
     expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+    // The pinned version reads the session back with the same shapes it was created with.
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      'Stripe-Version': '2026-03-25.dahlia',
+    });
   });
 
   it('treats anything but paid as not paid, and unknown fields as missing', async () => {

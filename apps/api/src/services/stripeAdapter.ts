@@ -12,8 +12,8 @@
  * Webhooks: `Stripe-Signature: t=<unix>,v1=<hex>`, v1 = HMAC-SHA256(secret, `${t}.${rawBody}`),
  * compared in constant time, and `t` must be within 300 s of now.
  *
- * API shapes follow Stripe's public documentation; they are confirmed against a Stripe test
- * account in F2 (no account exists yet, K-26).
+ * API shapes follow Stripe's public documentation and were confirmed against the client's Stripe
+ * sandbox in F5, under the pinned {@link STRIPE_VERSION}.
  *
  * @module
  */
@@ -30,6 +30,12 @@ import {
 } from './paymentPort';
 
 const STRIPE_API = 'https://api.stripe.com/v1';
+/**
+ * API version pinned on every call, so the account's default can never change the shapes this
+ * adapter relies on. Version 2026-09-30 dropped `payment_method_types` on Checkout Sessions and
+ * refused every session (FC 012 F5); 2026-03-25.dahlia still takes it for card and OXXO.
+ */
+const STRIPE_VERSION = '2026-03-25.dahlia';
 const TIMEOUT_MS = 10_000;
 const MIN_SESSION_MS = 30 * 60 * 1000;
 const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
@@ -133,6 +139,7 @@ export function createStripeAdapter(
       ...init,
       headers: {
         Authorization: `Bearer ${secrets.apiKey}`,
+        'Stripe-Version': STRIPE_VERSION,
         ...init.headers,
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
