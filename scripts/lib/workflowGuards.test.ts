@@ -178,6 +178,48 @@ describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
       'triggers must be workflow_dispatch only, found: none'
     );
   });
+
+  it.each([
+    [
+      'migrate on a GitHub runner',
+      'runs-on: [self-hosted, yekora-db]',
+      'runs-on: ubuntu-24.04',
+      'the migrate job must run on [self-hosted, yekora-db], found: ubuntu-24.04',
+    ],
+    [
+      'migrate on another self-hosted label',
+      'runs-on: [self-hosted, yekora-db]',
+      'runs-on: [self-hosted, other]',
+      'the migrate job must run on [self-hosted, yekora-db], found: [self-hosted, other]',
+    ],
+    [
+      'authorize on the database host',
+      'runs-on: ubuntu-24.04',
+      'runs-on: [self-hosted, yekora-db]',
+      'the authorize job must run on ubuntu-24.04, found: [self-hosted, yekora-db]',
+    ],
+    [
+      'authorize without a runner',
+      '    runs-on: ubuntu-24.04',
+      '',
+      'the authorize job must run on ubuntu-24.04, found: none',
+    ],
+  ])('FC 017 T2 · flags %s', (_case, from, to, violation) => {
+    expect(migrations).toContain(from);
+    expect(
+      migrationsWorkflowViolations(migrations.replace(from, to), OWNER)
+    ).toEqual([violation]);
+  });
+
+  it('FC 017 T2 · ignores runs-on outside the jobs block and keys of nested maps', () => {
+    const extra = migrations
+      .replace('jobs:', 'defaults:\n  runs-on-note:\n    runs-on: x\njobs:')
+      .replace(
+        '  migrate:',
+        '  migrate:\n    strategy:\n      runs-on: nested'
+      );
+    expect(migrationsWorkflowViolations(extra, OWNER)).toEqual([]);
+  });
 });
 
 const auditCron = readFileSync(

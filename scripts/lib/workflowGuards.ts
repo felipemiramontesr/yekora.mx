@@ -133,11 +133,63 @@ export function migrationsWorkflowViolations(
   if (!workflow.includes(`[ "$ACTOR" = "${owner}" ]`)) {
     violations.push(`the actor guard for ${owner} is missing`);
   }
-  violations.push(...parityViolations(lines, workflow));
+  violations.push(
+    ...runnerViolations(workflow),
+    ...parityViolations(lines, workflow)
+  );
   for (const uses of unpinnedActions(workflow)) {
     violations.push(`${uses} is not pinned by full commit SHA`);
   }
   return violations;
+}
+
+/** Runner each migrations job must use (FC 017 T2): only `migrate` reaches the database host. */
+const MIGRATION_RUNNERS: Readonly<Record<string, string>> = {
+  authorize: 'ubuntu-24.04',
+  migrate: '[self-hosted, yekora-db]',
+};
+
+/**
+ * The `runs-on` of every job, read from the two-space job keys under `jobs:`.
+ *
+ * @param workflow - Text of a workflow.
+ * @returns Job id → its `runs-on` value as written; a job without one is absent.
+ */
+function jobRunners(workflow: string): Map<string, string> {
+  const runners = new Map<string, string>();
+  let inJobs = false;
+  let job: string | null = null;
+  for (const line of workflow.split(/\r?\n/)) {
+    if (/^\S/.test(line)) {
+      inJobs = line.trimEnd() === 'jobs:';
+      job = null;
+      continue;
+    }
+    if (!inJobs) continue;
+    const key = /^ {2}([\w-]+):\s*$/.exec(line);
+    if (key) {
+      job = key[1];
+      continue;
+    }
+    // Trimmed after matching: a lazy capture between `\s*` would backtrack (sonarjs).
+    const runsOn = /^ {4}runs-on:(.*)$/.exec(line);
+    if (job && runsOn) runners.set(job, runsOn[1].trim());
+  }
+  return runners;
+}
+
+/**
+ * FC 017 T2: `authorize` runs on GitHub's Ubuntu and `migrate` on the database host, written
+ * exactly as in the file, so moving either job to another runner fails A08.
+ */
+function runnerViolations(workflow: string): string[] {
+  const runners = jobRunners(workflow);
+  return Object.entries(MIGRATION_RUNNERS)
+    .filter(([job, expected]) => runners.get(job) !== expected)
+    .map(
+      ([job, expected]) =>
+        `the ${job} job must run on ${expected}, found: ${runners.get(job) ?? 'none'}`
+    );
 }
 
 /**

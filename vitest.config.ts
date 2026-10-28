@@ -42,6 +42,9 @@ export default defineConfig({
         'apps/api/src/**/*.{test,spec}.ts',
         // Process wiring only (node dist/index.js on Hostinger); its logic is start() in index.ts.
         'apps/api/src/server.ts',
+        // Vitest 4 matches these globs anywhere in the path, so `lib/**` above also catches
+        // scripts/lib: keep the gate rules out, except the three held to product coverage.
+        'scripts/lib/!(backupCrypto|certification|dbParity).ts',
       ],
       thresholds: {
         lines: 100,
