@@ -1,9 +1,9 @@
 {
   "name": "yekora-api",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "private": true,
   "type": "commonjs",
-  "description": "YEKORA API release 9af4195ea01c88bda4b3a3a752371d349d5bc4e7, built by CI. Do not edit: the next deploy replaces it.",
+  "description": "YEKORA API release 692cc6a7958c830c8918ec70f70450be724dd73a, built by CI. Do not edit: the next deploy replaces it.",
   "engines": {
     "node": ">=24.0.0"
   },

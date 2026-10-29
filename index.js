@@ -96638,7 +96638,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.8.2"),
+  API_VERSION: external_exports.string().default("0.8.5"),
   GIT_SHA: external_exports.string().default("dev"),
   PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
   SITE_URL: external_exports.url().default("https://yekora.mx"),
@@ -96647,12 +96647,16 @@ var schema = external_exports.object({
   STRIPE_WEBHOOK_SECRET: external_exports.string().optional(),
   MP_ACCESS_TOKEN: external_exports.string().optional(),
   MP_WEBHOOK_SECRET: external_exports.string().optional(),
+  MP_SANDBOX_IS_TEST_ACCOUNT: external_exports.enum(["true", "false"]).default("false"),
   CHECKOUT_PII_KEY: external_exports.string().optional(),
   CUSTOMER_EMAIL_HMAC_PEPPER: external_exports.string().optional(),
   ORDER_TOKEN_PEPPER: external_exports.string().optional()
 });
 var KEY_PREFIXES = {
-  sandbox: { stripe: ["sk_test_", "rk_test_"], mercadoPago: ["TEST-"] },
+  sandbox: {
+    stripe: ["sk_test_", "rk_test_"],
+    mercadoPago: ["TEST-", "APP_USR-"]
+  },
   live: { stripe: ["sk_live_", "rk_live_"], mercadoPago: ["APP_USR-"] }
 };
 function pair(name, a, b) {
@@ -96679,8 +96683,14 @@ function loadPayments(parsed) {
     parsed.MP_ACCESS_TOKEN,
     parsed.MP_WEBHOOK_SECRET
   );
-  if (mercadoPago)
+  if (mercadoPago) {
     checkMode("MP_ACCESS_TOKEN", mercadoPago[0], prefixes.mercadoPago);
+    if (mode === "sandbox" && mercadoPago[0].startsWith("APP_USR-") && parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== "true") {
+      throw new Error(
+        "MISSING_APP_USR_CONFIRMATION: MP_ACCESS_TOKEN with APP_USR- in sandbox requires explicit MP_SANDBOX_IS_TEST_ACCOUNT=true"
+      );
+    }
+  }
   const key = parsed.CHECKOUT_PII_KEY;
   const peppers = pair(
     "The checkout",
@@ -97780,6 +97790,33 @@ var TYPE_OF = {
   SPEI: "bank_transfer",
   MERCADO_PAGO_BALANCE: "account_money"
 };
+async function isTestAccount(accessToken, fetchImpl) {
+  try {
+    const answer = await fetchImpl(`${MP_API}/users/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!answer.ok) return null;
+    const { tags } = await answer.json();
+    return Array.isArray(tags) ? tags.includes("test_user") : null;
+  } catch {
+    return null;
+  }
+}
+async function verifyMercadoPagoTestAccount(accessToken, fetchImpl = fetch) {
+  if (await isTestAccount(accessToken, fetchImpl) !== true) {
+    throw new Error(
+      "UNVERIFIED_MP_TEST_ACCOUNT: the Mercado Pago account is not a verified test account"
+    );
+  }
+}
+async function verifyMercadoPagoLiveAccount(accessToken, fetchImpl = fetch) {
+  if (await isTestAccount(accessToken, fetchImpl) !== false) {
+    throw new Error(
+      "TEST_ACCOUNT_REJECTED_IN_LIVE: the Mercado Pago account is a test account or cannot be checked"
+    );
+  }
+}
 function header(headers, name) {
   const value = headers[name];
   return (Array.isArray(value) ? value[0] : value) ?? "";
@@ -98366,8 +98403,18 @@ async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix
 }
 
 // src/index.ts
-async function start(env2, makeDb = createDb) {
+async function checkMercadoPagoAccount(payments, fetchImpl) {
+  const token = payments.mercadoPago?.accessToken;
+  if (token === void 0) return;
+  if (payments.mode === "live") {
+    await verifyMercadoPagoLiveAccount(token, fetchImpl);
+  } else if (token.startsWith("APP_USR-")) {
+    await verifyMercadoPagoTestAccount(token, fetchImpl);
+  }
+}
+async function start(env2, makeDb = createDb, fetchImpl = fetch) {
   const config2 = loadConfig(env2);
+  await checkMercadoPagoAccount(config2.payments, fetchImpl);
   const db = makeDb(config2.db);
   const app = await buildApp({
     config: config2,
@@ -98386,7 +98433,7 @@ async function start(env2, makeDb = createDb) {
 }
 
 // src/server.ts
-var sha = true ? "9af4195ea01c88bda4b3a3a752371d349d5bc4e7" : void 0;
+var sha = true ? "692cc6a7958c830c8918ec70f70450be724dd73a" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
