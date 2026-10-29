@@ -1,6 +1,10 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { createMercadoPagoAdapter } from './mercadoPagoAdapter';
+import {
+  createMercadoPagoAdapter,
+  verifyMercadoPagoLiveAccount,
+  verifyMercadoPagoTestAccount,
+} from './mercadoPagoAdapter';
 import { type SessionRequest } from './paymentPort';
 
 // The 30-minute margin of FC 012 T2 (1 800 s).
@@ -283,4 +287,58 @@ describe('verifyWebhook without data.id in the query', () => {
       })
     ).toBeNull();
   });
+});
+
+describe('account check at startup (FC 019, GET /users/me)', () => {
+  // The tags the client's test account returned (H 19:20:39); a real seller lacks test_user.
+  const TEST_TAGS = { tags: ['user_product_seller', 'test_user', 'normal'] };
+  const LIVE_TAGS = { tags: ['user_product_seller', 'normal'] };
+  const TOKEN = 'APP_USR-secret-token';
+
+  it('asks api.mercadopago.com/users/me with the token, and accepts a test account in sandbox', async () => {
+    const fetchMock = answering(TEST_TAGS);
+    await expect(
+      verifyMercadoPagoTestAccount(TOKEN, fetchMock)
+    ).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.mercadopago.com/users/me');
+    expect(init?.headers).toEqual({ Authorization: `Bearer ${TOKEN}` });
+  });
+
+  it('accepts a real account in live', async () => {
+    await expect(
+      verifyMercadoPagoLiveAccount(TOKEN, answering(LIVE_TAGS))
+    ).resolves.toBeUndefined();
+  });
+
+  const unreachable = vi.fn<typeof fetch>(async () => {
+    throw new TypeError('fetch failed');
+  });
+  it.each([
+    ['a real account', answering(LIVE_TAGS)],
+    ['an HTTP error', answering({ message: 'invalid token' }, 401)],
+    ['an answer without tags', answering({ id: 1 })],
+    ['an unreachable Mercado Pago', unreachable],
+  ])(
+    'refuses %s in sandbox, without revealing the token',
+    async (_case, fetchMock) => {
+      const failure = verifyMercadoPagoTestAccount(TOKEN, fetchMock);
+      await expect(failure).rejects.toThrow(/^UNVERIFIED_MP_TEST_ACCOUNT: /);
+      await expect(failure).rejects.not.toThrow(TOKEN);
+    }
+  );
+
+  it.each([
+    ['a test account', answering(TEST_TAGS)],
+    ['an HTTP error', answering({ message: 'invalid token' }, 401)],
+    ['an answer without tags', answering({ id: 1 })],
+    ['an unreachable Mercado Pago', unreachable],
+  ])(
+    'refuses %s in live, without revealing the token',
+    async (_case, fetchMock) => {
+      const failure = verifyMercadoPagoLiveAccount(TOKEN, fetchMock);
+      await expect(failure).rejects.toThrow(/^TEST_ACCOUNT_REJECTED_IN_LIVE: /);
+      await expect(failure).rejects.not.toThrow(TOKEN);
+    }
+  );
 });

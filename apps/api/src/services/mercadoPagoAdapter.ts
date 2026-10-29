@@ -15,6 +15,10 @@
  * API shapes follow Mercado Pago's public documentation; they are confirmed against a test
  * account in F2 (no account exists yet, K-26).
  *
+ * Account check at startup (FC 019): test and live tokens may both start with `APP_USR-`, so
+ * `GET /users/me` decides. A test account carries the `test_user` tag (confirmed with the
+ * client's test token, H 19:20:39). Any doubt (network, HTTP error, no tags) fails closed.
+ *
  * @module
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -58,6 +62,64 @@ export interface MercadoPagoSecrets {
   accessToken: string;
   /** Secret key that signs the webhooks. */
   webhookSecret: string;
+}
+
+/**
+ * Whether the token's account is a Mercado Pago test account, or null when Mercado Pago cannot
+ * say (unreachable, HTTP error, or an answer without tags). Never reveals the token.
+ */
+async function isTestAccount(
+  accessToken: string,
+  fetchImpl: typeof fetch
+): Promise<boolean | null> {
+  try {
+    const answer = await fetchImpl(`${MP_API}/users/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!answer.ok) return null;
+    const { tags } = (await answer.json()) as { tags?: unknown };
+    return Array.isArray(tags) ? tags.includes('test_user') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refuses to go on unless the token belongs to a Mercado Pago test account (FC 019 T1.1 V).
+ *
+ * @param accessToken - Sandbox token starting with `APP_USR-`.
+ * @param fetchImpl - `fetch`, injectable for tests (CI never reaches the network).
+ * @throws `UNVERIFIED_MP_TEST_ACCOUNT` when the account is not a test one or cannot be checked.
+ */
+export async function verifyMercadoPagoTestAccount(
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  if ((await isTestAccount(accessToken, fetchImpl)) !== true) {
+    throw new Error(
+      'UNVERIFIED_MP_TEST_ACCOUNT: the Mercado Pago account is not a verified test account'
+    );
+  }
+}
+
+/**
+ * Refuses to go on unless the token belongs to a real (non-test) Mercado Pago account (FC 019
+ * T1.2 V).
+ *
+ * @param accessToken - Live token (`APP_USR-…`).
+ * @param fetchImpl - `fetch`, injectable for tests (CI never reaches the network).
+ * @throws `TEST_ACCOUNT_REJECTED_IN_LIVE` when the account is a test one or cannot be checked.
+ */
+export async function verifyMercadoPagoLiveAccount(
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  if ((await isTestAccount(accessToken, fetchImpl)) !== false) {
+    throw new Error(
+      'TEST_ACCOUNT_REJECTED_IN_LIVE: the Mercado Pago account is a test account or cannot be checked'
+    );
+  }
 }
 
 function header(headers: WebhookInput['headers'], name: string): string {

@@ -10,6 +10,11 @@
  * checkout needs its three secrets (personal-data key and two peppers) or none. Without them
  * the checkout answers 503: closed, never half-open (T1.1 K).
  *
+ * Mercado Pago (FC 019): its test credentials may also start with `APP_USR-`, the live prefix,
+ * so the prefix alone no longer tells the accounts apart. In `sandbox` such a token needs the
+ * operator's MP_SANDBOX_IS_TEST_ACCOUNT=true here, and `start` then asks Mercado Pago whether
+ * the account really is a test one (in `live`, that it is not) before listening.
+ *
  * @module
  */
 import { z } from 'zod';
@@ -41,7 +46,7 @@ const schema = z.object({
       'must be a Yekora database'
     ),
   BANXICO_TOKEN: z.string().optional(),
-  API_VERSION: z.string().default('0.8.2'),
+  API_VERSION: z.string().default('0.8.5'),
   GIT_SHA: z.string().default('dev'),
   PAYMENTS_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
   SITE_URL: z.url().default('https://yekora.mx'),
@@ -50,14 +55,21 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   MP_ACCESS_TOKEN: z.string().optional(),
   MP_WEBHOOK_SECRET: z.string().optional(),
+  MP_SANDBOX_IS_TEST_ACCOUNT: z.enum(['true', 'false']).default('false'),
   CHECKOUT_PII_KEY: z.string().optional(),
   CUSTOMER_EMAIL_HMAC_PEPPER: z.string().optional(),
   ORDER_TOKEN_PEPPER: z.string().optional(),
 });
 
-/** Key prefixes each mode accepts (Stripe secret or restricted keys; Mercado Pago tokens). */
+/**
+ * Key prefixes each mode accepts (Stripe secret or restricted keys; Mercado Pago tokens).
+ * `APP_USR-` in sandbox is not proof of a test account: see `loadPayments` (FC 019).
+ */
 const KEY_PREFIXES = {
-  sandbox: { stripe: ['sk_test_', 'rk_test_'], mercadoPago: ['TEST-'] },
+  sandbox: {
+    stripe: ['sk_test_', 'rk_test_'],
+    mercadoPago: ['TEST-', 'APP_USR-'],
+  },
   live: { stripe: ['sk_live_', 'rk_live_'], mercadoPago: ['APP_USR-'] },
 } as const;
 
@@ -153,8 +165,20 @@ function loadPayments(parsed: z.infer<typeof schema>): PaymentsConfig {
     parsed.MP_ACCESS_TOKEN,
     parsed.MP_WEBHOOK_SECRET
   );
-  if (mercadoPago)
+  if (mercadoPago) {
     checkMode('MP_ACCESS_TOKEN', mercadoPago[0], prefixes.mercadoPago);
+    // A live-looking token in sandbox needs the operator's word first (FC 019 T1.1 C); the
+    // account itself is checked against Mercado Pago when the API starts (T1.1 V).
+    if (
+      mode === 'sandbox' &&
+      mercadoPago[0].startsWith('APP_USR-') &&
+      parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== 'true'
+    ) {
+      throw new Error(
+        'MISSING_APP_USR_CONFIRMATION: MP_ACCESS_TOKEN with APP_USR- in sandbox requires explicit MP_SANDBOX_IS_TEST_ACCOUNT=true'
+      );
+    }
+  }
   const key = parsed.CHECKOUT_PII_KEY;
   const peppers = pair(
     'The checkout',

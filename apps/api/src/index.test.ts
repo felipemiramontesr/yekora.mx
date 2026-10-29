@@ -69,3 +69,66 @@ describe('start', () => {
     await expect(start({ ...env, DB_NAME: 'archon' })).rejects.toThrow();
   });
 });
+
+describe('start · Mercado Pago account check (FC 019)', () => {
+  const tags = (list: string[]) =>
+    vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ tags: list }))
+    );
+  const mp = (token: string) => ({
+    MP_ACCESS_TOKEN: token,
+    MP_WEBHOOK_SECRET: 'mp_1',
+  });
+  const sandboxAppUsr = {
+    ...mp('APP_USR-1'),
+    MP_SANDBOX_IS_TEST_ACCOUNT: 'true',
+  };
+  const live = { ...mp('APP_USR-1'), PAYMENTS_MODE: 'live' };
+
+  it.each([
+    ['without Mercado Pago (T1.0)', {}],
+    ['with a TEST- token in sandbox (T1.1)', mp('TEST-1')],
+  ])('starts without asking Mercado Pago %s', async (_case, keys) => {
+    const fetchMock = tags([]);
+    const { stop } = await start({ ...env, ...keys }, idleDb, fetchMock);
+    await stop();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a test account in sandbox', sandboxAppUsr, ['test_user', 'normal']],
+    ['a real account in live', live, ['normal']],
+  ])(
+    'starts with %s, after asking Mercado Pago once',
+    async (_case, keys, list) => {
+      const fetchMock = tags(list);
+      const { stop } = await start({ ...env, ...keys }, idleDb, fetchMock);
+      await stop();
+      expect(fetchMock).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    [
+      'a real account in sandbox',
+      sandboxAppUsr,
+      ['normal'],
+      'UNVERIFIED_MP_TEST_ACCOUNT',
+    ],
+    [
+      'a test account in live',
+      live,
+      ['test_user'],
+      'TEST_ACCOUNT_REJECTED_IN_LIVE',
+    ],
+  ])(
+    'refuses %s before opening the database',
+    async (_case, keys, list, code) => {
+      const makeDb = vi.fn(idleDb);
+      await expect(
+        start({ ...env, ...keys }, makeDb, tags(list))
+      ).rejects.toThrow(code);
+      expect(makeDb).not.toHaveBeenCalled();
+    }
+  );
+});

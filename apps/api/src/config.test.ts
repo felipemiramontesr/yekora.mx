@@ -17,7 +17,7 @@ describe('loadConfig', () => {
         database: 'yekora_dev',
       },
       banxicoToken: undefined,
-      version: '0.8.2',
+      version: '0.8.5',
       sha: 'dev',
       // FC 012: sandbox by default and nothing configured, so the checkout stays closed (503).
       payments: {
@@ -138,6 +138,20 @@ describe('loadConfig · payments (FC 012, 092_AN §2)', () => {
     expect(payments.mercadoPago?.accessToken).toBe('APP_USR-1');
   });
 
+  it('accepts an APP_USR- token in sandbox once the operator confirms a test account (FC 019)', () => {
+    const { payments } = loadConfig({
+      ...base,
+      MP_ACCESS_TOKEN: 'APP_USR-1',
+      MP_WEBHOOK_SECRET: 'mp_1',
+      MP_SANDBOX_IS_TEST_ACCOUNT: 'true',
+    });
+    expect(payments.mode).toBe('sandbox');
+    expect(payments.mercadoPago).toEqual({
+      accessToken: 'APP_USR-1',
+      webhookSecret: 'mp_1',
+    });
+  });
+
   it.each([
     [
       'a live Stripe key in sandbox',
@@ -152,6 +166,34 @@ describe('loadConfig · payments (FC 012, 092_AN §2)', () => {
         MP_WEBHOOK_SECRET: 'w',
       },
       'MP_ACCESS_TOKEN does not match PAYMENTS_MODE',
+    ],
+    [
+      'an APP_USR- token in sandbox without the operator confirmation',
+      { MP_ACCESS_TOKEN: 'APP_USR-1', MP_WEBHOOK_SECRET: 'w' },
+      'MISSING_APP_USR_CONFIRMATION',
+    ],
+    [
+      'an APP_USR- token in sandbox the operator marks as not a test account',
+      {
+        MP_ACCESS_TOKEN: 'APP_USR-1',
+        MP_WEBHOOK_SECRET: 'w',
+        MP_SANDBOX_IS_TEST_ACCOUNT: 'false',
+      },
+      'MISSING_APP_USR_CONFIRMATION',
+    ],
+    [
+      'a Mercado Pago token of no known kind in sandbox',
+      {
+        MP_ACCESS_TOKEN: 'abc',
+        MP_WEBHOOK_SECRET: 'w',
+        MP_SANDBOX_IS_TEST_ACCOUNT: 'true',
+      },
+      'MP_ACCESS_TOKEN does not match PAYMENTS_MODE',
+    ],
+    [
+      'a confirmation that is not true or false',
+      { MP_SANDBOX_IS_TEST_ACCOUNT: 'yes' },
+      'Invalid option',
     ],
     [
       'half of Stripe',
