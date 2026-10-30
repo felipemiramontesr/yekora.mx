@@ -6,6 +6,7 @@ import {
   isCertified,
   jobStatus,
   type JunitCase,
+  layerModule,
   parseJunitCases,
   renderDashboard,
   testModule,
@@ -224,6 +225,41 @@ describe('testModule', () => {
       totals: { passed: 3, total: 4 },
     });
     expect(testModule('🛡️ Backend', [], api).status).toBe('NOT_VERIFIED');
+  });
+});
+
+describe('FC 025 T1.3 · layerModule: the layer job and its own tests, both green', () => {
+  const api = (file: string) => file.startsWith('apps/api/');
+  const red: JunitCase[] = [
+    ...greenCases,
+    { file: 'apps/api/x.test.ts', name: 'x', outcome: 'failed' },
+  ];
+
+  it.each([
+    ['green tests in a green job', greenCases, 'success', 'PASSED'],
+    ['green tests in a failed job', greenCases, 'failure', 'FAILED'],
+    ['a red test in a green job', red, 'success', 'FAILED'],
+    ['green tests in a skipped job', greenCases, 'skipped', 'NOT_VERIFIED'],
+    [
+      'a green job whose tests never reached the report',
+      [],
+      'success',
+      'NOT_VERIFIED',
+    ],
+  ] as const)('%s → %s', (_case, cases, result, status) => {
+    expect(layerModule('🛡️ Backend', cases, api, result)).toMatchObject({
+      name: '🛡️ Backend',
+      status,
+    });
+  });
+
+  it('keeps the counts of its own cases', () => {
+    expect(
+      layerModule('🛡️ Backend', greenCases, api, 'success').totals
+    ).toEqual({
+      passed: 3,
+      total: 3,
+    });
   });
 });
 

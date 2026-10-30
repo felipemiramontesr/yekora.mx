@@ -93,6 +93,108 @@ describe('deployWorkflowViolations (FC 009 · K-13: API checks always on)', () =
   });
 });
 
+describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
+  // The tampering below writes `\n`; a Windows checkout of the file may carry `\r\n`.
+  const lf = deploy.replace(/\r\n/g, '\n');
+  // global-certification's needs as Prettier prints it, and the same list on one line.
+  const NEEDS_BLOCK = /( {4}needs:\n {6}\[\n)((?: {8}[\w-]+,\n)+)( {6}\])/;
+  const ONE_LINE =
+    '    needs: [frontend-validation, backend-validation, database-validation, security-scan, e2e-validation, sonar-scan]';
+
+  it.each([
+    [
+      'the Backend job switched off again',
+      (w: string) =>
+        w.replace(
+          '  backend-validation:\n',
+          '  backend-validation:\n    if: false\n'
+        ),
+      ['the backend-validation job is switched off (if: false)'],
+    ],
+    [
+      'the Database job moved off GitHub Ubuntu',
+      (w: string) =>
+        w.replace(
+          '  database-validation:\n    name: 🏛️ Database (SQL) Verification\n    runs-on: ubuntu-24.04',
+          '  database-validation:\n    name: 🏛️ Database (SQL) Verification\n    runs-on: ubuntu-22.04'
+        ),
+      ['the database-validation job must run on ubuntu-24.04'],
+    ],
+    [
+      'the Database job on another MariaDB, without its real-SQL suite',
+      (w: string) =>
+        w
+          .replace('image: mariadb:11.8.9', 'image: mariadb:10.4')
+          .replace('vitest run --config vitest.db.config.ts', 'echo skipped'),
+      [
+        'the database-validation job must run: image: mariadb:11.8.9',
+        'the database-validation job must run: vitest run --config vitest.db.config.ts',
+      ],
+    ],
+    [
+      'the Frontend job building the API again',
+      (w: string) =>
+        w.replace(
+          '      - name: Upload TSC Result',
+          '      - name: Build API bundle\n        run: bun run --cwd apps/api build\n      - name: Upload TSC Result'
+        ),
+      ['the frontend-validation job must not build or test apps/api'],
+    ],
+    [
+      'the Frontend job running every test',
+      (w: string) =>
+        w.replace(
+          'vitest run --config vitest.frontend.config.ts',
+          'vitest run'
+        ),
+      [
+        'the frontend-validation job must run: vitest run --config vitest.frontend.config.ts',
+      ],
+    ],
+    [
+      'a certification that no longer waits for the Database job',
+      (w: string) => w.replace('        database-validation,\n', ''),
+      ['global-certification must wait for: database-validation'],
+    ],
+    [
+      'a one-line needs that leaves out the Backend job',
+      (w: string) =>
+        w.replace(NEEDS_BLOCK, ONE_LINE.replace('backend-validation, ', '')),
+      ['global-certification must wait for: backend-validation'],
+    ],
+    [
+      'a certification that waits for nothing',
+      (w: string) => w.replace(NEEDS_BLOCK, ''),
+      [
+        'global-certification must wait for: frontend-validation, backend-validation, database-validation, security-scan, e2e-validation, sonar-scan',
+      ],
+    ],
+    [
+      'a missing Backend job',
+      (w: string) => w.replace('  backend-validation:\n', '  api-checks:\n'),
+      ['the backend-validation job is missing'],
+    ],
+  ])('flags %s', (_case, tamper, expected) => {
+    const tampered = tamper(lf);
+    expect(tampered).not.toBe(lf);
+    expect(deployWorkflowViolations(tampered)).toEqual(expected);
+  });
+
+  it('accepts the full needs list on one line too', () => {
+    expect(deployWorkflowViolations(lf.replace(NEEDS_BLOCK, ONE_LINE))).toEqual(
+      []
+    );
+  });
+
+  it('ignores apps/api in a comment of the Frontend job', () => {
+    const commented = lf.replace(
+      '      - name: Upload TSC Result',
+      '      # The apps/api bundle is built by the Backend job.\n      - name: Upload TSC Result'
+    );
+    expect(deployWorkflowViolations(commented)).toEqual([]);
+  });
+});
+
 describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
   it('the real db-migrations.yml is conformant', () => {
     expect(migrationsWorkflowViolations(migrations, OWNER)).toEqual([]);

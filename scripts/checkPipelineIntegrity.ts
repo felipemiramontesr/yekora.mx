@@ -7,6 +7,8 @@
  *      production-db, checks the actor and pins every action (scripts/lib/workflowGuards.ts).
  *   e) FC 008 · R1: no workflow other than db-migrations.yml mentions self-hosted.
  *   f) FC 009 · K-13: the apiv1 smoke test and the catalog read of deploy.yml are always on.
+ *      FC 025: one job per layer (Frontend without apps/api, Backend, Database on MariaDB
+ *      11.8.9), none switched off, and global-certification waits for all of them.
  *   g) FC 016 · K-32: dependency-audit-cron.yml runs the audit gate daily on ubuntu-24.04 with
  *      pinned actions, and dependabot.yml keeps Archon's policy (bun, no majors, two groups).
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
@@ -129,5 +131,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
+  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
 );

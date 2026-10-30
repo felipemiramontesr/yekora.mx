@@ -208,6 +208,32 @@ export function testModule(
   };
 }
 
+/**
+ * FC 025 T1.3: a layer (Frontend, Backend, Database) is PASSED only when its job finished green
+ * and its own test cases did too. Green tests inside a red job, or a green job whose tests never
+ * reached the report, are not certified.
+ *
+ * @param name - Name with its icon.
+ * @param cases - All JUnit cases of the run.
+ * @param owns - Which files belong to the layer.
+ * @param jobResult - `needs.<job>.result` of the layer's job.
+ */
+export function layerModule(
+  name: string,
+  cases: readonly JunitCase[],
+  owns: (file: string) => boolean,
+  jobResult: string | undefined
+): ModuleRow {
+  const tests = testModule(name, cases, owns);
+  const job = jobStatus(jobResult);
+  let status: Status = 'PASSED';
+  if (tests.status === 'FAILED' || job === 'FAILED') status = 'FAILED';
+  else if (tests.status !== 'PASSED' || job !== 'PASSED') {
+    status = 'NOT_VERIFIED';
+  }
+  return { ...tests, status };
+}
+
 /** Everything the dashboard shows. */
 export interface DashboardInput {
   /** Module table rows. */

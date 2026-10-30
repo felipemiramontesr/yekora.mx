@@ -1,8 +1,10 @@
 name: 🚀 Yekora Deployment
 
 # Single CI workflow (FC 001): same job graph as Archon's deploy.yml, with Yekora's own
-# stack inside each job (Next.js + Bun + Vitest + Playwright). The database migrations
-# workflow will live in its own file when a database exists.
+# stack inside each job (Next.js + Bun + Vitest + Playwright). FC 025: one job per layer, named
+# for what it runs: Frontend (site and CI tooling), Backend (the API, no database) and Database
+# (migrations and the API's real SQL on MariaDB 11.8.9, as production). Applying migrations to
+# production lives in db-migrations.yml.
 
 on:
   push:
@@ -60,10 +62,6 @@ jobs:
       - name: TSDoc Coverage (blocking — every exported declaration documented)
         if: matrix.shard == 1
         run: bun run check:tsdoc
-      - name: Build API bundle (apps/api, esbuild → dist/index.js)
-        # Proves the Hostinger entry point bundles; the deploy artifact comes in FC 008 F5.
-        if: matrix.shard == 1
-        run: bun run --cwd apps/api build
       - name: Upload TSC Result
         if: matrix.shard == 1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -72,7 +70,8 @@ jobs:
           path: tsc-result.json
       - name: Test Shard
         id: test_shard
-        run: bunx vitest run --shard=${{ matrix.shard }}/2
+        # Site and CI tooling only; the API's tests run in the Backend job (FC 025).
+        run: bunx vitest run --config vitest.frontend.config.ts --shard=${{ matrix.shard }}/2
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
         # Only when the shard ran: if an earlier step failed there is no XML.
@@ -89,20 +88,111 @@ jobs:
           path: test-results.xml
 
   backend-validation:
-    name: 🛡️ Backend (API) Verification — reserved slot
-    # Reserved until Yekora has an API layer (Archon parity).
-    if: false
+    name: 🛡️ Backend (API) Verification
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "Backend slot reserved"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build API bundle (apps/api, esbuild → dist/index.js)
+        # Proves the Hostinger entry point bundles; api-release publishes the same build.
+        run: bun run --cwd apps/api build
+      - name: API unit tests (100 % coverage of apps/api, no database)
+        id: api_tests
+        run: bunx vitest run --config vitest.backend.config.ts --coverage
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
+        if: always() && steps.api_tests.outcome != 'skipped'
+        with:
+          report_paths: 'test-results.xml'
+          detailed_summary: true
+          include_passed: true
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && steps.api_tests.outcome != 'skipped'
+        with:
+          name: backend-results
+          path: test-results.xml
 
   database-validation:
-    name: 🏛️ Database (SQL) Verification — reserved slot
-    # Reserved until the database engine is chosen (Archon parity).
-    if: false
+    name: 🏛️ Database (SQL) Verification
     runs-on: ubuntu-24.04
+    # Production's engine (SELECT VERSION() = 11.8.9-MariaDB-log, measured by Ω on 2026-10-30), in a
+    # throwaway service: no self-hosted runner and no production secret ever reach this job.
+    services:
+      mariadb:
+        image: mariadb:11.8.9
+        env:
+          MARIADB_ROOT_PASSWORD: ci-only-root
+          MARIADB_DATABASE: yekora_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=24
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: root
+      DB_PASSWORD: ci-only-root
+      DB_NAME: yekora_ci
+      # Production's fingerprint after 001–003 (FC 012 §374, FC 015).
+      EXPECTED_FINGERPRINT: 7f5c74ddf2db9510890c56d86eedc17d (295 elementos)
     steps:
-      - run: echo "Database slot reserved"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Migrations from scratch (001–003) with their verify counters
+        run: |
+          set -euo pipefail
+          bun scripts/migrateDb.ts | tee migrate.log
+          for n in 001 002 003; do
+            grep -q "^\[VERIFY\] $n " migrate.log || { echo "FATAL: no [VERIFY] $n"; exit 1; }
+          done
+      - name: Idempotency (DB_LAW) — a second run applies nothing
+        run: |
+          set -euo pipefail
+          bun scripts/migrateDb.ts | tee rerun.log
+          grep -q '^\[SKIP\] nothing to apply' rerun.log
+          grep -q '^\[OK\] migrations: 0 applied' rerun.log
+      - name: Schema fingerprint equals production's (Rule 23)
+        run: bun scripts/dbParityCheck.ts --expect "$EXPECTED_FINGERPRINT"
+      - name: Reversibility — down 003, 002, 001, then up again with the same fingerprint
+        run: |
+          set -euo pipefail
+          for n in 003 002 001; do bun scripts/migrateDb.ts --down "$n"; done
+          bun scripts/migrateDb.ts --plan | tee plan.log
+          grep -q '^\[PLAN\] tables=1$' plan.log || { echo "FATAL: business tables left after the rollback"; exit 1; }
+          bun scripts/migrateDb.ts
+          bun scripts/dbParityCheck.ts --expect "$EXPECTED_FINGERPRINT"
+      - name: Real SQL of the API (catalog, quote, checkout, webhooks, constraints)
+        id: db_tests
+        run: bunx vitest run --config vitest.db.config.ts
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
+        if: always() && steps.db_tests.outcome != 'skipped'
+        with:
+          report_paths: 'test-results.xml'
+          detailed_summary: true
+          include_passed: true
+      - name: Upload Database Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && steps.db_tests.outcome != 'skipped'
+        with:
+          name: database-results
+          path: test-results.xml
 
   security-scan:
     name: 🔍 Secret Scan (TruffleHog)
@@ -225,7 +315,15 @@ jobs:
 
   global-certification:
     name: 🔱 Yekora Global Certification
-    needs: [frontend-validation, security-scan, e2e-validation, sonar-scan]
+    needs:
+      [
+        frontend-validation,
+        backend-validation,
+        database-validation,
+        security-scan,
+        e2e-validation,
+        sonar-scan,
+      ]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -281,6 +379,8 @@ jobs:
       - name: Generate Certification Dashboard
         env:
           FRONTEND_RESULT: ${{ needs.frontend-validation.result }}
+          BACKEND_RESULT: ${{ needs.backend-validation.result }}
+          DB_RESULT: ${{ needs.database-validation.result }}
           E2E_RESULT: ${{ needs.e2e-validation.result }}
           SONAR_RESULT: ${{ needs.sonar-scan.result }}
           SECURITY_RESULT: ${{ needs.security-scan.result }}

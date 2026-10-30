@@ -95,6 +95,74 @@ export function deployWorkflowViolations(workflow: string): string[] {
       'the site build must always read the catalog from apiv1.yekora.mx'
     );
   }
+  violations.push(...layerViolations(workflow));
+  return violations;
+}
+
+/** The three layer jobs of deploy.yml (FC 025 T1.1, T1.2) and what each must run. */
+const LAYER_JOBS: Readonly<Record<string, readonly string[]>> = {
+  'frontend-validation': ['vitest run --config vitest.frontend.config.ts'],
+  'backend-validation': [
+    'bun run --cwd apps/api build',
+    'vitest run --config vitest.backend.config.ts --coverage',
+  ],
+  'database-validation': [
+    'image: mariadb:11.8.9',
+    'bun scripts/migrateDb.ts',
+    'dbParityCheck.ts --expect',
+    'vitest run --config vitest.db.config.ts',
+  ],
+};
+
+/** Jobs global-certification must wait for before any release (FC 025 T1.3). */
+const CERTIFIED_JOBS = [
+  'frontend-validation',
+  'backend-validation',
+  'database-validation',
+  'security-scan',
+  'e2e-validation',
+  'sonar-scan',
+];
+
+/**
+ * FC 025: one job per layer, each named for what it runs. Frontend never touches apps/api, the
+ * Backend and Database jobs are never switched off, all three run on GitHub's Ubuntu, and the
+ * certification waits for every verification job.
+ */
+function layerViolations(workflow: string): string[] {
+  const blocks = jobBlocks(workflow);
+  const violations: string[] = [];
+  for (const [job, required] of Object.entries(LAYER_JOBS)) {
+    const block = blocks.get(job);
+    if (block === undefined) {
+      violations.push(`the ${job} job is missing`);
+      continue;
+    }
+    if (block.some((line) => /^ {4}if:\s*false\b/.test(line))) {
+      violations.push(`the ${job} job is switched off (if: false)`);
+    }
+    if (!block.includes('    runs-on: ubuntu-24.04')) {
+      violations.push(`the ${job} job must run on ubuntu-24.04`);
+    }
+    for (const step of required) {
+      if (!block.some((line) => line.includes(step))) {
+        violations.push(`the ${job} job must run: ${step}`);
+      }
+    }
+  }
+  const frontend = blocks.get('frontend-validation') ?? [];
+  if (frontend.some((line) => line.split('#')[0].includes('apps/api'))) {
+    violations.push(
+      'the frontend-validation job must not build or test apps/api'
+    );
+  }
+  const waited = new Set(jobNeeds(blocks.get('global-certification') ?? []));
+  const missing = CERTIFIED_JOBS.filter((job) => !waited.has(job));
+  if (missing.length > 0) {
+    violations.push(
+      `global-certification must wait for: ${missing.join(', ')}`
+    );
+  }
   return violations;
 }
 
@@ -150,15 +218,15 @@ const MIGRATION_RUNNERS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The `runs-on` of every job, read from the two-space job keys under `jobs:`.
+ * The lines of every job, read from the two-space job keys under `jobs:`.
  *
  * @param workflow - Text of a workflow.
- * @returns Job id → its `runs-on` value as written; a job without one is absent.
+ * @returns Job id → the lines below its key, as written.
  */
-function jobRunners(workflow: string): Map<string, string> {
-  const runners = new Map<string, string>();
+function jobBlocks(workflow: string): Map<string, string[]> {
+  const blocks = new Map<string, string[]>();
   let inJobs = false;
-  let job: string | null = null;
+  let job: string[] | null = null;
   for (const line of workflow.split(/\r?\n/)) {
     if (/^\S/.test(line)) {
       inJobs = line.trimEnd() === 'jobs:';
@@ -168,12 +236,50 @@ function jobRunners(workflow: string): Map<string, string> {
     if (!inJobs) continue;
     const key = /^ {2}([\w-]+):\s*$/.exec(line);
     if (key) {
-      job = key[1];
+      job = [];
+      blocks.set(key[1], job);
       continue;
     }
+    job?.push(line);
+  }
+  return blocks;
+}
+
+/**
+ * The jobs a job waits for, whether `needs` is written on one line or spread over several (as
+ * Prettier prints a long list).
+ *
+ * @param block - Lines of the job.
+ * @returns Job ids in `needs`; empty when it has none.
+ */
+function jobNeeds(block: readonly string[]): string[] {
+  const start = block.findIndex((line) => line.startsWith('    needs:'));
+  if (start === -1) return [];
+  const rest = block.slice(start + 1);
+  const end = rest.findIndex((line) => !/^ {6,}\S/.test(line));
+  const text = [block[start], ...rest.slice(0, end === -1 ? rest.length : end)]
+    .join(' ')
+    .replace(/^ {4}needs:/, '');
+  return text
+    .replace(/[[\]\s]/g, '')
+    .split(',')
+    .filter((job) => job !== '');
+}
+
+/**
+ * The `runs-on` of every job.
+ *
+ * @param workflow - Text of a workflow.
+ * @returns Job id → its `runs-on` value as written; a job without one is absent.
+ */
+function jobRunners(workflow: string): Map<string, string> {
+  const runners = new Map<string, string>();
+  for (const [job, lines] of jobBlocks(workflow)) {
     // Trimmed after matching: a lazy capture between `\s*` would backtrack (sonarjs).
-    const runsOn = /^ {4}runs-on:(.*)$/.exec(line);
-    if (job && runsOn) runners.set(job, runsOn[1].trim());
+    const runsOn = lines
+      .map((line) => /^ {4}runs-on:(.*)$/.exec(line))
+      .find((match) => match !== null);
+    if (runsOn) runners.set(job, runsOn[1].trim());
   }
   return runners;
 }

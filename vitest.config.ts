@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   esbuild: { jsx: 'automatic' },
@@ -17,6 +17,8 @@ export default defineConfig({
       // CI gate rules (scripts/lib) are tested too, but stay out of product coverage below.
       'scripts/**/*.{test,spec}.ts',
     ],
+    // FC 025: the real-SQL suite needs MariaDB, which only the Database job has (vitest.db.config.ts).
+    exclude: [...configDefaults.exclude, 'apps/api/src/db.integration.test.ts'],
     // JUnit feeds the per-shard test report and the certification dashboard in CI.
     reporters: ['default', 'junit'],
     outputFile: { junit: 'test-results.xml' },
