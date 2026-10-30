@@ -96638,7 +96638,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.8.5"),
+  API_VERSION: external_exports.string().default("0.8.6"),
   GIT_SHA: external_exports.string().default("dev"),
   PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
   SITE_URL: external_exports.url().default("https://yekora.mx"),
@@ -97786,9 +97786,9 @@ var PAYMENT_TYPES = [
   "account_money",
   "digital_currency"
 ];
-var TYPE_OF = {
-  SPEI: "bank_transfer",
-  MERCADO_PAGO_BALANCE: "account_money"
+var ALLOWED_TYPES = {
+  SPEI: ["bank_transfer", "account_money"],
+  MERCADO_PAGO_BALANCE: ["account_money"]
 };
 async function isTestAccount(accessToken, fetchImpl) {
   try {
@@ -97838,8 +97838,8 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
   }
   return {
     async createSession(request) {
-      const type = TYPE_OF[request.method];
-      if (type === void 0) {
+      const allowed = ALLOWED_TYPES[request.method];
+      if (allowed === void 0) {
         throw new PaymentProcessorError(
           `Mercado Pago: unsupported method ${request.method}`
         );
@@ -97876,9 +97876,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
           expiration_date_to: until,
           date_of_expiration: until,
           payment_methods: {
-            excluded_payment_types: PAYMENT_TYPES.filter((t) => t !== type).map(
-              (id) => ({ id })
-            ),
+            excluded_payment_types: PAYMENT_TYPES.filter(
+              (t) => !allowed.includes(t)
+            ).map((id) => ({ id })),
             installments: 1
           }
         })
@@ -98433,7 +98433,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "692cc6a7958c830c8918ec70f70450be724dd73a" : void 0;
+var sha = true ? "05cf38e502c7434e57f5df94f7f54ea4d7f3bd13" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
