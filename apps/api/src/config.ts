@@ -46,7 +46,7 @@ const schema = z.object({
       'must be a Yekora database'
     ),
   BANXICO_TOKEN: z.string().optional(),
-  API_VERSION: z.string().default('0.8.5'),
+  API_VERSION: z.string().default('0.8.6'),
   GIT_SHA: z.string().default('dev'),
   PAYMENTS_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
   SITE_URL: z.url().default('https://yekora.mx'),

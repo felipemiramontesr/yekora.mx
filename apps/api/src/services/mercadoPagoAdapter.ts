@@ -4,7 +4,10 @@
  * fixed host https://api.mercadopago.com (no SDK; OWASP A10).
  *
  * One method per preference (Ω, 112_AN): every other payment type is excluded, so the hosted
- * page offers only what the buyer chose in Yekora. Expiry (T2): the preference and the payment
+ * page offers only what the buyer chose in Yekora. Mercado Pago Mexico refuses to exclude its
+ * own balance (`account_money`), so a SPEI page also offers it (FC 019 T1.3, 181_AN): the
+ * payment is reconciled by status, amount, currency and reference, never by type, so either
+ * way pays the order. Expiry (T2): the preference and the payment
  * (`expiration_date_to`, `date_of_expiration`) end at the order's deadline minus 30 minutes.
  * Amounts go out as pesos with two decimals and come back as cents, rounded.
  *
@@ -12,8 +15,8 @@
  * `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`), where data.id comes from the query
  * string (lower-cased), compared in constant time.
  *
- * API shapes follow Mercado Pago's public documentation; they are confirmed against a test
- * account in F2 (no account exists yet, K-26).
+ * API shapes follow Mercado Pago's public documentation, confirmed against the client's test
+ * account in FC 019 F2 (a balance payment paid an order end to end, webhook signature included).
  *
  * Account check at startup (FC 019): test and live tokens may both start with `APP_USR-`, so
  * `GET /users/me` decides. A test account carries the `test_user` tag (confirmed with the
@@ -36,7 +39,7 @@ import {
 const MP_API = 'https://api.mercadopago.com';
 const TIMEOUT_MS = 10_000;
 
-/** Payment types of Mercado Pago in Mexico; the chosen one is the only one not excluded. */
+/** Payment types of Mercado Pago in Mexico; those a method allows are the only ones not excluded. */
 const PAYMENT_TYPES = [
   'credit_card',
   'debit_card',
@@ -48,12 +51,15 @@ const PAYMENT_TYPES = [
   'digital_currency',
 ] as const;
 
-/** The Mercado Pago payment type each Yekora method maps to. */
-const TYPE_OF: Partial<
-  Record<PaymentMethodCode, (typeof PAYMENT_TYPES)[number]>
+/**
+ * The Mercado Pago payment types each Yekora method leaves open (FC 019 T1.3): its own type,
+ * plus `account_money`, which Mercado Pago Mexico never lets a preference exclude.
+ */
+const ALLOWED_TYPES: Partial<
+  Record<PaymentMethodCode, readonly (typeof PAYMENT_TYPES)[number][]>
 > = {
-  SPEI: 'bank_transfer',
-  MERCADO_PAGO_BALANCE: 'account_money',
+  SPEI: ['bank_transfer', 'account_money'],
+  MERCADO_PAGO_BALANCE: ['account_money'],
 };
 
 /** Secrets of the Mercado Pago application (test or production, per environment). */
@@ -155,8 +161,8 @@ export function createMercadoPagoAdapter(
 
   return {
     async createSession(request): Promise<CreatedSession> {
-      const type = TYPE_OF[request.method];
-      if (type === undefined) {
+      const allowed = ALLOWED_TYPES[request.method];
+      if (allowed === undefined) {
         throw new PaymentProcessorError(
           `Mercado Pago: unsupported method ${request.method}`
         );
@@ -193,9 +199,9 @@ export function createMercadoPagoAdapter(
           expiration_date_to: until,
           date_of_expiration: until,
           payment_methods: {
-            excluded_payment_types: PAYMENT_TYPES.filter((t) => t !== type).map(
-              (id) => ({ id })
-            ),
+            excluded_payment_types: PAYMENT_TYPES.filter(
+              (t) => !allowed.includes(t)
+            ).map((id) => ({ id })),
             installments: 1,
           },
         }),

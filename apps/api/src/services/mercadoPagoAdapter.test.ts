@@ -42,7 +42,7 @@ const sent = (fetchMock: ReturnType<typeof answering>) =>
   };
 
 describe('createSession (Checkout Pro preference, fixed host)', () => {
-  it('posts a SPEI-only preference for the exact total to api.mercadopago.com', async () => {
+  it('posts a SPEI preference for the exact total to api.mercadopago.com', async () => {
     const fetchMock = answering({
       id: 'pref_1',
       init_point:
@@ -81,11 +81,6 @@ describe('createSession (Checkout Pro preference, fixed host)', () => {
       expires: true,
       expiration_date_from: NOW.toISOString(),
     });
-    // Only the chosen method stays offered (Ω, 112_AN).
-    expect(
-      body.payment_methods.excluded_payment_types.map((t) => t.id)
-    ).not.toContain('bank_transfer');
-    expect(body.payment_methods.excluded_payment_types).toHaveLength(7);
     expect(session).toEqual({
       reference: 'pref_1',
       redirectUrl:
@@ -108,10 +103,49 @@ describe('createSession (Checkout Pro preference, fixed host)', () => {
       const remote = new Date(String(body[field])).getTime();
       expect(expiresAt.getTime() - remote).toBe(REMOTE_EXPIRY_MARGIN_MS);
     }
-    expect(
-      body.payment_methods.excluded_payment_types.map((t) => t.id)
-    ).not.toContain('account_money');
   });
+
+  // FC 019 T1.3 (181_AN): Mercado Pago Mexico answers 400 when a preference excludes
+  // account_money, so SPEI leaves it open beside bank_transfer; balance leaves only itself.
+  it.each([
+    [
+      'SPEI',
+      [
+        'credit_card',
+        'debit_card',
+        'prepaid_card',
+        'ticket',
+        'atm',
+        'digital_currency',
+      ],
+    ],
+    [
+      'MERCADO_PAGO_BALANCE',
+      [
+        'credit_card',
+        'debit_card',
+        'prepaid_card',
+        'ticket',
+        'atm',
+        'bank_transfer',
+        'digital_currency',
+      ],
+    ],
+  ] as const)(
+    'T1.3: a %s preference excludes every type but its own, and never account_money',
+    async (method, excluded) => {
+      const fetchMock = answering({
+        id: 'p',
+        init_point: 'https://www.mercadopago.com.mx/x',
+      });
+      await createMercadoPagoAdapter(SECRETS, fetchMock).createSession(
+        request({ method })
+      );
+      expect(
+        sent(fetchMock).payment_methods.excluded_payment_types.map((t) => t.id)
+      ).toEqual(excluded);
+    }
+  );
 
   it('refuses card and OXXO (they belong to Stripe) and a hold with no room left', async () => {
     for (const method of ['CARD', 'OXXO'] as const) {
