@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   auditCronViolations,
   dependabotViolations,
+  dependencyViolations,
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
+  serviceWorkerViolations,
   unpinnedActions,
   workflowTriggers,
 } from './workflowGuards';
@@ -526,6 +528,75 @@ describe('dependabotViolations (FC 016 · Archon policy, T2)', () => {
     expect(dependabot).toContain(from);
     expect(dependabotViolations(dependabot.replace(from, to))).toEqual([
       violation,
+    ]);
+  });
+});
+
+describe('FC 026 Enmienda 5–8 · shards, no wait-on, service workers', () => {
+  const lf = deploy.replace(/\r\n/g, '\n');
+  const PROBE =
+    'for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 > /dev/null';
+
+  it('flags a missing E2E shard', () => {
+    expect(
+      deployWorkflowViolations(
+        lf.replace("          - { project: 'webkit', shard: '3/3' }\n", '')
+      )
+    ).toEqual([
+      "the e2e-validation matrix lacks: { project: 'webkit', shard: '3/3' }",
+    ]);
+  });
+
+  it('flags wait-on back in the workflow, and a probe without its final curl', () => {
+    const violations = deployWorkflowViolations(
+      lf.replace(PROBE, 'bunx wait-on http://localhost:3100 --timeout 60000')
+    );
+    expect(violations).toContain(
+      'wait-on is back in deploy.yml (FC 026: curl probe instead)'
+    );
+    expect(violations).toContain(
+      'the e2e-validation job must run: done; curl -fsS http://localhost:3100'
+    );
+  });
+
+  it('dependencyViolations: wait-on stays out of package.json', () => {
+    expect(dependencyViolations(readFileSync('package.json', 'utf8'))).toEqual(
+      []
+    );
+    expect(
+      dependencyViolations(
+        JSON.stringify({ devDependencies: { 'wait-on': '^9.5.1' } })
+      )
+    ).toEqual(['wait-on is back in package.json (FC 026)']);
+    expect(dependencyViolations('{}')).toEqual([]);
+  });
+
+  const files = () =>
+    new Map(
+      [
+        'playwright.local.config.ts',
+        'playwright.stack.config.ts',
+        'e2e/pwa.spec.ts',
+        'e2e/cart.spec.ts',
+      ].map((path) => [path, readFileSync(path, 'utf8')])
+    );
+
+  it('serviceWorkerViolations: the real configs and suites are conformant', () => {
+    expect(serviceWorkerViolations(files())).toEqual([]);
+  });
+
+  it('flags another suite that allows them, a config that does not block them and a PWA suite that cannot run its worker', () => {
+    const tampered = files();
+    tampered.set(
+      'e2e/cart.spec.ts',
+      "test.use({ serviceWorkers: 'allow' });\n// serviceWorkers: 'allow' in a comment is fine"
+    );
+    tampered.set('playwright.stack.config.ts', 'export default {};');
+    tampered.set('e2e/pwa.spec.ts', '// no worker');
+    expect(serviceWorkerViolations(tampered)).toEqual([
+      'playwright.stack.config.ts must block service workers',
+      'e2e/cart.spec.ts must not allow service workers',
+      'e2e/pwa.spec.ts must allow the service worker it tests',
     ]);
   });
 });

@@ -97,10 +97,22 @@ export function deployWorkflowViolations(workflow: string): string[] {
   }
   violations.push(
     ...stageOneViolations(workflow),
-    ...concurrencyViolations(workflow)
+    ...concurrencyViolations(workflow),
+    ...e2eMatrixViolations(workflow)
   );
   return violations;
 }
+
+/**
+ * FC 026 Enmienda 8: up to 60 s for Apache, then one last curl outside the loop, which fails the
+ * step if Apache never answered (a loop that ends in `sleep` would exit 0). Replaces wait-on.
+ */
+const APACHE_PROBE = [
+  'seq 1 30',
+  'sleep 2',
+  'curl -fsS http://localhost:3100',
+  'done; curl -fsS http://localhost:3100',
+];
 
 /**
  * The verification jobs of deploy.yml's first stage and what each must run (FC 025 T1.1–T1.2,
@@ -147,7 +159,8 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'actions/cache@',
     '~/.cache/ms-playwright',
     'httpd:2.4',
-    'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }}',
+    ...APACHE_PROBE,
+    'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }} --shard=${{ matrix.shard }}',
   ],
   'e2e-stack-validation': [
     'image: mariadb:11.8.9',
@@ -157,9 +170,21 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     '.status == "ok" and .db == "connected"',
     'CATALOG_API_URL: http://127.0.0.1:3001',
     'httpd:2.4',
+    ...APACHE_PROBE,
     'playwright test --config=playwright.stack.config.ts',
   ],
 };
+
+/** The seven E2E shards (FC 026 Enmienda 5): WebKit, the slowest engine, in three. */
+const E2E_SHARDS = [
+  "{ project: 'chromium', shard: '1/2' }",
+  "{ project: 'chromium', shard: '2/2' }",
+  "{ project: 'webkit', shard: '1/3' }",
+  "{ project: 'webkit', shard: '2/3' }",
+  "{ project: 'webkit', shard: '3/3' }",
+  "{ project: 'mobile-chrome', shard: '1/2' }",
+  "{ project: 'mobile-chrome', shard: '2/2' }",
+];
 
 /** Jobs global-certification must wait for before any release (FC 026 T1.4). */
 const CERTIFIED_JOBS = [
@@ -255,6 +280,75 @@ function stageOneViolations(workflow: string): string[] {
  * FC 026 T2: only a pull request cancels its own older run; a push to main is never cancelled,
  * and the release and deploy jobs keep their own non-cancelling groups.
  */
+function e2eMatrixViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const browsers = codeOf(jobBlocks(workflow).get('e2e-validation') ?? []);
+  const missing = E2E_SHARDS.filter(
+    (shard) => !browsers.some((line) => line.trim() === `- ${shard}`)
+  );
+  if (missing.length > 0) {
+    violations.push(`the e2e-validation matrix lacks: ${missing.join(', ')}`);
+  }
+  if (
+    codeOf(workflow.split(/\r?\n/)).some((line) => line.includes('wait-on'))
+  ) {
+    violations.push(
+      'wait-on is back in deploy.yml (FC 026: curl probe instead)'
+    );
+  }
+  return violations;
+}
+
+/**
+ * FC 026 Enmienda 5: wait-on is gone from the dependencies; its two high advisories of
+ * 2026-10-31 (follow-redirects, joi) came only through it.
+ *
+ * @param packageJson - Text of package.json.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function dependencyViolations(packageJson: string): string[] {
+  const { dependencies = {}, devDependencies = {} } = JSON.parse(
+    packageJson
+  ) as Record<string, Record<string, string> | undefined>;
+  return 'wait-on' in { ...dependencies, ...devDependencies }
+    ? ['wait-on is back in package.json (FC 026)']
+    : [];
+}
+
+/**
+ * FC 026 T2: both Playwright configs block service workers, and only e2e/pwa.spec.ts lets them
+ * run. In WebKit a service worker fetches the API past page.route, so any other suite that
+ * allowed it could reach production.
+ *
+ * @param files - Path → text of every file under e2e/ and of the two Playwright configs.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function serviceWorkerViolations(
+  files: ReadonlyMap<string, string>
+): string[] {
+  const violations: string[] = [];
+  for (const config of [
+    'playwright.local.config.ts',
+    'playwright.stack.config.ts',
+  ]) {
+    if (!files.get(config)?.includes("serviceWorkers: 'block'")) {
+      violations.push(`${config} must block service workers`);
+    }
+  }
+  for (const [path, text] of files) {
+    const allows = codeOf(text.split(/\r?\n/)).some((line) =>
+      line.includes("serviceWorkers: 'allow'")
+    );
+    if (allows && path !== 'e2e/pwa.spec.ts') {
+      violations.push(`${path} must not allow service workers`);
+    }
+  }
+  if (!files.get('e2e/pwa.spec.ts')?.includes("serviceWorkers: 'allow'")) {
+    violations.push('e2e/pwa.spec.ts must allow the service worker it tests');
+  }
+  return violations;
+}
+
 function concurrencyViolations(workflow: string): string[] {
   const violations: string[] = [];
   const lines = workflow.split(/\r?\n/);

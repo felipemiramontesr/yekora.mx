@@ -11,6 +11,8 @@
  *      11.8.9), none switched off, and global-certification waits for all of them.
  *   g) FC 016 · K-32: dependency-audit-cron.yml runs the audit gate daily on ubuntu-24.04 with
  *      pinned actions, and dependabot.yml keeps Archon's policy (bun, no majors, two groups).
+ *   h) FC 026: one job per piece of work with its commands, seven E2E shards, no wait-on (in
+ *      deploy.yml or package.json), and service workers blocked in every E2E suite but the PWA's.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
@@ -19,9 +21,11 @@ import { join } from 'node:path';
 import {
   auditCronViolations,
   dependabotViolations,
+  dependencyViolations,
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
+  serviceWorkerViolations,
 } from './lib/workflowGuards';
 
 /** GitHub login of GrayMan (Ω), the only actor allowed to migrate production. */
@@ -125,11 +129,39 @@ if (existsSync(join(root, 'bun.lock'))) {
   failures.push('c) bun.lock is missing');
 }
 
+for (const violation of dependencyViolations(
+  readFileSync(join(root, 'package.json'), 'utf8')
+)) {
+  failures.push(`h) ${violation}`);
+}
+
+/** Every .ts/.tsx file under e2e/, by repository path. */
+function e2eFiles(dir: string): [string, string][] {
+  return readdirSync(join(root, dir), { withFileTypes: true }).flatMap(
+    (entry): [string, string][] => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return e2eFiles(path);
+      return /\.tsx?$/.test(entry.name)
+        ? [[path, readFileSync(join(root, path), 'utf8')]]
+        : [];
+    }
+  );
+}
+const playwrightFiles = new Map([
+  ...e2eFiles('e2e'),
+  ...['playwright.local.config.ts', 'playwright.stack.config.ts'].map(
+    (path): [string, string] => [path, readFileSync(join(root, path), 'utf8')]
+  ),
+]);
+for (const violation of serviceWorkerViolations(playwrightFiles)) {
+  failures.push(`h) ${violation}`);
+}
+
 if (failures.length > 0) {
   console.error('[FAIL] A08 pipeline integrity:');
   for (const failure of failures) console.error(`  - ${failure}`);
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
+  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, seven E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
 );
