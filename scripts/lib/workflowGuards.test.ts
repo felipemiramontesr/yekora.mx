@@ -93,13 +93,14 @@ describe('deployWorkflowViolations (FC 009 · K-13: API checks always on)', () =
   });
 });
 
-describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
+describe('deployWorkflowViolations (FC 025 · FC 026: one job per piece of work)', () => {
   // The tampering below writes `\n`; a Windows checkout of the file may carry `\r\n`.
   const lf = deploy.replace(/\r\n/g, '\n');
   // global-certification's needs as Prettier prints it, and the same list on one line.
   const NEEDS_BLOCK = /( {4}needs:\n {6}\[\n)((?: {8}[\w-]+,\n)+)( {6}\])/;
   const ONE_LINE =
-    '    needs: [frontend-validation, backend-validation, database-validation, security-scan, e2e-validation, sonar-scan]';
+    '    needs: [static-analysis, dependency-audit, frontend-validation, tooling-validation, backend-validation, database-validation, security-scan, e2e-validation, e2e-stack-validation, sonar-scan]';
+  const SITE_TESTS = '      - name: Site tests (app, components, lib)\n';
 
   it.each([
     [
@@ -121,6 +122,7 @@ describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
       ['the database-validation job must run on ubuntu-24.04'],
     ],
     [
+      // The first MariaDB image of the file is the Database job's.
       'the Database job on another MariaDB, without its real-SQL suite',
       (w: string) =>
         w
@@ -132,13 +134,48 @@ describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
       ],
     ],
     [
+      'a secret scan that no longer asks for verified secrets only',
+      (w: string) =>
+        w.replace('extra_args: --only-verified', 'extra_args: --json'),
+      ['the security-scan job must run: extra_args: --only-verified'],
+    ],
+    [
+      'static analysis without its type check',
+      (w: string) => w.replace('bun run typecheck >', 'true >'),
+      ['the static-analysis job must run: bun run typecheck'],
+    ],
+    [
       'the Frontend job building the API again',
       (w: string) =>
         w.replace(
-          '      - name: Upload TSC Result',
-          '      - name: Build API bundle\n        run: bun run --cwd apps/api build\n      - name: Upload TSC Result'
+          SITE_TESTS,
+          '      - name: Build API bundle\n        run: bun run --cwd apps/api build\n' +
+            SITE_TESTS
         ),
-      ['the frontend-validation job must not build or test apps/api'],
+      [
+        'the frontend-validation job must test the site only (no apps/api, no scripts/)',
+      ],
+    ],
+    [
+      'the Frontend job running the tooling tests again',
+      (w: string) =>
+        w.replace(
+          SITE_TESTS,
+          '      - name: Tooling\n        run: bunx vitest run scripts/\n' +
+            SITE_TESTS
+        ),
+      [
+        'the frontend-validation job must test the site only (no apps/api, no scripts/)',
+      ],
+    ],
+    [
+      'the Frontend job split into shards again',
+      (w: string) =>
+        w.replace(
+          '    name: 🎨 Frontend (Next.js) Verification\n',
+          '    name: 🎨 Frontend (Next.js) Verification\n    strategy:\n      matrix:\n        shard: [1, 2]\n'
+        ),
+      ['the frontend-validation job must be one job, without a matrix'],
     ],
     [
       'the Frontend job running every test',
@@ -152,9 +189,46 @@ describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
       ],
     ],
     [
-      'a certification that no longer waits for the Database job',
-      (w: string) => w.replace('        database-validation,\n', ''),
-      ['global-certification must wait for: database-validation'],
+      'the E2E browsers waiting for the Frontend job again',
+      (w: string) =>
+        w.replace(
+          '    needs: [e2e-build]\n',
+          '    needs: [e2e-build, frontend-validation]\n'
+        ),
+      [
+        'the e2e-validation job must wait for e2e-build, found: e2e-build, frontend-validation',
+      ],
+    ],
+    [
+      'the real-stack lane waiting for the Frontend job',
+      (w: string) =>
+        w.replace(
+          '    name: 🧪 E2E · Real Stack (Site + API + MariaDB 11.8.9)\n',
+          '    name: 🧪 E2E · Real Stack (Site + API + MariaDB 11.8.9)\n    needs: [frontend-validation]\n'
+        ),
+      [
+        'the e2e-stack-validation job must wait for nothing, found: frontend-validation',
+      ],
+    ],
+    [
+      // The first browser cache of the file is the matrix lane's.
+      'a browser lane without its cache',
+      (w: string) =>
+        w.replace('path: ~/.cache/ms-playwright', 'path: ~/.cache/other'),
+      ['the e2e-validation job must run: ~/.cache/ms-playwright'],
+    ],
+    [
+      'a real-stack lane that no longer checks the database behind /health',
+      (w: string) =>
+        w.replace('.status == "ok" and .db == "connected"', '.status == "ok"'),
+      [
+        'the e2e-stack-validation job must run: .status == "ok" and .db == "connected"',
+      ],
+    ],
+    [
+      'a certification that no longer waits for the real-stack lane',
+      (w: string) => w.replace('        e2e-stack-validation,\n', ''),
+      ['global-certification must wait for: e2e-stack-validation'],
     ],
     [
       'a one-line needs that leaves out the Backend job',
@@ -166,13 +240,33 @@ describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
       'a certification that waits for nothing',
       (w: string) => w.replace(NEEDS_BLOCK, ''),
       [
-        'global-certification must wait for: frontend-validation, backend-validation, database-validation, security-scan, e2e-validation, sonar-scan',
+        'global-certification must wait for: static-analysis, dependency-audit, frontend-validation, tooling-validation, backend-validation, database-validation, security-scan, e2e-validation, e2e-stack-validation, sonar-scan',
       ],
     ],
     [
       'a missing Backend job',
       (w: string) => w.replace('  backend-validation:\n', '  api-checks:\n'),
       ['the backend-validation job is missing'],
+    ],
+    [
+      'a workflow that cancels runs of main too',
+      (w: string) =>
+        w.replace(
+          "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+          '  cancel-in-progress: true'
+        ),
+      [
+        'the workflow must cancel older runs of a pull request only (concurrency)',
+      ],
+    ],
+    [
+      'a release that can be cancelled',
+      (w: string) =>
+        w.replace(
+          '      group: api-release\n      cancel-in-progress: false',
+          '      group: api-release\n      cancel-in-progress: true'
+        ),
+      ['the api-release job must never be cancelled'],
     ],
   ])('flags %s', (_case, tamper, expected) => {
     const tampered = tamper(lf);
@@ -186,10 +280,11 @@ describe('deployWorkflowViolations (FC 025 · one job per layer)', () => {
     );
   });
 
-  it('ignores apps/api in a comment of the Frontend job', () => {
+  it('ignores apps/api and scripts/ in a comment of the Frontend job', () => {
     const commented = lf.replace(
-      '      - name: Upload TSC Result',
-      '      # The apps/api bundle is built by the Backend job.\n      - name: Upload TSC Result'
+      SITE_TESTS,
+      '      # apps/api is the Backend job; scripts/ is the CI Tooling job.\n' +
+        SITE_TESTS
     );
     expect(deployWorkflowViolations(commented)).toEqual([]);
   });

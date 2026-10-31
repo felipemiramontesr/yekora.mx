@@ -22,7 +22,7 @@ test('the cart is visible from launch with 0 and an empty pack (Ω decision)', a
 }) => {
   await page.goto('/');
   await expect(cartButton(page)).toHaveAccessibleName(
-    'Abrir tu mochila (0 productos)'
+    'Abrir tu mochila, 0 productos'
   );
   await page.goto('/carrito/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
@@ -53,7 +53,7 @@ test('adds from the product page, opens the panel and totals with VAT included',
   await expect(panel(page)).toContainText('$668.97 MXN');
   await expect(panel(page)).toContainText('$4,850.00 MXN');
   await expect(cartButton(page)).toHaveAccessibleName(
-    'Abrir tu mochila (1 producto)'
+    'Abrir tu mochila, 1 producto'
   );
   await panel(page).getByRole('button', { name: 'Cerrar' }).click();
   await expect(panel(page)).toBeHidden();
@@ -149,7 +149,7 @@ test('follows the cart across tabs', async ({ context, page }) => {
   await other.goto('/catalogo/e2e-arnes-alpino/');
   await other.getByRole('button', { name: 'Agregar a la mochila' }).click();
   await expect(cartButton(page)).toHaveAccessibleName(
-    'Abrir tu mochila (1 producto)'
+    'Abrir tu mochila, 1 producto'
   );
 });
 

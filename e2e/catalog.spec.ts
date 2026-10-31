@@ -21,6 +21,21 @@ function cspViolations(page: Page): string[] {
 }
 
 const cards = (page: Page) => page.locator('main li');
+
+/**
+ * FC 026: the header navigation the visitor can use now. From xl (1280 px) it is the bar; below,
+ * on the iPhone and Android projects, it lives in the <details> menu, which is opened first.
+ */
+async function headerNav(page: Page, name: string | RegExp) {
+  const menu = page.getByRole('banner').locator('details');
+  const closed = await menu.evaluate((d) => !(d as HTMLDetailsElement).open);
+  // Opened only when shown and closed: a second click on the summary would fold it again.
+  if ((await menu.isVisible()) && closed) await menu.locator('summary').click();
+  return page
+    .getByRole('navigation', { name })
+    .filter({ visible: true })
+    .first();
+}
 // The catalog's selects, by their exact name (the footer also has a «Disciplinas» nav).
 const filter = (page: Page, name: string) =>
   page.getByRole('combobox', { name, exact: true });
@@ -105,9 +120,9 @@ test('a card opens its product page, which switches language and leads back', as
     'https://yekora.mx/catalogo/e2e-arnes-alpino/'
   );
 
-  await page
-    .getByRole('navigation', { name: 'Idioma' })
-    .first()
+  await (
+    await headerNav(page, 'Idioma')
+  )
     .getByRole('link', { name: 'English' })
     .click();
   await expect(page).toHaveURL(/\/en\/catalog\/e2e-arnes-alpino\/$/);
@@ -126,9 +141,9 @@ test('the header links the catalog in both languages', async ({ page }) => {
     ['/en/', 'Catalog', /\/en\/catalog\/$/],
   ] as const) {
     await page.goto(home);
-    await page
-      .getByRole('navigation', { name: /Navegación principal|Main navigation/ })
-      .first()
+    await (
+      await headerNav(page, /Navegación principal|Main navigation/)
+    )
       .getByRole('link', { name })
       .click();
     await expect(page).toHaveURL(path);

@@ -1,7 +1,22 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // The static export as Hostinger serves it (FC 003): Spanish at the root, English under /en/
 // with translated slugs, no locale redirect and no language cookie.
+
+/**
+ * FC 026: the header navigation the visitor can use now. From xl (1280 px) it is the bar; below,
+ * on the iPhone and Android projects, it lives in the <details> menu, which is opened first.
+ */
+async function headerNav(page: Page, name: string | RegExp) {
+  const menu = page.getByRole('banner').locator('details');
+  const closed = await menu.evaluate((d) => !(d as HTMLDetailsElement).open);
+  // Opened only when shown and closed: a second click on the summary would fold it again.
+  if ((await menu.isVisible()) && closed) await menu.locator('summary').click();
+  return page
+    .getByRole('navigation', { name })
+    .filter({ visible: true })
+    .first();
+}
 
 test('the root is the Spanish home page, whatever the browser language', async ({
   page,
@@ -41,17 +56,16 @@ test('disciplines are anchors inside the current language', async ({
   page,
 }) => {
   await page.goto('/');
-  const nav = page
-    .getByRole('navigation', { name: 'Navegación principal' })
-    .first();
+  const nav = await headerNav(page, 'Navegación principal');
   await nav.getByRole('link', { name: 'Escalada' }).click();
   await expect(page).toHaveURL(/\/#escalada$/);
   await expect(page.locator('#escalada')).toBeVisible();
   // FC 008: the catalog is a real page now, linked in the current language.
-  await expect(nav.getByRole('link', { name: 'Catálogo' })).toHaveAttribute(
-    'href',
-    '/catalogo/'
-  );
+  await expect(
+    (await headerNav(page, 'Navegación principal')).getByRole('link', {
+      name: 'Catálogo',
+    })
+  ).toHaveAttribute('href', '/catalogo/');
 });
 
 test('switching language opens the same page in the other language, with no cookie', async ({
@@ -59,15 +73,15 @@ test('switching language opens the same page in the other language, with no cook
   context,
 }) => {
   await page.goto('/nosotros/');
-  const switcher = page.getByRole('navigation', { name: 'Idioma' }).first();
+  const switcher = await headerNav(page, 'Idioma');
   await switcher.getByRole('link', { name: 'English' }).click();
   await expect(page).toHaveURL(/\/en\/about\/$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('About us');
 
-  await page
-    .getByRole('navigation', { name: 'Language' })
-    .first()
+  await (
+    await headerNav(page, 'Language')
+  )
     .getByRole('link', { name: 'Español' })
     .click();
   await expect(page).toHaveURL(/\/nosotros\/$/);
@@ -145,7 +159,13 @@ test('the mobile menu opens without client JavaScript', async ({
 
 test('the shipping and returns policy is one footer click away in both languages', async ({
   page,
+  context,
+  baseURL,
 }) => {
+  // On a phone the fixed cookie notice covers the end of the footer until it is answered.
+  await context.addCookies([
+    { name: 'yekora_cookie_consent', value: '1', url: baseURL ?? '' },
+  ]);
   for (const [home, link, path, heading] of [
     [
       '/',

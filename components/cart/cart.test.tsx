@@ -178,7 +178,7 @@ describe('cart button and panel', () => {
   it('shows 0 from launch and opens the branded empty pack (Ω decision)', () => {
     showButton();
     expect(cartLink().getAttribute('aria-label')).toBe(
-      'Abrir tu mochila (0 productos)'
+      'Abrir tu mochila, 0 productos'
     );
     expect(cartLink().getAttribute('href')).toBe('/carrito/');
     fireEvent.click(cartLink());
@@ -197,7 +197,7 @@ describe('cart button and panel', () => {
       getCartStore().addItem('TENT');
     });
     expect(cartLink().getAttribute('aria-label')).toBe(
-      'Open your pack (1 product)'
+      'Open your pack, 1 product'
     );
     act(() => {
       getCartStore().addItem('TENT', 2);

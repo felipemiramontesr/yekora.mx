@@ -11,13 +11,15 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // realStack.spec.ts needs the real API and MariaDB: it runs with playwright.stack.config.ts.
   testIgnore: process.env.E2E_APACHE
-    ? ['**/smoke.spec.ts']
-    : ['**/smoke.spec.ts', '**/htaccess.spec.ts'],
+    ? ['**/smoke.spec.ts', '**/realStack.spec.ts']
+    : ['**/smoke.spec.ts', '**/htaccess.spec.ts', '**/realStack.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: process.env.CI ? 2 : 4,
+  // FC 026: GitHub's ubuntu-24.04 runner has 4 cores; one worker per core.
+  workers: 4,
   // In CI the github reporter turns every failure into a public annotation on the run, so the
   // exact error is readable without downloading logs; the HTML report stays as an artifact.
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
@@ -28,6 +30,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     viewport: { width: 1280, height: 720 },
+    // FC 026: in WebKit the site's service worker fetches the API itself, past page.route, so an
+    // emulated API would be skipped and production reached. Only pwa.spec.ts lets it run.
+    serviceWorkers: 'block',
   },
   webServer: process.env.E2E_APACHE
     ? undefined
@@ -39,5 +44,10 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 180_000,
       },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // FC 026: desktop Chrome, iPhone (WebKit, Safari's engine) and Android (Chrome on a phone).
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'webkit', use: { ...devices['iPhone 14'] } },
+    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
+  ],
 });

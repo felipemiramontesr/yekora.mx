@@ -36,6 +36,8 @@ export default defineConfig({
         'scripts/lib/certification.ts',
         // FC 015 (K-31): the parity gate decides whether production matches local; same bar.
         'scripts/lib/dbParity.ts',
+        // FC 026: the real-stack seed decides what the E2E lane's database holds; same bar.
+        'scripts/lib/e2eStackSeed.ts',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',
@@ -45,8 +47,8 @@ export default defineConfig({
         // Process wiring only (node dist/index.js on Hostinger); its logic is start() in index.ts.
         'apps/api/src/server.ts',
         // Vitest 4 matches these globs anywhere in the path, so `lib/**` above also catches
-        // scripts/lib: keep the gate rules out, except the three held to product coverage.
-        'scripts/lib/!(backupCrypto|certification|dbParity).ts',
+        // scripts/lib: keep the gate rules out, except the four held to product coverage.
+        'scripts/lib/!(backupCrypto|certification|dbParity|e2eStackSeed).ts',
       ],
       thresholds: {
         lines: 100,

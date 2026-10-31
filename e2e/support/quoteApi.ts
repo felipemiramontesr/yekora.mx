@@ -160,6 +160,18 @@ export async function mockQuoteApi(page: Page, mode: 'ok' | 'down' = 'ok') {
     'https://apiv1.yekora.mx/v1/cart/quote**',
     async (route: Route) => {
       if (mode === 'down') return route.abort('connectionrefused');
+      // FC 026: the CORS preflight of the JSON POST, answered as the real API does. WebKit
+      // sends it through the interception; Chromium does not.
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({
+          status: 204,
+          headers: {
+            'access-control-allow-origin': 'http://localhost:3100',
+            'access-control-allow-methods': 'POST, OPTIONS',
+            'access-control-allow-headers': 'content-type',
+          },
+        });
+      }
       const lang =
         new URL(route.request().url()).searchParams.get('lang') ?? 'es-MX';
       const { items, destination } = route.request().postDataJSON() as {

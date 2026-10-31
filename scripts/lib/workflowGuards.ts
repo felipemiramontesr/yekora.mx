@@ -95,13 +95,28 @@ export function deployWorkflowViolations(workflow: string): string[] {
       'the site build must always read the catalog from apiv1.yekora.mx'
     );
   }
-  violations.push(...layerViolations(workflow));
+  violations.push(
+    ...stageOneViolations(workflow),
+    ...concurrencyViolations(workflow)
+  );
   return violations;
 }
 
-/** The three layer jobs of deploy.yml (FC 025 T1.1, T1.2) and what each must run. */
-const LAYER_JOBS: Readonly<Record<string, readonly string[]>> = {
+/**
+ * The verification jobs of deploy.yml's first stage and what each must run (FC 025 T1.1–T1.2,
+ * FC 026 T2 JobCommands): one job per piece of work, so a job that exists without its command
+ * fails A08 instead of passing green.
+ */
+const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
+  'static-analysis': [
+    'bun run lint',
+    'bun run typecheck',
+    'tsc-result.json',
+    'bun run check:tsdoc',
+  ],
+  'dependency-audit': ['bun scripts/dependencyAuditGate.ts'],
   'frontend-validation': ['vitest run --config vitest.frontend.config.ts'],
+  'tooling-validation': ['vitest run --config vitest.tooling.config.ts'],
   'backend-validation': [
     'bun run --cwd apps/api build',
     'vitest run --config vitest.backend.config.ts --coverage',
@@ -112,49 +127,119 @@ const LAYER_JOBS: Readonly<Record<string, readonly string[]>> = {
     'dbParityCheck.ts --expect',
     'vitest run --config vitest.db.config.ts',
   ],
+  'security-scan': [
+    'trufflesecurity/trufflehog@',
+    'extra_args: --only-verified',
+  ],
+  'sonar-scan': [
+    'bun run test:coverage',
+    'node tools/verify-sonar-spotless.mjs',
+  ],
+  'e2e-build': [
+    'playwright.local.config.ts',
+    'smoke.spec.ts',
+    'CATALOG_FIXTURE: e2e/fixtures/catalog.json',
+    'bun run build',
+    'name: e2e-static-out',
+  ],
+  'e2e-validation': [
+    'name: e2e-static-out',
+    'actions/cache@',
+    '~/.cache/ms-playwright',
+    'httpd:2.4',
+    'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }}',
+  ],
+  'e2e-stack-validation': [
+    'image: mariadb:11.8.9',
+    'bun scripts/migrateDb.ts',
+    'bun scripts/seedE2eStack.ts',
+    'http://127.0.0.1:3001/health',
+    '.status == "ok" and .db == "connected"',
+    'CATALOG_API_URL: http://127.0.0.1:3001',
+    'httpd:2.4',
+    'playwright test --config=playwright.stack.config.ts',
+  ],
 };
 
-/** Jobs global-certification must wait for before any release (FC 025 T1.3). */
+/** Jobs global-certification must wait for before any release (FC 026 T1.4). */
 const CERTIFIED_JOBS = [
+  'static-analysis',
+  'dependency-audit',
   'frontend-validation',
+  'tooling-validation',
   'backend-validation',
   'database-validation',
   'security-scan',
   'e2e-validation',
+  'e2e-stack-validation',
   'sonar-scan',
 ];
 
-/**
- * FC 025: one job per layer, each named for what it runs. Frontend never touches apps/api, the
- * Backend and Database jobs are never switched off, all three run on GitHub's Ubuntu, and the
- * certification waits for every verification job.
- */
-function layerViolations(workflow: string): string[] {
-  const blocks = jobBlocks(workflow);
+/** What each E2E job may wait for (FC 026 T2): never the Frontend job. */
+const E2E_NEEDS: Readonly<Record<string, string>> = {
+  'e2e-build': '',
+  'e2e-validation': 'e2e-build',
+  'e2e-stack-validation': '',
+};
+
+/** One stage-one job: present, switched on, on GitHub's Ubuntu and running its commands. */
+function jobViolations(
+  job: string,
+  block: readonly string[] | undefined,
+  required: readonly string[]
+): string[] {
+  if (block === undefined) return [`the ${job} job is missing`];
   const violations: string[] = [];
-  for (const [job, required] of Object.entries(LAYER_JOBS)) {
-    const block = blocks.get(job);
-    if (block === undefined) {
-      violations.push(`the ${job} job is missing`);
-      continue;
-    }
-    if (block.some((line) => /^ {4}if:\s*false\b/.test(line))) {
-      violations.push(`the ${job} job is switched off (if: false)`);
-    }
-    if (!block.includes('    runs-on: ubuntu-24.04')) {
-      violations.push(`the ${job} job must run on ubuntu-24.04`);
-    }
-    for (const step of required) {
-      if (!block.some((line) => line.includes(step))) {
-        violations.push(`the ${job} job must run: ${step}`);
-      }
+  if (block.some((line) => /^ {4}if:\s*false\b/.test(line))) {
+    violations.push(`the ${job} job is switched off (if: false)`);
+  }
+  if (!block.includes('    runs-on: ubuntu-24.04')) {
+    violations.push(`the ${job} job must run on ubuntu-24.04`);
+  }
+  for (const step of required) {
+    if (!block.some((line) => line.includes(step))) {
+      violations.push(`the ${job} job must run: ${step}`);
     }
   }
-  const frontend = blocks.get('frontend-validation') ?? [];
-  if (frontend.some((line) => line.split('#')[0].includes('apps/api'))) {
+  return violations;
+}
+
+/** Code of a job, without comments. */
+const codeOf = (block: readonly string[]) =>
+  block.map((line) => line.split('#')[0]);
+
+/**
+ * FC 025 and FC 026: one job per piece of work, each named for what it runs and holding its own
+ * command; none switched off; all on GitHub's Ubuntu. Frontend runs the site only, in one job;
+ * E2E never waits for it; the certification waits for every verification job.
+ */
+function stageOneViolations(workflow: string): string[] {
+  const blocks = jobBlocks(workflow);
+  const violations = Object.entries(STAGE_ONE_JOBS).flatMap(([job, required]) =>
+    jobViolations(job, blocks.get(job), required)
+  );
+  const frontend = codeOf(blocks.get('frontend-validation') ?? []);
+  if (
+    frontend.some(
+      (line) => line.includes('apps/api') || line.includes('scripts/')
+    )
+  ) {
     violations.push(
-      'the frontend-validation job must not build or test apps/api'
+      'the frontend-validation job must test the site only (no apps/api, no scripts/)'
     );
+  }
+  if (frontend.some((line) => /^ {4}strategy:/.test(line))) {
+    violations.push(
+      'the frontend-validation job must be one job, without a matrix'
+    );
+  }
+  for (const [job, expected] of Object.entries(E2E_NEEDS)) {
+    const needs = jobNeeds(blocks.get(job) ?? []).join(', ');
+    if (blocks.has(job) && needs !== expected) {
+      violations.push(
+        `the ${job} job must wait for ${expected || 'nothing'}, found: ${needs || 'nothing'}`
+      );
+    }
   }
   const waited = new Set(jobNeeds(blocks.get('global-certification') ?? []));
   const missing = CERTIFIED_JOBS.filter((job) => !waited.has(job));
@@ -162,6 +247,33 @@ function layerViolations(workflow: string): string[] {
     violations.push(
       `global-certification must wait for: ${missing.join(', ')}`
     );
+  }
+  return violations;
+}
+
+/**
+ * FC 026 T2: only a pull request cancels its own older run; a push to main is never cancelled,
+ * and the release and deploy jobs keep their own non-cancelling groups.
+ */
+function concurrencyViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const lines = workflow.split(/\r?\n/);
+  const top = lines.indexOf('concurrency:');
+  const cancel = top === -1 ? undefined : lines[top + 2];
+  if (
+    cancel !==
+    "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+  ) {
+    violations.push(
+      'the workflow must cancel older runs of a pull request only (concurrency)'
+    );
+  }
+  const blocks = jobBlocks(workflow);
+  for (const job of ['api-release', 'hostinger-deployment']) {
+    const block = blocks.get(job) ?? [];
+    if (!block.includes('      cancel-in-progress: false')) {
+      violations.push(`the ${job} job must never be cancelled`);
+    }
   }
   return violations;
 }

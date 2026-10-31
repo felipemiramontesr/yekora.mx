@@ -48,7 +48,7 @@ export function CartButton({
           event.preventDefault();
           show();
         }}
-        aria-label={`${messages.open} (${count})`}
+        aria-label={`${messages.open}, ${count}`}
         className="tap-target relative shrink-0 justify-center"
       >
         <ShoppingBag aria-hidden="true" size={24} />

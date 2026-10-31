@@ -6,6 +6,9 @@ import { expect, test, type Page } from '@playwright/test';
  * really cut.
  */
 
+// The other suites block service workers (playwright.local.config.ts); this one is about it.
+test.use({ serviceWorkers: 'allow' });
+
 /** Waits until the service worker is active and controls the page. */
 async function controlledBy(page: Page) {
   await page.evaluate(() => navigator.serviceWorker.ready);

@@ -5,18 +5,19 @@
  * owaspCoverageMap.json (verifyL's) is never read.
  *
  * Signals:
- * - JUnit test cases of each layer job (FC 025): the Frontend shards
- *   (`all-results/frontend-results-shard-*`: site and CI tooling), `backend-results` (the API's
- *   unit tests) and `database-results` (the API's real SQL on MariaDB), split into the Frontend,
- *   Backend, Database and Tooling modules and matched to the OWASP evidence by file and describe
- *   block;
- * - tsc-result.json of the type check;
- * - job results: FRONTEND_RESULT, BACKEND_RESULT, DB_RESULT, E2E_RESULT, SONAR_RESULT (coverage
- *   100 % is enforced there) and SECURITY_RESULT;
+ * - JUnit test cases of each job with tests (FC 025, FC 026): `frontend-results` (the site),
+ *   `tooling-results` (scripts/), `backend-results` (the API's unit tests) and `database-results`
+ *   (the API's real SQL on MariaDB), split into the Frontend, Tooling, Backend and Database
+ *   modules and matched to the OWASP evidence by file and describe block;
+ * - `tsc-result/tsc-result.json` of the Static Analysis job's type check;
+ * - job results: STATIC_RESULT, AUDIT_RESULT, FRONTEND_RESULT, TOOLING_RESULT, BACKEND_RESULT,
+ *   DB_RESULT, E2E_RESULT, E2E_STACK_RESULT, SONAR_RESULT (coverage 100 % is enforced there) and
+ *   SECURITY_RESULT;
  * - gate script exit codes: A03_EXIT, A04_EXIT, A06_EXIT, A08_EXIT.
  *
  * T2 (T1.4): exit 1 unless every module and every OWASP row is PASSED or RESERVED SLOT. FC 025
- * T1.3: each layer row needs its job green and its own tests green (`layerModule`).
+ * T1.3: each layer row needs its job green and its own tests green (`layerModule`). FC 026 T1.4:
+ * one row per verification job.
  *
  * CLI: `bun scripts/generateCertificationDashboard.ts [all-results-dir]` → markdown on stdout.
  */
@@ -31,7 +32,6 @@ import {
   type ModuleRow,
   parseJunitCases,
   renderDashboard,
-  testModule,
 } from './lib/certification';
 
 // Extension rows after A01–A10, as Archon's ArchonALE. They live here, not in the map, because
@@ -54,7 +54,8 @@ const DB_SUITE = 'apps/api/src/db.integration.test.ts';
 const reports = existsSync(resultsDir)
   ? readdirSync(resultsDir).filter(
       (name) =>
-        name.startsWith('frontend-results-shard-') ||
+        name === 'frontend-results' ||
+        name === 'tooling-results' ||
         name === 'backend-results' ||
         name === 'database-results'
     )
@@ -64,7 +65,7 @@ const cases = reports
   .filter((path) => existsSync(path))
   .flatMap((path) => parseJunitCases(readFileSync(path, 'utf8')));
 
-const tscPath = join(resultsDir, 'frontend-tsc-result', 'tsc-result.json');
+const tscPath = join(resultsDir, 'tsc-result', 'tsc-result.json');
 const tscErrors = existsSync(tscPath)
   ? Number(
       (JSON.parse(readFileSync(tscPath, 'utf8')) as { errors?: number })
@@ -93,21 +94,34 @@ const modules: ModuleRow[] = [
     (file) => file === DB_SUITE,
     env.DB_RESULT
   ),
-  testModule('🧰 CI Gates & Tooling (scripts)', cases, (file) =>
-    file.startsWith('scripts/')
+  layerModule(
+    '🧰 CI Gates & Tooling (scripts)',
+    cases,
+    (file) => file.startsWith('scripts/'),
+    env.TOOLING_RESULT
   ),
   {
     name: '🏷️ Static Type Checking (TypeScript)',
     status: tscStatus,
     detail: tscErrors === undefined ? undefined : `${tscErrors} Errors`,
   },
-  // The Frontend job also gates lint, TSDoc and the audit for the whole repository; the API
-  // bundle is built by the Backend job (FC 025).
+  // FC 026: each gate in its own job, each with its own row.
   {
-    name: '🧹 Lint · TSDoc · Audit (frontend job)',
-    status: jobStatus(env.FRONTEND_RESULT),
+    name: '🧹 Static Analysis (ESLint · TSDoc)',
+    status: jobStatus(env.STATIC_RESULT),
   },
-  { name: '🧪 E2E (Playwright · Apache)', status: jobStatus(env.E2E_RESULT) },
+  {
+    name: '📦 Dependency Audit (critical=0 ∧ high=0)',
+    status: jobStatus(env.AUDIT_RESULT),
+  },
+  {
+    name: '🧪 E2E Multi-Browser & A11y (Chromium · WebKit · Android · axe)',
+    status: jobStatus(env.E2E_RESULT),
+  },
+  {
+    name: '🧪 E2E Real Stack (Site + API + MariaDB 11.8.9)',
+    status: jobStatus(env.E2E_STACK_RESULT),
+  },
   { name: '🔍 SonarQube + SonarSpotless', status: jobStatus(env.SONAR_RESULT) },
   {
     name: '🔐 Secret Scan (TruffleHog)',

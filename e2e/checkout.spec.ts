@@ -16,6 +16,19 @@ const MP_PAGE =
   'https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=e2e';
 const CORS = { 'access-control-allow-origin': 'http://localhost:3100' };
 
+/**
+ * FC 026: the CORS preflight the browser sends before a JSON POST or an Authorization header,
+ * answered as the real API does. WebKit sends it through the interception; Chromium does not.
+ */
+const PREFLIGHT = {
+  status: 204,
+  headers: {
+    ...CORS,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, authorization',
+  },
+};
+
 type OrderStatus =
   | 'PENDING_PAYMENT'
   | 'PAID'
@@ -52,6 +65,7 @@ async function backend(
   page.on('request', (request: Request) => seen.urls.push(request.url()));
   await mockQuoteApi(page);
   await page.route('https://apiv1.yekora.mx/v1/checkout**', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill(PREFLIGHT);
     seen.checkouts.push(route.request().postDataJSON());
     const answer = options.checkout ?? { redirectUrl: STRIPE_PAGE };
     if ('code' in answer) {
@@ -80,6 +94,7 @@ async function backend(
     });
   });
   await page.route('https://apiv1.yekora.mx/v1/orders/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill(PREFLIGHT);
     seen.authorizations.push(
       await route.request().headerValue('authorization')
     );
@@ -192,7 +207,7 @@ test('buys by card: cart → checkout → Stripe → paid, with the token only i
   });
   await expect(
     page.getByRole('banner').getByRole('link', { name: /Abrir tu mochila/ })
-  ).toHaveAccessibleName('Abrir tu mochila (0 productos)');
+  ).toHaveAccessibleName('Abrir tu mochila, 0 productos');
   expect(seen.authorizations.every((h) => h === `Bearer ${TOKEN}`)).toBe(true);
   expect(seen.urls.filter((url) => url.includes(TOKEN))).toEqual([]);
   // The browser keeps the access in this tab only, and no personal data at all.
@@ -227,7 +242,7 @@ test('SPEI goes to Mercado Pago; back from cancel, the same payment page is offe
   // Leaving the processor is not paying: the pack stays as it was.
   await expect(
     page.getByRole('banner').getByRole('link', { name: /Abrir tu mochila/ })
-  ).toHaveAccessibleName('Abrir tu mochila (1 producto)');
+  ).toHaveAccessibleName('Abrir tu mochila, 1 producto');
   await page
     .getByRole('button', { name: 'Volver a la página de pago' })
     .click();

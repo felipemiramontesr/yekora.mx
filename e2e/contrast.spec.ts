@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -43,44 +44,102 @@ async function minContrastBehind(page: Page, selector: string) {
   await element.evaluate((node) => {
     (node as HTMLElement).style.color = '';
   });
-  return page.evaluate(
-    async ({ png, textColor }) => {
-      const [r, g, b, a = 1] = (textColor.match(/[\d.]+/g) ?? []).map(Number);
-      const image = new Image();
-      image.src = `data:image/png;base64,${png}`;
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('no 2d context');
-      context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(0, 0, image.width, image.height).data;
-      const channel = (value: number) => {
-        const c = value / 255;
-        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-      };
-      const luminance = (red: number, green: number, blue: number) =>
-        0.2126 * channel(red) +
-        0.7152 * channel(green) +
-        0.0722 * channel(blue);
-      let min = Infinity;
-      for (let i = 0; i < pixels.length; i += 4) {
-        const [br, bg, bb] = [pixels[i], pixels[i + 1], pixels[i + 2]];
-        const text = luminance(
-          a * r + (1 - a) * br,
-          a * g + (1 - a) * bg,
-          a * b + (1 - a) * bb
-        );
-        const back = luminance(br, bg, bb);
-        const ratio =
-          (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
-        min = Math.min(min, ratio);
-      }
-      return min;
-    },
-    { png: shot.toString('base64'), textColor: color }
+  const [r, g, b, a = 1] = (color.match(/[\d.]+/g) ?? []).map(Number);
+  const { pixels, channels } = decodePng(shot);
+  let min = Infinity;
+  for (let i = 0; i < pixels.length; i += channels) {
+    const [br, bg, bb] = [pixels[i], pixels[i + 1], pixels[i + 2]];
+    const text = luminance(
+      a * r + (1 - a) * br,
+      a * g + (1 - a) * bg,
+      a * b + (1 - a) * bb
+    );
+    const back = luminance(br, bg, bb);
+    const ratio = (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
+    min = Math.min(min, ratio);
+  }
+  return min;
+}
+
+/** sRGB channel (0–255) to linear light, as WCAG 2 defines relative luminance. */
+function channel(value: number) {
+  const c = value / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance(red: number, green: number, blue: number) {
+  return (
+    0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
   );
+}
+
+/**
+ * FC 026: the screenshot is decoded here in Node (zlib), not in a page canvas, so the same
+ * measurement runs on every engine; WebKit never finished the canvas decode. Playwright writes
+ * 8-bit, non-interlaced RGB or RGBA PNGs; each scanline carries one of the five PNG filters.
+ */
+function decodePng(png: Buffer): { pixels: Uint8Array; channels: number } {
+  const { width, height, channels, data } = readChunks(png);
+  const raw = inflateSync(data);
+  const stride = width * channels;
+  const pixels = new Uint8Array(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const value = raw[y * (stride + 1) + 1 + x];
+      const left = x >= channels ? pixels[y * stride + x - channels] : 0;
+      const up = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const upLeft =
+        x >= channels && y > 0 ? pixels[(y - 1) * stride + x - channels] : 0;
+      pixels[y * stride + x] =
+        (value + predictor(filter, left, up, upLeft)) & 0xff;
+    }
+  }
+  return { pixels, channels };
+}
+
+/** Size and format from IHDR, and the compressed image data of every IDAT, in order. */
+function readChunks(png: Buffer) {
+  let offset = 8; // PNG signature
+  let header: Buffer | undefined;
+  const data: Buffer[] = [];
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString('ascii', offset + 4, offset + 8);
+    const body = png.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') header = body;
+    if (type === 'IDAT') data.push(body);
+    offset += 12 + length;
+  }
+  if (header === undefined) throw new Error('PNG without IHDR');
+  const [depth, colorType, , , interlace] = header.subarray(8, 13);
+  if (depth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error('only 8-bit, non-interlaced RGB or RGBA PNGs');
+  }
+  return {
+    width: header.readUInt32BE(0),
+    height: header.readUInt32BE(4),
+    channels: colorType === 6 ? 4 : 3,
+    data: Buffer.concat(data),
+  };
+}
+
+/** The value a PNG filter adds back to each byte (None, Sub, Up, Average, Paeth). */
+function predictor(filter: number, left: number, up: number, upLeft: number) {
+  if (filter === 1) return left;
+  if (filter === 2) return up;
+  if (filter === 3) return Math.floor((left + up) / 2);
+  if (filter === 4) {
+    const p = left + up - upLeft;
+    const [pa, pb, pc] = [
+      Math.abs(p - left),
+      Math.abs(p - up),
+      Math.abs(p - upLeft),
+    ];
+    if (pa <= pb && pa <= pc) return left;
+    return pb <= pc ? up : upLeft;
+  }
+  return 0;
 }
 
 for (const viewport of VIEWPORTS) {

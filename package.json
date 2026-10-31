@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:frontend": "vitest run --config vitest.frontend.config.ts",
+    "test:tooling": "vitest run --config vitest.tooling.config.ts",
     "test:backend": "vitest run --config vitest.backend.config.ts --coverage",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e": "playwright test --config=playwright.local.config.ts",
@@ -32,6 +33,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "^1.64.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.10.0",
