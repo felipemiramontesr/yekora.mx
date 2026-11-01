@@ -11,7 +11,7 @@
  *      11.8.9), none switched off, and global-certification waits for all of them.
  *   g) FC 016 · K-32: dependency-audit-cron.yml runs the audit gate daily on ubuntu-24.04 with
  *      pinned actions, and dependabot.yml keeps Archon's policy (bun, no majors, two groups).
- *   h) FC 026: one job per piece of work with its commands, seven E2E shards, no wait-on (in
+ *   h) FC 026: one job per piece of work with its commands, eight E2E shards, no wait-on (in
  *      deploy.yml or package.json), and service workers blocked in every E2E suite but the PWA's.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
@@ -163,5 +163,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, seven E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
+  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
 );

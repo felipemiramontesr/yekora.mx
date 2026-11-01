@@ -330,6 +330,40 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  site-build:
+    name: 🏗️ Production Site Build
+    # FC 026 Enmienda 10: the production site is built at t = 0, from the live API, and handed to
+    # the deploy as an artifact; the deploy only waits for the released API and syncs.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build static export (out/)
+        # FC 008/009: the catalog is always read from apiv1.yekora.mx; a failed read fails the
+        # build and the previous deploy stays online.
+        env:
+          CATALOG_API_URL: https://apiv1.yekora.mx
+        run: bun run build
+      - name: Upload the production site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: prod-static-out
+          path: out/
+          # out/.htaccess carries the rewrite rules, the CSP and the hardening headers.
+          include-hidden-files: true
+          retention-days: 1
+
   e2e-validation:
     name: 🧪 E2E (${{ matrix.project }} · ${{ matrix.shard }})
     needs: [e2e-build]
@@ -339,14 +373,15 @@ jobs:
       fail-fast: false
       matrix:
         # Desktop Chrome, iPhone (WebKit) and Android (Chrome on a phone): playwright.local.config.ts.
-        # FC 026 Enmienda 5: WebKit is the slowest engine, so it gets three shards (run 41236200523:
-        # 183 s of tests in one job); the Chromium projects get two each.
+        # FC 026 Enmienda 10: WebKit is the slowest engine, so it gets four shards (stable run of
+        # acdf515: 70 s of tests per shard with three); the Chromium projects get two each.
         include:
           - { project: 'chromium', shard: '1/2' }
           - { project: 'chromium', shard: '2/2' }
-          - { project: 'webkit', shard: '1/3' }
-          - { project: 'webkit', shard: '2/3' }
-          - { project: 'webkit', shard: '3/3' }
+          - { project: 'webkit', shard: '1/4' }
+          - { project: 'webkit', shard: '2/4' }
+          - { project: 'webkit', shard: '3/4' }
+          - { project: 'webkit', shard: '4/4' }
           - { project: 'mobile-chrome', shard: '1/2' }
           - { project: 'mobile-chrome', shard: '2/2' }
     steps:
@@ -381,6 +416,20 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}
+      - name: Cache WebKit's system packages (apt)
+        # FC 026 Enmienda 10: the stable run spent 41 s installing WebKit's Linux libraries. The
+        # .deb files are kept between runs; dpkg still installs them, but nothing is downloaded.
+        if: matrix.project == 'webkit'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /home/runner/apt-cache
+          key: ${{ runner.os }}-webkit-apt-${{ hashFiles('.playwright-version') }}
+      - name: Restore WebKit's system packages into apt's archive
+        if: matrix.project == 'webkit'
+        # An empty cache (first run) has no .deb to copy: that is not an error.
+        run: |
+          mkdir -p /home/runner/apt-cache
+          sudo cp -n /home/runner/apt-cache/*.deb /var/cache/apt/archives/ 2> /dev/null || true
       - name: Install both engines (download only when the cache missed)
         # One key for every lane: whichever lane fills it stores Chromium and WebKit together.
         if: steps.pw_cache.outputs.cache-hit != 'true'
@@ -391,6 +440,11 @@ jobs:
         # breaks E2E.
         if: steps.pw_cache.outputs.cache-hit == 'true'
         run: bunx playwright install --with-deps ${{ matrix.project == 'webkit' && 'webkit' || 'chromium' }}
+      - name: Keep WebKit's system packages for the next run
+        if: matrix.project == 'webkit'
+        run: |
+          sudo cp -n /var/cache/apt/archives/*.deb /home/runner/apt-cache/ 2> /dev/null || true
+          sudo chown -R runner:docker /home/runner/apt-cache
       - name: Run Playwright E2E and WCAG audit (content, RWD gate, .htaccess, axe)
         env:
           E2E_APACHE: '1'
@@ -724,10 +778,10 @@ jobs:
   hostinger-deployment:
     name: 🚀 Deployment to Hostinger
     # Only certified pushes to main reach production (FC 003). Hostinger's own Git
-    # auto-deployment stays off: this job is the only way in. FC 026 Enmienda 9: it builds the
-    # site while api-release publishes, and waits for apiv1.yekora.mx to serve this commit
-    # before the rsync, so the order API → site holds without paying the two in series.
-    needs: [global-certification]
+    # auto-deployment stays off: this job is the only way in. FC 026 Enmienda 10: the site comes
+    # built from site-build; this job waits for apiv1.yekora.mx to serve this commit before the
+    # rsync, so the order API → site holds without paying the two in series.
+    needs: [global-certification, site-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -755,12 +809,11 @@ jobs:
           bun-version: '1.3.14'
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Build static export (out/)
-        # FC 008/009: the catalog is always read from apiv1.yekora.mx; a failed read fails the
-        # build and the previous deploy stays online. Built in parallel with api-release.
-        env:
-          CATALOG_API_URL: https://apiv1.yekora.mx
-        run: bun run build
+      - name: Download the production site built at t = 0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: prod-static-out
+          path: out
       - name: ⏱️ Wait for the API release — apiv1.yekora.mx serves this commit (≤ 120 s)
         run: |
           set -uo pipefail

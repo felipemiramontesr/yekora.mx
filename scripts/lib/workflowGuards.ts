@@ -149,6 +149,12 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'bun run test:coverage',
     'node tools/verify-sonar-spotless.mjs',
   ],
+  // FC 026 Enmienda 10: the production site, built at t = 0 for the deploy.
+  'site-build': [
+    'CATALOG_API_URL: https://apiv1.yekora.mx',
+    'bun run build',
+    'name: prod-static-out',
+  ],
   'e2e-build': [
     'playwright.local.config.ts',
     'smoke.spec.ts',
@@ -161,6 +167,12 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'actions/cache@',
     '~/.cache/ms-playwright',
     '.playwright-version',
+    // FC 026 Enmienda 10: WebKit's Linux packages kept between runs (restore, then backup).
+    '/home/runner/apt-cache',
+    'webkit-apt',
+    'sudo cp -n /home/runner/apt-cache/*.deb /var/cache/apt/archives/',
+    'sudo cp -n /var/cache/apt/archives/*.deb /home/runner/apt-cache/',
+    'sudo chown -R runner:docker /home/runner/apt-cache',
     'httpd:2.4',
     ...APACHE_PROBE,
     'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }} --shard=${{ matrix.shard }}',
@@ -181,13 +193,14 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** The seven E2E shards (FC 026 Enmienda 5): WebKit, the slowest engine, in three. */
+/** The eight E2E shards (FC 026 Enmienda 10): WebKit, the slowest engine, in four. */
 const E2E_SHARDS = [
   "{ project: 'chromium', shard: '1/2' }",
   "{ project: 'chromium', shard: '2/2' }",
-  "{ project: 'webkit', shard: '1/3' }",
-  "{ project: 'webkit', shard: '2/3' }",
-  "{ project: 'webkit', shard: '3/3' }",
+  "{ project: 'webkit', shard: '1/4' }",
+  "{ project: 'webkit', shard: '2/4' }",
+  "{ project: 'webkit', shard: '3/4' }",
+  "{ project: 'webkit', shard: '4/4' }",
   "{ project: 'mobile-chrome', shard: '1/2' }",
   "{ project: 'mobile-chrome', shard: '2/2' }",
 ];
@@ -297,6 +310,7 @@ const DEPLOY_TIMEOUTS: Readonly<Record<string, number>> = {
   'security-scan': 15,
   'sonar-scan': 15,
   'e2e-build': 15,
+  'site-build': 15,
   'e2e-validation': 15,
   'e2e-stack-validation': 15,
   'hostinger-deployment': 15,
@@ -366,20 +380,31 @@ function boundedNetworkViolations(workflow: string): string[] {
 function siteGateViolations(block: readonly string[]): string[] {
   const violations: string[] = [];
   const needs = jobNeeds(block).join(', ');
-  if (needs !== 'global-certification') {
+  if (needs !== 'global-certification, site-build') {
     violations.push(
-      `the hostinger-deployment job must wait for global-certification only, found: ${needs || 'nothing'}`
+      `the hostinger-deployment job must wait for global-certification and site-build only, found: ${needs || 'nothing'}`
     );
   }
   const code = codeOf(block);
   const rsync = code.findIndex((line) => line.includes('rsync -avz'));
   const beforeSync = code.slice(0, rsync === -1 ? 0 : rsync);
   for (const required of [
+    // FC 026 Enmienda 10: the site built at t = 0 by site-build.
+    'actions/download-artifact@',
+    'name: prod-static-out',
     'https://apiv1.yekora.mx/health',
     '$GITHUB_SHA',
     'SECONDS + 120',
     'sleep 3',
     'exit 1',
+    // Rebuilt against the released API only when this push changed apps/api; any doubt rebuilds.
+    'BEFORE: ${{ github.event.before }}',
+    '[ -n "$BEFORE" ]',
+    '0000000000000000000000000000000000000000',
+    'git cat-file -e "$BEFORE^{commit}"',
+    'git diff --quiet "$BEFORE" "$GITHUB_SHA" -- apps/api; then',
+    'else',
+    'bun run build',
   ]) {
     if (!beforeSync.some((line) => line.includes(required))) {
       violations.push(`the deploy must check before its rsync: ${required}`);
@@ -394,7 +419,12 @@ function browserCacheViolations(
   blocks: ReadonlyMap<string, string[]>
 ): string[] {
   const violations: string[] = [];
-  const keys = code.filter((line) => /^\s+key:/.test(line));
+  // The browser caches are the ones whose path is Playwright's; WebKit's apt cache has its own.
+  const keys = code.filter(
+    (line, i) =>
+      /^\s+key:/.test(line) &&
+      code[i - 1]?.trim() === 'path: ~/.cache/ms-playwright'
+  );
   const expectedKey =
     "key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}";
   if (keys.length === 0 || keys.some((line) => line.trim() !== expectedKey)) {

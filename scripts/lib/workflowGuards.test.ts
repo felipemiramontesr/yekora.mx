@@ -79,6 +79,7 @@ describe('deployWorkflowViolations (FC 009 · K-13: API checks always on)', () =
       'the retired API_LIVE switch is back (K-13)',
       'the apiv1.yekora.mx smoke test must not be conditional',
       'the site build must always read the catalog from apiv1.yekora.mx',
+      'the site-build job must run: CATALOG_API_URL: https://apiv1.yekora.mx',
     ]);
   });
 
@@ -545,10 +546,10 @@ describe('FC 026 Enmienda 5–8 · shards, no wait-on, service workers', () => {
   it('flags a missing E2E shard', () => {
     expect(
       deployWorkflowViolations(
-        lf.replace("          - { project: 'webkit', shard: '3/3' }\n", '')
+        lf.replace("          - { project: 'webkit', shard: '4/4' }\n", '')
       )
     ).toEqual([
-      "the e2e-validation matrix lacks: { project: 'webkit', shard: '3/3' }",
+      "the e2e-validation matrix lacks: { project: 'webkit', shard: '4/4' }",
     ]);
   });
 
@@ -662,11 +663,11 @@ describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
       // The release job has the same needs line: only the deploy job's is changed.
       (w: string) =>
         w.replace(
-          /( {2}hostinger-deployment:\n(?:.*\n)*?) {4}needs: \[global-certification\]/,
-          '$1    needs: [global-certification, api-release]'
+          /( {2}hostinger-deployment:\n(?:.*\n)*?) {4}needs: \[global-certification, site-build\]/,
+          '$1    needs: [global-certification, site-build, api-release]'
         ),
       [
-        'the hostinger-deployment job must wait for global-certification only, found: global-certification, api-release',
+        'the hostinger-deployment job must wait for global-certification and site-build only, found: global-certification, site-build, api-release',
       ],
     ],
     [
@@ -714,5 +715,57 @@ describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
         cronLf.replace('    timeout-minutes: 15', '    timeout-minutes: 360')
       )
     ).toEqual(['the audit job must have timeout-minutes: 15, found: 360']);
+  });
+});
+
+describe('FC 026 Enmienda 10 · site built at t = 0, WebKit apt cache', () => {
+  const lf = deploy.replace(/\r\n/g, '\n');
+
+  it.each([
+    [
+      'a deploy that no longer takes the site from site-build',
+      (w: string) =>
+        w.replace(
+          '        with:\n          name: prod-static-out\n          path: out\n',
+          '        with:\n          name: other-site\n          path: out\n'
+        ),
+      ['the deploy must check before its rsync: name: prod-static-out'],
+    ],
+    [
+      'a deploy that never rebuilds after an API change',
+      (w: string) =>
+        w.replace(
+          'git diff --quiet "$BEFORE" "$GITHUB_SHA" -- apps/api; then',
+          'true; then'
+        ),
+      [
+        'the deploy must check before its rsync: git diff --quiet "$BEFORE" "$GITHUB_SHA" -- apps/api; then',
+      ],
+    ],
+    [
+      'a WebKit lane that no longer keeps its apt packages',
+      (w: string) =>
+        w.replace('sudo chown -R runner:docker /home/runner/apt-cache', 'true'),
+      [
+        'the e2e-validation job must run: sudo chown -R runner:docker /home/runner/apt-cache',
+      ],
+    ],
+    [
+      'a site-build job switched off',
+      (w: string) =>
+        w.replace('  site-build:\n', '  site-build:\n    if: false\n'),
+      ['the site-build job is switched off (if: false)'],
+    ],
+  ])('flags %s', (_case, tamper, expected) => {
+    const tampered = tamper(lf);
+    expect(tampered).not.toBe(lf);
+    expect(deployWorkflowViolations(tampered)).toEqual(expected);
+  });
+
+  it('keeps the apt cache key out of the browser cache rule', () => {
+    expect(lf).toContain(
+      "key: ${{ runner.os }}-webkit-apt-${{ hashFiles('.playwright-version') }}"
+    );
+    expect(deployWorkflowViolations(lf)).toEqual([]);
   });
 });
