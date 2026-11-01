@@ -98,7 +98,9 @@ export function deployWorkflowViolations(workflow: string): string[] {
   violations.push(
     ...stageOneViolations(workflow),
     ...concurrencyViolations(workflow),
-    ...e2eMatrixViolations(workflow)
+    ...e2eMatrixViolations(workflow),
+    ...jobTimeoutViolations(workflow, DEPLOY_TIMEOUTS),
+    ...boundedNetworkViolations(workflow)
   );
   return violations;
 }
@@ -158,6 +160,7 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'name: e2e-static-out',
     'actions/cache@',
     '~/.cache/ms-playwright',
+    '.playwright-version',
     'httpd:2.4',
     ...APACHE_PROBE,
     'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }} --shard=${{ matrix.shard }}',
@@ -166,6 +169,9 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'image: mariadb:11.8.9',
     'bun scripts/migrateDb.ts',
     'bun scripts/seedE2eStack.ts',
+    'actions/cache@',
+    '~/.cache/ms-playwright',
+    '.playwright-version',
     'http://127.0.0.1:3001/health',
     '.status == "ok" and .db == "connected"',
     'CATALOG_API_URL: http://127.0.0.1:3001',
@@ -280,6 +286,136 @@ function stageOneViolations(workflow: string): string[] {
  * FC 026 T2: only a pull request cancels its own older run; a push to main is never cancelled,
  * and the release and deploy jobs keep their own non-cancelling groups.
  */
+/** FC 026 Enmienda 9: the exact ceiling of every job of deploy.yml (GitHub's default is 360). */
+const DEPLOY_TIMEOUTS: Readonly<Record<string, number>> = {
+  'static-analysis': 15,
+  'dependency-audit': 15,
+  'frontend-validation': 15,
+  'tooling-validation': 15,
+  'backend-validation': 15,
+  'database-validation': 15,
+  'security-scan': 15,
+  'sonar-scan': 15,
+  'e2e-build': 15,
+  'e2e-validation': 15,
+  'e2e-stack-validation': 15,
+  'hostinger-deployment': 15,
+  'global-certification': 10,
+  'api-release': 10,
+};
+
+/** The `timeout-minutes` of each job, read at job level (four spaces), not a step's. */
+function jobTimeoutViolations(
+  workflow: string,
+  expected: Readonly<Record<string, number>>
+): string[] {
+  const blocks = jobBlocks(workflow);
+  return Object.entries(expected).flatMap(([job, minutes]) => {
+    const line = (blocks.get(job) ?? []).find((l) =>
+      /^ {4}timeout-minutes:/.test(l)
+    );
+    const found = line?.replace(/^ {4}timeout-minutes:/, '').trim();
+    return found === String(minutes)
+      ? []
+      : [
+          `the ${job} job must have timeout-minutes: ${minutes}, found: ${found ?? 'none'}`,
+        ];
+  });
+}
+
+const CURL_LIMITS = ['--connect-timeout 5', '--max-time 10'];
+
+/**
+ * FC 026 Enmienda 9 (run 41248127975 hung 73 min): every curl is bounded; the API smoke waits
+ * 300 s polling every 3 s and prints DNS and IPv4/IPv6 reachability on timeout; the site waits
+ * for the released API (120 s) before its rsync; the browser cache follows Playwright only.
+ */
+function boundedNetworkViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const code = codeOf(workflow.split(/\r?\n/));
+  const unbounded = code.filter(
+    (line) =>
+      /\bcurl\b/.test(line) && !CURL_LIMITS.every((flag) => line.includes(flag))
+  );
+  if (unbounded.length > 0) {
+    violations.push(
+      `every curl needs ${CURL_LIMITS.join(' ')}: ${unbounded.length} without them`
+    );
+  }
+  const blocks = jobBlocks(workflow);
+  const release = codeOf(blocks.get('api-release') ?? []);
+  for (const required of [
+    'SECONDS + 300',
+    'sleep 3',
+    'getent ahosts apiv1.yekora.mx',
+    'curl -4',
+    'curl -6',
+  ]) {
+    if (!release.some((line) => line.includes(required))) {
+      violations.push(`the api-release smoke must run: ${required}`);
+    }
+  }
+  violations.push(
+    ...siteGateViolations(blocks.get('hostinger-deployment') ?? [])
+  );
+  violations.push(...browserCacheViolations(code, blocks));
+  return violations;
+}
+
+/** The deploy builds after certification and syncs only once the API serves this commit. */
+function siteGateViolations(block: readonly string[]): string[] {
+  const violations: string[] = [];
+  const needs = jobNeeds(block).join(', ');
+  if (needs !== 'global-certification') {
+    violations.push(
+      `the hostinger-deployment job must wait for global-certification only, found: ${needs || 'nothing'}`
+    );
+  }
+  const code = codeOf(block);
+  const rsync = code.findIndex((line) => line.includes('rsync -avz'));
+  const beforeSync = code.slice(0, rsync === -1 ? 0 : rsync);
+  for (const required of [
+    'https://apiv1.yekora.mx/health',
+    '$GITHUB_SHA',
+    'SECONDS + 120',
+    'sleep 3',
+    'exit 1',
+  ]) {
+    if (!beforeSync.some((line) => line.includes(required))) {
+      violations.push(`the deploy must check before its rsync: ${required}`);
+    }
+  }
+  return violations;
+}
+
+/** One cache key for every E2E lane, derived from Playwright's version, never bun.lock. */
+function browserCacheViolations(
+  code: readonly string[],
+  blocks: ReadonlyMap<string, string[]>
+): string[] {
+  const violations: string[] = [];
+  const keys = code.filter((line) => /^\s+key:/.test(line));
+  const expectedKey =
+    "key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}";
+  if (keys.length === 0 || keys.some((line) => line.trim() !== expectedKey)) {
+    violations.push(`every browser cache must use ${expectedKey}`);
+  }
+  for (const job of ['e2e-validation', 'e2e-stack-validation']) {
+    const lines = codeOf(blocks.get(job) ?? []);
+    const writes = lines.some(
+      (line) =>
+        line.includes("devDependencies['@playwright/test']") &&
+        line.includes('> .playwright-version')
+    );
+    if (!writes) {
+      violations.push(
+        `the ${job} job must write .playwright-version from package.json`
+      );
+    }
+  }
+  return violations;
+}
+
 function e2eMatrixViolations(workflow: string): string[] {
   const violations: string[] = [];
   const browsers = codeOf(jobBlocks(workflow).get('e2e-validation') ?? []);
@@ -409,7 +545,9 @@ export function migrationsWorkflowViolations(
   }
   violations.push(
     ...runnerViolations(workflow),
-    ...parityViolations(lines, workflow)
+    ...parityViolations(lines, workflow),
+    // FC 026 Enmienda 9: an authorization never waits long; a migration with its backup may.
+    ...jobTimeoutViolations(workflow, { authorize: 5, migrate: 20 })
   );
   for (const uses of unpinnedActions(workflow)) {
     violations.push(`${uses} is not pinned by full commit SHA`);
@@ -593,6 +731,7 @@ export function auditCronViolations(workflow: string): string[] {
       'the security Issue must be opened only when the audit fails'
     );
   }
+  violations.push(...jobTimeoutViolations(workflow, { audit: 15 }));
   return violations;
 }
 

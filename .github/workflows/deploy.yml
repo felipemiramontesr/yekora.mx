@@ -33,6 +33,7 @@ jobs:
   static-analysis:
     name: 🧹 Static Analysis (ESLint · TypeScript · TSDoc)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Node.js
@@ -69,6 +70,7 @@ jobs:
   dependency-audit:
     name: 📦 Dependency Audit (critical = 0 · high = 0)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     # Every push and pull request; Dependabot (PRs) and dependency-audit-cron.yml (daily) stay.
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -88,6 +90,7 @@ jobs:
   frontend-validation:
     name: 🎨 Frontend (Next.js) Verification
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Node.js
@@ -121,6 +124,7 @@ jobs:
   tooling-validation:
     name: 🧰 CI Tooling Verification
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Node.js
@@ -154,6 +158,7 @@ jobs:
   backend-validation:
     name: 🛡️ Backend (API) Verification
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Node.js
@@ -189,6 +194,7 @@ jobs:
   database-validation:
     name: 🏛️ Database (SQL) Verification
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     # Production's engine (SELECT VERSION() = 11.8.9-MariaDB-log, measured by Ω on 2026-10-30), in a
     # throwaway service: no self-hosted runner and no production secret ever reach this job.
     services:
@@ -261,6 +267,7 @@ jobs:
   security-scan:
     name: 🔍 Secret Scan (TruffleHog)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -276,6 +283,7 @@ jobs:
   e2e-build:
     name: 🏗️ E2E Static Site Build
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Node.js
@@ -326,6 +334,7 @@ jobs:
     name: 🧪 E2E (${{ matrix.project }} · ${{ matrix.shard }})
     needs: [e2e-build]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -362,19 +371,26 @@ jobs:
         run: |
           docker run -d --name yekora-httpd -p 3100:80             -v "$PWD/out:/usr/local/apache2/htdocs:ro"             -v "$PWD/e2e/apache/yekora.conf:/usr/local/apache2/conf/extra/yekora.conf:ro"             httpd:2.4             sh -c 'echo "Include conf/extra/yekora.conf" >> conf/httpd.conf && exec httpd-foreground'
           # Up to 60 s for Apache; the last curl, outside the loop, fails the step if it never answered.
-          for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 > /dev/null
+          for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null
+      - name: Playwright version for the browser cache key
+        # FC 026 Enmienda 9: the key follows Playwright only, not every change of bun.lock.
+        run: node -p "require('./package.json').devDependencies['@playwright/test']" > .playwright-version
       - name: Cache Playwright browsers
         id: pw_cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ matrix.project == 'webkit' && 'webkit' || 'chromium' }}-${{ hashFiles('bun.lock') }}
-      - name: Install the browser (download only when the cache missed)
+          key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}
+      - name: Install both engines (download only when the cache missed)
+        # One key for every lane: whichever lane fills it stores Chromium and WebKit together.
         if: steps.pw_cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps ${{ matrix.project == 'webkit' && 'webkit' || 'chromium' }}
-      - name: Install the browser's system libraries (cache hit)
+        run: bunx playwright install --with-deps chromium webkit
+      - name: Install this lane's system libraries, and its browser if the cache lacks it (cache hit)
+        # The key reads the declared range; if the lockfile moved Playwright within it, `install`
+        # fetches the matching browser (a no-op when it is already there), so a stale cache never
+        # breaks E2E.
         if: steps.pw_cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps ${{ matrix.project == 'webkit' && 'webkit' || 'chromium' }}
+        run: bunx playwright install --with-deps ${{ matrix.project == 'webkit' && 'webkit' || 'chromium' }}
       - name: Run Playwright E2E and WCAG audit (content, RWD gate, .htaccess, axe)
         env:
           E2E_APACHE: '1'
@@ -394,6 +410,7 @@ jobs:
   e2e-stack-validation:
     name: 🧪 E2E · Real Stack (Site + API + MariaDB 11.8.9)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     # The whole chain with nothing emulated: MariaDB as production, the real API, the site built
     # from it and served by Apache. No processor keys: a checkout ends in the API's 503.
     services:
@@ -435,10 +452,10 @@ jobs:
           set -euo pipefail
           PORT=3001 HOST=127.0.0.1 nohup bun apps/api/src/server.ts > api.log 2>&1 &
           for attempt in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:3001/health > /dev/null 2>&1 && break
+            curl --connect-timeout 5 --max-time 10 -fsS http://127.0.0.1:3001/health > /dev/null 2>&1 && break
             sleep 1
           done
-          curl -fsS http://127.0.0.1:3001/health | jq -e '.status == "ok" and .db == "connected"'
+          curl --connect-timeout 5 --max-time 10 -fsS http://127.0.0.1:3001/health | jq -e '.status == "ok" and .db == "connected"'
       - name: Build static export (out/) from the real API
         env:
           CATALOG_API_URL: http://127.0.0.1:3001
@@ -448,19 +465,26 @@ jobs:
         run: |
           docker run -d --name yekora-httpd -p 3100:80             -v "$PWD/out:/usr/local/apache2/htdocs:ro"             -v "$PWD/e2e/apache/yekora.conf:/usr/local/apache2/conf/extra/yekora.conf:ro"             httpd:2.4             sh -c 'echo "Include conf/extra/yekora.conf" >> conf/httpd.conf && exec httpd-foreground'
           # Up to 60 s for Apache; the last curl, outside the loop, fails the step if it never answered.
-          for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 > /dev/null
+          for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null
+      - name: Playwright version for the browser cache key
+        # FC 026 Enmienda 9: the key follows Playwright only, not every change of bun.lock.
+        run: node -p "require('./package.json').devDependencies['@playwright/test']" > .playwright-version
       - name: Cache Playwright browsers
         id: pw_cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('bun.lock') }}
-      - name: Install the browser (download only when the cache missed)
+          key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}
+      - name: Install both engines (download only when the cache missed)
+        # One key for every lane: whichever lane fills it stores Chromium and WebKit together.
         if: steps.pw_cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
-      - name: Install the browser's system libraries (cache hit)
+        run: bunx playwright install --with-deps chromium webkit
+      - name: Install this lane's system libraries, and its browser if the cache lacks it (cache hit)
+        # The key reads the declared range; if the lockfile moved Playwright within it, `install`
+        # fetches the matching browser (a no-op when it is already there), so a stale cache never
+        # breaks E2E.
         if: steps.pw_cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
+        run: bunx playwright install --with-deps chromium
       - name: Run the real-stack suite (catalog, cart quote, shipping, checkout)
         run: bunx playwright test --config=playwright.stack.config.ts
       - name: API and Apache logs
@@ -479,6 +503,7 @@ jobs:
   sonar-scan:
     name: 🔍 SonarQube Quality Gate
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -530,6 +555,7 @@ jobs:
       ]
     if: always()
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -608,6 +634,7 @@ jobs:
     needs: [global-certification]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     concurrency:
@@ -651,23 +678,30 @@ jobs:
           echo "[OK] api-release ← $GITHUB_SHA"
       - name: 🔥 Smoke test — apiv1.yekora.mx serves this commit
         # FC 009 F0 · K-13: unconditional (the F5 bootstrap switch API_LIVE is gone; the A08 gate
-        # fails if it ever comes back). Up to 6 minutes for Hostinger to pull and restart.
+        # fails if it ever comes back). FC 026 Enmienda 9: a 300 s deadline polled every 3 s, every
+        # curl bounded; on timeout it prints DNS and IPv4/IPv6 reachability, so a blocked runner,
+        # an IPv6 route and a down server read differently (run 41248127975 hung 73 min blind).
         run: |
           set -uo pipefail
-          for attempt in $(seq 1 36); do
-            LIVE=$(curl -fsS "https://apiv1.yekora.mx/health" | jq -r '.sha' 2> /dev/null || true)
-            if [ "$LIVE" = "$GITHUB_SHA" ]; then break; fi
-            echo "Attempt $attempt: live sha '$LIVE', expected $GITHUB_SHA"
-            sleep 10
+          DEADLINE=$((SECONDS + 300))
+          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS "https://apiv1.yekora.mx/health" | jq -r '.sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              echo "FATAL: apiv1.yekora.mx does not run $GITHUB_SHA after 300 s. Network diagnosis:"
+              getent ahosts apiv1.yekora.mx || echo "DNS: no answer"
+              curl -4 -v --connect-timeout 5 --max-time 10 -o /dev/null https://apiv1.yekora.mx/health || echo "IPv4: unreachable"
+              curl -6 -v --connect-timeout 5 --max-time 10 -o /dev/null https://apiv1.yekora.mx/health || echo "IPv6: unreachable"
+              exit 1
+            fi
+            sleep 3
           done
-          [ "$LIVE" = "$GITHUB_SHA" ] || { echo "FATAL: apiv1.yekora.mx does not run $GITHUB_SHA"; exit 1; }
-          curl -fsS https://apiv1.yekora.mx/health | jq -e '.status == "ok" and .db == "connected"'
-          curl -fsS https://apiv1.yekora.mx/v1/catalog | jq -e '.items | type == "array"' > /dev/null
+          echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA after ${SECONDS} s"
+          curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -e '.status == "ok" and .db == "connected"'
+          curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/v1/catalog | jq -e '.items | type == "array"' > /dev/null
           # A Banxico FIX is stored since 2026-10-19: a 503 here would mean the rates were lost.
-          RATE=$(curl -sS -o /dev/null -w '%{http_code}' https://apiv1.yekora.mx/v1/exchange-rate)
+          RATE=$(curl --connect-timeout 5 --max-time 10 -sS -o /dev/null -w '%{http_code}' https://apiv1.yekora.mx/v1/exchange-rate)
           [ "$RATE" = "200" ] || { echo "FATAL: /v1/exchange-rate → $RATE"; exit 1; }
           # FC 009 F4: the cart quote answers the empty cart with a zeroed summary.
-          curl -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+          curl --connect-timeout 5 --max-time 10 -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
             -d '{"items":[]}' \
             | jq -e '.items == [] and .warnings == [] and .summary.totalMxnCents == 0 and .summary.subtotalMxnCents == 0 and .summary.taxMxnCents == 0' > /dev/null \
@@ -675,12 +709,12 @@ jobs:
           # FC 011: an unknown SKU makes the quote read products with the physical columns of
           # migration 002 (a missing column is a 500). Without a destination it is a 200 with an
           # `unavailable` warning; with one, T1.1 V refuses it with a 400 problem.
-          curl -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+          curl --connect-timeout 5 --max-time 10 -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
             -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}]}' \
             | jq -e '.warnings == [{"sku":"SMOKE-NONE","code":"unavailable"}] and .summary.shippingCode == null and .summary.serviceable == true' > /dev/null \
             || { echo "FATAL: /v1/cart/quote without destination"; exit 1; }
-          SHIP=$(curl -sS -o /tmp/ship.json -w '%{http_code}' -X POST https://apiv1.yekora.mx/v1/cart/quote \
+          SHIP=$(curl --connect-timeout 5 --max-time 10 -sS -o /tmp/ship.json -w '%{http_code}' -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
             -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}],"destination":{"stateCode":"ZAC"}}')
           [ "$SHIP" = "400" ] && jq -e '.detail == "EMPTY_OR_UNAVAILABLE_CART"' /tmp/ship.json > /dev/null \
@@ -690,11 +724,13 @@ jobs:
   hostinger-deployment:
     name: 🚀 Deployment to Hostinger
     # Only certified pushes to main reach production (FC 003). Hostinger's own Git
-    # auto-deployment stays off: this job is the only way in. FC 008: after the API release, so
-    # the catalog is read from the API that was just verified.
-    needs: [global-certification, api-release]
+    # auto-deployment stays off: this job is the only way in. FC 026 Enmienda 9: it builds the
+    # site while api-release publishes, and waits for apiv1.yekora.mx to serve this commit
+    # before the rsync, so the order API → site holds without paying the two in series.
+    needs: [global-certification]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     # One deploy at a time; a newer push waits instead of cutting an rsync in half.
     concurrency:
       group: hostinger-production
@@ -706,6 +742,9 @@ jobs:
       SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # The full history lets the rebuild step compare this push with the previous one.
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -718,10 +757,37 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build static export (out/)
         # FC 008/009: the catalog is always read from apiv1.yekora.mx; a failed read fails the
-        # build and the previous deploy stays online.
+        # build and the previous deploy stays online. Built in parallel with api-release.
         env:
           CATALOG_API_URL: https://apiv1.yekora.mx
         run: bun run build
+      - name: ⏱️ Wait for the API release — apiv1.yekora.mx serves this commit (≤ 120 s)
+        run: |
+          set -uo pipefail
+          DEADLINE=$((SECONDS + 120))
+          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -r '.sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              echo "FATAL: apiv1.yekora.mx does not serve $GITHUB_SHA after 120 s; the site is not deployed."
+              exit 1
+            fi
+            sleep 3
+          done
+          echo "[OK] apiv1.yekora.mx serves $GITHUB_SHA"
+      - name: Rebuild against the released API when this commit changed apps/api
+        # The early build read the previous API. When this push changed the API, the catalog is
+        # read again from the one just released; otherwise the early build is the same and stays.
+        env:
+          CATALOG_API_URL: https://apiv1.yekora.mx
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "$BEFORE^{commit}" 2> /dev/null \
+            && git diff --quiet "$BEFORE" "$GITHUB_SHA" -- apps/api; then
+            echo "[OK] apps/api unchanged since $BEFORE: the early build stays."
+          else
+            echo "apps/api changed (or no comparable base): rebuilding against the released API."
+            bun run build
+          fi
       - name: 🛡️ A1 guard — no fictitious product reaches production
         # FC 008 Does NOT: fictitious products in production. E2E fixture slugs start with e2e-
         # and local seed slugs with dev-; either one in out/ aborts the deploy.
@@ -789,40 +855,39 @@ jobs:
 
       - name: 🔥 Smoke test — production serves this commit
         run: |
-          for attempt in 1 2 3 4 5 6; do
-            LIVE=$(curl -fsS "https://yekora.mx/version.txt?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' || true)
-            if [ "$LIVE" = "$GITHUB_SHA" ]; then break; fi
-            echo "Attempt $attempt: live version '$LIVE', expected $GITHUB_SHA"
-            sleep 10
+          # FC 026 Enmienda 9: polled every 3 s up to 120 s, every curl bounded.
+          DEADLINE=$((SECONDS + 120))
+          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS "https://yekora.mx/version.txt?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' 2> /dev/null)" = "$GITHUB_SHA" ]; do
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              echo "FATAL: https://yekora.mx/version.txt does not serve $GITHUB_SHA after 120 s"
+              exit 1
+            fi
+            sleep 3
           done
-          if [ "$LIVE" != "$GITHUB_SHA" ]; then
-            echo "FATAL: https://yekora.mx/version.txt does not serve $GITHUB_SHA"
-            exit 1
-          fi
           for url in https://yekora.mx/ https://yekora.mx/en/ https://yekora.mx/favicon.ico \
             https://yekora.mx/envios-y-devoluciones/ https://yekora.mx/en/shipping-and-returns/ \
             https://yekora.mx/manifest.webmanifest https://yekora.mx/offline/ https://yekora.mx/en/offline/ \
             https://yekora.mx/catalogo/ https://yekora.mx/en/catalog/ https://yekora.mx/carrito/ https://yekora.mx/en/cart/; do
-            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
+            STATUS=$(curl --connect-timeout 5 --max-time 10 -sS -o /dev/null -w '%{http_code}' "$url")
             echo "$url → $STATUS"
             if [ "$STATUS" != "200" ]; then exit 1; fi
           done
           # FC 007 G1: production must serve the stamped service worker, never the bare marker.
-          curl -fsS "https://yekora.mx/sw.js?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' -o /tmp/sw.js
+          curl --connect-timeout 5 --max-time 10 -fsS "https://yekora.mx/sw.js?sha=$GITHUB_SHA" -H 'Cache-Control: no-cache' -o /tmp/sw.js
           if grep -q '__BUILD_SHA__' /tmp/sw.js || ! grep -q "$GITHUB_SHA" /tmp/sw.js; then
             echo "FATAL: https://yekora.mx/sw.js does not carry $GITHUB_SHA"
             exit 1
           fi
           # An unknown path must answer 404 with the branded page, never 200 (FC 004).
-          NOT_FOUND=$(curl -sS -o /tmp/404.html -w '%{http_code}' "https://yekora.mx/ruta-inexistente-$GITHUB_SHA/")
+          NOT_FOUND=$(curl --connect-timeout 5 --max-time 10 -sS -o /tmp/404.html -w '%{http_code}' "https://yekora.mx/ruta-inexistente-$GITHUB_SHA/")
           echo "unknown path → $NOT_FOUND"
           if [ "$NOT_FOUND" != "404" ] || ! grep -q 'Ruta no encontrada' /tmp/404.html; then exit 1; fi
           # FC 010 (OWASP A02/A05): plain HTTP is a 301 to HTTPS (Hostinger's CDN), and the live
           # answer carries HSTS and the hardening headers of public/.htaccess.
-          REDIRECT=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' http://yekora.mx/catalogo/)
+          REDIRECT=$(curl --connect-timeout 5 --max-time 10 -sS -o /dev/null -w '%{http_code} %{redirect_url}' http://yekora.mx/catalogo/)
           echo "http://yekora.mx/catalogo/ → $REDIRECT"
           if [ "$REDIRECT" != "301 https://yekora.mx/catalogo/" ]; then exit 1; fi
-          curl -fsSI https://yekora.mx/ | tr -d '\r' | tr '[:upper:]' '[:lower:]' > /tmp/headers.txt
+          curl --connect-timeout 5 --max-time 10 -fsSI https://yekora.mx/ | tr -d '\r' | tr '[:upper:]' '[:lower:]' > /tmp/headers.txt
           for header in \
             'strict-transport-security: max-age=31536000; includesubdomains' \
             'x-content-type-options: nosniff' \

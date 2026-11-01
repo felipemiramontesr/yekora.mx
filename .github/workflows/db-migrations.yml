@@ -52,6 +52,7 @@ jobs:
   authorize:
     name: 🔐 Authorize (T1.2 · D ∧ A)
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Only GrayMan, only main, only by hand
@@ -83,6 +84,7 @@ jobs:
     name: 🏛️ Backup and migrate
     needs: authorize
     runs-on: [self-hosted, yekora-db]
+    timeout-minutes: 20
     # O: GrayMan approves this environment before the job starts.
     environment: production-db
     timeout-minutes: 20

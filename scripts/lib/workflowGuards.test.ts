@@ -70,7 +70,8 @@ describe('deployWorkflowViolations (FC 009 · K-13: API checks always on)', () =
   it('flags the retired switch, a conditional smoke test and an optional catalog read', () => {
     const tampered = deploy
       .replace(SMOKE, `${SMOKE}\n        if: vars.API_LIVE == 'true'`)
-      .replace(
+      // Both site builds of the deploy job (early, and the rebuild after an API change).
+      .replaceAll(
         'CATALOG_API_URL: https://apiv1.yekora.mx',
         "CATALOG_API_URL: ${{ vars.API_LIVE == 'true' && 'https://apiv1.yekora.mx' || '' }}"
       );
@@ -248,7 +249,10 @@ describe('deployWorkflowViolations (FC 025 · FC 026: one job per piece of work)
     [
       'a missing Backend job',
       (w: string) => w.replace('  backend-validation:\n', '  api-checks:\n'),
-      ['the backend-validation job is missing'],
+      [
+        'the backend-validation job is missing',
+        'the backend-validation job must have timeout-minutes: 15, found: none',
+      ],
     ],
     [
       'a workflow that cancels runs of main too',
@@ -490,6 +494,7 @@ describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
       'every job must run on ubuntu-24.04',
       'it must run scripts/dependencyAuditGate.ts',
       'the security Issue must be opened only when the audit fails',
+      'the audit job must have timeout-minutes: 15, found: none',
     ]);
   });
 });
@@ -535,7 +540,7 @@ describe('dependabotViolations (FC 016 · Archon policy, T2)', () => {
 describe('FC 026 Enmienda 5–8 · shards, no wait-on, service workers', () => {
   const lf = deploy.replace(/\r\n/g, '\n');
   const PROBE =
-    'for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 > /dev/null';
+    'for attempt in $(seq 1 30); do curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null && break; sleep 2; done; curl -fsS http://localhost:3100 --connect-timeout 5 --max-time 10 > /dev/null';
 
   it('flags a missing E2E shard', () => {
     expect(
@@ -598,5 +603,116 @@ describe('FC 026 Enmienda 5–8 · shards, no wait-on, service workers', () => {
       'e2e/cart.spec.ts must not allow service workers',
       'e2e/pwa.spec.ts must allow the service worker it tests',
     ]);
+  });
+});
+
+describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
+  const lf = deploy.replace(/\r\n/g, '\n');
+  const migrationsLf = migrations.replace(/\r\n/g, '\n');
+  const cronLf = readFileSync(
+    '.github/workflows/dependency-audit-cron.yml',
+    'utf8'
+  ).replace(/\r\n/g, '\n');
+  const GATE_DEADLINE = 'DEADLINE=$((SECONDS + 120))';
+
+  it.each([
+    [
+      'a job back on GitHub default ceiling',
+      (w: string) =>
+        w
+          .replace(
+            '    name: 📦 API release (apiv1.yekora.mx)\n',
+            '    name: 📦 API release (apiv1.yekora.mx)\n'
+          )
+          .replace(
+            /( {2}api-release:\n(?:.*\n)*?) {4}timeout-minutes: 10\n/,
+            '$1'
+          ),
+      ['the api-release job must have timeout-minutes: 10, found: none'],
+    ],
+    [
+      'a job with another ceiling',
+      (w: string) =>
+        w.replace(
+          /( {2}e2e-build:\n(?:.*\n)*?) {4}timeout-minutes: 15/,
+          '$1    timeout-minutes: 60'
+        ),
+      ['the e2e-build job must have timeout-minutes: 15, found: 60'],
+    ],
+    [
+      'a curl without its limits',
+      (w: string) =>
+        w.replace(
+          'curl --connect-timeout 5 --max-time 10 -fsSI https://yekora.mx/',
+          'curl -fsSI https://yekora.mx/'
+        ),
+      ['every curl needs --connect-timeout 5 --max-time 10: 1 without them'],
+    ],
+    [
+      'an API smoke without its network diagnosis',
+      (w: string) =>
+        w.replace(
+          'getent ahosts apiv1.yekora.mx || echo "DNS: no answer"',
+          'echo "no diagnosis"'
+        ),
+      ['the api-release smoke must run: getent ahosts apiv1.yekora.mx'],
+    ],
+    [
+      'a deploy that waits for the API release again in series',
+      // The release job has the same needs line: only the deploy job's is changed.
+      (w: string) =>
+        w.replace(
+          /( {2}hostinger-deployment:\n(?:.*\n)*?) {4}needs: \[global-certification\]/,
+          '$1    needs: [global-certification, api-release]'
+        ),
+      [
+        'the hostinger-deployment job must wait for global-certification only, found: global-certification, api-release',
+      ],
+    ],
+    [
+      'a deploy that syncs without waiting for the released API',
+      (w: string) => w.replace(GATE_DEADLINE, 'DEADLINE=$SECONDS'),
+      ['the deploy must check before its rsync: SECONDS + 120'],
+    ],
+    [
+      'a browser cache keyed on the whole lockfile again',
+      (w: string) =>
+        w.replace("hashFiles('.playwright-version')", "hashFiles('bun.lock')"),
+      [
+        "every browser cache must use key: ${{ runner.os }}-playwright-${{ hashFiles('.playwright-version') }}",
+      ],
+    ],
+    [
+      'a lane that no longer writes the Playwright version',
+      (w: string) =>
+        w.replace(
+          "run: node -p \"require('./package.json').devDependencies['@playwright/test']\" > .playwright-version",
+          'run: echo skipped'
+        ),
+      [
+        'the e2e-validation job must write .playwright-version from package.json',
+      ],
+    ],
+  ])('flags %s', (_case, tamper, expected) => {
+    const tampered = tamper(lf);
+    expect(tampered).not.toBe(lf);
+    expect(deployWorkflowViolations(tampered)).toEqual(expected);
+  });
+
+  it('holds the migrations and the daily audit to their ceilings', () => {
+    expect(
+      migrationsWorkflowViolations(
+        migrationsLf.replace(
+          '    timeout-minutes: 20',
+          '    timeout-minutes: 90'
+        ),
+        OWNER
+      )
+    ).toEqual(['the migrate job must have timeout-minutes: 20, found: 90']);
+    expect(
+      auditCronViolations(
+        cronLf.replace('    timeout-minutes: 15', '    timeout-minutes: 360')
+      )
+    ).toEqual(['the audit job must have timeout-minutes: 15, found: 360']);
   });
 });
