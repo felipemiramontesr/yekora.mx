@@ -44119,9 +44119,9 @@ var require_merge_json_schemas = __commonJS({
       for (let i = 0; i < maxArrayItemsLength; i++) {
         const indexItemSchemas = [];
         for (const schema2 of schemas) {
-          const itemSchema = getSchemaForItem(schema2, i);
-          if (itemSchema !== void 0) {
-            indexItemSchemas.push(itemSchema);
+          const itemSchema2 = getSchemaForItem(schema2, i);
+          if (itemSchema2 !== void 0) {
+            indexItemSchemas.push(itemSchema2);
           }
         }
         mergedItemsSchemas[i] = _mergeSchemas(indexItemSchemas, options);
@@ -90964,7 +90964,7 @@ function generateTupleCheck(doc, ctx, schema2, accessor) {
   const outputVar = newVar(ctx);
   doc.write(`const ${outputVar} = [];`);
   for (let i = 0; i < items.length; i++) {
-    const itemSchema = items[i];
+    const itemSchema2 = items[i];
     if (i >= optoutStart) {
       doc.write(`if (${outputVar}.length === ${i}) {`);
       doc.indented((d) => {
@@ -90972,12 +90972,12 @@ function generateTupleCheck(doc, ctx, schema2, accessor) {
         d.indented((d2) => {
           const elemVar = newVar(ctx);
           d2.write(`const ${elemVar} = ${accessor}[${i}];`);
-          const elemOutput = compileChild(d2, ctx, itemSchema, elemVar);
+          const elemOutput = compileChild(d2, ctx, itemSchema2, elemVar);
           d2.write(`${outputVar}[${i}] = ${elemOutput};`);
         });
         d.write(`} else {`);
         d.indented((d2) => {
-          if (dropsWhenAbsent(itemSchema)) {
+          if (dropsWhenAbsent(itemSchema2)) {
             d2.write(`${outputVar}.length = ${i};`);
             return;
           }
@@ -90986,7 +90986,7 @@ function generateTupleCheck(doc, ctx, schema2, accessor) {
           d2.write(`const ${elemVar} = undefined;`);
           d2.write(`const ${branchVar} = (() => {`);
           d2.indented((d3) => {
-            const elemOutput = compileChild(d3, ctx, itemSchema, elemVar);
+            const elemOutput = compileChild(d3, ctx, itemSchema2, elemVar);
             d3.write(`return ${elemOutput};`);
           });
           d2.write(`})();`);
@@ -90999,7 +90999,7 @@ function generateTupleCheck(doc, ctx, schema2, accessor) {
     } else {
       const elemVar = newVar(ctx);
       doc.write(`const ${elemVar} = ${accessor}[${i}];`);
-      const elemOutput = compileChild(doc, ctx, itemSchema, elemVar);
+      const elemOutput = compileChild(doc, ctx, itemSchema2, elemVar);
       doc.write(`${outputVar}[${i}] = ${elemOutput};`);
     }
   }
@@ -96743,11 +96743,39 @@ function loadConfig(env2) {
   };
 }
 
-// src/lib/problem.ts
-var PROBLEM_TYPE = "application/problem+json";
-function problem(status, title, detail) {
-  return detail === void 0 ? { type: "about:blank", title, status } : { type: "about:blank", title, status, detail };
-}
+// ../../lib/api/catalogClient.ts
+var slug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+var exchangeRateSchema = external_exports.object({
+  series: external_exports.string(),
+  date: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  rate: external_exports.string().regex(/^\d+\.\d{4}$/)
+});
+var itemSchema = external_exports.object({
+  sku: external_exports.string().min(1),
+  slug,
+  name: external_exports.string().min(1),
+  description: external_exports.string(),
+  discipline: slug,
+  disciplineName: external_exports.string().min(1),
+  level: slug,
+  levelName: external_exports.string().min(1),
+  priceMxnCents: external_exports.number().int().positive(),
+  priceUsdCents: external_exports.number().int().nonnegative().nullable(),
+  inStock: external_exports.boolean()
+});
+var productSchema = itemSchema.extend({
+  images: external_exports.array(
+    external_exports.object({
+      path: external_exports.string().startsWith("/images/products/"),
+      alt: external_exports.string()
+    })
+  )
+});
+var pageSchema = external_exports.object({
+  items: external_exports.array(itemSchema),
+  total: external_exports.number().int().nonnegative(),
+  exchangeRate: exchangeRateSchema.nullable()
+});
 
 // ../../lib/cart/cartTypes.ts
 var MAX_LINES = 50;
@@ -96813,339 +96841,6 @@ var cartQuoteSchema = external_exports.object({
     })
   )
 });
-
-// src/lib/money.ts
-function splitVat(totalMxnCents) {
-  const base = Math.round(totalMxnCents * 100 / 116);
-  return { base, tax: totalMxnCents - base };
-}
-function usdCents(priceMxnCents, fix) {
-  if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
-  return Math.round(priceMxnCents / fix);
-}
-
-// src/services/cartQuote.ts
-var LOW_STOCK = 5;
-var MAX_QUANTITY2 = 99;
-function stockStatus(stock) {
-  if (stock <= 0) return "out_of_stock";
-  return stock < LOW_STOCK ? "low_stock" : "available";
-}
-function quoteLine(line, row2, lang4) {
-  if (!row2) {
-    return {
-      quoted: {
-        sku: line.sku,
-        slug: null,
-        name: null,
-        quantity: line.quantity,
-        unitPriceMxnCents: null,
-        lineTotalMxnCents: null,
-        lineBaseMxnCents: null,
-        lineTaxMxnCents: null,
-        stockStatus: "unavailable",
-        availableQuantity: 0,
-        purchasable: false
-      },
-      warning: "unavailable"
-    };
-  }
-  const unit = Number(row2.price_mxn_cents);
-  const stock = Number(row2.stock);
-  const total = unit * line.quantity;
-  const { base, tax } = splitVat(total);
-  const status = stockStatus(stock);
-  const purchasable = stock >= line.quantity;
-  let warning;
-  if (status === "out_of_stock") warning = "out_of_stock";
-  else if (!purchasable) warning = "insufficient_stock";
-  return {
-    quoted: {
-      sku: row2.sku,
-      slug: row2.slug,
-      name: lang4 === "en" ? row2.name_en : row2.name_es,
-      quantity: line.quantity,
-      unitPriceMxnCents: unit,
-      lineTotalMxnCents: total,
-      lineBaseMxnCents: base,
-      lineTaxMxnCents: tax,
-      stockStatus: status,
-      availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
-      purchasable
-    },
-    warning,
-    counted: purchasable ? { base, tax, total } : void 0
-  };
-}
-function buildQuote(lines, rows, rate, lang4, shipping = null) {
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
-  const items = [];
-  const warnings = [];
-  const summary = {
-    subtotalMxnCents: 0,
-    taxMxnCents: 0,
-    totalMxnCents: 0,
-    totalItems: 0
-  };
-  for (const line of lines) {
-    const { quoted, warning, counted } = quoteLine(
-      line,
-      bySku.get(line.sku),
-      lang4
-    );
-    items.push(quoted);
-    if (warning) warnings.push({ sku: line.sku, code: warning });
-    if (counted) {
-      summary.subtotalMxnCents += counted.base;
-      summary.taxMxnCents += counted.tax;
-      summary.totalMxnCents += counted.total;
-      summary.totalItems += quoted.quantity;
-    }
-  }
-  const totalMxnCents = summary.totalMxnCents + (shipping?.total ?? 0);
-  const fix = rate ? Number(rate.rate) : null;
-  const referenceUsdCents = totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
-  return {
-    items,
-    summary: {
-      itemsBaseMxnCents: summary.subtotalMxnCents,
-      itemsTaxMxnCents: summary.taxMxnCents,
-      itemsTotalMxnCents: summary.totalMxnCents,
-      shippingCode: shipping?.code ?? null,
-      shippingBaseMxnCents: shipping?.base ?? null,
-      shippingTaxMxnCents: shipping?.tax ?? null,
-      shippingTotalMxnCents: shipping?.total ?? null,
-      serviceable: shipping?.code !== "UNSERVICEABLE_DESTINATION",
-      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
-      subtotalMxnCents: summary.subtotalMxnCents + (shipping?.base ?? 0),
-      taxMxnCents: summary.taxMxnCents + (shipping?.tax ?? 0),
-      totalMxnCents,
-      totalItems: summary.totalItems,
-      referenceUsdCents,
-      exchangeRate: rate
-    },
-    warnings
-  };
-}
-async function readProducts(db, lines) {
-  if (lines.length === 0) return [];
-  return db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [lines.map((line) => line.sku)]
-  );
-}
-async function quoteCart(db, lines, rate, lang4) {
-  return buildQuote(lines, await readProducts(db, lines), rate, lang4);
-}
-async function quoteCartToDestination(db, lines, rate, lang4, destination, provider) {
-  const rows = await readProducts(db, lines);
-  const products = buildQuote(lines, rows, rate, lang4);
-  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
-    return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
-  }
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
-  const shipment = await provider.quote({
-    stateCode: destination.stateCode,
-    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
-    lines: lines.map((line) => {
-      const row2 = bySku.get(line.sku);
-      return {
-        quantity: line.quantity,
-        weightGrams: Number(row2.weight_grams),
-        lengthMm: Number(row2.length_mm),
-        widthMm: Number(row2.width_mm),
-        heightMm: Number(row2.height_mm),
-        classId: Number(row2.shipping_class_id)
-      };
-    })
-  });
-  if (shipment.code === "INVALID_DESTINATION") {
-    return { ok: false, code: "INVALID_DESTINATION" };
-  }
-  const shipping = shipment.serviceable ? {
-    code: shipment.code,
-    base: shipment.baseMxnCents,
-    tax: shipment.taxMxnCents,
-    total: shipment.totalMxnCents,
-    remaining: shipment.freeShippingRemainingMxnCents
-  } : {
-    code: "UNSERVICEABLE_DESTINATION",
-    base: 0,
-    tax: 0,
-    total: 0,
-    remaining: null
-  };
-  return { ok: true, quote: buildQuote(lines, rows, rate, lang4, shipping) };
-}
-
-// src/routes/cart.ts
-var requestSchema = external_exports.strictObject({
-  items: cartLinesSchema,
-  destination: destinationSchema.optional()
-});
-var REJECTION_TITLE = {
-  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
-  INVALID_DESTINATION: "Invalid destination"
-};
-var lang = external_exports.enum(["es-MX", "en"]).default("es-MX");
-function registerCartRoutes(app, deps) {
-  app.post(
-    "/v1/cart/quote",
-    {
-      bodyLimit: 16 * 1024,
-      config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
-    },
-    async (request, reply) => {
-      const body = requestSchema.safeParse(request.body);
-      const language = lang.safeParse(
-        request.query.lang
-      );
-      if (!body.success || !language.success) {
-        return reply.code(400).type(PROBLEM_TYPE).send(
-          problem(
-            400,
-            "Invalid cart",
-            body.error?.issues[0]?.message ?? "Invalid lang"
-          )
-        );
-      }
-      const { items, destination } = body.data;
-      const rate = await deps.rate();
-      if (destination === void 0) {
-        return cartQuoteSchema.parse(
-          await quoteCart(deps.db, items, rate, language.data)
-        );
-      }
-      const result = await quoteCartToDestination(
-        deps.db,
-        items,
-        rate,
-        language.data,
-        destination,
-        deps.shipping
-      );
-      if (!result.ok) {
-        return reply.code(400).type(PROBLEM_TYPE).send(problem(400, REJECTION_TITLE[result.code], result.code));
-      }
-      return cartQuoteSchema.parse(result.quote);
-    }
-  );
-}
-
-// src/services/catalog.ts
-var SORTS = ["name", "price_asc", "price_desc"];
-async function listProducts(db, query) {
-  const filters = [
-    query.discipline,
-    query.discipline,
-    query.level,
-    query.level
-  ];
-  const [{ total }] = await db.query(
-    "SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?)",
-    filters
-  );
-  const items = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
-    [
-      ...filters,
-      query.sort,
-      query.sort,
-      query.lang,
-      query.pageSize,
-      (query.page - 1) * query.pageSize
-    ]
-  );
-  return { items, total: Number(total) };
-}
-async function findProduct(db, slug2) {
-  const [product] = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [slug2]
-  );
-  if (!product) return null;
-  const images = await db.query(
-    "SELECT i.path, i.alt_es, i.alt_en FROM product_images i JOIN products p ON p.id = i.product_id WHERE p.slug = ? ORDER BY i.sort_order ASC",
-    [slug2]
-  );
-  return { product, images };
-}
-
-// src/routes/catalog.ts
-var slug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160);
-var lang2 = external_exports.enum(["es-MX", "en"]).default("es-MX");
-var listQuery = external_exports.object({
-  discipline: slug.max(40).optional(),
-  level: slug.max(40).optional(),
-  sort: external_exports.enum(SORTS).default("name"),
-  lang: lang2,
-  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
-  pageSize: external_exports.coerce.number().int().min(1).max(48).default(24)
-});
-function present(row2, language, fix) {
-  const english = language === "en";
-  return {
-    sku: row2.sku,
-    slug: row2.slug,
-    name: english ? row2.name_en : row2.name_es,
-    description: english ? row2.description_en : row2.description_es,
-    discipline: row2.discipline,
-    disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
-    level: row2.level,
-    levelName: english ? row2.level_name_en : row2.level_name_es,
-    priceMxnCents: Number(row2.price_mxn_cents),
-    priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
-    inStock: Number(row2.stock) > 0
-  };
-}
-function registerCatalogRoutes(app, deps) {
-  app.get("/v1/catalog", async (request, reply) => {
-    const parsed = listQuery.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", parsed.error.issues[0]?.message));
-    }
-    const query = parsed.data;
-    const [{ items, total }, rate] = await Promise.all([
-      listProducts(deps.db, {
-        ...query,
-        discipline: query.discipline ?? null,
-        level: query.level ?? null
-      }),
-      deps.rate()
-    ]);
-    const fix = rate ? Number(rate.rate) : null;
-    return {
-      items: items.map((row2) => present(row2, query.lang, fix)),
-      page: query.page,
-      pageSize: query.pageSize,
-      total,
-      exchangeRate: rate
-    };
-  });
-  app.get("/v1/catalog/:slug", async (request, reply) => {
-    const params = external_exports.object({ slug }).safeParse(request.params);
-    const language = lang2.safeParse(request.query.lang);
-    if (!params.success || !language.success) {
-      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
-    }
-    const [found, rate] = await Promise.all([
-      findProduct(deps.db, params.data.slug),
-      deps.rate()
-    ]);
-    if (!found) {
-      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Product not found"));
-    }
-    const english = language.data === "en";
-    return {
-      ...present(found.product, language.data, rate ? Number(rate.rate) : null),
-      images: found.images.map((image) => ({
-        path: image.path,
-        alt: english ? image.alt_en : image.alt_es
-      })),
-      exchangeRate: rate
-    };
-  });
-}
 
 // ../../lib/cart/mxStates.ts
 var MEXICAN_STATES = [
@@ -97252,6 +96947,363 @@ var CHECKOUT_RETURN_PATHS = {
   en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
 };
 
+// src/lib/language.ts
+var languageSchema = external_exports.enum(["es-MX", "en"]).default("es-MX");
+var languageQuery = external_exports.object({ lang: languageSchema });
+
+// src/lib/problem.ts
+var problemSchema = external_exports.object({
+  /** Problem type; `about:blank` means "see the status". */
+  type: external_exports.string(),
+  /** Short, human-readable summary. */
+  title: external_exports.string(),
+  /** HTTP status code. */
+  status: external_exports.number().int(),
+  /** Optional explanation safe to show to clients. */
+  detail: external_exports.string().optional()
+});
+var PROBLEM_TYPE = "application/problem+json";
+function problem(status, title, detail) {
+  return detail === void 0 ? { type: "about:blank", title, status } : { type: "about:blank", title, status, detail };
+}
+
+// src/lib/money.ts
+function splitVat(totalMxnCents) {
+  const base = Math.round(totalMxnCents * 100 / 116);
+  return { base, tax: totalMxnCents - base };
+}
+function usdCents(priceMxnCents, fix) {
+  if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
+  return Math.round(priceMxnCents / fix);
+}
+
+// src/services/cartQuote.ts
+var LOW_STOCK = 5;
+var MAX_QUANTITY2 = 99;
+function stockStatus(stock) {
+  if (stock <= 0) return "out_of_stock";
+  return stock < LOW_STOCK ? "low_stock" : "available";
+}
+function quoteLine(line, row2, lang) {
+  if (!row2) {
+    return {
+      quoted: {
+        sku: line.sku,
+        slug: null,
+        name: null,
+        quantity: line.quantity,
+        unitPriceMxnCents: null,
+        lineTotalMxnCents: null,
+        lineBaseMxnCents: null,
+        lineTaxMxnCents: null,
+        stockStatus: "unavailable",
+        availableQuantity: 0,
+        purchasable: false
+      },
+      warning: "unavailable"
+    };
+  }
+  const unit = Number(row2.price_mxn_cents);
+  const stock = Number(row2.stock);
+  const total = unit * line.quantity;
+  const { base, tax } = splitVat(total);
+  const status = stockStatus(stock);
+  const purchasable = stock >= line.quantity;
+  let warning;
+  if (status === "out_of_stock") warning = "out_of_stock";
+  else if (!purchasable) warning = "insufficient_stock";
+  return {
+    quoted: {
+      sku: row2.sku,
+      slug: row2.slug,
+      name: lang === "en" ? row2.name_en : row2.name_es,
+      quantity: line.quantity,
+      unitPriceMxnCents: unit,
+      lineTotalMxnCents: total,
+      lineBaseMxnCents: base,
+      lineTaxMxnCents: tax,
+      stockStatus: status,
+      availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
+      purchasable
+    },
+    warning,
+    counted: purchasable ? { base, tax, total } : void 0
+  };
+}
+function buildQuote(lines, rows, rate, lang, shipping = null) {
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const items = [];
+  const warnings = [];
+  const summary = {
+    subtotalMxnCents: 0,
+    taxMxnCents: 0,
+    totalMxnCents: 0,
+    totalItems: 0
+  };
+  for (const line of lines) {
+    const { quoted, warning, counted } = quoteLine(
+      line,
+      bySku.get(line.sku),
+      lang
+    );
+    items.push(quoted);
+    if (warning) warnings.push({ sku: line.sku, code: warning });
+    if (counted) {
+      summary.subtotalMxnCents += counted.base;
+      summary.taxMxnCents += counted.tax;
+      summary.totalMxnCents += counted.total;
+      summary.totalItems += quoted.quantity;
+    }
+  }
+  const totalMxnCents = summary.totalMxnCents + (shipping?.total ?? 0);
+  const fix = rate ? Number(rate.rate) : null;
+  const referenceUsdCents = totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
+  return {
+    items,
+    summary: {
+      itemsBaseMxnCents: summary.subtotalMxnCents,
+      itemsTaxMxnCents: summary.taxMxnCents,
+      itemsTotalMxnCents: summary.totalMxnCents,
+      shippingCode: shipping?.code ?? null,
+      shippingBaseMxnCents: shipping?.base ?? null,
+      shippingTaxMxnCents: shipping?.tax ?? null,
+      shippingTotalMxnCents: shipping?.total ?? null,
+      serviceable: shipping?.code !== "UNSERVICEABLE_DESTINATION",
+      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
+      subtotalMxnCents: summary.subtotalMxnCents + (shipping?.base ?? 0),
+      taxMxnCents: summary.taxMxnCents + (shipping?.tax ?? 0),
+      totalMxnCents,
+      totalItems: summary.totalItems,
+      referenceUsdCents,
+      exchangeRate: rate
+    },
+    warnings
+  };
+}
+async function readProducts(db, lines) {
+  if (lines.length === 0) return [];
+  return db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    [lines.map((line) => line.sku)]
+  );
+}
+async function quoteCart(db, lines, rate, lang) {
+  return buildQuote(lines, await readProducts(db, lines), rate, lang);
+}
+async function quoteCartToDestination(db, lines, rate, lang, destination, provider) {
+  const rows = await readProducts(db, lines);
+  const products = buildQuote(lines, rows, rate, lang);
+  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
+    return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
+  }
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const shipment = await provider.quote({
+    stateCode: destination.stateCode,
+    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
+    lines: lines.map((line) => {
+      const row2 = bySku.get(line.sku);
+      return {
+        quantity: line.quantity,
+        weightGrams: Number(row2.weight_grams),
+        lengthMm: Number(row2.length_mm),
+        widthMm: Number(row2.width_mm),
+        heightMm: Number(row2.height_mm),
+        classId: Number(row2.shipping_class_id)
+      };
+    })
+  });
+  if (shipment.code === "INVALID_DESTINATION") {
+    return { ok: false, code: "INVALID_DESTINATION" };
+  }
+  const shipping = shipment.serviceable ? {
+    code: shipment.code,
+    base: shipment.baseMxnCents,
+    tax: shipment.taxMxnCents,
+    total: shipment.totalMxnCents,
+    remaining: shipment.freeShippingRemainingMxnCents
+  } : {
+    code: "UNSERVICEABLE_DESTINATION",
+    base: 0,
+    tax: 0,
+    total: 0,
+    remaining: null
+  };
+  return { ok: true, quote: buildQuote(lines, rows, rate, lang, shipping) };
+}
+
+// src/routes/cart.ts
+var cartQuoteRequestSchema = external_exports.strictObject({
+  items: cartLinesSchema,
+  destination: destinationSchema.optional()
+});
+var REJECTION_TITLE = {
+  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
+  INVALID_DESTINATION: "Invalid destination"
+};
+function registerCartRoutes(app, deps) {
+  app.post(
+    "/v1/cart/quote",
+    {
+      bodyLimit: 16 * 1024,
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+    },
+    async (request, reply) => {
+      const body = cartQuoteRequestSchema.safeParse(request.body);
+      const language = languageSchema.safeParse(
+        request.query.lang
+      );
+      if (!body.success || !language.success) {
+        return reply.code(400).type(PROBLEM_TYPE).send(
+          problem(
+            400,
+            "Invalid cart",
+            body.error?.issues[0]?.message ?? "Invalid lang"
+          )
+        );
+      }
+      const { items, destination } = body.data;
+      const rate = await deps.rate();
+      if (destination === void 0) {
+        return cartQuoteSchema.parse(
+          await quoteCart(deps.db, items, rate, language.data)
+        );
+      }
+      const result = await quoteCartToDestination(
+        deps.db,
+        items,
+        rate,
+        language.data,
+        destination,
+        deps.shipping
+      );
+      if (!result.ok) {
+        return reply.code(400).type(PROBLEM_TYPE).send(problem(400, REJECTION_TITLE[result.code], result.code));
+      }
+      return cartQuoteSchema.parse(result.quote);
+    }
+  );
+}
+
+// src/services/catalog.ts
+var SORTS = ["name", "price_asc", "price_desc"];
+async function listProducts(db, query) {
+  const filters = [
+    query.discipline,
+    query.discipline,
+    query.level,
+    query.level
+  ];
+  const [{ total }] = await db.query(
+    "SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?)",
+    filters
+  );
+  const items = await db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    [
+      ...filters,
+      query.sort,
+      query.sort,
+      query.lang,
+      query.pageSize,
+      (query.page - 1) * query.pageSize
+    ]
+  );
+  return { items, total: Number(total) };
+}
+async function findProduct(db, slug3) {
+  const [product] = await db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    [slug3]
+  );
+  if (!product) return null;
+  const images = await db.query(
+    "SELECT i.path, i.alt_es, i.alt_en FROM product_images i JOIN products p ON p.id = i.product_id WHERE p.slug = ? ORDER BY i.sort_order ASC",
+    [slug3]
+  );
+  return { product, images };
+}
+
+// src/routes/catalog.ts
+var slug2 = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160);
+var catalogListQuery = external_exports.object({
+  discipline: slug2.max(40).optional(),
+  level: slug2.max(40).optional(),
+  sort: external_exports.enum(SORTS).default("name"),
+  lang: languageSchema,
+  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
+  pageSize: external_exports.coerce.number().int().min(1).max(48).default(24)
+});
+var catalogItemParams = external_exports.object({ slug: slug2 });
+function present(row2, language, fix) {
+  const english = language === "en";
+  return {
+    sku: row2.sku,
+    slug: row2.slug,
+    name: english ? row2.name_en : row2.name_es,
+    description: english ? row2.description_en : row2.description_es,
+    discipline: row2.discipline,
+    disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
+    level: row2.level,
+    levelName: english ? row2.level_name_en : row2.level_name_es,
+    priceMxnCents: Number(row2.price_mxn_cents),
+    priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
+    inStock: Number(row2.stock) > 0
+  };
+}
+function registerCatalogRoutes(app, deps) {
+  app.get("/v1/catalog", async (request, reply) => {
+    const parsed = catalogListQuery.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", parsed.error.issues[0]?.message));
+    }
+    const query = parsed.data;
+    const [{ items, total }, rate] = await Promise.all([
+      listProducts(deps.db, {
+        ...query,
+        discipline: query.discipline ?? null,
+        level: query.level ?? null
+      }),
+      deps.rate()
+    ]);
+    const fix = rate ? Number(rate.rate) : null;
+    return {
+      items: items.map((row2) => present(row2, query.lang, fix)),
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      exchangeRate: rate
+    };
+  });
+  app.get("/v1/catalog/:slug", async (request, reply) => {
+    const params = catalogItemParams.safeParse(request.params);
+    const language = languageSchema.safeParse(
+      request.query.lang
+    );
+    if (!params.success || !language.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
+    }
+    const [found, rate] = await Promise.all([
+      findProduct(deps.db, params.data.slug),
+      deps.rate()
+    ]);
+    if (!found) {
+      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Product not found"));
+    }
+    const english = language.data === "en";
+    return {
+      ...present(found.product, language.data, rate ? Number(rate.rate) : null),
+      images: found.images.map((image) => ({
+        path: image.path,
+        alt: english ? image.alt_en : image.alt_es
+      })),
+      exchangeRate: rate
+    };
+  });
+}
+
+// src/routes/orders.ts
+var import_node_crypto2 = require("node:crypto");
+
 // src/services/checkout.ts
 var PROCESSOR_OF = {
   CARD: "STRIPE",
@@ -97343,12 +97395,12 @@ function admit(deps, body) {
   }
   return { request: parsed.data, method, processorCode, processor, secrets };
 }
-async function price(deps, request, lang4) {
+async function price(deps, request, lang) {
   const quoted = await quoteCartToDestination(
     deps.db,
     request.items,
     await deps.rate(),
-    lang4,
+    lang,
     {
       stateCode: request.address.stateCode,
       postalCode: request.address.postalCode
@@ -97427,12 +97479,12 @@ async function persist(deps, admitted, quote, order) {
     throw error62;
   }
 }
-async function createCheckout(deps, body, lang4) {
+async function createCheckout(deps, body, lang) {
   const admitted = admit(deps, body);
   if ("ok" in admitted) return admitted;
   const now = deps.now();
   await expireOverdueOrders(deps.db, now);
-  const quote = await price(deps, admitted.request, lang4);
+  const quote = await price(deps, admitted.request, lang);
   if ("ok" in quote) return quote;
   const [methodRow] = await deps.db.query(
     "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
@@ -97450,8 +97502,8 @@ async function createCheckout(deps, body, lang4) {
   };
   const orderId = await persist(deps, admitted, quote, order);
   if (typeof orderId !== "number") return orderId;
-  const paths = CHECKOUT_RETURN_PATHS[lang4];
-  const webhook = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
+  const paths = CHECKOUT_RETURN_PATHS[lang];
+  const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
   const total = quote.summary.totalMxnCents;
   try {
     const session = await admitted.processor.createSession({
@@ -97463,7 +97515,7 @@ async function createCheckout(deps, body, lang4) {
       now,
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
-      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook}`
+      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
     });
     await deps.db.query(
       "UPDATE orders SET processor_reference = ? WHERE id = ?",
@@ -97485,57 +97537,7 @@ async function createCheckout(deps, body, lang4) {
   }
 }
 
-// src/routes/checkout.ts
-var lang3 = external_exports.enum(["es-MX", "en"]).default("es-MX");
-var TITLES = {
-  INVALID_REQUEST: "Invalid checkout request",
-  SERVICE_UNAVAILABLE: "Payments unavailable",
-  INVALID_SHIPPING_ADDRESS: "Invalid shipping address",
-  PRIVACY_CONSENT_REQUIRED: "Privacy consent required",
-  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
-  UNSERVICEABLE_DESTINATION: "Destination not served",
-  PRICE_CHANGED: "Prices changed",
-  INSUFFICIENT_STOCK: "Insufficient stock"
-};
-function registerCheckoutRoutes(app, deps) {
-  app.post(
-    "/v1/checkout",
-    {
-      bodyLimit: 16 * 1024,
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } }
-    },
-    async (request, reply) => {
-      const language = lang3.safeParse(
-        request.query.lang
-      );
-      const outcome = language.success ? await createCheckout(deps, request.body, language.data) : { ok: false, status: 400, code: "INVALID_REQUEST" };
-      if (!outcome.ok) {
-        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES[outcome.code], outcome.code));
-      }
-      return reply.code(201).send(checkoutSessionSchema.parse(outcome.session));
-    }
-  );
-}
-
-// src/routes/exchangeRate.ts
-function registerExchangeRateRoute(app, rate) {
-  app.get("/v1/exchange-rate", async (_request, reply) => {
-    const current = await rate();
-    if (!current) {
-      return reply.code(503).type(PROBLEM_TYPE).send(
-        problem(
-          503,
-          "Exchange rate unavailable",
-          "No Banxico FIX stored yet."
-        )
-      );
-    }
-    return current;
-  });
-}
-
 // src/routes/orders.ts
-var import_node_crypto2 = require("node:crypto");
 var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
 var BEARER = /^Bearer ([\w-]{43})$/;
 function registerOrderRoutes(app, deps) {
@@ -97575,6 +97577,163 @@ function registerOrderRoutes(app, deps) {
       });
     }
   );
+}
+
+// src/contract.ts
+var healthSchema = external_exports.object({
+  status: external_exports.enum(["ok", "degraded"]),
+  version: external_exports.string(),
+  sha: external_exports.string(),
+  db: external_exports.enum(["connected", "unreachable"])
+});
+var catalogItemSchema = productSchema.omit({ images: true });
+var catalogPageSchema = external_exports.object({
+  items: external_exports.array(catalogItemSchema),
+  page: external_exports.number().int().positive(),
+  pageSize: external_exports.number().int().positive(),
+  total: external_exports.number().int().nonnegative(),
+  exchangeRate: exchangeRateSchema.nullable()
+});
+var catalogProductSchema = productSchema.extend({
+  exchangeRate: exchangeRateSchema.nullable()
+});
+var webhookAckSchema = external_exports.object({ code: external_exports.string() });
+var webhook = (processor, path) => ({
+  method: "POST",
+  path,
+  summary: `${processor} payment notification, verified by signature`,
+  permission: "public",
+  request: { rawBody: true },
+  responses: {
+    200: webhookAckSchema,
+    401: problemSchema,
+    500: problemSchema,
+    503: problemSchema
+  }
+});
+var ROUTE_CONTRACTS = [
+  {
+    method: "GET",
+    path: "/health",
+    summary: "Liveness, deployed version and database reachability",
+    permission: "public",
+    request: {},
+    responses: { 200: healthSchema, 503: healthSchema }
+  },
+  {
+    method: "GET",
+    path: "/v1/catalog",
+    summary: "Active products, filtered, sorted and paged, in one language",
+    permission: "public",
+    request: { query: catalogListQuery },
+    responses: { 200: catalogPageSchema, 400: problemSchema }
+  },
+  {
+    method: "GET",
+    path: "/v1/catalog/:slug",
+    summary: "One active product with its gallery, in one language",
+    permission: "public",
+    request: { params: catalogItemParams, query: languageQuery },
+    responses: {
+      200: catalogProductSchema,
+      400: problemSchema,
+      404: problemSchema
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/cart/quote",
+    summary: "Canonical quote of a guest cart, with shipping when a destination is given",
+    permission: "public",
+    request: { query: languageQuery, body: cartQuoteRequestSchema },
+    responses: { 200: cartQuoteSchema, 400: problemSchema }
+  },
+  {
+    method: "GET",
+    path: "/v1/exchange-rate",
+    summary: "Banxico FIX used for the USD reference",
+    permission: "public",
+    request: {},
+    responses: { 200: exchangeRateSchema, 503: problemSchema }
+  },
+  {
+    method: "POST",
+    path: "/v1/checkout",
+    summary: "Pending order with reserved stock and a hosted payment session",
+    permission: "public",
+    request: { query: languageQuery, body: checkoutRequestSchema },
+    responses: {
+      201: checkoutSessionSchema,
+      400: problemSchema,
+      409: problemSchema,
+      503: problemSchema
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/orders/:order_number",
+    summary: "The buyer's view of one order, behind its access token",
+    permission: "public",
+    request: {
+      params: external_exports.object({ order_number: external_exports.string().regex(ORDER_NUMBER) }),
+      headers: external_exports.object({ authorization: external_exports.string().regex(BEARER) })
+    },
+    responses: {
+      200: orderViewSchema,
+      404: problemSchema,
+      503: problemSchema
+    }
+  },
+  webhook("Stripe", "/v1/webhooks/stripe"),
+  webhook("Mercado Pago", "/v1/webhooks/mercadopago")
+];
+
+// src/routes/checkout.ts
+var TITLES = {
+  INVALID_REQUEST: "Invalid checkout request",
+  SERVICE_UNAVAILABLE: "Payments unavailable",
+  INVALID_SHIPPING_ADDRESS: "Invalid shipping address",
+  PRIVACY_CONSENT_REQUIRED: "Privacy consent required",
+  EMPTY_OR_UNAVAILABLE_CART: "Cart cannot be quoted",
+  UNSERVICEABLE_DESTINATION: "Destination not served",
+  PRICE_CHANGED: "Prices changed",
+  INSUFFICIENT_STOCK: "Insufficient stock"
+};
+function registerCheckoutRoutes(app, deps) {
+  app.post(
+    "/v1/checkout",
+    {
+      bodyLimit: 16 * 1024,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } }
+    },
+    async (request, reply) => {
+      const language = languageSchema.safeParse(
+        request.query.lang
+      );
+      const outcome = language.success ? await createCheckout(deps, request.body, language.data) : { ok: false, status: 400, code: "INVALID_REQUEST" };
+      if (!outcome.ok) {
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES[outcome.code], outcome.code));
+      }
+      return reply.code(201).send(checkoutSessionSchema.parse(outcome.session));
+    }
+  );
+}
+
+// src/routes/exchangeRate.ts
+function registerExchangeRateRoute(app, rate) {
+  app.get("/v1/exchange-rate", async (_request, reply) => {
+    const current = await rate();
+    if (!current) {
+      return reply.code(503).type(PROBLEM_TYPE).send(
+        problem(
+          503,
+          "Exchange rate unavailable",
+          "No Banxico FIX stored yet."
+        )
+      );
+    }
+    return current;
+  });
 }
 
 // src/services/settlement.ts
@@ -98249,6 +98408,18 @@ async function buildApp(deps) {
     },
     trustProxy: true
   });
+  const declared = new Set(
+    ROUTE_CONTRACTS.map(({ method, path }) => `${method} ${path}`)
+  );
+  app.addHook("onRoute", ({ method, url: url2 }) => {
+    for (const verb of [method].flat()) {
+      if (verb === "HEAD" || verb === "OPTIONS") continue;
+      if (!declared.has(`${verb} ${url2}`))
+        throw new Error(
+          `Route ${verb} ${url2} is not in apps/api/src/contract.ts`
+        );
+    }
+  });
   await app.register(import_helmet.default);
   await app.register(import_cors.default, { origin: CORS_ORIGINS, methods: ["GET", "POST"] });
   await app.register(import_rate_limit.default, { max: 120, timeWindow: "1 minute" });
@@ -98433,7 +98604,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "207dd4b2c824e1cb21e3182bad2ffada34afefbd" : void 0;
+var sha = true ? "227c0a8fefeca5b586cf377459e5988c8f9e3c2e" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
