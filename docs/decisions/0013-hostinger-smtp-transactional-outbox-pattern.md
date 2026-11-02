@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (FC 027 · K-44)
 - **Date:** 2026-11-01
-- **Architectural Reference:** ADR 0010 (Platform Architecture)
+- **Architectural Reference:** ADR 0013 (Platform Architecture / Transactional Outbox)
 - **Source:** Sovereign decisions of GrayMan (Ω) (chat, 2026-11-01; transmitted by Charlie in H 2026-11-01 17:10:14 / 17:37:43; formal analysis 240_AN, 241_AN, 242_AN, 245_AN).
 
 ## Context

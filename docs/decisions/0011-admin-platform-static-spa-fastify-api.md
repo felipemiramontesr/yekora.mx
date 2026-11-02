@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (FC 027 · K-44)
 - **Date:** 2026-11-01
-- **Architectural Reference:** ADR 0008 (Platform Architecture)
+- **Architectural Reference:** ADR 0011 (Platform Architecture / Admin & Account SPA)
 - **Source:** Sovereign decisions of GrayMan (Ω) (chat, 2026-11-01; transmitted by Charlie in H 2026-11-01 17:10:14 / 17:37:43; formal analysis 240_AN, 241_AN, 242_AN, 245_AN).
 
 ## Context
@@ -16,7 +16,7 @@ A monolithic Next.js deployment with Node.js SSR on the main domain was evaluate
 1. **Static SPA Frontend Architecture (`output: 'export'`):**
    - The entire frontend codebase—including the public storefront, customer portal (`/cuenta`), and backoffice management views—is compiled as a 100% static export (`output: 'export'`).
    - The customer portal and administration routes are structured as an authenticated Single Page Application (SPA).
-   - Apache on Hostinger (`public/.htaccess`) provides fallback routing: all requests under `/cuenta/*` and `/admin/*` that do not match a static physical asset rewrite internally to `index.html`.
+   - Apache on Hostinger (`public/.htaccess`) provides fallback routing: all requests under `/cuenta/*` and `/admin/*` that do not match a static physical asset rewrite internally to each area's own index (`/cuenta/index.html` and `/admin/index.html`), preventing unwanted fallbacks to the root homepage.
 
 2. **Decoupled API Backend (`apiv1.yekora.mx`):**
    - The API remains completely decoupled in Fastify on `apiv1.yekora.mx`, serving data and handling mutations against MariaDB 11.8.9.
