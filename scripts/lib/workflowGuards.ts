@@ -739,6 +739,80 @@ function parityViolations(
   return violations;
 }
 
+/** The pinned release of dependabot/fetch-metadata (v3.1.0) that FC 037 reviewed. */
+const FETCH_METADATA =
+  'dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98';
+
+/**
+ * Every violation of the Dependabot auto-merge workflow (FC 037, K-52, Ω's option a, A08): only
+ * Dependabot's own PRs, only patches, only through GitHub auto-merge behind the Global
+ * Certification check, enabled with SECURITY_AUTOFIX_TOKEN (so the merge deploys), and the
+ * repository token never writes code.
+ *
+ * @param workflow - Text of dependabot-automerge.yml.
+ * @returns Human-readable violations; empty when conformant.
+ */
+export function dependabotAutomergeViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const triggers = workflowTriggers(workflow);
+  if (triggers.join() !== 'pull_request') {
+    violations.push(
+      `the only trigger must be pull_request, found: ${triggers.join(', ') || 'none'}`
+    );
+  }
+  const required: readonly [string, string][] = [
+    [
+      "github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'",
+      'it must act only on PRs opened and pushed by dependabot[bot]',
+    ],
+    [`uses: ${FETCH_METADATA}`, `it must use ${FETCH_METADATA}`],
+    [
+      "if: steps.metadata.outputs.update-type == 'version-update:semver-patch'",
+      'auto-merge must be enabled for patches only',
+    ],
+    [
+      'GH_TOKEN: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}',
+      'auto-merge must be enabled with SECURITY_AUTOFIX_TOKEN (the repository token does not deploy)',
+    ],
+    [
+      '🔱 Yekora Global Certification',
+      'auto-merge must be gated on the Global Certification check',
+    ],
+    [
+      'gh pr merge --auto --squash',
+      'a patch must merge through GitHub auto-merge',
+    ],
+    ['requires-omega-approval', 'a minor or major update must be held for Ω'],
+  ];
+  for (const [needle, message] of required) {
+    if (!workflow.includes(needle)) violations.push(message);
+  }
+  if (/gh pr merge(?![^\n]*--auto)/.test(workflow)) {
+    violations.push(
+      'a PR may only be merged with --auto (behind the required check)'
+    );
+  }
+  const lines = workflow.split(/\r?\n/).map((line) => line.trim());
+  if (lines.includes('contents: write')) {
+    violations.push('the repository token must not get contents write');
+  }
+  const secrets = [...workflow.matchAll(/secrets\.\w+/g)].map((m) => m[0]);
+  if (secrets.some((secret) => secret !== AUTOFIX_SECRET)) {
+    violations.push(`only ${AUTOFIX_SECRET} may reach the auto-merge workflow`);
+  }
+  if (
+    mentionsSelfHosted(workflow) ||
+    lines.some((l) => l.startsWith('runs-on:') && l !== 'runs-on: ubuntu-24.04')
+  ) {
+    violations.push('every job must run on ubuntu-24.04');
+  }
+  for (const uses of unpinnedActions(workflow)) {
+    violations.push(`${uses} is not pinned by full commit SHA`);
+  }
+  violations.push(...jobTimeoutViolations(workflow, { automerge: 5 }));
+  return violations;
+}
+
 /**
  * Every violation of the daily dependency audit (FC 016, K-32, A08). It runs the product's
  * audit gate on a public runner only, with pinned actions, on a schedule or by hand, and touches

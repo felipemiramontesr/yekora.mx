@@ -1,0 +1,64 @@
+name: 🤖 Dependabot auto-merge (patches only)
+
+# FC 037 (K-52, Ω's option a, as FC 036): a Dependabot PR whose every update is a patch merges on
+# its own once the full CI is green; a minor or major one waits for GrayMan (Ω).
+#   - Only PRs opened by dependabot[bot]; fetch-metadata also verifies the commit is Dependabot's.
+#   - The merge is GitHub auto-merge behind the required «🔱 Yekora Global Certification» check
+#     of `main`. Without that rule GitHub would merge at once, before any CI, so the job checks it
+#     first and leaves the PR alone if it is missing (fail-closed).
+#   - Auto-merge is enabled with SECURITY_AUTOFIX_TOKEN, never the repository token: a merge done
+#     by the repository token does not fire the push of `main`, so the patch would never deploy.
+#     Dependabot runs only see Dependabot secrets: the token is registered there too.
+#   - The repository token only reads code and writes PR labels and comments.
+# Public runner only; every action pinned by full SHA (A08, scripts/lib/workflowGuards.ts).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  automerge:
+    name: 🤖 Patch auto-merge (minor and major wait for Ω)
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Read the update metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Enable auto-merge for a patch (behind the Global Certification check)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::SECURITY_AUTOFIX_TOKEN is not a Dependabot secret: the patch waits for Ω."
+            exit 1
+          fi
+          # Fail-closed: without the required check, GitHub would merge at once, before any CI.
+          REQUIRED=$(gh api "repos/${REPO}/branches/main" --jq '[.protection.required_status_checks.contexts[]?] | join(",")' 2>/dev/null || true)
+          if [[ ",${REQUIRED}," != *",🔱 Yekora Global Certification,"* ]]; then
+            echo "::error::main does not require the Global Certification check: auto-merge stays off."
+            exit 1
+          fi
+          gh pr merge --auto --squash "${PR_URL}"
+      - name: Hold a minor or major update for Ω
+        # Once per PR (opened or reopened), not on every rebase.
+        if: steps.metadata.outputs.update-type != 'version-update:semver-patch' && github.event.action != 'synchronize'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          gh label create requires-omega-approval --color 5319E7 --description "Espera la aprobación de GrayMan (Ω)" --force
+          gh pr edit "${PR_URL}" --add-label requires-omega-approval
+          gh pr comment "${PR_URL}" --body "Actualización ${UPDATE_TYPE}: no se integra sola (FC 037, opción a). Espera la aprobación de GrayMan (Ω)."

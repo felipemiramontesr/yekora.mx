@@ -15,6 +15,8 @@
  *      deploy.yml or package.json), and service workers blocked in every E2E suite but the PWA's.
  *   i) Every workflow and dependabot.yml is valid YAML with unique keys; GitHub refuses the
  *      whole file otherwise, and the text rules above cannot see it.
+ *   j) FC 037: dependabot-automerge.yml auto-merges Dependabot patches only, behind the Global
+ *      Certification check, with SECURITY_AUTOFIX_TOKEN; minor and major wait for Ω.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
@@ -22,6 +24,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   auditCronViolations,
+  dependabotAutomergeViolations,
   dependabotViolations,
   dependencyViolations,
   deployWorkflowViolations,
@@ -120,6 +123,16 @@ if (existsSync(auditCronPath)) {
 } else {
   failures.push('g) .github/workflows/dependency-audit-cron.yml is missing');
 }
+const automergePath = join(workflowsDir, 'dependabot-automerge.yml');
+if (existsSync(automergePath)) {
+  for (const violation of dependabotAutomergeViolations(
+    readFileSync(automergePath, 'utf8')
+  )) {
+    failures.push(`j) dependabot-automerge.yml: ${violation}`);
+  }
+} else {
+  failures.push('j) .github/workflows/dependabot-automerge.yml is missing');
+}
 const dependabotPath = join(root, '.github', 'dependabot.yml');
 if (existsSync(dependabotPath)) {
   for (const violation of dependabotViolations(
@@ -180,5 +193,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
+  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit, Dependabot policy and patch-only auto-merge in place.'
 );

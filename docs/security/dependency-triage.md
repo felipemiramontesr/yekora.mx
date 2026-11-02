@@ -38,8 +38,8 @@ El reloj corre desde que se abre o se comenta el Issue `security`.
 
 ## 4. PR de Dependabot
 
-- Los revisa Charlie (O): diff de `bun.lock`, notas de la versión y CI completo en verde.
-- Los integra GrayMan, a mano. Dependabot no fusiona por su cuenta.
+- **Parche (FC 037, opción a de GrayMan):** `.github/workflows/dependabot-automerge.yml` activa el auto-merge y el PR se integra solo cuando la certificación global sale en verde. Solo actúa sobre PR abiertos y empujados por `dependabot[bot]`, con un commit que `dependabot/fetch-metadata` verifica como suyo. Un PR agrupado cuenta por su actualización más grande.
+- **Minor o major:** el workflow le pone la etiqueta `requires-omega-approval` y un comentario. Charlie (O) revisa el diff de `bun.lock`, las notas de la versión y el CI; GrayMan decide.
 - Un PR con el CI en rojo no se integra: se analiza como cualquier regresión.
 - Un salto de versión mayor nunca llega por Dependabot (`ignore` de `version-update:semver-major`): se decide con su propio FC.
 
@@ -58,6 +58,7 @@ Charlie guía estos pasos uno por uno cuando llega el momento. Ningún valor de 
 - `scripts/checkPipelineIntegrity.ts` (A08, en el CI de producto) exige que `dependency-audit-cron.yml` corra en `ubuntu-24.04`, nunca en self-hosted, y que toda acción esté fijada por un SHA de 40 caracteres. Las reglas viven en `scripts/lib/workflowGuards.ts`, con su prueba.
 - `scripts/dependencyAuditGate.ts` es el mismo gate en el CI, en la auditoría diaria y en la máquina de cualquier raptor.
 - FC 036: la misma regla A08 exige que el Issue se cierre solo con la auditoría en cero (`if: success()`), que el job `autofix` corra solo tras una auditoría fallida y sin conservar el token del repositorio, que el auto-merge dependa del check «🔱 Yekora Global Certification», que ningún PR se integre sin `--auto` y que el único secreto del workflow sea `SECURITY_AUTOFIX_TOKEN`.
+- FC 037: la regla A08 j) exige que `dependabot-automerge.yml` se dispare solo por `pull_request`, actúe solo sobre PR de `dependabot[bot]`, use `dependabot/fetch-metadata` fijado por SHA, active el auto-merge solo en parches, con `SECURITY_AUTOFIX_TOKEN` y detrás del check de certificación, y retenga los minor y major con la etiqueta `requires-omega-approval`.
 
 ## 7. Corrección automática (FC 036, opción a de GrayMan)
 
@@ -65,6 +66,6 @@ Charlie guía estos pasos uno por uno cuando llega el momento. Ningún valor de 
 - **Qué nunca corrige solo:** un salto minor o major, o un parche que trae dependencias nuevas. Quedan listados en el Issue para GrayMan, que decide con FC.
 - **Cómo se integra:** el job abre un PR `security/auto-fix-<fecha>` que corre el CI completo. Se integra solo (auto-merge) cuando la certificación global sale en verde. Si `main` no exige ese check, el auto-merge **no se activa** y GrayMan integra a mano: sin el check, GitHub integraría al instante, antes de cualquier CI.
 - **Configuración que hace GrayMan en GitHub (una sola vez):**
-  1. **Token `SECURITY_AUTOFIX_TOKEN`** (Settings → Secrets and variables → Actions): token _fine-grained_ solo para este repositorio, con **Contents: Read and write** y **Pull requests: Read and write**, vencimiento de 90 días como máximo (se rota al vencer). Un PR empujado con el token propio de Actions no dispara el CI; por eso hace falta.
+  1. **Token `SECURITY_AUTOFIX_TOKEN`** (Settings → Secrets and variables → Actions): token _fine-grained_ solo para este repositorio, con **Contents: Read and write** y **Pull requests: Read and write**, vencimiento de 90 días como máximo (se rota al vencer). Un PR empujado con el token propio de Actions no dispara el CI; por eso hace falta. **El mismo valor se registra también en Settings → Secrets and variables → Dependabot** (FC 037): los workflows que dispara Dependabot solo ven esos secretos, y un auto-merge activado con el token propio de Actions integra sin disparar el despliegue.
   2. **Settings → General → Pull Requests:** activar **Allow auto-merge**.
   3. **Settings → Branches → regla para `main`:** exigir el status check **🔱 Yekora Global Certification** antes de integrar. GrayMan, como administrador, sigue empujando directo a `main`.

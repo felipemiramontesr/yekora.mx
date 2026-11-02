@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   auditCronViolations,
+  dependabotAutomergeViolations,
   dependabotViolations,
   dependencyViolations,
   deployWorkflowViolations,
@@ -17,6 +18,11 @@ const OWNER = 'felipemiramontesr';
 const SHA = 'a'.repeat(40);
 const migrations = readFileSync('.github/workflows/db-migrations.yml', 'utf8');
 const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
+// Line endings normalized: a Windows checkout writes CRLF, and some needles span lines.
+const automerge = readFileSync(
+  '.github/workflows/dependabot-automerge.yml',
+  'utf8'
+).replace(/\r\n/g, '\n');
 
 describe('yamlSyntaxViolations (A08 i: GitHub refuses invalid YAML outright)', () => {
   it('accepts every committed workflow and the Dependabot config', () => {
@@ -462,7 +468,7 @@ describe('migrationsWorkflowViolations (T1.2 · R1)', () => {
 const auditCron = readFileSync(
   '.github/workflows/dependency-audit-cron.yml',
   'utf8'
-);
+).replace(/\r\n/g, '\n');
 const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
 
 describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
@@ -608,6 +614,116 @@ describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
       'the audit job must have timeout-minutes: 15, found: none',
       'the autofix job must have timeout-minutes: 15, found: none',
     ]);
+  });
+});
+
+describe('dependabotAutomergeViolations (FC 037 · patches only, Ω decides the rest)', () => {
+  it('the real dependabot-automerge.yml is conformant', () => {
+    expect(dependabotAutomergeViolations(automerge)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'another trigger (pull_request_target runs with write tokens on fork code)',
+      'pull_request:',
+      'pull_request_target:',
+      'the only trigger must be pull_request, found: pull_request_target',
+    ],
+    [
+      'any PR author',
+      "github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'",
+      'true',
+      'it must act only on PRs opened and pushed by dependabot[bot]',
+    ],
+    [
+      'an unreviewed fetch-metadata',
+      'dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98',
+      'dependabot/fetch-metadata@v3',
+      'it must use dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98',
+    ],
+    [
+      'auto-merge of a minor',
+      "if: steps.metadata.outputs.update-type == 'version-update:semver-patch'",
+      "if: steps.metadata.outputs.update-type != 'version-update:semver-major'",
+      'auto-merge must be enabled for patches only',
+    ],
+    [
+      'the repository token (the merge would not deploy)',
+      'GH_TOKEN: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}',
+      'GH_TOKEN: ${{ github.token }}',
+      'auto-merge must be enabled with SECURITY_AUTOFIX_TOKEN (the repository token does not deploy)',
+    ],
+    [
+      'auto-merge without the required check',
+      '🔱 Yekora Global Certification',
+      'anything',
+      'auto-merge must be gated on the Global Certification check',
+    ],
+    [
+      'a direct merge',
+      'gh pr merge --auto --squash',
+      'gh pr merge --squash',
+      'a patch must merge through GitHub auto-merge',
+    ],
+    [
+      'no hold for a minor or major',
+      'requires-omega-approval',
+      'needs-review',
+      'a minor or major update must be held for Ω',
+    ],
+    [
+      'a write token for code',
+      'issues: write',
+      'contents: write',
+      'the repository token must not get contents write',
+    ],
+    [
+      'another secret',
+      'secrets.SECURITY_AUTOFIX_TOKEN',
+      'secrets.SSH_PRIVATE_KEY',
+      'only secrets.SECURITY_AUTOFIX_TOKEN may reach the auto-merge workflow',
+    ],
+    [
+      'a floating runner',
+      'runs-on: ubuntu-24.04',
+      'runs-on: ubuntu-latest',
+      'every job must run on ubuntu-24.04',
+    ],
+    [
+      'no time limit',
+      'timeout-minutes: 5',
+      'timeout-minutes: 60',
+      'the automerge job must have timeout-minutes: 5, found: 60',
+    ],
+  ])('flags %s', (_case, from, to, violation) => {
+    expect(automerge).toContain(from);
+    expect(
+      dependabotAutomergeViolations(automerge.replaceAll(from, to))
+    ).toContain(violation);
+  });
+
+  it('flags an unpinned action and a merge without --auto anywhere', () => {
+    const tampered = `${automerge}\n      - uses: actions/checkout@v5\n      - run: gh pr merge 7 --admin\n`;
+    expect(dependabotAutomergeViolations(tampered)).toEqual(
+      expect.arrayContaining([
+        'actions/checkout@v5 is not pinned by full commit SHA',
+        'a PR may only be merged with --auto (behind the required check)',
+      ])
+    );
+  });
+
+  it('flags a self-hosted runner and a workflow with no trigger', () => {
+    expect(
+      dependabotAutomergeViolations(
+        automerge.replace(
+          'runs-on: ubuntu-24.04',
+          'runs-on: [self-hosted, yekora-db]'
+        )
+      )
+    ).toContain('every job must run on ubuntu-24.04');
+    expect(dependabotAutomergeViolations('name: x\n')).toContain(
+      'the only trigger must be pull_request, found: none'
+    );
   });
 });
 
