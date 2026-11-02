@@ -10,6 +10,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { languageSchema } from '../lib/language';
 import { usdCents } from '../lib/money';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import {
@@ -25,16 +26,19 @@ const slug = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   .max(160);
-const lang = z.enum(['es-MX', 'en']).default('es-MX');
 
-const listQuery = z.object({
+/** Query of `GET /v1/catalog`; also the request of the API contract (contract.ts). */
+export const catalogListQuery = z.object({
   discipline: slug.max(40).optional(),
   level: slug.max(40).optional(),
   sort: z.enum(SORTS).default('name'),
-  lang,
+  lang: languageSchema,
   page: z.coerce.number().int().min(1).max(1000).default(1),
   pageSize: z.coerce.number().int().min(1).max(48).default(24),
 });
+
+/** Path parameters of `GET /v1/catalog/:slug`. */
+export const catalogItemParams = z.object({ slug });
 
 /** Dependencies of the catalog routes. */
 interface CatalogDeps {
@@ -77,7 +81,7 @@ export function registerCatalogRoutes(
   deps: CatalogDeps
 ): void {
   app.get('/v1/catalog', async (request, reply) => {
-    const parsed = listQuery.safeParse(request.query);
+    const parsed = catalogListQuery.safeParse(request.query);
     if (!parsed.success) {
       return reply
         .code(400)
@@ -104,8 +108,10 @@ export function registerCatalogRoutes(
   });
 
   app.get('/v1/catalog/:slug', async (request, reply) => {
-    const params = z.object({ slug }).safeParse(request.params);
-    const language = lang.safeParse((request.query as { lang?: unknown }).lang);
+    const params = catalogItemParams.safeParse(request.params);
+    const language = languageSchema.safeParse(
+      (request.query as { lang?: unknown }).lang
+    );
     if (!params.success || !language.success) {
       return reply
         .code(400)

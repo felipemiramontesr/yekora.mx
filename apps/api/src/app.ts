@@ -16,6 +16,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { CORS_ORIGINS, type ApiConfig } from './config';
+import { ROUTE_CONTRACTS } from './contract';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
@@ -67,6 +68,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       redact: ['req.headers.authorization', 'req.headers.cookie'],
     },
     trustProxy: true,
+  });
+  // FC 027 Q03/T2.6: a route outside the contract has no documented shape and no permission, so
+  // it cannot be registered at all. HEAD and OPTIONS are Fastify's and CORS's own answers.
+  const declared = new Set(
+    ROUTE_CONTRACTS.map(({ method, path }) => `${method} ${path}`)
+  );
+  app.addHook('onRoute', ({ method, url }) => {
+    for (const verb of [method].flat()) {
+      if (verb === 'HEAD' || verb === 'OPTIONS') continue;
+      if (!declared.has(`${verb} ${url}`))
+        throw new Error(
+          `Route ${verb} ${url} is not in apps/api/src/contract.ts`
+        );
+    }
   });
   await app.register(helmet);
   // FC 009: POST only for the cart quote; the origins stay the site and the local servers.

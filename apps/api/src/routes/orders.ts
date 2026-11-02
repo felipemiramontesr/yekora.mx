@@ -40,8 +40,10 @@ interface OrderRow {
   access_token_hash: Buffer;
 }
 
-const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
-const BEARER = /^Bearer ([\w-]{43})$/;
+/** Shape of a public order number; also the path parameter of the API contract (contract.ts). */
+export const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
+/** The order access token header; also a header of the API contract (contract.ts). */
+export const BEARER = /^Bearer ([\w-]{43})$/;
 
 /**
  * Registers the order status route.

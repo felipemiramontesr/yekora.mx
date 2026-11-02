@@ -11,12 +11,10 @@
  * @module
  */
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import { checkoutSessionSchema } from '../../../../lib/checkout/checkoutTypes';
+import { languageSchema } from '../lib/language';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { type CheckoutDeps, createCheckout } from '../services/checkout';
-
-const lang = z.enum(['es-MX', 'en']).default('es-MX');
 
 const TITLES: Record<string, string> = {
   INVALID_REQUEST: 'Invalid checkout request',
@@ -46,7 +44,7 @@ export function registerCheckoutRoutes(
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (request, reply) => {
-      const language = lang.safeParse(
+      const language = languageSchema.safeParse(
         (request.query as { lang?: unknown }).lang
       );
       const outcome = language.success

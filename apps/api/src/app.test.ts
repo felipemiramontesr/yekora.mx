@@ -82,6 +82,22 @@ afterEach(async () => {
   await app.close();
 });
 
+describe('route contract guard (FC 027 Q03, T2.6)', () => {
+  it('refuses to register a route that is not in the API contract', async () => {
+    const built = await makeApp();
+    expect(() => built.get('/v1/undeclared', async () => ({}))).toThrow(
+      'Route GET /v1/undeclared is not in apps/api/src/contract.ts'
+    );
+    expect(() =>
+      built.route({
+        method: ['GET', 'DELETE'],
+        url: '/v1/catalog',
+        handler: async () => ({}),
+      })
+    ).toThrow('Route DELETE /v1/catalog is not in apps/api/src/contract.ts');
+  });
+});
+
 describe('GET /health', () => {
   it('reports the version, the deployed SHA and the database', async () => {
     const res = await (await makeApp()).inject('/health');

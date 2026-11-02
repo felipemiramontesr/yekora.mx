@@ -127,12 +127,16 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'bun run typecheck',
     'tsc-result.json',
     'bun run check:tsdoc',
+    // FC 027 T2.4/T2.5: static export, SPA fallbacks and mail only through the outbox.
+    'bun scripts/checkPlatformGuards.ts',
   ],
   'dependency-audit': ['bun scripts/dependencyAuditGate.ts'],
   'frontend-validation': ['vitest run --config vitest.frontend.config.ts'],
   'tooling-validation': ['vitest run --config vitest.tooling.config.ts'],
   'backend-validation': [
     'bun run --cwd apps/api build',
+    // FC 027 T2.2/T2.6 (Q03): OpenAPI in sync, no breaking change, every route guarded.
+    'bun scripts/checkApiContract.ts',
     'vitest run --config vitest.backend.config.ts --coverage',
   ],
   'database-validation': [

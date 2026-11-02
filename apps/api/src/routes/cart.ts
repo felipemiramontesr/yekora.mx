@@ -25,13 +25,15 @@ import {
   cartQuoteSchema,
   destinationSchema,
 } from '../../../../lib/cart/cartTypes';
+import { languageSchema } from '../lib/language';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { quoteCart, quoteCartToDestination } from '../services/cartQuote';
 import type { Db } from '../services/db';
 import type { CurrentRate } from '../services/exchangeRate';
 import type { ShippingRateProvider } from '../services/shippingPort';
 
-const requestSchema = z.strictObject({
+/** Body of `POST /v1/cart/quote`; also the request of the API contract (contract.ts). */
+export const cartQuoteRequestSchema = z.strictObject({
   items: cartLinesSchema,
   destination: destinationSchema.optional(),
 });
@@ -41,8 +43,6 @@ const REJECTION_TITLE = {
   EMPTY_OR_UNAVAILABLE_CART: 'Cart cannot be quoted',
   INVALID_DESTINATION: 'Invalid destination',
 } as const;
-
-const lang = z.enum(['es-MX', 'en']).default('es-MX');
 
 /** Dependencies of the cart route. */
 interface CartDeps {
@@ -68,8 +68,8 @@ export function registerCartRoutes(app: FastifyInstance, deps: CartDeps): void {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (request, reply) => {
-      const body = requestSchema.safeParse(request.body);
-      const language = lang.safeParse(
+      const body = cartQuoteRequestSchema.safeParse(request.body);
+      const language = languageSchema.safeParse(
         (request.query as { lang?: unknown }).lang
       );
       if (!body.success || !language.success) {
