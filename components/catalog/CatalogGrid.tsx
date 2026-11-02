@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { fill, type PriceText } from '@/lib/catalog/format';
 import { ProductVisual } from './ProductVisual';
@@ -70,11 +70,13 @@ function Filter({
   label,
   value,
   onChange,
+  disabled,
   children,
 }: Readonly<{
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled: boolean;
   children: ReactNode;
 }>) {
   const id = useId();
@@ -84,6 +86,7 @@ function Filter({
       <select
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3 font-normal text-petroleo"
       >
@@ -136,6 +139,9 @@ function ProductCard({
  * over the prerendered catalog, so the static export needs no page per filter; without
  * JavaScript the full catalog still shows. Filter options come from the products themselves,
  * so a level added in the database (ADR 0007) appears without a code change.
+ *
+ * FC 035 (256_AN): the selects stay disabled until React has hydrated them. A choice made on the
+ * static HTML before that would be reset to the initial state and lost, so it cannot be made.
  */
 export function CatalogGrid({
   locale,
@@ -145,6 +151,8 @@ export function CatalogGrid({
   const [discipline, setDiscipline] = useState('');
   const [level, setLevel] = useState('');
   const [sort, setSort] = useState<Sort>('name');
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
   const { filters } = messages;
 
   const disciplineOptions = useMemo(
@@ -188,6 +196,7 @@ export function CatalogGrid({
           label={filters.discipline}
           value={discipline}
           onChange={setDiscipline}
+          disabled={!isMounted}
         >
           <option value="">{filters.allDisciplines}</option>
           {disciplineOptions.map((option) => (
@@ -196,7 +205,12 @@ export function CatalogGrid({
             </option>
           ))}
         </Filter>
-        <Filter label={filters.level} value={level} onChange={setLevel}>
+        <Filter
+          label={filters.level}
+          value={level}
+          onChange={setLevel}
+          disabled={!isMounted}
+        >
           <option value="">{filters.allLevels}</option>
           {levelOptions.map((option) => (
             <option key={option.slug} value={option.slug}>
@@ -208,6 +222,7 @@ export function CatalogGrid({
           label={filters.sort}
           value={sort}
           onChange={(value) => setSort(value as Sort)}
+          disabled={!isMounted}
         >
           <option value="name">{filters.sortName}</option>
           <option value="price_asc">{filters.sortPriceAsc}</option>

@@ -12,7 +12,13 @@ export default {
         negro: '#000000',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        // FC 035: basic Latin first, then Latin Extended (the Ē of YĒKORA); each has its own file.
+        sans: [
+          'var(--font-inter)',
+          'var(--font-inter-ext)',
+          'system-ui',
+          'sans-serif',
+        ],
       },
     },
   },

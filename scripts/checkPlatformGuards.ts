@@ -5,10 +5,13 @@
  *      fallback to its own index.html (T2.4). None exists before FC 028.
  *   c) No module of apps/api/src imports an SMTP client except the outbox dispatcher, and no
  *      route imports the dispatcher (T2.5).
+ *   d) FC 035 T1.2: no source of the site imports next/font/google or names a Google Fonts host,
+ *      so the build never depends on Google answering.
  * CLI: `bun scripts/checkPlatformGuards.ts` — exit 0 = in place · exit 1 = a rule is broken.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { remoteFontViolations } from './lib/hermeticBuild';
 import { outboxViolations } from './lib/outboxValidation';
 import {
   SPA_AREAS,
@@ -16,14 +19,16 @@ import {
   staticExportViolations,
 } from './lib/spaExportValidation';
 
-/** Every .ts file under a directory, by repository path with forward slashes. */
-function sources(dir: string): Map<string, string> {
+/** Every .ts (and, when asked, .tsx) file under a directory, by repository path with "/". */
+function sources(dir: string, tsx = false): Map<string, string> {
   const files = new Map<string, string>();
   for (const entry of readdirSync(dir, {
     withFileTypes: true,
     recursive: true,
   })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
+    const typed =
+      entry.name.endsWith('.ts') || (tsx && entry.name.endsWith('.tsx'));
+    if (!entry.isFile() || !typed) continue;
     const path = join(entry.parentPath, entry.name).replaceAll('\\', '/');
     files.set(path, readFileSync(path, 'utf8'));
   }
@@ -42,6 +47,11 @@ const failures = [
     (v) => `b) ${v}`
   ),
   ...outboxViolations(sources('apps/api/src')).map((v) => `c) ${v}`),
+  ...remoteFontViolations(
+    new Map(
+      ['app', 'components', 'lib'].flatMap((dir) => [...sources(dir, true)])
+    )
+  ).map((v) => `d) ${v}`),
 ];
 
 if (failures.length > 0) {
@@ -50,5 +60,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `[OK] FC 027 platform guards: static export, ${areas.length} SPA areas with their fallback, mail only through the outbox.`
+  `[OK] FC 027 platform guards: static export, ${areas.length} SPA areas with their fallback, mail only through the outbox, fonts from the repository.`
 );

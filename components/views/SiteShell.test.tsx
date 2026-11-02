@@ -2,8 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/globals.css', () => ({}));
-vi.mock('next/font/google', () => ({
-  Inter: () => ({ variable: 'inter-variable' }),
+vi.mock('next/font/local', () => ({
+  default: (options: { variable: string }) => ({
+    variable: options.variable.slice(2),
+  }),
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/en/' }));
 
@@ -16,7 +18,9 @@ describe('SiteShell', () => {
         <p>child</p>
       </SiteShell>
     );
-    expect(html).toContain('<html lang="en" class="inter-variable">');
+    expect(html).toContain(
+      '<html lang="en" class="font-inter font-inter-ext">'
+    );
     expect(html).toContain('<main><p>child</p></main>');
     expect(html).toContain('<header');
     expect(html).toContain('<footer');

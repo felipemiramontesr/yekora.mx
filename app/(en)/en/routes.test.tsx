@@ -2,8 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/globals.css', () => ({}));
-vi.mock('next/font/google', () => ({
-  Inter: () => ({ variable: 'inter-variable' }),
+vi.mock('next/font/local', () => ({
+  default: (options: { variable: string }) => ({
+    variable: options.variable.slice(2),
+  }),
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => null }));
 // The real snapshot depends on the last local build; pages here render the empty catalog.

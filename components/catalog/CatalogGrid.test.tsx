@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getMessages, type Locale } from '@/app/i18n';
 import { CatalogGrid, type GridItem } from './CatalogGrid';
@@ -142,5 +150,35 @@ describe('CatalogGrid', () => {
     expect(screen.getByRole('status').textContent).toBe('1 producto');
     expect(screen.getByLabelText('Disciplina')).toBeTruthy();
     expect(screen.getByText('Disponible')).toBeTruthy();
+  });
+});
+
+describe('CatalogGrid hydration guard (FC 035 T1.1, 256_AN)', () => {
+  const element = (
+    <CatalogGrid
+      locale="en"
+      items={ITEMS}
+      messages={getMessages('en').catalog}
+    />
+  );
+
+  it('ships the static HTML with every select disabled, so no choice can be lost', () => {
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(element);
+    const selects = [...host.querySelectorAll('select')];
+    expect(selects).toHaveLength(3);
+    expect(selects.every((select) => select.disabled)).toBe(true);
+  });
+
+  it('enables every select once React has hydrated the static HTML', async () => {
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(element);
+    document.body.append(host);
+    await act(async () => {
+      hydrateRoot(host, element);
+    });
+    const selects = [...host.querySelectorAll('select')];
+    expect(selects.every((select) => !select.disabled)).toBe(true);
+    host.remove();
   });
 });
