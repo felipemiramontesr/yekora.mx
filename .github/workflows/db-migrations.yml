@@ -87,7 +87,6 @@ jobs:
     timeout-minutes: 20
     # O: GrayMan approves this environment before the job starts.
     environment: production-db
-    timeout-minutes: 20
     env:
       MIGRATION_FILE: ${{ inputs.migration_file }}
     defaults:

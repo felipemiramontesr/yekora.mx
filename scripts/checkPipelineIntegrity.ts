@@ -13,6 +13,8 @@
  *      pinned actions, and dependabot.yml keeps Archon's policy (bun, no majors, two groups).
  *   h) FC 026: one job per piece of work with its commands, eight E2E shards, no wait-on (in
  *      deploy.yml or package.json), and service workers blocked in every E2E suite but the PWA's.
+ *   i) Every workflow and dependabot.yml is valid YAML with unique keys; GitHub refuses the
+ *      whole file otherwise, and the text rules above cannot see it.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
@@ -26,6 +28,7 @@ import {
   mentionsSelfHosted,
   migrationsWorkflowViolations,
   serviceWorkerViolations,
+  yamlSyntaxViolations,
 } from './lib/workflowGuards';
 
 /** GitHub login of GrayMan (Ω), the only actor allowed to migrate production. */
@@ -84,6 +87,20 @@ if (existsSync(migrationsPath)) {
     failures.push(`d) ${MIGRATIONS_WORKFLOW}: ${violation}`);
   }
 }
+for (const path of [
+  ...readdirSync(workflowsDir)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .map((name) => join('.github', 'workflows', name)),
+  join('.github', 'dependabot.yml'),
+]) {
+  if (!existsSync(join(root, path))) continue;
+  for (const violation of yamlSyntaxViolations(
+    readFileSync(join(root, path), 'utf8')
+  )) {
+    failures.push(`i) ${path}: ${violation}`);
+  }
+}
+
 for (const name of readdirSync(workflowsDir)) {
   if (name === MIGRATIONS_WORKFLOW || !/\.ya?ml$/.test(name)) continue;
   if (mentionsSelfHosted(readFileSync(join(workflowsDir, name), 'utf8'))) {
@@ -163,5 +180,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
+  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit and Dependabot policy in place.'
 );

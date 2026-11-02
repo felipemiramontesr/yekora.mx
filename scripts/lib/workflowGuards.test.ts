@@ -10,12 +10,45 @@ import {
   serviceWorkerViolations,
   unpinnedActions,
   workflowTriggers,
+  yamlSyntaxViolations,
 } from './workflowGuards';
 
 const OWNER = 'felipemiramontesr';
 const SHA = 'a'.repeat(40);
 const migrations = readFileSync('.github/workflows/db-migrations.yml', 'utf8');
 const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
+
+describe('yamlSyntaxViolations (A08 i: GitHub refuses invalid YAML outright)', () => {
+  it('accepts every committed workflow and the Dependabot config', () => {
+    for (const path of [
+      '.github/workflows/deploy.yml',
+      '.github/workflows/db-migrations.yml',
+      '.github/workflows/dependency-audit-cron.yml',
+      '.github/dependabot.yml',
+    ]) {
+      expect(yamlSyntaxViolations(readFileSync(path, 'utf8'))).toEqual([]);
+    }
+  });
+
+  it('refuses a duplicate key, as the second timeout-minutes of run 41374309856', () => {
+    const job = [
+      'jobs:',
+      '  migrate:',
+      '    timeout-minutes: 20',
+      '    environment: production-db',
+      '    timeout-minutes: 20',
+    ].join('\n');
+    expect(yamlSyntaxViolations(job)).toEqual([
+      'invalid YAML: Map keys must be unique at line 5, column 5:',
+    ]);
+  });
+
+  it('refuses broken indentation', () => {
+    expect(
+      yamlSyntaxViolations('jobs:\n  a:\n    x: 1\n   y: 2\n')
+    ).not.toEqual([]);
+  });
+});
 
 describe('workflowTriggers', () => {
   it('reads the block form', () => {

@@ -9,8 +9,25 @@
  * - every action it uses is pinned by full commit SHA;
  * - no other workflow mentions `self-hosted`, so no other path reaches that machine.
  *
+ * The other rules read the text, so they cannot see that a file is not valid YAML; GitHub then
+ * refuses the whole workflow on every push. {@link yamlSyntaxViolations} parses each file first.
+ *
  * @module
  */
+import { parseDocument } from 'yaml';
+
+/**
+ * Parse errors of a workflow or Dependabot file, duplicate keys included: GitHub refuses such a
+ * file outright (run 41374309856: a second `timeout-minutes` left db-migrations.yml unusable).
+ *
+ * @param text - File text.
+ * @returns One message per parse error, with its line; empty when the YAML is valid.
+ */
+export function yamlSyntaxViolations(text: string): string[] {
+  return parseDocument(text, { uniqueKeys: true }).errors.map(
+    (error) => `invalid YAML: ${error.message.split('\n')[0]}`
+  );
+}
 
 /**
  * Events under the top-level `on:` key, in both YAML forms (`on: push`, `on: [a, b]` or a
