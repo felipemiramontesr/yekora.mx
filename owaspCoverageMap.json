@@ -102,7 +102,7 @@
           "exitEnv": "A06_EXIT"
         }
       ],
-      "notes": "Blocking audit: critical = 0 and high = 0, dated exceptions; frozen lockfile in every job."
+      "notes": "Blocking audit (FC 036): zero advisories of any severity; an exception only for an advisory with no patched release, dated, and it fails once expired or stale; frozen lockfile in every job."
     },
     "A07": {
       "id": "A07:2021",

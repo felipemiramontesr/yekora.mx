@@ -111,7 +111,7 @@ const modules: ModuleRow[] = [
     status: jobStatus(env.STATIC_RESULT),
   },
   {
-    name: '📦 Dependency Audit (critical=0 ∧ high=0)',
+    name: '📦 Dependency Audit (zero advisories, every severity)',
     status: jobStatus(env.AUDIT_RESULT),
   },
   {

@@ -508,6 +508,76 @@ describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
     ]);
   });
 
+  it.each([
+    [
+      'an issue closed on any outcome',
+      'if: success()',
+      'if: always()',
+      'the issue must close only when the audit is back to zero',
+    ],
+    [
+      'no automatic close',
+      'gh issue close',
+      'gh issue view',
+      'a clean audit must close the security issue',
+    ],
+    [
+      'another fix command',
+      'run: bun scripts/securityAutoFix.ts',
+      'run: bun update',
+      'the autofix job must run scripts/securityAutoFix.ts',
+    ],
+    [
+      'an autofix after a passing audit',
+      "if: failure() && needs.audit.result == 'failure'",
+      'if: always()',
+      'the autofix job must run only after a failed audit',
+    ],
+    [
+      'a checkout that keeps the repository token',
+      'persist-credentials: false',
+      'persist-credentials: true',
+      'the autofix checkout must not keep the repository token',
+    ],
+    [
+      'auto-merge without the required check',
+      '🔱 Yekora Global Certification',
+      'anything',
+      'auto-merge must be gated on the Global Certification check',
+    ],
+    [
+      'a direct merge',
+      'gh pr merge --repo "${REPO}" "${BRANCH}" --auto --squash',
+      'gh pr merge --repo "${REPO}" "${BRANCH}" --squash',
+      'patch PRs must merge through GitHub auto-merge, never directly',
+    ],
+    [
+      'a write token for the repository',
+      'issues: write\n    steps:\n      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5\n        with:',
+      'pull-requests: write\n    steps:\n      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5\n        with:',
+      'the repository token must not get contents or pull-requests write',
+    ],
+    [
+      'a production secret',
+      'secrets.SECURITY_AUTOFIX_TOKEN',
+      'secrets.SSH_PRIVATE_KEY',
+      'only secrets.SECURITY_AUTOFIX_TOKEN may reach the audit workflow',
+    ],
+  ])('FC 036: flags %s', (_case, from, to, violation) => {
+    expect(auditCron).toContain(from);
+    expect(auditCronViolations(auditCron.replace(from, to))).toContain(
+      violation
+    );
+  });
+
+  it('FC 036: flags a merge that skips auto-merge anywhere in the workflow', () => {
+    expect(
+      auditCronViolations(`${auditCron}\n          gh pr merge 12 --admin\n`)
+    ).toContain(
+      'a PR may only be merged with --auto (behind the required check)'
+    );
+  });
+
   it('flags a self-hosted runner, which also fails the runner rule', () => {
     expect(
       auditCronViolations(
@@ -528,7 +598,15 @@ describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
       'every job must run on ubuntu-24.04',
       'it must run scripts/dependencyAuditGate.ts',
       'the security Issue must be opened only when the audit fails',
+      'the issue must close only when the audit is back to zero',
+      'a clean audit must close the security issue',
+      'the autofix job must run scripts/securityAutoFix.ts',
+      'the autofix job must run only after a failed audit',
+      'the autofix checkout must not keep the repository token',
+      'auto-merge must be gated on the Global Certification check',
+      'patch PRs must merge through GitHub auto-merge, never directly',
       'the audit job must have timeout-minutes: 15, found: none',
+      'the autofix job must have timeout-minutes: 15, found: none',
     ]);
   });
 });

@@ -58,7 +58,8 @@
   },
   "overrides": {
     "tinypool": "^2.1.2",
-    "postcss": "^8.5.31"
+    "postcss": "^8.5.31",
+    "minimatch": "^11.0.1"
   },
   "lint-staged": {
     "*.{js,ts,tsx,vue,css,md,json}": "prettier --write",

@@ -1,14 +1,21 @@
 name: 🛡️ Dependency Audit (daily)
 
-# FC 016 (K-32, Archon parity) · Preventive daily audit of the supply chain. It runs the same gate
-# as the product CI (`scripts/dependencyAuditGate.ts`: critical = 0 ∧ high = 0, unknown severity
-# counted as high) to catch a new advisory before it blocks a delivery, as one did on
-# 2026-10-26 (deploy 40388948104). On failure it opens (or comments) one Issue labelled
-# `security`, which notifies GrayMan by e-mail; Charlie transcribes it to channel H.
+# FC 016 (K-32, Archon parity) · FC 036 (K-40, «siempre en cero», Ω's option a).
+# Daily audit of the supply chain with the product CI's gate (`scripts/dependencyAuditGate.ts`:
+# zero advisories of any severity; an exception only for an advisory with no patched release).
+#   - Audit at zero → it closes the open security issue, citing the commit and the run.
+#   - Audit not at zero → it opens (or comments) one issue labelled `security`, which stays open,
+#     and the `autofix` job rewrites bun.lock with every patch fix (scripts/securityAutoFix.ts)
+#     and opens a PR. That PR runs the full CI; it merges on its own only when `main` requires
+#     the Global Certification check, so it can never skip a red job. A minor or major fix is
+#     never applied here: the issue lists it for GrayMan (Ω).
 # Procedure and deadlines: docs/security/dependency-triage.md
 #
 # Public runner only (never self-hosted, A08 e); every action pinned by full SHA (A08,
-# scripts/lib/workflowGuards.ts). Read-only checkout; `issues: write` only for this job.
+# scripts/lib/workflowGuards.ts). The repository token only reads code and writes issues; the
+# PR is pushed with SECURITY_AUTOFIX_TOKEN (fine-grained, this repository, contents and pull
+# requests), because a PR pushed with the repository token would not start the CI. No production
+# secret reaches either job.
 
 on:
   schedule:
@@ -20,7 +27,7 @@ permissions:
 
 jobs:
   audit:
-    name: 🛡️ Security Audit (critical=0 ∧ high=0)
+    name: 🛡️ Security Audit (zero advisories, every severity)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -34,8 +41,18 @@ jobs:
           bun-version: '1.3.14'
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Security Audit (blocking — critical=0 ∧ high=0)
+      - name: Security Audit (blocking — zero advisories of any severity)
         run: bun scripts/dependencyAuditGate.ts
+      - name: Close the security issue (audit back to zero)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Aviso de seguridad en dependencias (auditoría diaria)"
+          for NUMBER in $(gh issue list --label security --state open --search "in:title \"${TITLE}\"" --json number --jq '.[].number'); do
+            gh issue close "${NUMBER}" --comment "La auditoría volvió a cero en ${GITHUB_SHA} (ejecución ${RUN_URL}). Cierre automático (FC 036)."
+          done
       - name: Open or update the security issue
         if: failure()
         env:
@@ -43,11 +60,72 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TITLE="Aviso de seguridad en dependencias (auditoría diaria)"
-          BODY="La auditoría diaria encontró avisos critical o high. Ejecución: ${RUN_URL}. Atender según docs/security/dependency-triage.md (crítica ≤ 24 h, alta ≤ 72 h, moderada o baja ≤ 7 días)."
+          BODY="La auditoría diaria encontró avisos (cualquier severidad bloquea desde el FC 036). Ejecución: ${RUN_URL}. El job autofix propone los parches; lo demás espera a GrayMan. Plazos en docs/security/dependency-triage.md (crítica ≤ 24 h, alta ≤ 72 h, moderada o baja ≤ 7 días)."
           gh label create security --color B60205 --description "Avisos de seguridad" --force
           NUMBER=$(gh issue list --label security --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')
           if [ -n "${NUMBER}" ]; then
             gh issue comment "${NUMBER}" --body "${BODY}"
           else
             gh issue create --title "${TITLE}" --label security --body "${BODY}"
+          fi
+
+  autofix:
+    name: 🔧 Security auto-fix (patches on green CI · minor and major wait for Ω)
+    needs: audit
+    if: failure() && needs.audit.result == 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Plan and apply the patch fixes
+        id: plan
+        run: bun scripts/securityAutoFix.ts
+      - name: Verify the patched lockfile installs as is
+        if: steps.plan.outputs.applied != '0'
+        run: bun install --frozen-lockfile
+      - name: Open the fix PR (auto-merge only behind the Global Certification check)
+        if: steps.plan.outputs.applied != '0'
+        env:
+          GH_TOKEN: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::SECURITY_AUTOFIX_TOKEN is not configured: the fix stays in the issue for Ω."
+            exit 1
+          fi
+          BRANCH="security/auto-fix-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "yekora-security-autofix"
+          git config user.email "yekora-security-autofix@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          git add bun.lock
+          git commit -m "FC_36_Security_Patch_AutoFix_$(date -u +%Y%m%d)" -m "Patch-level fixes of the daily audit (scripts/securityAutoFix.ts)."
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "${BRANCH}"
+          gh pr create --repo "${REPO}" --base main --head "${BRANCH}" --title "Seguridad: parches automáticos $(date -u +%Y-%m-%d)" --body-file autofix-summary.md --label security
+          # Fail-closed: without the required check, GitHub would merge at once, before any CI.
+          REQUIRED=$(gh api "repos/${REPO}/branches/main" --jq '[.protection.required_status_checks.contexts[]?] | join(",")' 2>/dev/null || true)
+          if [[ ",${REQUIRED}," == *",🔱 Yekora Global Certification,"* ]]; then
+            gh pr merge --repo "${REPO}" "${BRANCH}" --auto --squash
+          else
+            echo "::warning::main does not require the Global Certification check: auto-merge stays off, Ω merges by hand."
+          fi
+      - name: Report the plan in the security issue
+        if: always() && steps.plan.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Aviso de seguridad en dependencias (auditoría diaria)"
+          NUMBER=$(gh issue list --label security --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')
+          if [ -n "${NUMBER}" ]; then
+            gh issue comment "${NUMBER}" --body-file autofix-summary.md
           fi

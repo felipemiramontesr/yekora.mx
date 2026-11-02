@@ -777,12 +777,78 @@ export function auditCronViolations(workflow: string): string[] {
   if (!workflow.includes('run: bun scripts/dependencyAuditGate.ts')) {
     violations.push('it must run scripts/dependencyAuditGate.ts');
   }
-  if (!workflow.includes('if: failure()')) {
+  // A whole line: `if: failure() && …` of the autofix job must not count as the issue step's.
+  const lines = workflow.split(/\r?\n/).map((line) => line.trim());
+  if (!lines.includes('if: failure()')) {
     violations.push(
       'the security Issue must be opened only when the audit fails'
     );
   }
-  violations.push(...jobTimeoutViolations(workflow, { audit: 15 }));
+  violations.push(...autoFixViolations(workflow));
+  violations.push(
+    ...jobTimeoutViolations(workflow, { audit: 15, autofix: 15 })
+  );
+  return violations;
+}
+
+/** The only secret the audit workflow may read (FC 036: pushes the fix PR, nothing else). */
+const AUTOFIX_SECRET = 'secrets.SECURITY_AUTOFIX_TOKEN';
+
+/**
+ * FC 036 T2.2 (Ω's option a): the issue closes only on a clean audit; the auto-fix applies
+ * patches only, through a PR whose auto-merge is gated on the Global Certification check; the
+ * repository token never writes code, and no other secret reaches the workflow.
+ */
+function autoFixViolations(workflow: string): string[] {
+  const violations: string[] = [];
+  const required: readonly [string, string][] = [
+    [
+      'if: success()',
+      'the issue must close only when the audit is back to zero',
+    ],
+    ['gh issue close', 'a clean audit must close the security issue'],
+    [
+      'run: bun scripts/securityAutoFix.ts',
+      'the autofix job must run scripts/securityAutoFix.ts',
+    ],
+    [
+      "if: failure() && needs.audit.result == 'failure'",
+      'the autofix job must run only after a failed audit',
+    ],
+    [
+      'persist-credentials: false',
+      'the autofix checkout must not keep the repository token',
+    ],
+    [
+      '🔱 Yekora Global Certification',
+      'auto-merge must be gated on the Global Certification check',
+    ],
+    [
+      '--auto --squash',
+      'patch PRs must merge through GitHub auto-merge, never directly',
+    ],
+  ];
+  for (const [needle, message] of required) {
+    if (!workflow.includes(needle)) violations.push(message);
+  }
+  const writes = workflow
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .some((line) => ['contents: write', 'pull-requests: write'].includes(line));
+  if (writes) {
+    violations.push(
+      'the repository token must not get contents or pull-requests write'
+    );
+  }
+  const secrets = [...workflow.matchAll(/secrets\.\w+/g)].map((m) => m[0]);
+  if (secrets.some((secret) => secret !== AUTOFIX_SECRET)) {
+    violations.push(`only ${AUTOFIX_SECRET} may reach the audit workflow`);
+  }
+  if (/gh pr merge(?![^\n]*--auto)/.test(workflow)) {
+    violations.push(
+      'a PR may only be merged with --auto (behind the required check)'
+    );
+  }
   return violations;
 }
 
