@@ -609,12 +609,56 @@ describe('auditCronViolations (FC 016 · daily dependency audit, A08)', () => {
       'a clean audit must close the security issue',
       'the autofix job must run scripts/securityAutoFix.ts',
       'the autofix job must run only after a failed audit',
-      'the autofix checkout must not keep the repository token',
       'auto-merge must be gated on the Global Certification check',
       'patch PRs must merge through GitHub auto-merge, never directly',
+      'the autofix checkout must not keep the repository token',
+      'the token-expiration-check job is missing (FC 038)',
       'the audit job must have timeout-minutes: 15, found: none',
       'the autofix job must have timeout-minutes: 15, found: none',
+      'the token-expiration-check job must have timeout-minutes: 5, found: none',
     ]);
+  });
+
+  it.each([
+    [
+      'a watch that does not run the checker',
+      'run: bun scripts/checkTokenExpiration.ts',
+      'run: echo skipped',
+      'token-expiration-check must run scripts/checkTokenExpiration.ts',
+    ],
+    [
+      'a watch skipped when the audit is at zero',
+      '    # Its own job, no needs: it runs on every daily run, with the audit at zero or not.\n    if: always()',
+      '    if: failure()',
+      'token-expiration-check must run on every daily run (if: always())',
+    ],
+    [
+      'a watch that waits for the audit',
+      '  token-expiration-check:\n',
+      '  token-expiration-check:\n    needs: audit\n',
+      'token-expiration-check must not wait for another job',
+    ],
+    [
+      'a watch that inspects another token',
+      'TOKEN_TO_CHECK: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}',
+      'TOKEN_TO_CHECK: ${{ github.token }}',
+      'token-expiration-check must inspect SECURITY_AUTOFIX_TOKEN itself',
+    ],
+  ])('FC 038: flags %s', (_case, from, to, violation) => {
+    expect(auditCron).toContain(from);
+    expect(auditCronViolations(auditCron.replace(from, to))).toContain(
+      violation
+    );
+  });
+
+  it('FC 038: flags a missing watch job', () => {
+    const without = auditCron.slice(
+      0,
+      auditCron.indexOf('  token-expiration-check:')
+    );
+    expect(auditCronViolations(without)).toContain(
+      'the token-expiration-check job is missing (FC 038)'
+    );
   });
 });
 

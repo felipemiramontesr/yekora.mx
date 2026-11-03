@@ -889,9 +889,41 @@ export function auditCronViolations(workflow: string): string[] {
     );
   }
   violations.push(...autoFixViolations(workflow));
+  violations.push(...tokenWatchViolations(workflow));
   violations.push(
-    ...jobTimeoutViolations(workflow, { audit: 15, autofix: 15 })
+    ...jobTimeoutViolations(workflow, {
+      audit: 15,
+      autofix: 15,
+      'token-expiration-check': 5,
+    })
   );
+  return violations;
+}
+
+/**
+ * FC 038 T2.0: the expiry watch of SECURITY_AUTOFIX_TOKEN is a job of its own that runs on every
+ * daily run (`if: always()`, no `needs`), so an audit at zero cannot skip it.
+ */
+function tokenWatchViolations(workflow: string): string[] {
+  const block = jobBlocks(workflow).get('token-expiration-check');
+  if (block === undefined)
+    return ['the token-expiration-check job is missing (FC 038)'];
+  const lines = block.map((line) => line.trim());
+  const violations: string[] = [];
+  if (!lines.includes('run: bun scripts/checkTokenExpiration.ts'))
+    violations.push(
+      'token-expiration-check must run scripts/checkTokenExpiration.ts'
+    );
+  if (!lines.includes('if: always()'))
+    violations.push(
+      'token-expiration-check must run on every daily run (if: always())'
+    );
+  if (jobNeeds(block).length > 0)
+    violations.push('token-expiration-check must not wait for another job');
+  if (!lines.includes('TOKEN_TO_CHECK: ${{ secrets.SECURITY_AUTOFIX_TOKEN }}'))
+    violations.push(
+      'token-expiration-check must inspect SECURITY_AUTOFIX_TOKEN itself'
+    );
   return violations;
 }
 
@@ -920,10 +952,6 @@ function autoFixViolations(workflow: string): string[] {
       'the autofix job must run only after a failed audit',
     ],
     [
-      'persist-credentials: false',
-      'the autofix checkout must not keep the repository token',
-    ],
-    [
       '🔱 Yekora Global Certification',
       'auto-merge must be gated on the Global Certification check',
     ],
@@ -934,6 +962,13 @@ function autoFixViolations(workflow: string): string[] {
   ];
   for (const [needle, message] of required) {
     if (!workflow.includes(needle)) violations.push(message);
+  }
+  // In the autofix job itself: the token watch (FC 038) has the same line and must not count.
+  const autofix = (jobBlocks(workflow).get('autofix') ?? []).map((l) =>
+    l.trim()
+  );
+  if (!autofix.includes('persist-credentials: false')) {
+    violations.push('the autofix checkout must not keep the repository token');
   }
   const writes = workflow
     .split(/\r?\n/)
