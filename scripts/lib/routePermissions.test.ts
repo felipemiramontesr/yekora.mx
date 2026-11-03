@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ROUTE_CONTRACTS } from '../../apps/api/src/contract';
+import { PERMISSIONS } from '../../apps/api/src/lib/permissions';
 import { routePermissionViolations } from './routePermissions';
 
 describe('routePermissionViolations (FC 027 T2.6, S02)', () => {
   it('the API contract of today maps every route to a known permission', () => {
-    expect(routePermissionViolations(ROUTE_CONTRACTS, [])).toEqual([]);
+    expect(routePermissionViolations(ROUTE_CONTRACTS, PERMISSIONS)).toEqual([]);
   });
 
   it('refuses a private route declared public, under either prefix', () => {

@@ -67,7 +67,10 @@ describe('API contract answers (FC 027 Q03, T2.2)', () => {
     const keys = ROUTE_CONTRACTS.map(({ method, path }) => `${method} ${path}`);
     expect(new Set(keys).size).toBe(keys.length);
     for (const route of ROUTE_CONTRACTS) {
-      expect(route.permission).toBe('public');
+      // FC 028: the signed-in account needs a permission; everything else stays public.
+      expect(route.permission).toBe(
+        route.path.startsWith('/v1/account/') ? 'account:self' : 'public'
+      );
       expect(Object.keys(route.responses).length).toBeGreaterThan(0);
     }
   });

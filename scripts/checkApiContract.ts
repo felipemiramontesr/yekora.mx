@@ -12,6 +12,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { ROUTE_CONTRACTS } from '../apps/api/src/contract';
+import { PERMISSIONS } from '../apps/api/src/lib/permissions';
 import { problemSchema } from '../apps/api/src/lib/problem';
 import {
   breakingChanges,
@@ -21,8 +22,8 @@ import {
 import { routePermissionViolations } from './lib/routePermissions';
 
 const DOCUMENT = 'apps/api/openapi.json';
-/** RBAC permission codes; FC 028 fills it from the permissions it creates. */
-const PERMISSION_CATALOG: readonly string[] = [];
+/** RBAC permission codes (FC 028): the catalog migration 004 seeds, as the API names it. */
+const PERMISSION_CATALOG: readonly string[] = PERMISSIONS;
 
 const write = process.argv.includes('--write');
 const next = buildOpenApi(ROUTE_CONTRACTS, problemSchema, {

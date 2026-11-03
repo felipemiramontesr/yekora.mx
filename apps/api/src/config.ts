@@ -15,9 +15,14 @@
  * operator's MP_SANDBOX_IS_TEST_ACCOUNT=true here, and `start` then asks Mercado Pago whether
  * the account really is a test one (in `live`, that it is not) before listening.
  *
+ * Identity (FC 028): AUTH_SECRET (session and one-time code keys) and TOTP_ENCRYPTION_KEY (TOTP
+ * secrets at rest, 277_AN V2) come together or not at all; each is 32 random bytes in base64.
+ * Without them every /v1/auth and /v1/account route answers 503: closed, never half-open.
+ *
  * @module
  */
 import { z } from 'zod';
+import { parseAuthKey } from './services/authCrypto';
 import { parsePiiKey } from './services/checkoutCrypto';
 import type { MercadoPagoSecrets } from './services/mercadoPagoAdapter';
 import type { StripeSecrets } from './services/stripeAdapter';
@@ -59,6 +64,8 @@ const schema = z.object({
   CHECKOUT_PII_KEY: z.string().optional(),
   CUSTOMER_EMAIL_HMAC_PEPPER: z.string().optional(),
   ORDER_TOKEN_PEPPER: z.string().optional(),
+  AUTH_SECRET: z.string().optional(),
+  TOTP_ENCRYPTION_KEY: z.string().optional(),
 });
 
 /**
@@ -99,6 +106,14 @@ export interface PaymentsConfig {
   checkout: CheckoutSecrets | null;
 }
 
+/** The identity secrets (FC 028), both or none. */
+export interface AuthSecrets {
+  /** AUTH_SECRET: keys the one-time code hashes. */
+  secret: Buffer;
+  /** TOTP_ENCRYPTION_KEY: encrypts TOTP secrets at rest. */
+  totpKey: Buffer;
+}
+
 /** Database connection settings. */
 export interface DbConfig {
   /** MariaDB host. */
@@ -131,6 +146,8 @@ export interface ApiConfig {
   sha: string;
   /** Payment processors and checkout secrets (FC 012). */
   payments: PaymentsConfig;
+  /** Identity secrets, or null when not configured (FC 028). */
+  auth: AuthSecrets | null;
 }
 
 /** A pair of secrets that must be configured together, or null when both are absent. */
@@ -239,5 +256,20 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
     version: parsed.API_VERSION,
     sha: parsed.GIT_SHA,
     payments: loadPayments(parsed),
+    auth: loadAuth(parsed),
   };
+}
+
+function loadAuth(parsed: z.infer<typeof schema>): AuthSecrets | null {
+  const secrets = pair(
+    'Identity',
+    parsed.AUTH_SECRET,
+    parsed.TOTP_ENCRYPTION_KEY
+  );
+  return (
+    secrets && {
+      secret: parseAuthKey('AUTH_SECRET', secrets[0]),
+      totpKey: parseAuthKey('TOTP_ENCRYPTION_KEY', secrets[1]),
+    }
+  );
 }

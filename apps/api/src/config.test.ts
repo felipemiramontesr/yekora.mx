@@ -28,6 +28,8 @@ describe('loadConfig', () => {
         mercadoPago: null,
         checkout: null,
       },
+      // FC 028: no identity secrets, so /v1/auth and /v1/account stay closed (503).
+      auth: null,
     });
   });
 
@@ -231,6 +233,46 @@ describe('loadConfig · payments (FC 012, 092_AN §2)', () => {
       'CHECKOUT_PII_KEY must be 32 random bytes',
     ],
     ['an unknown mode', { PAYMENTS_MODE: 'demo' }, 'Invalid option'],
+  ])('refuses to start with %s', (_case, env, message) => {
+    expect(() => loadConfig({ ...base, ...env })).toThrow(message);
+  });
+});
+
+describe('loadConfig · identity (FC 028, 277_AN V2)', () => {
+  const secret = Buffer.alloc(32, 1).toString('base64');
+  const totp = Buffer.alloc(32, 2).toString('base64');
+
+  it('reads both identity keys as 32-byte buffers', () => {
+    const { auth } = loadConfig({
+      ...base,
+      AUTH_SECRET: secret,
+      TOTP_ENCRYPTION_KEY: totp,
+    });
+    expect(auth?.secret).toEqual(Buffer.alloc(32, 1));
+    expect(auth?.totpKey).toEqual(Buffer.alloc(32, 2));
+  });
+
+  it.each([
+    [
+      'only AUTH_SECRET',
+      { AUTH_SECRET: secret },
+      'Identity needs both of its secrets or none',
+    ],
+    [
+      'only TOTP_ENCRYPTION_KEY',
+      { TOTP_ENCRYPTION_KEY: totp },
+      'Identity needs both of its secrets or none',
+    ],
+    [
+      'a short AUTH_SECRET',
+      { AUTH_SECRET: 'c2hvcnQ=', TOTP_ENCRYPTION_KEY: totp },
+      'AUTH_SECRET must be 32 random bytes in base64',
+    ],
+    [
+      'a short TOTP key',
+      { AUTH_SECRET: secret, TOTP_ENCRYPTION_KEY: 'c2hvcnQ=' },
+      'TOTP_ENCRYPTION_KEY must be 32 random bytes in base64',
+    ],
   ])('refuses to start with %s', (_case, env, message) => {
     expect(() => loadConfig({ ...base, ...env })).toThrow(message);
   });

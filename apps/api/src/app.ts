@@ -17,7 +17,11 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { CORS_ORIGINS, type ApiConfig } from './config';
 import { ROUTE_CONTRACTS } from './contract';
+import { permissionGuard } from './lib/guard';
+import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
+import { registerAccountRoutes } from './routes/account';
+import { registerAuthRoutes } from './routes/auth';
 import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
 import { registerCheckoutRoutes } from './routes/checkout';
@@ -71,21 +75,43 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   // FC 027 Q03/T2.6: a route outside the contract has no documented shape and no permission, so
   // it cannot be registered at all. HEAD and OPTIONS are Fastify's and CORS's own answers.
-  const declared = new Set(
-    ROUTE_CONTRACTS.map(({ method, path }) => `${method} ${path}`)
+  const permissionOf = new Map(
+    ROUTE_CONTRACTS.map(({ method, path, permission }) => [
+      `${method} ${path}`,
+      permission,
+    ])
   );
-  app.addHook('onRoute', ({ method, url }) => {
-    for (const verb of [method].flat()) {
+  const now = deps.now ?? (() => new Date());
+  // FC 028: every route the contract does not declare public runs behind the session guard.
+  const guard = permissionGuard({ db: deps.db, auth: deps.config.auth, now });
+  app.decorateRequest('user', null);
+  app.addHook('onRoute', (route) => {
+    for (const verb of [route.method].flat()) {
       if (verb === 'HEAD' || verb === 'OPTIONS') continue;
-      if (!declared.has(`${verb} ${url}`))
+      const permission = permissionOf.get(`${verb} ${route.url}`);
+      if (permission === undefined)
         throw new Error(
-          `Route ${verb} ${url} is not in apps/api/src/contract.ts`
+          `Route ${verb} ${route.url} is not in apps/api/src/contract.ts`
         );
+      if (permission !== 'public') {
+        if (!(PERMISSIONS as readonly string[]).includes(permission))
+          throw new Error(
+            `Route ${verb} ${route.url} needs unknown permission ${permission}`
+          );
+        route.preHandler = [
+          guard(permission),
+          ...[route.preHandler ?? []].flat(),
+        ];
+      }
     }
   });
   await app.register(helmet);
-  // FC 009: POST only for the cart quote; the origins stay the site and the local servers.
-  await app.register(cors, { origin: CORS_ORIGINS, methods: ['GET', 'POST'] });
+  // FC 028: the session cookie travels only with credentials, from the site's exact origins.
+  await app.register(cors, {
+    origin: CORS_ORIGINS,
+    methods: ['GET', 'POST', 'PATCH'],
+    credentials: true,
+  });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -118,7 +144,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCartRoutes(app, { db: deps.db, rate: deps.rate, shipping });
   registerExchangeRateRoute(app, deps.rate);
   // FC 012: checkout and the buyer's order view; closed (503) while payments are not configured.
-  const now = deps.now ?? (() => new Date());
   const processors = deps.processors ?? configuredProcessors(deps.config);
   registerCheckoutRoutes(app, {
     db: deps.db,
@@ -133,6 +158,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     payments: deps.config.payments,
     now,
   });
+  // FC 028: sign-up and sign-in (public, rate limited) and the signed-in account.
+  registerAuthRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAccountRoutes(app, { db: deps.db });
   await registerWebhookRoutes(app, {
     db: deps.db,
     processors,

@@ -10,7 +10,24 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
 import { findProduct, listProducts } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
+import { codeHash, newToken } from './services/authCrypto';
 import { createDb } from './services/db';
+import {
+  capabilitiesOf,
+  closeSession,
+  createCustomer,
+  enableTotp,
+  failChallenge,
+  findUserByEmail,
+  liveChallenge,
+  openChallenge,
+  openSession,
+  savePendingTotp,
+  sessionUser,
+  totpOf,
+  useBackupCode,
+} from './services/identity';
+import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
 import { createTableRateProvider } from './services/shippingRates';
 import type { ShippingRateProvider } from './services/shippingPort';
@@ -425,5 +442,115 @@ describe('identity schema of migration 004 (FC 028 F0)', () => {
         [user]
       )
     ).rejects.toThrow('CONSTRAINT `ck_two_factor_challenges_type`');
+  });
+});
+
+describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
+  const SECRET = Buffer.alloc(32, 3);
+  const NOW = new Date();
+  let userId = '';
+
+  it('creates a buyer with the customer role once, and refuses the same e-mail again', async () => {
+    const passwordHash = await hashPassword('correct horse battery staple');
+    const user = { email: 'real@example.test', passwordHash, fullName: 'Real' };
+    expect(await createCustomer(db, user)).toBe(true);
+    expect(await createCustomer(db, user)).toBe(false);
+    const found = await findUserByEmail(db, 'real@example.test');
+    userId = String(found?.id);
+    expect(await capabilitiesOf(db, userId)).toEqual({
+      roles: ['customer'],
+      permissions: ['account:self'],
+      totpEnabled: false,
+    });
+  });
+
+  it('gives an admin the union of every permission through the joins', async () => {
+    await db.query(
+      "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')",
+      [userId]
+    );
+    const { roles, permissions } = await capabilitiesOf(db, userId);
+    expect(roles).toEqual(['admin', 'customer']);
+    expect(permissions).toEqual([
+      'account:self',
+      'audit:read',
+      'catalog:write',
+      'orders:read',
+      'users:manage',
+    ]);
+    await db.query(
+      "DELETE FROM user_roles WHERE user_id = ? AND role_id = 'admin'",
+      [userId]
+    );
+  });
+
+  it('spends a challenge after its attempts, and forgets an expired one', async () => {
+    const id = await openChallenge(db, SECRET, userId, NOW);
+    expect(await liveChallenge(db, id, NOW)).toEqual({
+      id,
+      userId,
+      attempts: 0,
+    });
+    for (let i = 0; i < 5; i++) await failChallenge(db, id);
+    expect(await liveChallenge(db, id, NOW)).toBeNull();
+    const later = await openChallenge(db, SECRET, userId, NOW);
+    expect(
+      await liveChallenge(db, later, new Date(NOW.getTime() + 6 * 60_000))
+    ).toBeNull();
+  });
+
+  it('enables TOTP with 8 backup codes and spends each code exactly once', async () => {
+    await savePendingTotp(db, userId, 'v1:aaaa:bbbb:cccc');
+    await savePendingTotp(db, userId, 'v1:dddd:eeee:ffff');
+    expect(await totpOf(db, userId)).toEqual({
+      encrypted: 'v1:dddd:eeee:ffff',
+      enabled: false,
+    });
+    const codes = ['11111111', '22222222'];
+    await db.transaction((tx) =>
+      enableTotp(
+        tx,
+        userId,
+        codes.map((c) => codeHash(SECRET, c))
+      )
+    );
+    expect((await totpOf(db, userId))?.enabled).toBe(true);
+    expect(
+      await useBackupCode(db, userId, codeHash(SECRET, '11111111'), NOW)
+    ).toBe(true);
+    expect(
+      await useBackupCode(db, userId, codeHash(SECRET, '11111111'), NOW)
+    ).toBe(false);
+    expect(
+      await useBackupCode(db, userId, codeHash(SECRET, '99999999'), NOW)
+    ).toBe(false);
+  });
+
+  it('opens a session that finds its user, and closes it', async () => {
+    const challengeId = await openChallenge(db, SECRET, userId, NOW);
+    const { token, maxAgeSeconds } = await db.transaction((tx) =>
+      openSession(tx, {
+        challengeId,
+        userId,
+        privileged: false,
+        ip: '203.0.113.7',
+        userAgent: 'suite',
+        now: NOW,
+      })
+    );
+    expect(maxAgeSeconds).toBe(28_800);
+    expect(await liveChallenge(db, challengeId, NOW)).toBeNull();
+    const user = await sessionUser(db, token, NOW);
+    expect(user).toMatchObject({
+      userId,
+      email: 'real@example.test',
+      totpEnabled: true,
+    });
+    expect(await sessionUser(db, newToken(), NOW)).toBeNull();
+    expect(
+      await sessionUser(db, token, new Date(NOW.getTime() + 9 * 3_600_000))
+    ).toBeNull();
+    await closeSession(db, String(user?.sessionId));
+    expect(await sessionUser(db, token, NOW)).toBeNull();
   });
 });

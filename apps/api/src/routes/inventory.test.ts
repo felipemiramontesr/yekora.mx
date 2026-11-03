@@ -1,7 +1,7 @@
 /**
- * OWASP A01 evidence (FC 010): the API's surface is a closed inventory of public routes, and
- * anything outside it is a 404 problem. Also the A07 reserved-slot guard (truth table T1.2): the
- * dashboard shows A07 as RESERVED SLOT only while the `A07 surface absent` cases pass here.
+ * OWASP A01 evidence (FC 010, FC 028): the API's surface is a closed inventory, anything outside
+ * it is a 404 problem, and the signed-in routes (/v1/account) answer only behind the session
+ * guard. A07 left its reserved slot with FC 028: its evidence is routes/auth.test.ts.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,14 @@ const INVENTORY = [
   '├── /v1/checkout (POST)',
   '├── /v1/exchange-rate (GET, HEAD)',
   '├── /v1/orders/:order_number (GET, HEAD)',
+  // FC 028: sign-up and sign-in (public, rate limited) and the signed-in account (guarded).
+  '├── /v1/auth/register (POST)',
+  '├── /v1/auth/login (POST)',
+  '├── /v1/auth/totp/enroll (POST)',
+  '├── /v1/auth/totp/confirm (POST)',
+  '├── /v1/auth/verify (POST)',
+  '├── /v1/account/me (GET, HEAD)',
+  '├── /v1/account/logout (POST)',
   // FC 012: payment notifications, accepted only with the processor's signature.
   '├── /v1/webhooks/stripe (POST)',
   '├── /v1/webhooks/mercadopago (POST)',
@@ -29,9 +37,6 @@ const INVENTORY = [
   '',
 ].join('\n');
 
-// Path segments that would mean accounts, sessions or privileged actions exist (A07 trigger).
-const AUTH_SEGMENT =
-  /\/(login|logout|register|auth|session|token|account|password|admin|users)\b/i;
 // Fastify plugins that would bring cookies, sessions or credentials into the API.
 const AUTH_PLUGINS = [
   '@fastify/cookie',
@@ -76,7 +81,7 @@ afterAll(async () => {
 });
 
 describe('A01 closed route inventory', () => {
-  it('exposes exactly the public read routes, the cart quote, the checkout, the order view and the payment webhooks', () => {
+  it('exposes exactly the public routes, the sign-in routes, the signed-in account and the payment webhooks', () => {
     expect(app.printRoutes({ commonPrefix: false })).toBe(INVENTORY);
   });
 
@@ -138,12 +143,23 @@ describe('A01 closed route inventory', () => {
   });
 });
 
-describe('A07 surface absent', () => {
-  it('no route belongs to accounts, sessions, tokens or administration', () => {
-    expect(app.printRoutes({ commonPrefix: false })).not.toMatch(AUTH_SEGMENT);
+describe('A01 signed-in surface behind the guard (FC 028)', () => {
+  it('answers no /v1/account route without the identity secrets (503), never its data', async () => {
+    for (const request of [
+      { method: 'GET', url: '/v1/account/me' },
+      { method: 'POST', url: '/v1/account/logout' },
+    ] as const) {
+      const response = await app.inject(request);
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ detail: 'AUTH_UNAVAILABLE' });
+    }
   });
 
-  it('the API depends on no cookie, session or credential plugin', () => {
+  it('keeps administration absent: no /admin or /v1/admin route exists yet', () => {
+    expect(app.printRoutes({ commonPrefix: false })).not.toMatch(/\/admin\b/);
+  });
+
+  it('reads its one cookie by hand: no cookie, session or credential plugin', () => {
     const manifest = JSON.parse(
       readFileSync(
         fileURLToPath(new URL('../../package.json', import.meta.url)),

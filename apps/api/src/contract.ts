@@ -25,13 +25,26 @@ import {
   orderViewSchema,
 } from '../../../lib/checkout/checkoutTypes';
 import { languageQuery } from './lib/language';
+import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
+import { meResponseSchema } from './routes/account';
+import {
+  challengeRequestSchema,
+  codeRequestSchema,
+  confirmResponseSchema,
+  enrollResponseSchema,
+  loginRequestSchema,
+  loginResponseSchema,
+  registeredSchema,
+  registerRequestSchema,
+  signedInSchema,
+} from './routes/auth';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
 import { BEARER, ORDER_NUMBER } from './routes/orders';
 
-/** Who may call a route. FC 028 widens it with the permissions of the RBAC catalog. */
-type Permission = 'public';
+/** Who may call a route: anyone, or the holders of one permission of the RBAC catalog. */
+type Access = 'public' | Permission;
 
 /** What one route accepts. */
 interface RequestContract {
@@ -55,8 +68,8 @@ interface RouteContract {
   path: string;
   /** One-line purpose. */
   summary: string;
-  /** Permission that guards the route. */
-  permission: Permission;
+  /** Permission that guards the route (app.ts runs the session guard for all but public). */
+  permission: Access;
   /** What the route accepts. */
   request: RequestContract;
   /** Schema of each answer by status; {@link problemSchema} marks an RFC 7807 error. */
@@ -85,6 +98,28 @@ const catalogProductSchema = productSchema.extend({
 });
 
 const webhookAckSchema = z.object({ code: z.string() });
+
+/** What the session guard answers instead of the route (lib/guard.ts). */
+const SIGNED_IN_REFUSALS = {
+  401: problemSchema,
+  403: problemSchema,
+  503: problemSchema,
+} as const;
+
+/** A public sign-in route: JSON body, its answers, 400 and 503 like every auth route. */
+const auth = (
+  path: string,
+  summary: string,
+  body: z.ZodType,
+  responses: Readonly<Record<number, z.ZodType>>
+): RouteContract => ({
+  method: 'POST',
+  path,
+  summary,
+  permission: 'public',
+  request: { body },
+  responses: { ...responses, 400: problemSchema, 503: problemSchema },
+});
 
 const webhook = (processor: string, path: string): RouteContract => ({
   method: 'POST',
@@ -177,4 +212,51 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   },
   webhook('Stripe', '/v1/webhooks/stripe'),
   webhook('Mercado Pago', '/v1/webhooks/mercadopago'),
+  // FC 028: sign-up and sign-in are public by nature; everything signed-in is /v1/account.
+  auth(
+    '/v1/auth/register',
+    'Creates a buyer account; never says whether the e-mail existed',
+    registerRequestSchema,
+    { 202: registeredSchema }
+  ),
+  auth(
+    '/v1/auth/login',
+    'Checks the password and opens a 5-minute second-factor challenge',
+    loginRequestSchema,
+    { 200: loginResponseSchema, 401: problemSchema }
+  ),
+  auth(
+    '/v1/auth/totp/enroll',
+    'Issues a new authenticator secret for the challenge’s user',
+    challengeRequestSchema,
+    { 200: enrollResponseSchema, 401: problemSchema, 409: problemSchema }
+  ),
+  auth(
+    '/v1/auth/totp/confirm',
+    'Turns the authenticator on, issues 8 backup codes and signs in',
+    codeRequestSchema,
+    { 200: confirmResponseSchema, 401: problemSchema, 409: problemSchema }
+  ),
+  auth(
+    '/v1/auth/verify',
+    'Signs in with an authenticator code or a backup code',
+    codeRequestSchema,
+    { 200: signedInSchema, 401: problemSchema, 409: problemSchema }
+  ),
+  {
+    method: 'GET',
+    path: '/v1/account/me',
+    summary: 'The signed-in user, with its roles and permissions',
+    permission: 'account:self',
+    request: {},
+    responses: { 200: meResponseSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/logout',
+    summary: 'Ends the session and clears its cookie',
+    permission: 'account:self',
+    request: {},
+    responses: { 204: z.null(), ...SIGNED_IN_REFUSALS },
+  },
 ];

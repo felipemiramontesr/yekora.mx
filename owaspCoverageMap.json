@@ -30,9 +30,14 @@
           "type": "junit",
           "path": "apps/api/src/routes/inventory.test.ts",
           "describe": "A01 closed route inventory"
+        },
+        {
+          "type": "junit",
+          "path": "apps/api/src/routes/inventory.test.ts",
+          "describe": "A01 signed-in surface behind the guard (FC 028)"
         }
       ],
-      "notes": "Closed inventory of public API routes (printRoutes), 404 problem for anything else, CORS for https://yekora.mx only. No accounts or privileged actions exist yet (see A07)."
+      "notes": "Closed inventory of API routes (printRoutes), 404 problem for anything else, CORS with credentials for https://yekora.mx only. FC 028: /v1/account routes answer only behind the session guard (permission per route from apps/api/src/contract.ts); no administration route exists yet."
     },
     "A02": {
       "id": "A02:2021",
@@ -40,13 +45,20 @@
       "method": "computed",
       "status": "PASSED",
       "evidence": [
-        { "type": "junit", "path": "scripts/lib/backupCrypto.test.ts" },
+        {
+          "type": "junit",
+          "path": "scripts/lib/backupCrypto.test.ts"
+        },
         {
           "type": "job",
           "job": "security-scan",
           "resultEnv": "SECURITY_RESULT"
         },
-        { "type": "job", "job": "e2e-validation", "resultEnv": "E2E_RESULT" }
+        {
+          "type": "job",
+          "job": "e2e-validation",
+          "resultEnv": "E2E_RESULT"
+        }
       ],
       "notes": "Authenticated backups (AES-256-GCM, scrypt), TruffleHog on every push, HSTS checked by e2e/htaccess.spec.ts on Apache. HTTP→HTTPS 301 is done by Hostinger's CDN."
     },
@@ -61,7 +73,10 @@
           "path": "scripts/checkNoRawSql.ts",
           "exitEnv": "A03_EXIT"
         },
-        { "type": "junit", "path": "apps/api/src/routes/cart.test.ts" }
+        {
+          "type": "junit",
+          "path": "apps/api/src/routes/cart.test.ts"
+        }
       ],
       "notes": "Static, parameterized SQL only (AST guard with per-call allowlist); Zod validation before any query."
     },
@@ -85,8 +100,15 @@
       "method": "computed",
       "status": "PASSED",
       "evidence": [
-        { "type": "junit", "path": "apps/api/src/app.test.ts" },
-        { "type": "job", "job": "e2e-validation", "resultEnv": "E2E_RESULT" }
+        {
+          "type": "junit",
+          "path": "apps/api/src/app.test.ts"
+        },
+        {
+          "type": "job",
+          "job": "e2e-validation",
+          "resultEnv": "E2E_RESULT"
+        }
       ],
       "notes": "Helmet and RFC 7807 errors without internals on the API; CSP, nosniff, Referrer-Policy, Permissions-Policy, no listing and branded 404 on Apache."
     },
@@ -107,16 +129,16 @@
     "A07": {
       "id": "A07:2021",
       "label": "Identification/Auth Failures",
-      "method": "reserved",
-      "status": "N/A",
+      "method": "computed",
+      "status": "PASSED",
       "evidence": [
         {
           "type": "junit",
-          "path": "apps/api/src/routes/inventory.test.ts",
-          "describe": "A07 surface absent"
+          "path": "apps/api/src/routes/auth.test.ts",
+          "describe": "A07 identification and authentication"
         }
       ],
-      "notes": "Ω (2026-10-19, 076_AN §6): the surface does not exist — no authentication, users, sessions or passwords in the public catalog and guest cart. RESERVED SLOT while 'A07 surface absent' passes; it activates with the first auth route or plugin (K-05/K-07), which fails that guard on purpose."
+      "notes": "FC 028 (left its reserved slot): Argon2id passwords (hash-wasm), no session before the second factor, TOTP mandatory for staff and admin (403 otherwise), keyed one-time codes, 5 attempts per 5-minute challenge, rate-limited sign-in, the same 401 for an unknown e-mail and a wrong password, __Host- cookie HttpOnly Secure SameSite=Strict, sessions stored as SHA-256."
     },
     "A08": {
       "id": "A08:2021",
@@ -138,7 +160,10 @@
       "method": "computed",
       "status": "PASSED",
       "evidence": [
-        { "type": "junit", "path": "apps/api/src/services/logging.test.ts" }
+        {
+          "type": "junit",
+          "path": "apps/api/src/services/logging.test.ts"
+        }
       ],
       "notes": "Rejections (400, 404, 429) and server failures leave a JSON trail; credentials never reach the log."
     },
@@ -148,7 +173,10 @@
       "method": "computed",
       "status": "PASSED",
       "evidence": [
-        { "type": "junit", "path": "apps/api/src/services/banxico.test.ts" }
+        {
+          "type": "junit",
+          "path": "apps/api/src/services/banxico.test.ts"
+        }
       ],
       "notes": "The only outbound call is the fixed Banxico SIE URL, with a timeout; no user-supplied URL is ever fetched."
     }
