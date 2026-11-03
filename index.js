@@ -99616,6 +99616,51 @@ var CHECKOUT_RETURN_PATHS = {
   en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
 };
 
+// ../../lib/account/orderTypes.ts
+var orderSummarySchema = orderViewSchema.extend({
+  /** When the order was placed, ISO 8601. */
+  createdAt: external_exports.string(),
+  /** True for sandbox purchases (purged before go-live). */
+  isTest: external_exports.boolean()
+});
+var orderPageSchema = external_exports.object({
+  items: external_exports.array(orderSummarySchema),
+  page: external_exports.number().int().positive(),
+  pageSize: external_exports.number().int().positive(),
+  total: external_exports.number().int().nonnegative()
+});
+var orderLineSchema = external_exports.object({
+  sku: external_exports.string(),
+  quantity: external_exports.number().int().positive(),
+  unitPriceMxnCents: external_exports.number().int().positive(),
+  lineTotalMxnCents: external_exports.number().int().positive()
+});
+var paymentEventSchema = external_exports.object({
+  processor: external_exports.enum(["STRIPE", "MERCADO_PAGO"]),
+  eventType: external_exports.string(),
+  processorStatus: external_exports.string().nullable(),
+  amountMxnCents: external_exports.number().int().nonnegative().nullable(),
+  /** The transition it applied, or null when it changed nothing. */
+  resultingStatus: external_exports.enum(ORDER_STATUS_CODES).nullable(),
+  /** A mismatch or a late payment, flagged for review. */
+  isAlert: external_exports.boolean(),
+  /** When the API received it, ISO 8601. */
+  receivedAt: external_exports.string()
+});
+var orderDetailSchema = orderSummarySchema.extend({
+  lines: external_exports.array(orderLineSchema),
+  paymentEvents: external_exports.array(paymentEventSchema)
+});
+var paging = {
+  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
+  pageSize: external_exports.coerce.number().int().min(1).max(50).default(20)
+};
+var accountOrdersQuery = external_exports.strictObject(paging);
+var adminOrdersQuery = external_exports.strictObject({
+  ...paging,
+  status: external_exports.enum(ORDER_STATUS_CODES).optional()
+});
+
 // src/lib/language.ts
 var languageSchema = external_exports.enum(["es-MX", "en"]).default("es-MX");
 var languageQuery = external_exports.object({ lang: languageSchema });
@@ -99653,6 +99698,403 @@ function sessionCookie(token, maxAgeSeconds) {
 }
 function clearedSessionCookie() {
   return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+}
+
+// src/lib/money.ts
+function splitVat(totalMxnCents) {
+  const base = Math.round(totalMxnCents * 100 / 116);
+  return { base, tax: totalMxnCents - base };
+}
+function usdCents(priceMxnCents, fix) {
+  if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
+  return Math.round(priceMxnCents / fix);
+}
+
+// src/services/cartQuote.ts
+var LOW_STOCK = 5;
+var MAX_QUANTITY2 = 99;
+function stockStatus(stock) {
+  if (stock <= 0) return "out_of_stock";
+  return stock < LOW_STOCK ? "low_stock" : "available";
+}
+function quoteLine(line, row2, lang) {
+  if (!row2) {
+    return {
+      quoted: {
+        sku: line.sku,
+        slug: null,
+        name: null,
+        quantity: line.quantity,
+        unitPriceMxnCents: null,
+        lineTotalMxnCents: null,
+        lineBaseMxnCents: null,
+        lineTaxMxnCents: null,
+        stockStatus: "unavailable",
+        availableQuantity: 0,
+        purchasable: false
+      },
+      warning: "unavailable"
+    };
+  }
+  const unit = Number(row2.price_mxn_cents);
+  const stock = Number(row2.stock);
+  const total = unit * line.quantity;
+  const { base, tax } = splitVat(total);
+  const status = stockStatus(stock);
+  const purchasable = stock >= line.quantity;
+  let warning;
+  if (status === "out_of_stock") warning = "out_of_stock";
+  else if (!purchasable) warning = "insufficient_stock";
+  return {
+    quoted: {
+      sku: row2.sku,
+      slug: row2.slug,
+      name: lang === "en" ? row2.name_en : row2.name_es,
+      quantity: line.quantity,
+      unitPriceMxnCents: unit,
+      lineTotalMxnCents: total,
+      lineBaseMxnCents: base,
+      lineTaxMxnCents: tax,
+      stockStatus: status,
+      availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
+      purchasable
+    },
+    warning,
+    counted: purchasable ? { base, tax, total } : void 0
+  };
+}
+function buildQuote(lines, rows, rate, lang, shipping = null) {
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const items = [];
+  const warnings = [];
+  const summary2 = {
+    subtotalMxnCents: 0,
+    taxMxnCents: 0,
+    totalMxnCents: 0,
+    totalItems: 0
+  };
+  for (const line of lines) {
+    const { quoted, warning, counted } = quoteLine(
+      line,
+      bySku.get(line.sku),
+      lang
+    );
+    items.push(quoted);
+    if (warning) warnings.push({ sku: line.sku, code: warning });
+    if (counted) {
+      summary2.subtotalMxnCents += counted.base;
+      summary2.taxMxnCents += counted.tax;
+      summary2.totalMxnCents += counted.total;
+      summary2.totalItems += quoted.quantity;
+    }
+  }
+  const totalMxnCents = summary2.totalMxnCents + (shipping?.total ?? 0);
+  const fix = rate ? Number(rate.rate) : null;
+  const referenceUsdCents = totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
+  return {
+    items,
+    summary: {
+      itemsBaseMxnCents: summary2.subtotalMxnCents,
+      itemsTaxMxnCents: summary2.taxMxnCents,
+      itemsTotalMxnCents: summary2.totalMxnCents,
+      shippingCode: shipping?.code ?? null,
+      shippingBaseMxnCents: shipping?.base ?? null,
+      shippingTaxMxnCents: shipping?.tax ?? null,
+      shippingTotalMxnCents: shipping?.total ?? null,
+      serviceable: shipping?.code !== "UNSERVICEABLE_DESTINATION",
+      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
+      subtotalMxnCents: summary2.subtotalMxnCents + (shipping?.base ?? 0),
+      taxMxnCents: summary2.taxMxnCents + (shipping?.tax ?? 0),
+      totalMxnCents,
+      totalItems: summary2.totalItems,
+      referenceUsdCents,
+      exchangeRate: rate
+    },
+    warnings
+  };
+}
+async function readProducts(db, lines) {
+  if (lines.length === 0) return [];
+  return db.query(
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    [lines.map((line) => line.sku)]
+  );
+}
+async function quoteCart(db, lines, rate, lang) {
+  return buildQuote(lines, await readProducts(db, lines), rate, lang);
+}
+async function quoteCartToDestination(db, lines, rate, lang, destination, provider) {
+  const rows = await readProducts(db, lines);
+  const products = buildQuote(lines, rows, rate, lang);
+  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
+    return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
+  }
+  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const shipment = await provider.quote({
+    stateCode: destination.stateCode,
+    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
+    lines: lines.map((line) => {
+      const row2 = bySku.get(line.sku);
+      return {
+        quantity: line.quantity,
+        weightGrams: Number(row2.weight_grams),
+        lengthMm: Number(row2.length_mm),
+        widthMm: Number(row2.width_mm),
+        heightMm: Number(row2.height_mm),
+        classId: Number(row2.shipping_class_id)
+      };
+    })
+  });
+  if (shipment.code === "INVALID_DESTINATION") {
+    return { ok: false, code: "INVALID_DESTINATION" };
+  }
+  const shipping = shipment.serviceable ? {
+    code: shipment.code,
+    base: shipment.baseMxnCents,
+    tax: shipment.taxMxnCents,
+    total: shipment.totalMxnCents,
+    remaining: shipment.freeShippingRemainingMxnCents
+  } : {
+    code: "UNSERVICEABLE_DESTINATION",
+    base: 0,
+    tax: 0,
+    total: 0,
+    remaining: null
+  };
+  return { ok: true, quote: buildQuote(lines, rows, rate, lang, shipping) };
+}
+
+// src/services/checkout.ts
+var PROCESSOR_OF = {
+  CARD: "STRIPE",
+  OXXO: "STRIPE",
+  SPEI: "MERCADO_PAGO",
+  MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
+};
+var refuse = (status, code) => ({ ok: false, status, code });
+function affected(result) {
+  return result.affectedRows;
+}
+async function expireOverdueOrders(db, now) {
+  return db.transaction(async (tx) => {
+    const overdue = await tx.query(
+      "SELECT id FROM orders WHERE status_id = 1 AND expires_at < ? FOR UPDATE",
+      [now]
+    );
+    if (overdue.length === 0) return 0;
+    const ids = overdue.map((row2) => row2.id);
+    await tx.query(
+      "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
+      [ids]
+    );
+    await tx.query(
+      "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
+      [ids]
+    );
+    return ids.length;
+  });
+}
+var InsufficientStock = class extends Error {
+};
+async function reserveLines(tx, lines) {
+  const reserved = await Promise.all(
+    lines.map(async (line) => {
+      const result = await tx.query(
+        "UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?",
+        [line.quantity, line.sku, line.quantity]
+      );
+      if (affected(result) !== 1) return null;
+      const [row2] = await tx.query(
+        "SELECT id FROM products WHERE sku = ?",
+        [line.sku]
+      );
+      return [line.sku, row2.id];
+    })
+  );
+  if (reserved.includes(null)) throw new InsufficientStock();
+  return new Map(reserved);
+}
+async function cancelOrder(db, orderId) {
+  await db.transaction(async (tx) => {
+    const result = await tx.query(
+      "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
+      [orderId]
+    );
+    if (affected(result) !== 1) return;
+    await tx.query(
+      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
+      [orderId]
+    );
+  });
+}
+function methodOf(body) {
+  const method = body?.method;
+  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
+}
+function admit(deps, body) {
+  const method = methodOf(body);
+  if (method === null) return refuse(400, "INVALID_REQUEST");
+  const processorCode = PROCESSOR_OF[method];
+  const processor = deps.processors[processorCode];
+  const secrets = deps.payments.checkout;
+  if (processor === void 0 || secrets === null) {
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
+  const parsed = checkoutRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const buyerData = parsed.error.issues.some(
+      (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
+    );
+    return refuse(
+      400,
+      buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
+    );
+  }
+  if (!parsed.data.privacyConsent) {
+    return refuse(400, "PRIVACY_CONSENT_REQUIRED");
+  }
+  return { request: parsed.data, method, processorCode, processor, secrets };
+}
+async function price(deps, request, lang) {
+  const quoted = await quoteCartToDestination(
+    deps.db,
+    request.items,
+    await deps.rate(),
+    lang,
+    {
+      stateCode: request.address.stateCode,
+      postalCode: request.address.postalCode
+    },
+    deps.shipping
+  );
+  if (!quoted.ok) {
+    return refuse(
+      400,
+      quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
+    );
+  }
+  const { shippingCode, totalMxnCents } = quoted.quote.summary;
+  if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
+    return refuse(400, "UNSERVICEABLE_DESTINATION");
+  }
+  if (totalMxnCents !== request.expectedTotalMxnCents) {
+    return refuse(409, "PRICE_CHANGED");
+  }
+  return quoted.quote;
+}
+async function persist(deps, admitted, quote, order) {
+  const { request, secrets } = admitted;
+  const { customer, address } = request;
+  const summary2 = quote.summary;
+  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
+  try {
+    return await deps.db.transaction(async (tx) => {
+      const productIds = await reserveLines(tx, request.items);
+      const inserted = await tx.query(
+        "INSERT INTO orders (order_number, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
+        [
+          order.orderNumber,
+          order.methodId,
+          summary2.itemsBaseMxnCents,
+          summary2.itemsTaxMxnCents,
+          summary2.itemsTotalMxnCents,
+          summary2.shippingBaseMxnCents,
+          summary2.shippingTaxMxnCents,
+          summary2.shippingTotalMxnCents,
+          summary2.totalMxnCents,
+          seal("customer_name", customer.name),
+          seal("customer_email", customer.email),
+          seal("customer_phone", customer.phone),
+          seal("shipping_address", JSON.stringify(address)),
+          emailHmac(secrets.emailPepper, customer.email),
+          tokenHash2(secrets.tokenPepper, order.accessToken),
+          order.now,
+          order.expiresAt,
+          deps.payments.mode === "sandbox" ? 1 : 0,
+          address.stateCode
+        ]
+      );
+      const id = inserted.insertId;
+      await tx.query(
+        "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
+        [
+          quote.items.map((item) => [
+            id,
+            productIds.get(item.sku),
+            item.sku,
+            item.quantity,
+            item.unitPriceMxnCents,
+            item.lineBaseMxnCents,
+            item.lineTaxMxnCents,
+            item.lineTotalMxnCents
+          ])
+        ]
+      );
+      return id;
+    });
+  } catch (error62) {
+    if (error62 instanceof InsufficientStock) {
+      return refuse(409, "INSUFFICIENT_STOCK");
+    }
+    throw error62;
+  }
+}
+async function createCheckout(deps, body, lang) {
+  const admitted = admit(deps, body);
+  if ("ok" in admitted) return admitted;
+  const now = deps.now();
+  await expireOverdueOrders(deps.db, now);
+  const quote = await price(deps, admitted.request, lang);
+  if ("ok" in quote) return quote;
+  const [methodRow] = await deps.db.query(
+    "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
+    [admitted.method]
+  );
+  if (methodRow === void 0) return refuse(503, "SERVICE_UNAVAILABLE");
+  const order = {
+    orderNumber: newOrderNumber(now),
+    accessToken: newAccessToken(),
+    methodId: methodRow.id,
+    now,
+    expiresAt: new Date(
+      now.getTime() + Number(methodRow.hold_minutes) * 6e4
+    )
+  };
+  const orderId = await persist(deps, admitted, quote, order);
+  if (typeof orderId !== "number") return orderId;
+  const paths = CHECKOUT_RETURN_PATHS[lang];
+  const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
+  const total = quote.summary.totalMxnCents;
+  try {
+    const session = await admitted.processor.createSession({
+      orderNumber: order.orderNumber,
+      method: admitted.method,
+      totalMxnCents: total,
+      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
+      expiresAt: order.expiresAt,
+      now,
+      successUrl: `${deps.payments.siteUrl}${paths.success}`,
+      cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
+      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
+    });
+    await deps.db.query(
+      "UPDATE orders SET processor_reference = ? WHERE id = ?",
+      [session.reference, orderId]
+    );
+    return {
+      ok: true,
+      session: {
+        orderNumber: order.orderNumber,
+        accessToken: order.accessToken,
+        redirectUrl: session.redirectUrl,
+        expiresAt: order.expiresAt.toISOString(),
+        totalMxnCents: total
+      }
+    };
+  } catch {
+    await cancelOrder(deps.db, orderId);
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
 }
 
 // src/services/identity.ts
@@ -99837,6 +100279,150 @@ function secondFactorSatisfied(user) {
   return !isPrivileged(user.roles) || user.totpEnabled;
 }
 
+// src/services/orderReads.ts
+var iso = (date5) => new Date(date5).toISOString();
+function summary(row2) {
+  return {
+    orderNumber: row2.order_number,
+    status: row2.status,
+    method: row2.method,
+    itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
+    shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
+    totalMxnCents: Number(row2.total_mxn_cents),
+    createdAt: iso(row2.created_at),
+    expiresAt: iso(row2.expires_at),
+    paidAt: row2.paid_at === null ? null : iso(row2.paid_at),
+    isTest: Number(row2.is_test) === 1
+  };
+}
+async function listOrders(db, scope, paging2) {
+  const { page, pageSize } = paging2;
+  const offset = (page - 1) * pageSize;
+  const [rows, [count]] = "userId" in scope ? await Promise.all([
+    db.query(
+      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.user_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
+      [scope.userId, pageSize, offset]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM orders WHERE user_id = ?",
+      [scope.userId]
+    )
+  ]) : await Promise.all([
+    db.query(
+      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE (? IS NULL OR s.code = ?) ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
+      [scope.status, scope.status, pageSize, offset]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM orders o JOIN order_statuses s ON s.id = o.status_id WHERE (? IS NULL OR s.code = ?)",
+      [scope.status, scope.status]
+    )
+  ]);
+  return { items: rows.map(summary), total: Number(count.n) };
+}
+async function findOrder(db, orderNumber) {
+  const [row2] = await db.query(
+    "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+    [orderNumber]
+  );
+  if (row2 === void 0) return null;
+  const [lines, events] = await Promise.all([
+    db.query(
+      "SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id",
+      [row2.id]
+    ),
+    db.query(
+      "SELECT p.code AS processor, e.event_type, e.processor_status, e.amount_mxn_cents, r.code AS resulting_status, e.is_alert, e.received_at FROM payment_events e JOIN payment_processors p ON p.id = e.processor_id LEFT JOIN order_statuses r ON r.id = e.resulting_status_id WHERE e.order_id = ? ORDER BY e.received_at, e.id",
+      [row2.id]
+    )
+  ]);
+  return {
+    ownerId: row2.user_id,
+    order: {
+      ...summary(row2),
+      lines: lines.map((line) => ({
+        sku: line.sku,
+        quantity: Number(line.quantity),
+        unitPriceMxnCents: Number(line.unit_price_mxn_cents),
+        lineTotalMxnCents: Number(line.line_total_mxn_cents)
+      })),
+      paymentEvents: events.map((event) => ({
+        processor: event.processor,
+        eventType: event.event_type,
+        processorStatus: event.processor_status,
+        amountMxnCents: event.amount_mxn_cents === null ? null : Number(event.amount_mxn_cents),
+        resultingStatus: event.resulting_status,
+        isAlert: Number(event.is_alert) === 1,
+        receivedAt: iso(event.received_at)
+      }))
+    }
+  };
+}
+
+// src/routes/orders.ts
+var import_node_crypto4 = require("node:crypto");
+var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
+var BEARER = /^Bearer ([\w-]{43})$/;
+var ORDER_PATHS = [
+  "/v1/orders/:order_number",
+  "/v1/account/orders",
+  "/v1/account/orders/:order_number",
+  "/v1/admin/orders",
+  "/v1/admin/orders/:order_number"
+];
+var WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+function registerOrderWriteRefusals(app) {
+  for (const url2 of ORDER_PATHS) {
+    app.route({
+      method: [...WRITE_METHODS],
+      url: url2,
+      handler: (_request, reply) => reply.code(405).header("Allow", "GET, HEAD").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "ORDERS_READ_ONLY"))
+    });
+  }
+}
+async function lookUpOrder(deps, orderNumber) {
+  if (!ORDER_NUMBER.test(orderNumber)) return null;
+  await expireOverdueOrders(deps.db, deps.now());
+  return findOrder(deps.db, orderNumber);
+}
+function registerOrderRoutes(app, deps) {
+  app.get(
+    "/v1/orders/:order_number",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+      const secrets = deps.payments.checkout;
+      if (secrets === null) {
+        return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
+      }
+      const { order_number: orderNumber } = request.params;
+      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
+      if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
+        return notFound();
+      await expireOverdueOrders(deps.db, deps.now());
+      const [row2] = await deps.db.query(
+        "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+        [orderNumber]
+      );
+      if (row2 === void 0 || !(0, import_node_crypto4.timingSafeEqual)(
+        Buffer.from(row2.access_token_hash),
+        tokenHash2(secrets.tokenPepper, token)
+      )) {
+        return notFound();
+      }
+      return orderViewSchema.parse({
+        orderNumber: row2.order_number,
+        status: row2.status,
+        method: row2.method,
+        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
+        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
+        totalMxnCents: Number(row2.total_mxn_cents),
+        expiresAt: new Date(row2.expires_at).toISOString(),
+        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
+      });
+    }
+  );
+}
+
 // src/routes/account.ts
 var meResponseSchema = external_exports.object({
   id: external_exports.uuid(),
@@ -99862,10 +100448,34 @@ function registerAccountRoutes(app, deps) {
     await closeSession(deps.db, request.user.sessionId);
     return reply.header("Set-Cookie", clearedSessionCookie()).code(204).send();
   });
+  app.get("/v1/account/orders", async (request, reply) => {
+    const query = accountOrdersQuery.safeParse(request.query);
+    if (!query.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
+    }
+    await expireOverdueOrders(deps.db, deps.now());
+    const { items, total } = await listOrders(
+      deps.db,
+      { userId: request.user.userId },
+      query.data
+    );
+    return orderPageSchema.parse({ items, total, ...query.data });
+  });
+  app.get("/v1/account/orders/:order_number", async (request, reply) => {
+    const { order_number: orderNumber } = request.params;
+    const found = await lookUpOrder(deps, orderNumber);
+    if (found === null) {
+      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+    }
+    if (found.ownerId !== request.user.userId) {
+      return reply.code(403).type(PROBLEM_TYPE).send(problem(403, "Not your order", "DATA_DOMAIN_FORBIDDEN"));
+    }
+    return orderDetailSchema.parse(found.order);
+  });
 }
 
 // src/services/passwords.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -99877,7 +100487,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto4.randomBytes)(16),
+    salt: (0, import_node_crypto5.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -99890,7 +100500,7 @@ async function verifyPassword(hash2, password) {
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto4.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto5.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -99935,26 +100545,26 @@ var TITLES = {
   TOTP_ALREADY_ENABLED: "Authenticator already enabled",
   TOTP_NOT_ENROLLED: "Set up the authenticator first"
 };
-function refuse(reply, status, code) {
+function refuse2(reply, status, code) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
 }
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
 function registerAuthRoutes(app, deps) {
   function parse3(schema2, request, reply) {
     if (deps.auth === null) {
-      void refuse(reply, 503, "AUTH_UNAVAILABLE");
+      void refuse2(reply, 503, "AUTH_UNAVAILABLE");
       return null;
     }
     const body = schema2.safeParse(request.body);
     if (!body.success) {
-      void refuse(reply, 400, "INVALID_REQUEST");
+      void refuse2(reply, 400, "INVALID_REQUEST");
       return null;
     }
     return { auth: deps.auth, body: body.data };
   }
   async function challengeOf(challengeId, reply) {
     const challenge = await liveChallenge(deps.db, challengeId, deps.now());
-    if (challenge === null) void refuse(reply, 401, "INVALID_CHALLENGE");
+    if (challenge === null) void refuse2(reply, 401, "INVALID_CHALLENGE");
     return challenge;
   }
   async function signIn(request, reply, challenge) {
@@ -99991,7 +100601,7 @@ function registerAuthRoutes(app, deps) {
       body.password
     );
     if (user === null || !valid) {
-      return refuse(reply, 401, "INVALID_CREDENTIALS");
+      return refuse2(reply, 401, "INVALID_CREDENTIALS");
     }
     const totp = await totpOf(deps.db, user.id);
     const challengeId = await openChallenge(
@@ -100012,7 +100622,7 @@ function registerAuthRoutes(app, deps) {
     const challenge = await challengeOf(body.challengeId, reply);
     if (challenge === null) return reply;
     if ((await totpOf(deps.db, challenge.userId))?.enabled) {
-      return refuse(reply, 409, "TOTP_ALREADY_ENABLED");
+      return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
     }
     const email3 = await emailOf(deps.db, challenge.userId);
     const secret = newTotpSecret();
@@ -100033,8 +100643,8 @@ function registerAuthRoutes(app, deps) {
     const challenge = await challengeOf(body.challengeId, reply);
     if (challenge === null) return reply;
     const totp = await totpOf(deps.db, challenge.userId);
-    if (totp === null) return refuse(reply, 409, "TOTP_NOT_ENROLLED");
-    if (totp.enabled) return refuse(reply, 409, "TOTP_ALREADY_ENABLED");
+    if (totp === null) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+    if (totp.enabled) return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
     const secret = decryptTotpSecret(
       auth2.totpKey,
       challenge.userId,
@@ -100042,7 +100652,7 @@ function registerAuthRoutes(app, deps) {
     );
     if (!verifyTotp(secret, body.code, deps.now())) {
       await failChallenge(deps.db, challenge.id);
-      return refuse(reply, 401, "INVALID_CODE");
+      return refuse2(reply, 401, "INVALID_CODE");
     }
     const backupCodes = newBackupCodes();
     await deps.db.transaction(
@@ -100062,7 +100672,7 @@ function registerAuthRoutes(app, deps) {
     const challenge = await challengeOf(body.challengeId, reply);
     if (challenge === null) return reply;
     const totp = await totpOf(deps.db, challenge.userId);
-    if (!totp?.enabled) return refuse(reply, 409, "TOTP_NOT_ENROLLED");
+    if (!totp?.enabled) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
     const passed = await (body.code.length === 6 ? Promise.resolve(
       verifyTotp(
         decryptTotpSecret(auth2.totpKey, challenge.userId, totp.encrypted),
@@ -100077,175 +100687,11 @@ function registerAuthRoutes(app, deps) {
     ));
     if (!passed) {
       await failChallenge(deps.db, challenge.id);
-      return refuse(reply, 401, "INVALID_CODE");
+      return refuse2(reply, 401, "INVALID_CODE");
     }
     await signIn(request, reply, challenge);
     return signedInSchema.parse({ status: "signed_in" });
   });
-}
-
-// src/lib/money.ts
-function splitVat(totalMxnCents) {
-  const base = Math.round(totalMxnCents * 100 / 116);
-  return { base, tax: totalMxnCents - base };
-}
-function usdCents(priceMxnCents, fix) {
-  if (fix === null || !Number.isFinite(fix) || fix <= 0) return null;
-  return Math.round(priceMxnCents / fix);
-}
-
-// src/services/cartQuote.ts
-var LOW_STOCK = 5;
-var MAX_QUANTITY2 = 99;
-function stockStatus(stock) {
-  if (stock <= 0) return "out_of_stock";
-  return stock < LOW_STOCK ? "low_stock" : "available";
-}
-function quoteLine(line, row2, lang) {
-  if (!row2) {
-    return {
-      quoted: {
-        sku: line.sku,
-        slug: null,
-        name: null,
-        quantity: line.quantity,
-        unitPriceMxnCents: null,
-        lineTotalMxnCents: null,
-        lineBaseMxnCents: null,
-        lineTaxMxnCents: null,
-        stockStatus: "unavailable",
-        availableQuantity: 0,
-        purchasable: false
-      },
-      warning: "unavailable"
-    };
-  }
-  const unit = Number(row2.price_mxn_cents);
-  const stock = Number(row2.stock);
-  const total = unit * line.quantity;
-  const { base, tax } = splitVat(total);
-  const status = stockStatus(stock);
-  const purchasable = stock >= line.quantity;
-  let warning;
-  if (status === "out_of_stock") warning = "out_of_stock";
-  else if (!purchasable) warning = "insufficient_stock";
-  return {
-    quoted: {
-      sku: row2.sku,
-      slug: row2.slug,
-      name: lang === "en" ? row2.name_en : row2.name_es,
-      quantity: line.quantity,
-      unitPriceMxnCents: unit,
-      lineTotalMxnCents: total,
-      lineBaseMxnCents: base,
-      lineTaxMxnCents: tax,
-      stockStatus: status,
-      availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
-      purchasable
-    },
-    warning,
-    counted: purchasable ? { base, tax, total } : void 0
-  };
-}
-function buildQuote(lines, rows, rate, lang, shipping = null) {
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
-  const items = [];
-  const warnings = [];
-  const summary = {
-    subtotalMxnCents: 0,
-    taxMxnCents: 0,
-    totalMxnCents: 0,
-    totalItems: 0
-  };
-  for (const line of lines) {
-    const { quoted, warning, counted } = quoteLine(
-      line,
-      bySku.get(line.sku),
-      lang
-    );
-    items.push(quoted);
-    if (warning) warnings.push({ sku: line.sku, code: warning });
-    if (counted) {
-      summary.subtotalMxnCents += counted.base;
-      summary.taxMxnCents += counted.tax;
-      summary.totalMxnCents += counted.total;
-      summary.totalItems += quoted.quantity;
-    }
-  }
-  const totalMxnCents = summary.totalMxnCents + (shipping?.total ?? 0);
-  const fix = rate ? Number(rate.rate) : null;
-  const referenceUsdCents = totalMxnCents > 0 ? usdCents(totalMxnCents, fix) : null;
-  return {
-    items,
-    summary: {
-      itemsBaseMxnCents: summary.subtotalMxnCents,
-      itemsTaxMxnCents: summary.taxMxnCents,
-      itemsTotalMxnCents: summary.totalMxnCents,
-      shippingCode: shipping?.code ?? null,
-      shippingBaseMxnCents: shipping?.base ?? null,
-      shippingTaxMxnCents: shipping?.tax ?? null,
-      shippingTotalMxnCents: shipping?.total ?? null,
-      serviceable: shipping?.code !== "UNSERVICEABLE_DESTINATION",
-      freeShippingRemainingMxnCents: shipping?.remaining ?? null,
-      subtotalMxnCents: summary.subtotalMxnCents + (shipping?.base ?? 0),
-      taxMxnCents: summary.taxMxnCents + (shipping?.tax ?? 0),
-      totalMxnCents,
-      totalItems: summary.totalItems,
-      referenceUsdCents,
-      exchangeRate: rate
-    },
-    warnings
-  };
-}
-async function readProducts(db, lines) {
-  if (lines.length === 0) return [];
-  return db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [lines.map((line) => line.sku)]
-  );
-}
-async function quoteCart(db, lines, rate, lang) {
-  return buildQuote(lines, await readProducts(db, lines), rate, lang);
-}
-async function quoteCartToDestination(db, lines, rate, lang, destination, provider) {
-  const rows = await readProducts(db, lines);
-  const products = buildQuote(lines, rows, rate, lang);
-  if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
-    return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
-  }
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
-  const shipment = await provider.quote({
-    stateCode: destination.stateCode,
-    itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
-    lines: lines.map((line) => {
-      const row2 = bySku.get(line.sku);
-      return {
-        quantity: line.quantity,
-        weightGrams: Number(row2.weight_grams),
-        lengthMm: Number(row2.length_mm),
-        widthMm: Number(row2.width_mm),
-        heightMm: Number(row2.height_mm),
-        classId: Number(row2.shipping_class_id)
-      };
-    })
-  });
-  if (shipment.code === "INVALID_DESTINATION") {
-    return { ok: false, code: "INVALID_DESTINATION" };
-  }
-  const shipping = shipment.serviceable ? {
-    code: shipment.code,
-    base: shipment.baseMxnCents,
-    tax: shipment.taxMxnCents,
-    total: shipment.totalMxnCents,
-    remaining: shipment.freeShippingRemainingMxnCents
-  } : {
-    code: "UNSERVICEABLE_DESTINATION",
-    base: 0,
-    tax: 0,
-    total: 0,
-    remaining: null
-  };
-  return { ok: true, quote: buildQuote(lines, rows, rate, lang, shipping) };
 }
 
 // src/routes/cart.ts
@@ -100418,284 +100864,6 @@ function registerCatalogRoutes(app, deps) {
   });
 }
 
-// src/routes/orders.ts
-var import_node_crypto5 = require("node:crypto");
-
-// src/services/checkout.ts
-var PROCESSOR_OF = {
-  CARD: "STRIPE",
-  OXXO: "STRIPE",
-  SPEI: "MERCADO_PAGO",
-  MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
-};
-var refuse2 = (status, code) => ({ ok: false, status, code });
-function affected(result) {
-  return result.affectedRows;
-}
-async function expireOverdueOrders(db, now) {
-  return db.transaction(async (tx) => {
-    const overdue = await tx.query(
-      "SELECT id FROM orders WHERE status_id = 1 AND expires_at < ? FOR UPDATE",
-      [now]
-    );
-    if (overdue.length === 0) return 0;
-    const ids = overdue.map((row2) => row2.id);
-    await tx.query(
-      "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
-      [ids]
-    );
-    await tx.query(
-      "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
-      [ids]
-    );
-    return ids.length;
-  });
-}
-var InsufficientStock = class extends Error {
-};
-async function reserveLines(tx, lines) {
-  const reserved = await Promise.all(
-    lines.map(async (line) => {
-      const result = await tx.query(
-        "UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?",
-        [line.quantity, line.sku, line.quantity]
-      );
-      if (affected(result) !== 1) return null;
-      const [row2] = await tx.query(
-        "SELECT id FROM products WHERE sku = ?",
-        [line.sku]
-      );
-      return [line.sku, row2.id];
-    })
-  );
-  if (reserved.includes(null)) throw new InsufficientStock();
-  return new Map(reserved);
-}
-async function cancelOrder(db, orderId) {
-  await db.transaction(async (tx) => {
-    const result = await tx.query(
-      "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
-      [orderId]
-    );
-    if (affected(result) !== 1) return;
-    await tx.query(
-      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
-      [orderId]
-    );
-  });
-}
-function methodOf(body) {
-  const method = body?.method;
-  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
-}
-function admit(deps, body) {
-  const method = methodOf(body);
-  if (method === null) return refuse2(400, "INVALID_REQUEST");
-  const processorCode = PROCESSOR_OF[method];
-  const processor = deps.processors[processorCode];
-  const secrets = deps.payments.checkout;
-  if (processor === void 0 || secrets === null) {
-    return refuse2(503, "SERVICE_UNAVAILABLE");
-  }
-  const parsed = checkoutRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    const buyerData = parsed.error.issues.some(
-      (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
-    );
-    return refuse2(
-      400,
-      buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
-    );
-  }
-  if (!parsed.data.privacyConsent) {
-    return refuse2(400, "PRIVACY_CONSENT_REQUIRED");
-  }
-  return { request: parsed.data, method, processorCode, processor, secrets };
-}
-async function price(deps, request, lang) {
-  const quoted = await quoteCartToDestination(
-    deps.db,
-    request.items,
-    await deps.rate(),
-    lang,
-    {
-      stateCode: request.address.stateCode,
-      postalCode: request.address.postalCode
-    },
-    deps.shipping
-  );
-  if (!quoted.ok) {
-    return refuse2(
-      400,
-      quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
-    );
-  }
-  const { shippingCode, totalMxnCents } = quoted.quote.summary;
-  if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
-    return refuse2(400, "UNSERVICEABLE_DESTINATION");
-  }
-  if (totalMxnCents !== request.expectedTotalMxnCents) {
-    return refuse2(409, "PRICE_CHANGED");
-  }
-  return quoted.quote;
-}
-async function persist(deps, admitted, quote, order) {
-  const { request, secrets } = admitted;
-  const { customer, address } = request;
-  const summary = quote.summary;
-  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
-  try {
-    return await deps.db.transaction(async (tx) => {
-      const productIds = await reserveLines(tx, request.items);
-      const inserted = await tx.query(
-        "INSERT INTO orders (order_number, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
-        [
-          order.orderNumber,
-          order.methodId,
-          summary.itemsBaseMxnCents,
-          summary.itemsTaxMxnCents,
-          summary.itemsTotalMxnCents,
-          summary.shippingBaseMxnCents,
-          summary.shippingTaxMxnCents,
-          summary.shippingTotalMxnCents,
-          summary.totalMxnCents,
-          seal("customer_name", customer.name),
-          seal("customer_email", customer.email),
-          seal("customer_phone", customer.phone),
-          seal("shipping_address", JSON.stringify(address)),
-          emailHmac(secrets.emailPepper, customer.email),
-          tokenHash2(secrets.tokenPepper, order.accessToken),
-          order.now,
-          order.expiresAt,
-          deps.payments.mode === "sandbox" ? 1 : 0,
-          address.stateCode
-        ]
-      );
-      const id = inserted.insertId;
-      await tx.query(
-        "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
-        [
-          quote.items.map((item) => [
-            id,
-            productIds.get(item.sku),
-            item.sku,
-            item.quantity,
-            item.unitPriceMxnCents,
-            item.lineBaseMxnCents,
-            item.lineTaxMxnCents,
-            item.lineTotalMxnCents
-          ])
-        ]
-      );
-      return id;
-    });
-  } catch (error62) {
-    if (error62 instanceof InsufficientStock) {
-      return refuse2(409, "INSUFFICIENT_STOCK");
-    }
-    throw error62;
-  }
-}
-async function createCheckout(deps, body, lang) {
-  const admitted = admit(deps, body);
-  if ("ok" in admitted) return admitted;
-  const now = deps.now();
-  await expireOverdueOrders(deps.db, now);
-  const quote = await price(deps, admitted.request, lang);
-  if ("ok" in quote) return quote;
-  const [methodRow] = await deps.db.query(
-    "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
-    [admitted.method]
-  );
-  if (methodRow === void 0) return refuse2(503, "SERVICE_UNAVAILABLE");
-  const order = {
-    orderNumber: newOrderNumber(now),
-    accessToken: newAccessToken(),
-    methodId: methodRow.id,
-    now,
-    expiresAt: new Date(
-      now.getTime() + Number(methodRow.hold_minutes) * 6e4
-    )
-  };
-  const orderId = await persist(deps, admitted, quote, order);
-  if (typeof orderId !== "number") return orderId;
-  const paths = CHECKOUT_RETURN_PATHS[lang];
-  const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
-  const total = quote.summary.totalMxnCents;
-  try {
-    const session = await admitted.processor.createSession({
-      orderNumber: order.orderNumber,
-      method: admitted.method,
-      totalMxnCents: total,
-      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
-      expiresAt: order.expiresAt,
-      now,
-      successUrl: `${deps.payments.siteUrl}${paths.success}`,
-      cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
-      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
-    });
-    await deps.db.query(
-      "UPDATE orders SET processor_reference = ? WHERE id = ?",
-      [session.reference, orderId]
-    );
-    return {
-      ok: true,
-      session: {
-        orderNumber: order.orderNumber,
-        accessToken: order.accessToken,
-        redirectUrl: session.redirectUrl,
-        expiresAt: order.expiresAt.toISOString(),
-        totalMxnCents: total
-      }
-    };
-  } catch {
-    await cancelOrder(deps.db, orderId);
-    return refuse2(503, "SERVICE_UNAVAILABLE");
-  }
-}
-
-// src/routes/orders.ts
-var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
-var BEARER = /^Bearer ([\w-]{43})$/;
-function registerOrderRoutes(app, deps) {
-  app.get(
-    "/v1/orders/:order_number",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
-    async (request, reply) => {
-      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
-      const secrets = deps.payments.checkout;
-      if (secrets === null) {
-        return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
-      }
-      const { order_number: orderNumber } = request.params;
-      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
-      if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
-        return notFound();
-      await expireOverdueOrders(deps.db, deps.now());
-      const [row2] = await deps.db.query(
-        "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
-        [orderNumber]
-      );
-      if (row2 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
-        Buffer.from(row2.access_token_hash),
-        tokenHash2(secrets.tokenPepper, token)
-      )) {
-        return notFound();
-      }
-      return orderViewSchema.parse({
-        orderNumber: row2.order_number,
-        status: row2.status,
-        method: row2.method,
-        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
-        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
-        totalMxnCents: Number(row2.total_mxn_cents),
-        expiresAt: new Date(row2.expires_at).toISOString(),
-        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
-      });
-    }
-  );
-}
-
 // src/contract.ts
 var healthSchema = external_exports.object({
   status: external_exports.enum(["ok", "degraded"]),
@@ -100720,14 +100888,23 @@ var SIGNED_IN_REFUSALS = {
   403: problemSchema,
   503: problemSchema
 };
-var auth = (path, summary, body, responses) => ({
+var auth = (path, summary2, body, responses) => ({
   method: "POST",
   path,
-  summary,
+  summary: summary2,
   permission: "public",
   request: { body },
   responses: { ...responses, 400: problemSchema, 503: problemSchema }
 });
+var orderParams = external_exports.object({ order_number: external_exports.string().regex(ORDER_NUMBER) });
+var readOnly = (path) => WRITE_METHODS.map((method) => ({
+  method,
+  path,
+  summary: "Refused: orders are read-only in this delivery",
+  permission: "public",
+  request: {},
+  responses: { 405: problemSchema }
+}));
 var webhook = (processor, path) => ({
   method: "POST",
   path,
@@ -100805,7 +100982,7 @@ var ROUTE_CONTRACTS = [
     summary: "The buyer's view of one order, behind its access token",
     permission: "public",
     request: {
-      params: external_exports.object({ order_number: external_exports.string().regex(ORDER_NUMBER) }),
+      params: orderParams,
       headers: external_exports.object({ authorization: external_exports.string().regex(BEARER) })
     },
     responses: {
@@ -100862,15 +101039,64 @@ var ROUTE_CONTRACTS = [
     permission: "account:self",
     request: {},
     responses: { 204: external_exports.null(), ...SIGNED_IN_REFUSALS }
-  }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/orders",
+    summary: "The signed-in buyer's own orders, newest first",
+    permission: "account:self",
+    request: { query: accountOrdersQuery },
+    responses: {
+      200: orderPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/orders/:order_number",
+    summary: "One of the buyer\u2019s orders, with its lines and payment events",
+    permission: "account:self",
+    request: { params: orderParams },
+    responses: {
+      200: orderDetailSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/orders",
+    summary: "Every order, newest first, optionally of one status",
+    permission: "orders:read",
+    request: { query: adminOrdersQuery },
+    responses: {
+      200: orderPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/orders/:order_number",
+    summary: "One order, with its lines and payment events",
+    permission: "orders:read",
+    request: { params: orderParams },
+    responses: {
+      200: orderDetailSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  ...ORDER_PATHS.flatMap(readOnly)
 ];
 
 // src/lib/guard.ts
 var TITLES2 = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
-  UNAUTHENTICATED: "Sign in first",
+  SESSION_INVALID_OR_EXPIRED: "Sign in first",
   SECOND_FACTOR_REQUIRED: "Two-step verification required",
-  FORBIDDEN: "Not allowed"
+  PERMISSION_DENIED: "Not allowed"
 };
 function permissionGuard(deps) {
   return (permission) => async (request, reply) => {
@@ -100878,12 +101104,39 @@ function permissionGuard(deps) {
     if (deps.auth === null) return refuse3(503, "AUTH_UNAVAILABLE");
     const token = readSessionToken(request.headers.cookie);
     const user = token ? await sessionUser(deps.db, token, deps.now()) : null;
-    if (user === null) return refuse3(401, "UNAUTHENTICATED");
+    if (user === null) return refuse3(401, "SESSION_INVALID_OR_EXPIRED");
     if (!secondFactorSatisfied(user))
       return refuse3(403, "SECOND_FACTOR_REQUIRED");
-    if (!user.permissions.includes(permission)) return refuse3(403, "FORBIDDEN");
+    if (!user.permissions.includes(permission))
+      return refuse3(403, "PERMISSION_DENIED");
     request.user = user;
   };
+}
+
+// src/routes/admin.ts
+function registerAdminRoutes(app, deps) {
+  app.get("/v1/admin/orders", async (request, reply) => {
+    const query = adminOrdersQuery.safeParse(request.query);
+    if (!query.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
+    }
+    const { status, ...paging2 } = query.data;
+    await expireOverdueOrders(deps.db, deps.now());
+    const { items, total } = await listOrders(
+      deps.db,
+      { status: status ?? null },
+      paging2
+    );
+    return orderPageSchema.parse({ items, total, ...paging2 });
+  });
+  app.get("/v1/admin/orders/:order_number", async (request, reply) => {
+    const { order_number: orderNumber } = request.params;
+    const found = await lookUpOrder(deps, orderNumber);
+    if (found === null) {
+      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+    }
+    return orderDetailSchema.parse(found.order);
+  });
 }
 
 // src/routes/checkout.ts
@@ -100932,6 +101185,58 @@ function registerExchangeRateRoute(app, rate) {
     }
     return current;
   });
+}
+
+// src/services/audit.ts
+var REDACTED = "[redacted]";
+var PII_KEY = /pass|secret|token|otp|backup|hash|code|name|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
+function redactPii(value) {
+  if (typeof value === "string") return value.includes("@") ? REDACTED : value;
+  if (Array.isArray(value)) return value.map(redactPii);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        PII_KEY.test(key) ? REDACTED : redactPii(item)
+      ])
+    );
+  }
+  return value;
+}
+async function recordAudit(db, entry) {
+  const json2 = (state) => state === null ? null : JSON.stringify(redactPii(state));
+  await db.query(
+    "INSERT INTO audit_log (user_id, action, entity_type, entity_id, before_state, after_state, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      entry.userId,
+      entry.action.slice(0, 100),
+      entry.entityType.slice(0, 50),
+      entry.entityId.slice(0, 100),
+      json2(entry.before),
+      json2(entry.after),
+      entry.ip
+    ]
+  );
+}
+function auditTrail(db) {
+  return async (request, reply) => {
+    const route = request.routeOptions.url;
+    if (request.user === null || !route?.startsWith("/v1/admin/")) return;
+    const params = Object.values(request.params);
+    try {
+      await recordAudit(db, {
+        userId: request.user.userId,
+        action: `${request.method} ${route}`,
+        entityType: route.split("/")[3],
+        entityId: params[0] ?? "*",
+        before: null,
+        after: { query: request.query, status: reply.statusCode },
+        ip: request.ip
+      });
+    } catch (error62) {
+      request.log.error({ err: error62 }, "audit_log write failed");
+    }
+  };
 }
 
 // src/services/settlement.ts
@@ -101678,7 +101983,10 @@ async function buildApp(deps) {
     now
   });
   registerAuthRoutes(app, { db: deps.db, auth: deps.config.auth, now });
-  registerAccountRoutes(app, { db: deps.db });
+  registerAccountRoutes(app, { db: deps.db, now });
+  registerAdminRoutes(app, { db: deps.db, now });
+  registerOrderWriteRefusals(app);
+  app.addHook("onResponse", auditTrail(deps.db));
   await registerWebhookRoutes(app, {
     db: deps.db,
     processors,
@@ -101824,7 +102132,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "1bc4a3d61e11ede96d9e411fcfaec87848f75e57" : void 0;
+var sha = true ? "f5977e4c54bfc51adcff2c2731c9428f51f66e16" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
