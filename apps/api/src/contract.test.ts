@@ -60,6 +60,17 @@ beforeAll(async () => {
   await app.close();
 }, 30_000);
 
+/**
+ * FC 028: the account needs account:self and the panel orders:read; a write on an order path
+ * is a public 405 refusal; everything else stays public.
+ */
+function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
+  if (Object.keys(route.responses).join() === '405') return 'public';
+  if (route.path.startsWith('/v1/account/')) return 'account:self';
+  if (route.path.startsWith('/v1/admin/')) return 'orders:read';
+  return 'public';
+}
+
 // The 1:1 mapping between this registry and the routes Fastify serves is proved by
 // scripts/lib/contractValidation.test.ts (ADR 0014); here, that the answers match their schemas.
 describe('API contract answers (FC 027 Q03, T2.2)', () => {
@@ -67,10 +78,7 @@ describe('API contract answers (FC 027 Q03, T2.2)', () => {
     const keys = ROUTE_CONTRACTS.map(({ method, path }) => `${method} ${path}`);
     expect(new Set(keys).size).toBe(keys.length);
     for (const route of ROUTE_CONTRACTS) {
-      // FC 028: the signed-in account needs a permission; everything else stays public.
-      expect(route.permission).toBe(
-        route.path.startsWith('/v1/account/') ? 'account:self' : 'public'
-      );
+      expect(route.permission).toBe(expectedPermission(route));
       expect(Object.keys(route.responses).length).toBeGreaterThan(0);
     }
   });

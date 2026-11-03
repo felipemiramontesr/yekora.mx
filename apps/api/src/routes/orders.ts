@@ -17,6 +17,7 @@ import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { expireOverdueOrders } from '../services/checkout';
 import { tokenHash } from '../services/checkoutCrypto';
 import type { Db, Transactional } from '../services/db';
+import { findOrder } from '../services/orderReads';
 
 /** Dependencies of the order route. */
 interface OrderDeps {
@@ -44,6 +45,59 @@ interface OrderRow {
 export const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
 /** The order access token header; also a header of the API contract (contract.ts). */
 export const BEARER = /^Bearer ([\w-]{43})$/;
+
+/**
+ * Every order path (FC 028 T2.6a): read-only in this delivery, so each write method gets 405.
+ * The order state machine with its writes belongs to FC 031.
+ */
+export const ORDER_PATHS = [
+  '/v1/orders/:order_number',
+  '/v1/account/orders',
+  '/v1/account/orders/:order_number',
+  '/v1/admin/orders',
+  '/v1/admin/orders/:order_number',
+] as const;
+
+/** The methods that would write. */
+export const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
+
+/**
+ * Registers the 405 answer of every write on an order path. Public on purpose: the refusal
+ * holds for anyone, before any session is looked at, and it reveals nothing.
+ *
+ * @param app - Fastify instance.
+ */
+export function registerOrderWriteRefusals(app: FastifyInstance): void {
+  for (const url of ORDER_PATHS) {
+    app.route({
+      method: [...WRITE_METHODS],
+      url,
+      handler: (_request, reply) =>
+        reply
+          .code(405)
+          .header('Allow', 'GET, HEAD')
+          .type(PROBLEM_TYPE)
+          .send(problem(405, 'Method not allowed', 'ORDERS_READ_ONLY')),
+    });
+  }
+}
+
+/**
+ * One order by its public number for the account area and the panel, after releasing lapsed
+ * reservations so it reads its true status.
+ *
+ * @param deps - Database with transactions and clock.
+ * @param orderNumber - The path parameter, not yet validated.
+ * @returns The order and its owner, or null when malformed or unknown.
+ */
+export async function lookUpOrder(
+  deps: { db: Db & Transactional; now: () => Date },
+  orderNumber: string
+): ReturnType<typeof findOrder> {
+  if (!ORDER_NUMBER.test(orderNumber)) return null;
+  await expireOverdueOrders(deps.db, deps.now());
+  return findOrder(deps.db, orderNumber);
+}
 
 /**
  * Registers the order status route.

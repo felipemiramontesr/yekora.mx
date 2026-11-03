@@ -75,7 +75,7 @@ export const checkoutSessionSchema = z.object({
 });
 
 /** The six order statuses (FSM of FC 012, `order_statuses`). */
-const ORDER_STATUS_CODES = [
+export const ORDER_STATUS_CODES = [
   'PENDING_PAYMENT',
   'PAID',
   'EXPIRED',

@@ -1,7 +1,8 @@
 /**
  * OWASP A01 evidence (FC 010, FC 028): the API's surface is a closed inventory, anything outside
- * it is a 404 problem, and the signed-in routes (/v1/account) answer only behind the session
- * guard. A07 left its reserved slot with FC 028: its evidence is routes/auth.test.ts.
+ * it is a 404 problem, the signed-in routes (/v1/account, /v1/admin) answer only behind the
+ * session guard, and orders are read-only: every write on an order path is a 405 (T2.6a).
+ * A07 left its reserved slot with FC 028: its evidence is routes/auth.test.ts.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +22,9 @@ const INVENTORY = [
   // FC 012: guest checkout and the buyer's order view (token-protected, no account).
   '├── /v1/checkout (POST)',
   '├── /v1/exchange-rate (GET, HEAD)',
-  '├── /v1/orders/:order_number (GET, HEAD)',
-  // FC 028: sign-up and sign-in (public, rate limited) and the signed-in account (guarded).
+  // FC 028 T2.6a: every order path also declares the writes, only to refuse them with 405.
+  '├── /v1/orders/:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  // FC 028: sign-up and sign-in (public, rate limited), the account and the panel (guarded).
   '├── /v1/auth/register (POST)',
   '├── /v1/auth/login (POST)',
   '├── /v1/auth/totp/enroll (POST)',
@@ -30,6 +32,10 @@ const INVENTORY = [
   '├── /v1/auth/verify (POST)',
   '├── /v1/account/me (GET, HEAD)',
   '├── /v1/account/logout (POST)',
+  '├── /v1/account/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 012: payment notifications, accepted only with the processor's signature.
   '├── /v1/webhooks/stripe (POST)',
   '├── /v1/webhooks/mercadopago (POST)',
@@ -81,7 +87,7 @@ afterAll(async () => {
 });
 
 describe('A01 closed route inventory', () => {
-  it('exposes exactly the public routes, the sign-in routes, the signed-in account and the payment webhooks', () => {
+  it('exposes exactly the public routes, the sign-in routes, the account, the panel and the payment webhooks', () => {
     expect(app.printRoutes({ commonPrefix: false })).toBe(INVENTORY);
   });
 
@@ -144,10 +150,13 @@ describe('A01 closed route inventory', () => {
 });
 
 describe('A01 signed-in surface behind the guard (FC 028)', () => {
-  it('answers no /v1/account route without the identity secrets (503), never its data', async () => {
+  it('answers no /v1/account or /v1/admin route without the identity secrets (503), never its data', async () => {
     for (const request of [
       { method: 'GET', url: '/v1/account/me' },
       { method: 'POST', url: '/v1/account/logout' },
+      { method: 'GET', url: '/v1/account/orders' },
+      { method: 'GET', url: '/v1/admin/orders' },
+      { method: 'GET', url: '/v1/admin/orders/YEK-2026-AB12CD34' },
     ] as const) {
       const response = await app.inject(request);
       expect(response.statusCode).toBe(503);
@@ -155,8 +164,14 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     }
   });
 
-  it('keeps administration absent: no /admin or /v1/admin route exists yet', () => {
-    expect(app.printRoutes({ commonPrefix: false })).not.toMatch(/\/admin\b/);
+  it('keeps the panel to its read-only orders: no other /admin or /v1/admin route exists', () => {
+    const panel = app
+      .printRoutes({ commonPrefix: false })
+      .split('\n')
+      .filter((line) => /\/admin\b/.test(line));
+    expect(panel).toEqual([
+      '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
+    ]);
   });
 
   it('reads its one cookie by hand: no cookie, session or credential plugin', () => {

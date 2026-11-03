@@ -24,6 +24,14 @@ describe('permission catalog (FC 028)', () => {
     expect(seeded.sort()).toEqual([...PERMISSIONS].sort());
   });
 
+  it('gives admin the union of every permission by construction, never a hand-kept list (T2.3b)', () => {
+    // One INSERT … SELECT over the whole catalog: a permission added later reaches admin too.
+    expect(migration004).toMatch(
+      /INSERT IGNORE INTO role_permissions \(role_id, permission_id\)\s+SELECT 'admin', id FROM permissions;/
+    );
+    expect(migration004).not.toMatch(/\('admin', '[a-z]+:[a-z_]+'\)/);
+  });
+
   it('treats every role but customer as privileged (TOTP mandatory)', () => {
     expect(isPrivileged(['customer'])).toBe(false);
     expect(isPrivileged([])).toBe(false);

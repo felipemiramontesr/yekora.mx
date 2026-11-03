@@ -613,7 +613,7 @@ describe('A07 identification and authentication', () => {
     const { cookie } = await signedInBuyer();
     store.userRoles.splice(0, store.userRoles.length);
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
-    expect(me.json()).toMatchObject({ detail: 'FORBIDDEN' });
+    expect(me.json()).toMatchObject({ detail: 'PERMISSION_DENIED' });
   });
 
   it('refuses a missing, malformed or expired session (401)', async () => {
@@ -628,7 +628,7 @@ describe('A07 identification and authentication', () => {
         headers: cookie ? { cookie } : {},
       });
       expect(me.statusCode).toBe(401);
-      expect(me.json()).toMatchObject({ detail: 'UNAUTHENTICATED' });
+      expect(me.json()).toMatchObject({ detail: 'SESSION_INVALID_OR_EXPIRED' });
     }
   });
 

@@ -6,8 +6,10 @@
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
  */
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
+import { auditTrail } from './services/audit';
 import { findProduct, listProducts } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
 import { codeHash, newToken } from './services/authCrypto';
@@ -27,6 +29,7 @@ import {
   totpOf,
   useBackupCode,
 } from './services/identity';
+import { findOrder, listOrders } from './services/orderReads';
 import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
 import { createTableRateProvider } from './services/shippingRates';
@@ -552,5 +555,99 @@ describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
     ).toBeNull();
     await closeSession(db, String(user?.sessionId));
     expect(await sessionUser(db, token, NOW)).toBeNull();
+  });
+});
+
+describe('order reads and audit trail on real SQL (orderReads.ts, audit.ts, FC 028 F1)', () => {
+  let owner = '';
+  let paid = '';
+
+  it('lists a buyer’s orders by user_id and shows one with its lines and payment events', async () => {
+    const passwordHash = await hashPassword('orders suite passphrase');
+    await createCustomer(db, {
+      email: 'orders@example.test',
+      passwordHash,
+      fullName: 'Orders',
+    });
+    owner = String((await findUserByEmail(db, 'orders@example.test'))?.id);
+    const [row] = await db.query<{ order_number: string }>(
+      'SELECT order_number FROM orders WHERE status_id = 2 ORDER BY id LIMIT 1'
+    );
+    paid = row.order_number;
+    await db.query('UPDATE orders SET user_id = ? WHERE order_number = ?', [
+      owner,
+      paid,
+    ]);
+    const mine = await listOrders(
+      db,
+      { userId: owner },
+      { page: 1, pageSize: 20 }
+    );
+    expect(mine.total).toBe(1);
+    expect(mine.items.map((item) => item.orderNumber)).toEqual([paid]);
+    const found = await findOrder(db, paid);
+    expect(found?.ownerId).toBe(owner);
+    expect(found?.order).toMatchObject({ status: 'PAID', method: 'CARD' });
+    expect(found?.order.lines).toEqual([
+      expect.objectContaining({ sku: 'ITEST-PACK', quantity: 1 }),
+    ]);
+    expect(found?.order.paymentEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          processor: 'STRIPE',
+          resultingStatus: 'PAID',
+        }),
+      ])
+    );
+    expect(await findOrder(db, 'YEK-2026-NOPE0000')).toBeNull();
+  });
+
+  it('lists every order for the panel, or those of one status', async () => {
+    const all = await listOrders(
+      db,
+      { status: null },
+      { page: 1, pageSize: 50 }
+    );
+    const onlyPaid = await listOrders(
+      db,
+      { status: 'PAID' },
+      { page: 1, pageSize: 50 }
+    );
+    expect(onlyPaid.total).toBeGreaterThanOrEqual(1);
+    expect(all.total).toBeGreaterThan(onlyPaid.total);
+    expect(new Set(onlyPaid.items.map((item) => item.status))).toEqual(
+      new Set(['PAID'])
+    );
+  });
+
+  it('writes the audit trail as valid JSON, and keeps it and the order when the user is gone (ON DELETE SET NULL)', async () => {
+    const request = {
+      user: { userId: owner },
+      routeOptions: { url: '/v1/admin/orders/:order_number' },
+      method: 'GET',
+      params: { order_number: paid },
+      query: { q: 'ana@example.com' },
+      ip: '203.0.113.7',
+      log: { error: () => undefined },
+    } as unknown as FastifyRequest;
+    await auditTrail(db).call(undefined as never, request, {
+      statusCode: 200,
+    } as FastifyReply);
+    const [entry] = await db.query<{ id: number; after_state: string }>(
+      'SELECT id, after_state FROM audit_log WHERE user_id = ? AND entity_id = ?',
+      [owner, paid]
+    );
+    expect(JSON.parse(entry.after_state)).toEqual({
+      query: { q: '[redacted]' },
+      status: 200,
+    });
+    // Removing the account keeps its trail and its purchase, both unlinked (T2.7).
+    await db.query('DELETE FROM users WHERE id = ?', [owner]);
+    const [kept] = await db.query<{ user_id: string | null }>(
+      'SELECT user_id FROM audit_log WHERE id = ?',
+      [entry.id]
+    );
+    expect(kept.user_id).toBeNull();
+    expect((await findOrder(db, paid))?.ownerId).toBeNull();
   });
 });

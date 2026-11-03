@@ -60,6 +60,68 @@ describe('routePermissionViolations (FC 027 T2.6, S02)', () => {
     ]);
   });
 
+  it('allows a private path to be public only for a 405 refusal (T2.6a)', () => {
+    const refusal = { 405: {} };
+    expect(
+      routePermissionViolations(
+        [
+          {
+            method: 'POST',
+            path: '/v1/account/orders',
+            permission: 'public',
+            responses: refusal,
+          },
+          {
+            method: 'PATCH',
+            path: '/v1/admin/orders',
+            permission: 'public',
+            responses: { 200: {}, 405: {} },
+          },
+        ],
+        []
+      )
+    ).toEqual(['PATCH /v1/admin/orders: private route declared public']);
+  });
+
+  it('refuses a panel route behind the buyer’s own permission (T2.3a)', () => {
+    expect(
+      routePermissionViolations(
+        [
+          {
+            method: 'GET',
+            path: '/v1/admin/orders',
+            permission: 'account:self',
+          },
+        ],
+        ['account:self']
+      )
+    ).toEqual([
+      'GET /v1/admin/orders: panel route without a granular permission',
+    ]);
+  });
+
+  it('refuses a DELETE that would do anything but refuse (T2.3c)', () => {
+    expect(
+      routePermissionViolations(
+        [
+          {
+            method: 'DELETE',
+            path: '/v1/admin/users/:id',
+            permission: 'users:manage',
+            responses: { 204: {} },
+          },
+          {
+            method: 'DELETE',
+            path: '/v1/admin/orders',
+            permission: 'public',
+            responses: { 405: {} },
+          },
+        ],
+        ['users:manage']
+      )
+    ).toEqual(['DELETE /v1/admin/users/:id: DELETE must only refuse (405)']);
+  });
+
   it('does not mistake a public path that only starts like a private prefix', () => {
     expect(
       routePermissionViolations(

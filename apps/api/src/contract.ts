@@ -8,8 +8,9 @@
  * app.ts refuses to register a route missing here, and scripts/lib/contractValidation.test.ts
  * proves both sets are equal.
  *
- * Every route is `public` today. FC 028 adds the permission catalog for `/v1/account/*` and
- * `/v1/admin/*` (T2.6): a route under those prefixes can never be public.
+ * FC 028 adds the permission catalog for `/v1/account/*` and `/v1/admin/*` (T2.6): a route
+ * under those prefixes is never public, except the 405 refusals of writes on orders (T2.6a),
+ * which answer nothing else.
  *
  * @module
  */
@@ -24,6 +25,12 @@ import {
   checkoutSessionSchema,
   orderViewSchema,
 } from '../../../lib/checkout/checkoutTypes';
+import {
+  accountOrdersQuery,
+  adminOrdersQuery,
+  orderDetailSchema,
+  orderPageSchema,
+} from '../../../lib/account/orderTypes';
 import { languageQuery } from './lib/language';
 import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
@@ -41,7 +48,12 @@ import {
 } from './routes/auth';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
-import { BEARER, ORDER_NUMBER } from './routes/orders';
+import {
+  BEARER,
+  ORDER_NUMBER,
+  ORDER_PATHS,
+  WRITE_METHODS,
+} from './routes/orders';
 
 /** Who may call a route: anyone, or the holders of one permission of the RBAC catalog. */
 type Access = 'public' | Permission;
@@ -63,7 +75,7 @@ interface RequestContract {
 /** One route of the API. */
 interface RouteContract {
   /** HTTP method. */
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | (typeof WRITE_METHODS)[number];
   /** Path in Fastify syntax (`:param`). */
   path: string;
   /** One-line purpose. */
@@ -120,6 +132,20 @@ const auth = (
   request: { body },
   responses: { ...responses, 400: problemSchema, 503: problemSchema },
 });
+
+/** Path parameter of every one-order route. */
+const orderParams = z.object({ order_number: z.string().regex(ORDER_NUMBER) });
+
+/** The 405 of every write on an order path (FC 028 T2.6a): orders are read-only. */
+const readOnly = (path: string): RouteContract[] =>
+  WRITE_METHODS.map((method) => ({
+    method,
+    path,
+    summary: 'Refused: orders are read-only in this delivery',
+    permission: 'public',
+    request: {},
+    responses: { 405: problemSchema },
+  }));
 
 const webhook = (processor: string, path: string): RouteContract => ({
   method: 'POST',
@@ -201,7 +227,7 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     summary: "The buyer's view of one order, behind its access token",
     permission: 'public',
     request: {
-      params: z.object({ order_number: z.string().regex(ORDER_NUMBER) }),
+      params: orderParams,
       headers: z.object({ authorization: z.string().regex(BEARER) }),
     },
     responses: {
@@ -259,4 +285,53 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     request: {},
     responses: { 204: z.null(), ...SIGNED_IN_REFUSALS },
   },
+  {
+    method: 'GET',
+    path: '/v1/account/orders',
+    summary: "The signed-in buyer's own orders, newest first",
+    permission: 'account:self',
+    request: { query: accountOrdersQuery },
+    responses: {
+      200: orderPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/orders/:order_number',
+    summary: 'One of the buyer’s orders, with its lines and payment events',
+    permission: 'account:self',
+    request: { params: orderParams },
+    responses: {
+      200: orderDetailSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/orders',
+    summary: 'Every order, newest first, optionally of one status',
+    permission: 'orders:read',
+    request: { query: adminOrdersQuery },
+    responses: {
+      200: orderPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/orders/:order_number',
+    summary: 'One order, with its lines and payment events',
+    permission: 'orders:read',
+    request: { params: orderParams },
+    responses: {
+      200: orderDetailSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  ...ORDER_PATHS.flatMap(readOnly),
 ];

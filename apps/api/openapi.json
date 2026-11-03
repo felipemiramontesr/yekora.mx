@@ -1374,6 +1374,146 @@
             }
           }
         }
+      },
+      "post": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/webhooks/stripe": {
@@ -2564,6 +2704,1670 @@
           },
           "503": {
             "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/orders": {
+      "get": {
+        "summary": "The signed-in buyer's own orders, newest first",
+        "x-permission": "account:self",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "orderNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING_PAYMENT",
+                              "PAID",
+                              "EXPIRED",
+                              "CANCELLED",
+                              "REFUNDED",
+                              "NEEDS_REVIEW"
+                            ]
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "CARD",
+                              "OXXO",
+                              "SPEI",
+                              "MERCADO_PAGO_BALANCE"
+                            ]
+                          },
+                          "itemsTotalMxnCents": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "shippingTotalMxnCents": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "totalMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "paidAt": {
+                            "type": ["string", "null"]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "isTest": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "orderNumber",
+                          "status",
+                          "method",
+                          "itemsTotalMxnCents",
+                          "shippingTotalMxnCents",
+                          "totalMxnCents",
+                          "expiresAt",
+                          "paidAt",
+                          "createdAt",
+                          "isTest"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "page", "pageSize", "total"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/orders/{order_number}": {
+      "get": {
+        "summary": "One of the buyer’s orders, with its lines and payment events",
+        "x-permission": "account:self",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^YEK-\\d{4}-[0-9A-Z]{8}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderNumber": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING_PAYMENT",
+                        "PAID",
+                        "EXPIRED",
+                        "CANCELLED",
+                        "REFUNDED",
+                        "NEEDS_REVIEW"
+                      ]
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": ["CARD", "OXXO", "SPEI", "MERCADO_PAGO_BALANCE"]
+                    },
+                    "itemsTotalMxnCents": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "shippingTotalMxnCents": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalMxnCents": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "paidAt": {
+                      "type": ["string", "null"]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "isTest": {
+                      "type": "boolean"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "unitPriceMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "lineTotalMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "quantity",
+                          "unitPriceMxnCents",
+                          "lineTotalMxnCents"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "paymentEvents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "processor": {
+                            "type": "string",
+                            "enum": ["STRIPE", "MERCADO_PAGO"]
+                          },
+                          "eventType": {
+                            "type": "string"
+                          },
+                          "processorStatus": {
+                            "type": ["string", "null"]
+                          },
+                          "amountMxnCents": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resultingStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "PENDING_PAYMENT",
+                                  "PAID",
+                                  "EXPIRED",
+                                  "CANCELLED",
+                                  "REFUNDED",
+                                  "NEEDS_REVIEW"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "isAlert": {
+                            "type": "boolean"
+                          },
+                          "receivedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "processor",
+                          "eventType",
+                          "processorStatus",
+                          "amountMxnCents",
+                          "resultingStatus",
+                          "isAlert",
+                          "receivedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "orderNumber",
+                    "status",
+                    "method",
+                    "itemsTotalMxnCents",
+                    "shippingTotalMxnCents",
+                    "totalMxnCents",
+                    "expiresAt",
+                    "paidAt",
+                    "createdAt",
+                    "isTest",
+                    "lines",
+                    "paymentEvents"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/orders": {
+      "get": {
+        "summary": "Every order, newest first, optionally of one status",
+        "x-permission": "orders:read",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_PAYMENT",
+                "PAID",
+                "EXPIRED",
+                "CANCELLED",
+                "REFUNDED",
+                "NEEDS_REVIEW"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "orderNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING_PAYMENT",
+                              "PAID",
+                              "EXPIRED",
+                              "CANCELLED",
+                              "REFUNDED",
+                              "NEEDS_REVIEW"
+                            ]
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "CARD",
+                              "OXXO",
+                              "SPEI",
+                              "MERCADO_PAGO_BALANCE"
+                            ]
+                          },
+                          "itemsTotalMxnCents": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "shippingTotalMxnCents": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "totalMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "paidAt": {
+                            "type": ["string", "null"]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "isTest": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "orderNumber",
+                          "status",
+                          "method",
+                          "itemsTotalMxnCents",
+                          "shippingTotalMxnCents",
+                          "totalMxnCents",
+                          "expiresAt",
+                          "paidAt",
+                          "createdAt",
+                          "isTest"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "page", "pageSize", "total"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/orders/{order_number}": {
+      "get": {
+        "summary": "One order, with its lines and payment events",
+        "x-permission": "orders:read",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^YEK-\\d{4}-[0-9A-Z]{8}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderNumber": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING_PAYMENT",
+                        "PAID",
+                        "EXPIRED",
+                        "CANCELLED",
+                        "REFUNDED",
+                        "NEEDS_REVIEW"
+                      ]
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": ["CARD", "OXXO", "SPEI", "MERCADO_PAGO_BALANCE"]
+                    },
+                    "itemsTotalMxnCents": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "shippingTotalMxnCents": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalMxnCents": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "paidAt": {
+                      "type": ["string", "null"]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "isTest": {
+                      "type": "boolean"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "unitPriceMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "lineTotalMxnCents": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "quantity",
+                          "unitPriceMxnCents",
+                          "lineTotalMxnCents"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "paymentEvents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "processor": {
+                            "type": "string",
+                            "enum": ["STRIPE", "MERCADO_PAGO"]
+                          },
+                          "eventType": {
+                            "type": "string"
+                          },
+                          "processorStatus": {
+                            "type": ["string", "null"]
+                          },
+                          "amountMxnCents": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resultingStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "PENDING_PAYMENT",
+                                  "PAID",
+                                  "EXPIRED",
+                                  "CANCELLED",
+                                  "REFUNDED",
+                                  "NEEDS_REVIEW"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "isAlert": {
+                            "type": "boolean"
+                          },
+                          "receivedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "processor",
+                          "eventType",
+                          "processorStatus",
+                          "amountMxnCents",
+                          "resultingStatus",
+                          "isAlert",
+                          "receivedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "orderNumber",
+                    "status",
+                    "method",
+                    "itemsTotalMxnCents",
+                    "shippingTotalMxnCents",
+                    "totalMxnCents",
+                    "expiresAt",
+                    "paidAt",
+                    "createdAt",
+                    "isTest",
+                    "lines",
+                    "paymentEvents"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Refused: orders are read-only in this delivery",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "405": {
+            "description": "Answer",
             "content": {
               "application/problem+json": {
                 "schema": {

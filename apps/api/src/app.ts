@@ -21,12 +21,17 @@ import { permissionGuard } from './lib/guard';
 import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
+import { registerAdminRoutes } from './routes/admin';
 import { registerAuthRoutes } from './routes/auth';
 import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
 import { registerCheckoutRoutes } from './routes/checkout';
 import { registerExchangeRateRoute } from './routes/exchangeRate';
-import { registerOrderRoutes } from './routes/orders';
+import {
+  registerOrderRoutes,
+  registerOrderWriteRefusals,
+} from './routes/orders';
+import { auditTrail } from './services/audit';
 import { registerWebhookRoutes } from './routes/webhooks';
 import type { CheckoutDeps } from './services/checkout';
 import type { Db, Transactional } from './services/db';
@@ -158,9 +163,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     payments: deps.config.payments,
     now,
   });
-  // FC 028: sign-up and sign-in (public, rate limited) and the signed-in account.
+  // FC 028: sign-up and sign-in (public, rate limited), the signed-in account and the panel,
+  // whose every answered request goes to the audit trail. Orders are read-only (405 to writes).
   registerAuthRoutes(app, { db: deps.db, auth: deps.config.auth, now });
-  registerAccountRoutes(app, { db: deps.db });
+  registerAccountRoutes(app, { db: deps.db, now });
+  registerAdminRoutes(app, { db: deps.db, now });
+  registerOrderWriteRefusals(app);
+  app.addHook('onResponse', auditTrail(deps.db));
   await registerWebhookRoutes(app, {
     db: deps.db,
     processors,

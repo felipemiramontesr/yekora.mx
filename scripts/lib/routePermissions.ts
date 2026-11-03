@@ -1,10 +1,13 @@
 /**
- * Route ↔ permission rule (FC 027 T2.6, S02): every route of the API contract names exactly one
- * permission, that permission exists in the RBAC catalog, and no route under the private
- * prefixes is public. scripts/checkApiContract.ts applies it to apps/api/src/contract.ts.
+ * Route ↔ permission rule (FC 027 T2.6, S02; FC 028 T2.3): every route of the API contract names
+ * exactly one permission, that permission exists in the RBAC catalog, and no route under the
+ * private prefixes is public. scripts/checkApiContract.ts applies it to apps/api/src/contract.ts.
  *
- * Today every route is public and the catalog is empty, so the private-prefix rule has no route
- * to judge yet; it binds from the first `/v1/account` or `/v1/admin` route of FC 028 on.
+ * FC 028 adds three letters:
+ * - T2.3a: a `/v1/admin` route needs a granular permission, never the buyer's `account:self`.
+ * - T2.3c: a `DELETE` route may only refuse (405); no master entity is ever deleted.
+ * - T2.6a: the one public route a private prefix may hold is a 405 refusal, which answers
+ *   nothing else and reveals nothing.
  *
  * @module
  */
@@ -15,18 +18,30 @@ export const PUBLIC_PERMISSION = 'public';
 /** Prefixes whose routes always need a session and a permission (FC 028). */
 export const PRIVATE_PREFIXES = ['/v1/account', '/v1/admin'] as const;
 
+/** The buyer's own permission, too broad for the panel (T2.3a). */
+const SELF_PERMISSION = 'account:self';
+
 /** The part of a route contract the rule reads. */
 export interface PermissionedRoute {
   method: string;
   path: string;
   permission: string;
+  /** Answers by status; a route whose only answer is 405 is a refusal. */
+  responses?: Readonly<Record<number, unknown>>;
 }
+
+const under = (path: string, prefix: string) =>
+  path === prefix || path.startsWith(`${prefix}/`);
+
+/** Whether a route only ever answers 405 Method Not Allowed. */
+const onlyRefuses = (route: PermissionedRoute) =>
+  Object.keys(route.responses ?? {}).join() === '405';
 
 /**
  * Finds every route that breaks the route ↔ permission rule.
  *
  * @param routes - The API contract.
- * @param catalog - Permission codes of the RBAC catalog (empty until FC 028).
+ * @param catalog - Permission codes of the RBAC catalog.
  * @returns One message per violation; empty when the mapping is complete.
  */
 export function routePermissionViolations(
@@ -36,17 +51,20 @@ export function routePermissionViolations(
   const violations: string[] = [];
   const known = new Set([PUBLIC_PERMISSION, ...catalog]);
   const seen = new Set<string>();
-  for (const { method, path, permission } of routes) {
-    const route = `${method} ${path}`;
-    if (seen.has(route)) violations.push(`${route}: declared twice`);
-    seen.add(route);
+  for (const route of routes) {
+    const { method, path, permission } = route;
+    const at = `${method} ${path}`;
+    if (seen.has(at)) violations.push(`${at}: declared twice`);
+    seen.add(at);
     if (!known.has(permission))
-      violations.push(`${route}: unknown permission "${permission}"`);
-    const isPrivate = PRIVATE_PREFIXES.some(
-      (prefix) => path === prefix || path.startsWith(`${prefix}/`)
-    );
-    if (isPrivate && permission === PUBLIC_PERMISSION)
-      violations.push(`${route}: private route declared public`);
+      violations.push(`${at}: unknown permission "${permission}"`);
+    const isPrivate = PRIVATE_PREFIXES.some((prefix) => under(path, prefix));
+    if (isPrivate && permission === PUBLIC_PERMISSION && !onlyRefuses(route))
+      violations.push(`${at}: private route declared public`);
+    if (under(path, '/v1/admin') && permission === SELF_PERMISSION)
+      violations.push(`${at}: panel route without a granular permission`);
+    if (method === 'DELETE' && !onlyRefuses(route))
+      violations.push(`${at}: DELETE must only refuse (405)`);
   }
   return violations;
 }

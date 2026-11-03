@@ -35,9 +35,24 @@
           "type": "junit",
           "path": "apps/api/src/routes/inventory.test.ts",
           "describe": "A01 signed-in surface behind the guard (FC 028)"
+        },
+        {
+          "type": "junit",
+          "path": "apps/api/src/routes/ordersReadOnly.test.ts",
+          "describe": "T2.6a orders are read-only: every write is refused with 405"
+        },
+        {
+          "type": "junit",
+          "path": "apps/api/src/routes/ordersReadOnly.test.ts",
+          "describe": "T2.6b a buyer reads only their own orders (T1.2 D)"
+        },
+        {
+          "type": "junit",
+          "path": "apps/api/src/routes/ordersReadOnly.test.ts",
+          "describe": "T1.2 the panel needs orders:read, and staff their authenticator (T2.1a)"
         }
       ],
-      "notes": "Closed inventory of API routes (printRoutes), 404 problem for anything else, CORS with credentials for https://yekora.mx only. FC 028: /v1/account routes answer only behind the session guard (permission per route from apps/api/src/contract.ts); no administration route exists yet."
+      "notes": "Closed inventory of API routes (printRoutes), 404 problem for anything else, CORS with credentials for https://yekora.mx only. FC 028: /v1/account and /v1/admin routes answer only behind the session guard (permission per route from apps/api/src/contract.ts; the panel only with a granular permission and staff's authenticator); a buyer reads only their own orders (403 DATA_DOMAIN_FORBIDDEN otherwise); every write on an order path is a public 405; every answered panel request goes to audit_log without personal data."
     },
     "A02": {
       "id": "A02:2021",
