@@ -12,7 +12,7 @@ import type { PaymentsConfig } from './config';
 import { auditTrail } from './services/audit';
 import { findProduct, listProducts } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
-import { codeHash, newToken } from './services/authCrypto';
+import { codeHash, encryptTotpSecret, newToken } from './services/authCrypto';
 import { createDb } from './services/db';
 import {
   capabilitiesOf,
@@ -22,14 +22,18 @@ import {
   failChallenge,
   findUserByEmail,
   liveChallenge,
+  markEmailVerified,
   openChallenge,
   openSession,
+  passEmailChallenge,
   savePendingTotp,
   sessionUser,
   totpOf,
   useBackupCode,
 } from './services/identity';
 import { findOrder, listOrders } from './services/orderReads';
+import { enqueueMail } from './services/outbox';
+import { createOutboxDispatcher } from './services/outboxDispatcher';
 import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
 import { createTableRateProvider } from './services/shippingRates';
@@ -492,6 +496,8 @@ describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
     expect(await liveChallenge(db, id, NOW)).toEqual({
       id,
       userId,
+      type: 'TOTP',
+      codeHash: codeHash(SECRET, id),
       attempts: 0,
     });
     for (let i = 0; i < 5; i++) await failChallenge(db, id);
@@ -649,5 +655,122 @@ describe('order reads and audit trail on real SQL (orderReads.ts, audit.ts, FC 0
     );
     expect(kept.user_id).toBeNull();
     expect((await findOrder(db, paid))?.ownerId).toBeNull();
+  });
+});
+
+describe('mailed code and outbox on real SQL (identity.ts, outbox.ts, outboxDispatcher.ts, FC 028 F1)', () => {
+  const SECRET = Buffer.alloc(32, 5);
+  const KEY = Buffer.alloc(32, 6);
+  const NOW = new Date();
+  let userId = '';
+
+  it('opens an EMAIL challenge and its mail in one transaction, then passes it on to TOTP', async () => {
+    const passwordHash = await hashPassword('outbox suite passphrase');
+    await createCustomer(db, {
+      email: 'outbox@example.test',
+      passwordHash,
+      fullName: 'Outbox',
+    });
+    userId = String((await findUserByEmail(db, 'outbox@example.test'))?.id);
+    const challengeId = await db.transaction(async (tx) => {
+      const id = await openChallenge(tx, SECRET, userId, NOW, '482913');
+      await enqueueMail(tx, {
+        type: 'SIGN_IN_CODE',
+        userId,
+        challengeId: id,
+        code: encryptTotpSecret(KEY, id, Buffer.from('482913')),
+      });
+      return id;
+    });
+    expect(await liveChallenge(db, challengeId, NOW)).toMatchObject({
+      type: 'EMAIL',
+      codeHash: codeHash(SECRET, '482913'),
+    });
+    await markEmailVerified(db, userId, NOW);
+    await markEmailVerified(db, userId, new Date(NOW.getTime() + 60_000));
+    const [user] = await db.query<{ email_verified_at: Date }>(
+      'SELECT email_verified_at FROM users WHERE id = ?',
+      [userId]
+    );
+    expect(
+      Math.abs(user.email_verified_at.getTime() - NOW.getTime())
+    ).toBeLessThan(1000);
+    await passEmailChallenge(db, SECRET, challengeId);
+    expect(await liveChallenge(db, challengeId, NOW)).toMatchObject({
+      type: 'TOTP',
+      codeHash: codeHash(SECRET, challengeId),
+    });
+  });
+
+  it('rolls the challenge back when its mail cannot be queued (T2.4b)', async () => {
+    const before = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM two_factor_challenges WHERE user_id = ?',
+      [userId]
+    );
+    await expect(
+      db.transaction(async (tx) => {
+        await openChallenge(tx, SECRET, userId, NOW, '111111');
+        await tx.query(
+          'INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)',
+          ['SIGN_IN_CODE', 'not json']
+        );
+      })
+    ).rejects.toThrow('ck_outbox_events_payload');
+    const after = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM two_factor_challenges WHERE user_id = ?',
+      [userId]
+    );
+    expect(Number(after[0].n)).toBe(Number(before[0].n));
+  });
+
+  it('sends each due message once and records SENT, or the retry and its backoff', async () => {
+    await db.transaction((tx) =>
+      enqueueMail(tx, { type: 'TOTP_ENABLED', userId })
+    );
+    const sent: string[] = [];
+    let fail = false;
+    const outbox = createOutboxDispatcher({
+      db,
+      totpKey: KEY,
+      send: async (message) => {
+        if (fail) throw new Error('smtp down');
+        sent.push(`${message.to} ${message.subject}`);
+      },
+      now: () => new Date(Date.now() + 1000),
+      log: { error: () => undefined },
+      wait: async () => undefined,
+    });
+    outbox.kick();
+    await outbox.drain();
+    expect(sent).toEqual([
+      'outbox@example.test Tu código de acceso a YĒKORA',
+      'outbox@example.test Activaste la verificación en dos pasos en YĒKORA',
+    ]);
+    const statuses = await db.query<{ status: string; sent_at: Date | null }>(
+      "SELECT status, sent_at FROM outbox_events WHERE payload LIKE CONCAT('%', ?, '%') ORDER BY id",
+      [userId]
+    );
+    expect(statuses.map((s) => s.status)).toEqual(['SENT', 'SENT']);
+    expect(statuses.every((s) => s.sent_at !== null)).toBe(true);
+
+    fail = true;
+    await db.transaction((tx) =>
+      enqueueMail(tx, { type: 'TOTP_ENABLED', userId })
+    );
+    outbox.kick();
+    await outbox.drain();
+    const [retry] = await db.query<{
+      status: string;
+      retry_count: number;
+      error_message: string;
+    }>(
+      "SELECT status, retry_count, error_message FROM outbox_events WHERE status <> 'SENT' AND payload LIKE CONCAT('%', ?, '%')",
+      [userId]
+    );
+    expect(retry).toMatchObject({
+      status: 'PENDING',
+      retry_count: 1,
+      error_message: 'smtp down',
+    });
   });
 });

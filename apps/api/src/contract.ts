@@ -265,7 +265,7 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   ),
   auth(
     '/v1/auth/verify',
-    'Signs in with an authenticator code or a backup code',
+    'Signs in with the mailed code, an authenticator code or a backup code',
     codeRequestSchema,
     { 200: signedInSchema, 401: problemSchema, 409: problemSchema }
   ),

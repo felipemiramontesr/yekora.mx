@@ -19,6 +19,10 @@
  * secrets at rest, 277_AN V2) come together or not at all; each is 32 random bytes in base64.
  * Without them every /v1/auth and /v1/account route answers 503: closed, never half-open.
  *
+ * Mail (FC 028 F1, ADR 0013): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and MAIL_FROM come
+ * together or not at all. Without them nothing is sent, the outbox keeps every message, and a
+ * sign-in that needs the e-mail code answers 503 MAIL_UNAVAILABLE.
+ *
  * @module
  */
 import { z } from 'zod';
@@ -66,6 +70,11 @@ const schema = z.object({
   ORDER_TOKEN_PEPPER: z.string().optional(),
   AUTH_SECRET: z.string().optional(),
   TOTP_ENCRYPTION_KEY: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
 });
 
 /**
@@ -114,6 +123,20 @@ export interface AuthSecrets {
   totpKey: Buffer;
 }
 
+/** The SMTP account of the outbox (FC 028), all five settings or none. */
+export interface MailConfig {
+  /** SMTP server, e.g. smtp.hostinger.com. */
+  host: string;
+  /** 465 (implicit TLS) or 587 (STARTTLS). */
+  port: number;
+  /** Mailbox user, e.g. no-reply@yekora.mx. */
+  user: string;
+  /** Mailbox password. */
+  password: string;
+  /** Sender as shown, e.g. `YĒKORA <no-reply@yekora.mx>`. */
+  from: string;
+}
+
 /** Database connection settings. */
 export interface DbConfig {
   /** MariaDB host. */
@@ -148,6 +171,8 @@ export interface ApiConfig {
   payments: PaymentsConfig;
   /** Identity secrets, or null when not configured (FC 028). */
   auth: AuthSecrets | null;
+  /** SMTP account of the outbox, or null when not configured (FC 028). */
+  mail: MailConfig | null;
 }
 
 /** A pair of secrets that must be configured together, or null when both are absent. */
@@ -257,6 +282,24 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
     sha: parsed.GIT_SHA,
     payments: loadPayments(parsed),
     auth: loadAuth(parsed),
+    mail: loadMail(parsed),
+  };
+}
+
+function loadMail(parsed: z.infer<typeof schema>): MailConfig | null {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM } = parsed;
+  const settings = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM];
+  const given = settings.filter(Boolean).length;
+  if (given === 0) return null;
+  if (given < settings.length) {
+    throw new Error('Mail needs all of its settings or none');
+  }
+  return {
+    host: String(SMTP_HOST),
+    port: Number(SMTP_PORT),
+    user: String(SMTP_USER),
+    password: String(SMTP_PASSWORD),
+    from: String(MAIL_FROM),
   };
 }
 

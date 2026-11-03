@@ -1,14 +1,22 @@
 /**
- * Sign-up and sign-in (FC 028 F0, 143_AN B2): `/v1/auth/*`, public by nature, rate limited.
+ * Sign-up and sign-in (FC 028, 143_AN B2): `/v1/auth/*`, public by nature, rate limited.
  *
  * - `register` never says whether an e-mail already had an account (202 either way).
  * - `login` checks the password (an unknown e-mail costs the same Argon2id work) and opens a
- *   5-minute challenge; it never opens a session.
- * - `totp/enroll` and `totp/confirm` turn TOTP on for a user who has none; confirming also
- *   issues the 8 backup codes, shown once, and opens the session.
- * - `verify` takes a TOTP code or a backup code and opens the session.
- * A wrong code counts against the challenge (5 at most). The e-mail code arrives in FC 028 F1
- * with the outbox. Without AUTH_SECRET and TOTP_ENCRYPTION_KEY every route answers 503.
+ *   5-minute challenge; it never opens a session. `channel` tells where the code comes from:
+ *   the authenticator when it is on, otherwise a 6-digit code mailed through the outbox.
+ * - `verify` takes that code: the mailed one, or an authenticator or backup code. A buyer is then
+ *   signed in. Staff and admin who proved their mailbox but have no authenticator yet get 409
+ *   TOTP_NOT_ENROLLED (T2.1a), and their challenge moves on to `totp/enroll`.
+ * - `totp/enroll` and `totp/confirm` turn the authenticator on, only after the mailbox was
+ *   proved; confirming issues the 8 backup codes, shown once, queues a security alert in the
+ *   same transaction (T2.4b) and opens the session.
+ * A wrong code counts against the challenge (5 at most). Without AUTH_SECRET and
+ * TOTP_ENCRYPTION_KEY every route answers 503; without the SMTP account, a sign-in that needs the
+ * mailed code answers 503 MAIL_UNAVAILABLE.
+ *
+ * The /v1 contract is published, so the mailed code arrived without breaking it (FC 027 Q03):
+ * `login` gained a property and `verify` answers with the 409 it already declared.
  *
  * @module
  */
@@ -19,33 +27,38 @@ import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
 import { sessionCookie } from '../lib/session';
 import {
+  base32,
   codeHash,
   decryptTotpSecret,
   encryptTotpSecret,
   newBackupCodes,
+  newEmailCode,
   newTotpSecret,
   otpauthUri,
-  base32,
+  sameHash,
   verifyTotp,
 } from '../services/authCrypto';
 import type { Db, Transactional } from '../services/db';
 import {
   canonicalEmail,
-  clientFacts,
   capabilitiesOf,
+  type Challenge,
+  clientFacts,
   createCustomer,
   emailOf,
   enableTotp,
   failChallenge,
   findUserByEmail,
   liveChallenge,
+  markEmailVerified,
   openChallenge,
   openSession,
+  passEmailChallenge,
   savePendingTotp,
   totpOf,
   useBackupCode,
-  type Challenge,
 } from '../services/identity';
+import { enqueueMail } from '../services/outbox';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
 
 /** An e-mail as typed: surrounding spaces are dropped before it is validated. */
@@ -79,7 +92,10 @@ export const codeRequestSchema = z.strictObject({
 /** Answer of `POST /v1/auth/login`: what the second step must be. */
 export const loginResponseSchema = z.object({
   challengeId: z.uuid(),
+  // `enroll_totp` is no longer answered: enrolment now comes after the mailed code.
   next: z.enum(['verify', 'enroll_totp']),
+  /** Where the code of `verify` comes from. */
+  channel: z.enum(['email', 'authenticator']),
 });
 
 /** Answer of `POST /v1/auth/totp/enroll`: the secret, for the app or typed by hand. */
@@ -103,11 +119,14 @@ export const registeredSchema = z.object({ status: z.literal('accepted') });
 interface AuthDeps {
   db: Db & Transactional;
   auth: AuthSecrets | null;
+  /** Whether the outbox can mail (an SMTP account is configured). */
+  mailReady: boolean;
   now: () => Date;
 }
 
 const TITLES: Record<string, string> = {
   AUTH_UNAVAILABLE: 'Sign-in unavailable',
+  MAIL_UNAVAILABLE: 'Sign-in by e-mail unavailable',
   INVALID_REQUEST: 'Invalid request',
   INVALID_CREDENTIALS: 'Invalid e-mail or password',
   INVALID_CHALLENGE: 'Sign-in expired, start again',
@@ -130,7 +149,7 @@ const LIMITED = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
  * Registers the sign-up and sign-in routes.
  *
  * @param app - Fastify instance.
- * @param deps - Database, identity secrets and clock.
+ * @param deps - Database, identity secrets, mail readiness and clock.
  */
 export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
   /** Parses a body, or answers 503 / 400 and returns null. */
@@ -151,23 +170,50 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     return { auth: deps.auth, body: body.data };
   }
 
-  /** The live challenge of a body, or a 401 and null. */
+  /** The live challenge of a body, of a kind the route accepts, or a 401 and null. */
   async function challengeOf(
     challengeId: string,
+    types: readonly Challenge['type'][],
     reply: FastifyReply
   ): Promise<Challenge | null> {
     const challenge = await liveChallenge(deps.db, challengeId, deps.now());
-    if (challenge === null) void refuse(reply, 401, 'INVALID_CHALLENGE');
-    return challenge;
+    if (challenge && types.includes(challenge.type)) return challenge;
+    void refuse(reply, 401, 'INVALID_CHALLENGE');
+    return null;
+  }
+
+  /**
+   * Checks a mailed code. A buyer is signed in; staff and admin, who must still enrol the
+   * authenticator, get 409 TOTP_NOT_ENROLLED and keep the challenge for `totp/enroll`.
+   */
+  async function passMailedCode(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    auth: AuthSecrets,
+    challenge: Challenge,
+    code: string
+  ) {
+    if (!sameHash(challenge.codeHash, codeHash(auth.secret, code))) {
+      await failChallenge(deps.db, challenge.id);
+      return refuse(reply, 401, 'INVALID_CODE');
+    }
+    await markEmailVerified(deps.db, challenge.userId, deps.now());
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    if (isPrivileged(roles)) {
+      await passEmailChallenge(deps.db, auth.secret, challenge.id);
+      return refuse(reply, 409, 'TOTP_NOT_ENROLLED');
+    }
+    await signIn(request, reply, challenge, roles);
+    return signedInSchema.parse({ status: 'signed_in' });
   }
 
   /** Opens the session of a passed challenge and sets the cookie. */
   async function signIn(
     request: FastifyRequest,
     reply: FastifyReply,
-    challenge: Challenge
+    challenge: Challenge,
+    roles: readonly string[]
   ): Promise<void> {
-    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
     const { token, maxAgeSeconds } = await deps.db.transaction((tx) =>
       openSession(tx, {
         challengeId: challenge.id,
@@ -205,16 +251,43 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     if (user === null || !valid) {
       return refuse(reply, 401, 'INVALID_CREDENTIALS');
     }
-    const totp = await totpOf(deps.db, user.id);
-    const challengeId = await openChallenge(
-      deps.db,
-      auth.secret,
-      user.id,
-      deps.now()
-    );
+    if ((await totpOf(deps.db, user.id))?.enabled) {
+      const challengeId = await openChallenge(
+        deps.db,
+        auth.secret,
+        user.id,
+        deps.now()
+      );
+      return loginResponseSchema.parse({
+        challengeId,
+        next: 'verify',
+        channel: 'authenticator',
+      });
+    }
+    if (!deps.mailReady) return refuse(reply, 503, 'MAIL_UNAVAILABLE');
+    // The challenge and its mail commit together, or neither does (T2.4b).
+    const code = newEmailCode();
+    const challengeId = await deps.db.transaction(async (tx) => {
+      const id = await openChallenge(
+        tx,
+        auth.secret,
+        user.id,
+        deps.now(),
+        code
+      );
+      await enqueueMail(tx, {
+        type: 'SIGN_IN_CODE',
+        userId: user.id,
+        challengeId: id,
+        code: encryptTotpSecret(auth.totpKey, id, Buffer.from(code, 'utf8')),
+      });
+      return id;
+    });
+    request.outboxQueued = true;
     return loginResponseSchema.parse({
       challengeId,
-      next: totp?.enabled ? 'verify' : 'enroll_totp',
+      next: 'verify',
+      channel: 'email',
     });
   });
 
@@ -222,7 +295,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const parsed = parse(challengeRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
-    const challenge = await challengeOf(body.challengeId, reply);
+    const challenge = await challengeOf(body.challengeId, ['TOTP'], reply);
     if (challenge === null) return reply;
     if ((await totpOf(deps.db, challenge.userId))?.enabled) {
       return refuse(reply, 409, 'TOTP_ALREADY_ENABLED');
@@ -244,7 +317,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const parsed = parse(codeRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
-    const challenge = await challengeOf(body.challengeId, reply);
+    const challenge = await challengeOf(body.challengeId, ['TOTP'], reply);
     if (challenge === null) return reply;
     const totp = await totpOf(deps.db, challenge.userId);
     if (totp === null) return refuse(reply, 409, 'TOTP_NOT_ENROLLED');
@@ -259,14 +332,18 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
       return refuse(reply, 401, 'INVALID_CODE');
     }
     const backupCodes = newBackupCodes();
-    await deps.db.transaction((tx) =>
-      enableTotp(
+    // The authenticator, its backup codes and the alert to the mailbox commit together.
+    await deps.db.transaction(async (tx) => {
+      await enableTotp(
         tx,
         challenge.userId,
         backupCodes.map((code) => codeHash(auth.secret, code))
-      )
-    );
-    await signIn(request, reply, challenge);
+      );
+      await enqueueMail(tx, { type: 'TOTP_ENABLED', userId: challenge.userId });
+    });
+    request.outboxQueued = true;
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    await signIn(request, reply, challenge, roles);
     return confirmResponseSchema.parse({ backupCodes });
   });
 
@@ -274,8 +351,15 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const parsed = parse(codeRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
-    const challenge = await challengeOf(body.challengeId, reply);
+    const challenge = await challengeOf(
+      body.challengeId,
+      ['EMAIL', 'TOTP'],
+      reply
+    );
     if (challenge === null) return reply;
+    if (challenge.type === 'EMAIL') {
+      return passMailedCode(request, reply, auth, challenge, body.code);
+    }
     const totp = await totpOf(deps.db, challenge.userId);
     if (!totp?.enabled) return refuse(reply, 409, 'TOTP_NOT_ENROLLED');
     // Six digits: the authenticator. Eight: a backup code, spent on use.
@@ -297,7 +381,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
       await failChallenge(deps.db, challenge.id);
       return refuse(reply, 401, 'INVALID_CODE');
     }
-    await signIn(request, reply, challenge);
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    await signIn(request, reply, challenge, roles);
     return signedInSchema.parse({ status: 'signed_in' });
   });
 }

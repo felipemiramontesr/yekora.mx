@@ -3,8 +3,12 @@
  * challenges, TOTP enrolment, backup codes and sessions. Static parameterized SQL only (ADR 0003).
  *
  * A password never opens a session: it only opens a 5-minute challenge with at most 5 attempts.
- * The session is created after the second factor (TOTP or a backup code), so no session ever
- * skips 2FA (T2.1a). Sessions live 2 h for staff and admin and 8 h for buyers.
+ * The session is created after the second factor, so no session ever skips 2FA (T2.1a):
+ * - an `EMAIL` challenge carries the keyed hash of a 6-digit code sent by mail (FC 028 F1);
+ * - a `TOTP` challenge waits for the authenticator or a backup code. A user without the
+ *   authenticator reaches it only through a passed `EMAIL` challenge, so enrolling one always
+ *   needs the mailbox too.
+ * Sessions live 2 h for staff and admin and 8 h for buyers.
  *
  * @module
  */
@@ -43,6 +47,10 @@ interface Capabilities {
 export interface Challenge {
   id: string;
   userId: string;
+  /** `EMAIL`: waits for the mailed code. `TOTP`: waits for the authenticator or a backup code. */
+  type: 'EMAIL' | 'TOTP';
+  /** Keyed hash of the mailed code (`EMAIL`) or of the challenge id (`TOTP`). */
+  codeHash: string;
   attempts: number;
 }
 
@@ -177,24 +185,69 @@ export async function capabilitiesOf(
 /**
  * Opens a sign-in challenge after a correct password.
  *
- * @param db - Database port.
- * @param secret - AUTH_SECRET (the code hash column keys the challenge id).
+ * @param db - Database port, or the transaction that also queues the mailed code.
+ * @param secret - AUTH_SECRET (keys the code hash).
  * @param userId - The user who passed the password.
  * @param now - Clock.
+ * @param emailCode - The 6-digit code to mail; without it the challenge waits for TOTP.
  * @returns The challenge id the browser sends back with its code.
  */
 export async function openChallenge(
-  db: Db,
+  db: Pick<Db, 'query'>,
   secret: Buffer,
   userId: string,
-  now: Date
+  now: Date,
+  emailCode?: string
 ): Promise<string> {
   const id = randomUUID();
   await db.query(
-    "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, 'TOTP', ?, ?)",
-    [id, userId, codeHash(secret, id), new Date(now.getTime() + CHALLENGE_MS)]
+    'INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)',
+    [
+      id,
+      userId,
+      emailCode === undefined ? 'TOTP' : 'EMAIL',
+      codeHash(secret, emailCode ?? id),
+      new Date(now.getTime() + CHALLENGE_MS),
+    ]
   );
   return id;
+}
+
+/**
+ * Turns a passed `EMAIL` challenge into a `TOTP` one, for a privileged user who must now
+ * enrol the authenticator (T2.1a). Its time and attempts stay as they were.
+ *
+ * @param db - Database port.
+ * @param secret - AUTH_SECRET.
+ * @param id - Challenge id.
+ */
+export async function passEmailChallenge(
+  db: Db,
+  secret: Buffer,
+  id: string
+): Promise<void> {
+  await db.query(
+    "UPDATE two_factor_challenges SET challenge_type = 'TOTP', code_hash = ? WHERE id = ? AND challenge_type = 'EMAIL'",
+    [codeHash(secret, id), id]
+  );
+}
+
+/**
+ * Records that a user proved their mailbox, the first time only.
+ *
+ * @param db - Database port.
+ * @param userId - The user.
+ * @param now - Clock.
+ */
+export async function markEmailVerified(
+  db: Db,
+  userId: string,
+  now: Date
+): Promise<void> {
+  await db.query(
+    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?',
+    [now, userId]
+  );
 }
 
 /**
@@ -213,13 +266,21 @@ export async function liveChallenge(
   const [row] = await db.query<{
     id: string;
     user_id: string;
+    challenge_type: Challenge['type'];
+    code_hash: string;
     attempts: number;
   }>(
-    'SELECT id, user_id, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?',
+    'SELECT id, user_id, challenge_type, code_hash, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?',
     [id, now, MAX_ATTEMPTS]
   );
   return row
-    ? { id: row.id, userId: row.user_id, attempts: Number(row.attempts) }
+    ? {
+        id: row.id,
+        userId: row.user_id,
+        type: row.challenge_type,
+        codeHash: row.code_hash,
+        attempts: Number(row.attempts),
+      }
     : null;
 }
 

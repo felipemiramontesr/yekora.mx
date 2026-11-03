@@ -37,6 +37,11 @@ import type { CheckoutDeps } from './services/checkout';
 import type { Db, Transactional } from './services/db';
 import type { CurrentRate } from './services/exchangeRate';
 import { createMercadoPagoAdapter } from './services/mercadoPagoAdapter';
+import {
+  createOutboxDispatcher,
+  type SendMail,
+  smtpSender,
+} from './services/outboxDispatcher';
 import { createTableRateProvider } from './services/shippingRates';
 import { createStripeAdapter } from './services/stripeAdapter';
 
@@ -54,6 +59,8 @@ interface AppDeps {
   processors?: CheckoutDeps['processors'];
   /** Clock of the checkout; the real one by default. */
   now?: () => Date;
+  /** Mail sender of the outbox; by default SMTP from the configured mailbox (tests inject one). */
+  sendMail?: SendMail;
 }
 
 /** The processors whose secrets are configured; the others stay absent (T1.1 K = ⊥). */
@@ -163,9 +170,39 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     payments: deps.config.payments,
     now,
   });
+  // FC 028 F1 (ADR 0013): routes only queue mail; the dispatcher sends it after the answer has
+  // left (onResponse) and on its sweep. Without an SMTP account or the identity keys there is
+  // no dispatcher, and the outbox keeps every message.
+  const { auth, mail } = deps.config;
+  const dispatcher =
+    auth && mail
+      ? createOutboxDispatcher({
+          db: deps.db,
+          totpKey: auth.totpKey,
+          send: deps.sendMail ?? smtpSender(mail),
+          now,
+          log: app.log,
+        })
+      : null;
+  app.decorateRequest('outboxQueued', false);
+  app.addHook('onResponse', async (request) => {
+    if (request.outboxQueued) dispatcher?.kick();
+  });
+  if (dispatcher) {
+    app.addHook('onReady', async () => dispatcher.start());
+    app.addHook('onClose', async () => {
+      dispatcher.stop();
+      await dispatcher.drain();
+    });
+  }
   // FC 028: sign-up and sign-in (public, rate limited), the signed-in account and the panel,
   // whose every answered request goes to the audit trail. Orders are read-only (405 to writes).
-  registerAuthRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAuthRoutes(app, {
+    db: deps.db,
+    auth,
+    mailReady: dispatcher !== null,
+    now,
+  });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
   registerOrderWriteRefusals(app);

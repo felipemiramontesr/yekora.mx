@@ -153,7 +153,7 @@
           "describe": "A07 identification and authentication"
         }
       ],
-      "notes": "FC 028 (left its reserved slot): Argon2id passwords (hash-wasm), no session before the second factor, TOTP mandatory for staff and admin (403 otherwise), keyed one-time codes, 5 attempts per 5-minute challenge, rate-limited sign-in, the same 401 for an unknown e-mail and a wrong password, __Host- cookie HttpOnly Secure SameSite=Strict, sessions stored as SHA-256."
+      "notes": "FC 028 (left its reserved slot): Argon2id passwords (hash-wasm), no session before the second factor, a 6-digit code mailed through the outbox (never inside the request) for accounts without the authenticator, TOTP mandatory for staff and admin and enrolled only after the mailbox is proved (403 otherwise), keyed one-time codes, 5 attempts per 5-minute challenge, rate-limited sign-in, the same 401 for an unknown e-mail and a wrong password, __Host- cookie HttpOnly Secure SameSite=Strict, sessions stored as SHA-256."
     },
     "A08": {
       "id": "A08:2021",

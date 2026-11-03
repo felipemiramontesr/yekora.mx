@@ -9,6 +9,7 @@
  * - TOTP secrets are AES-256-GCM ciphertext under TOTP_ENCRYPTION_KEY, its own key (never the
  *   backup key nor the personal-data key), bound to their user through the GCM additional data.
  *   Stored format, versioned for a future rotation: `v1:<iv>:<tag>:<ciphertext>` (base64url).
+ *   A mailed sign-in code waits in the outbox the same way, bound to its challenge instead.
  * - TOTP is RFC 6238 on `node:crypto` (SHA-1, 30 s, 6 digits), as Archon does: no library.
  *
  * @module
@@ -71,6 +72,28 @@ export function tokenHash(token: string): string {
  */
 export function codeHash(secret: Buffer, code: string): string {
   return createHmac('sha256', secret).update(code, 'utf8').digest('hex');
+}
+
+/**
+ * A one-time sign-in code for the mailbox: 6 random digits (FC 028 F1).
+ *
+ * @returns The code, kept only as a keyed hash and, until mailed, encrypted in the outbox.
+ */
+export function newEmailCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
+/**
+ * Whether two keyed hashes are equal, in constant time.
+ *
+ * @param a - Hex digest.
+ * @param b - Hex digest.
+ * @returns True when they match.
+ */
+export function sameHash(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'hex');
+  const right = Buffer.from(b, 'hex');
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 /**

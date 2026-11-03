@@ -1,14 +1,15 @@
 /**
- * OWASP A07 evidence (FC 028 F0): sign-up, sign-in, the second factor, sessions and the guard,
- * end to end through Fastify against an in-memory stand-in of migration 004. The real SQL of
- * these statements runs in db.integration.test.ts.
+ * OWASP A07 evidence (FC 028 F0–F1): sign-up, sign-in, the mailed code, the authenticator,
+ * sessions and the guard, end to end through Fastify against an in-memory stand-in of migration
+ * 004. Mail is queued in the outbox and sent by the dispatcher to a recording sender. The real
+ * SQL of these statements runs in db.integration.test.ts.
  */
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { createHmac } from 'node:crypto';
-import { base32, tokenHash } from '../services/authCrypto';
+import { base32, decryptTotpSecret, tokenHash } from '../services/authCrypto';
 import type { Db, Transactional, TxQuery } from '../services/db';
 
 const NOW = new Date('2026-11-02T18:00:00Z');
@@ -23,9 +24,17 @@ function totpCode(secret: Buffer, step: number): string {
   return String(value % 1_000_000).padStart(6, '0');
 }
 const PASSWORD = 'correct horse battery staple';
+const TOTP_KEY = Buffer.alloc(32, 2);
 const KEYS = {
   AUTH_SECRET: Buffer.alloc(32, 1).toString('base64'),
-  TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
+  TOTP_ENCRYPTION_KEY: TOTP_KEY.toString('base64'),
+};
+const MAIL = {
+  SMTP_HOST: 'smtp.example.test',
+  SMTP_PORT: '465',
+  SMTP_USER: 'no-reply@example.test',
+  SMTP_PASSWORD: 'mailbox password',
+  MAIL_FROM: 'YĒKORA <no-reply@example.test>',
 };
 const BASE = { DB_HOST: '127.0.0.1', DB_USER: 'root', DB_NAME: 'yekora_dev' };
 
@@ -54,9 +63,21 @@ function freshState() {
     backup: [] as { user: string; hash: string; used: number }[],
     challenges: new Map<
       string,
-      { user: string; expires: Date; attempts: number }
+      {
+        user: string;
+        type: string;
+        hash: string;
+        expires: Date;
+        attempts: number;
+      }
     >(),
     sessions: new Map<string, { user: string; expires: Date }>(),
+    outbox: [] as {
+      id: number;
+      type: string;
+      payload: string;
+      status: string;
+    }[],
   };
 }
 type State = ReturnType<typeof freshState>;
@@ -106,7 +127,17 @@ const spendBackup = (s: State, p: Params) => {
 const liveChallengeRow = (s: State, p: Params) => {
   const c = s.challenges.get(p[0] as string);
   const live = c && c.expires > (p[1] as Date) && c.attempts < (p[2] as number);
-  return live ? [{ id: p[0], user_id: c.user, attempts: c.attempts }] : [];
+  return live
+    ? [
+        {
+          id: p[0],
+          user_id: c.user,
+          challenge_type: c.type,
+          code_hash: c.hash,
+          attempts: c.attempts,
+        },
+      ]
+    : [];
 };
 const sessionRow = (s: State, p: Params) => {
   const session = s.sessions.get(p[0] as string);
@@ -124,8 +155,13 @@ const sessionRow = (s: State, p: Params) => {
       ]
     : [];
 };
+const claimOutbox = (s: State, p: Params) => {
+  const row = s.outbox.find((r) => r.id === p[1] && r.status === 'PENDING');
+  if (row) row.status = 'PROCESSING';
+  return { affectedRows: row ? 1 : 0 };
+};
 
-/** One handler per statement of identity.ts, matched by its opening words. */
+/** One handler per statement of identity.ts and the outbox, matched by its opening words. */
 const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
   ['SELECT id, email, password_hash', activeByEmail],
   [
@@ -142,8 +178,17 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
           password_hash: p[2],
           full_name: p[3],
           is_active: 1,
+          email_verified_at: null,
         })
       ),
+  ],
+  [
+    'UPDATE users SET email_verified_at',
+    (s, p) =>
+      write(() => {
+        const user = s.users.get(p[1] as string) ?? {};
+        user.email_verified_at ??= p[0];
+      }),
   ],
   [
     'INSERT INTO user_roles',
@@ -201,20 +246,31 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
       write(() =>
         s.challenges.set(p[0] as string, {
           user: p[1] as string,
-          expires: p[3] as Date,
+          type: p[2] as string,
+          hash: p[3] as string,
+          expires: p[4] as Date,
           attempts: 0,
         })
       ),
   ],
-  ['SELECT id, user_id, attempts', liveChallengeRow],
+  ['SELECT id, user_id, challenge_type', liveChallengeRow],
   [
-    'UPDATE two_factor_challenges',
+    'UPDATE two_factor_challenges SET challenge_type',
     (s, p) =>
       write(() =>
-        Object.assign(s.challenges.get(p[0] as string) ?? { attempts: 0 }, {
-          attempts: (s.challenges.get(p[0] as string)?.attempts ?? 0) + 1,
+        Object.assign(s.challenges.get(p[1] as string) ?? {}, {
+          type: 'TOTP',
+          hash: p[0],
         })
       ),
+  ],
+  [
+    'UPDATE two_factor_challenges SET attempts',
+    (s, p) =>
+      write(() => {
+        const challenge = s.challenges.get(p[0] as string);
+        if (challenge) challenge.attempts += 1;
+      }),
   ],
   [
     'DELETE FROM two_factor_challenges',
@@ -234,6 +290,42 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
   [
     'DELETE FROM user_sessions',
     (s, p) => write(() => s.sessions.delete(p[0] as string)),
+  ],
+  [
+    'INSERT INTO outbox_events',
+    (s, p) =>
+      write(() =>
+        s.outbox.push({
+          id: s.outbox.length + 1,
+          type: p[0] as string,
+          payload: p[1] as string,
+          status: 'PENDING',
+        })
+      ),
+  ],
+  ["UPDATE outbox_events SET status = 'PENDING'", () => []],
+  [
+    'SELECT id, event_type, payload',
+    (s) =>
+      s.outbox
+        .filter((r) => r.status === 'PENDING')
+        .map((r) => ({
+          id: r.id,
+          event_type: r.type,
+          payload: r.payload,
+          retry_count: 0,
+          max_retries: 5,
+        })),
+  ],
+  ["UPDATE outbox_events SET status = 'PROCESSING'", claimOutbox],
+  [
+    "UPDATE outbox_events SET status = 'SENT'",
+    (s, p) =>
+      write(() =>
+        Object.assign(s.outbox.find((r) => r.id === p[1]) ?? {}, {
+          status: 'SENT',
+        })
+      ),
   ],
 ];
 
@@ -255,15 +347,20 @@ function memoryDb() {
 
 let app: FastifyInstance;
 let store: ReturnType<typeof memoryDb>;
+let sent: { to: string; subject: string; text: string }[];
 
-async function start(env: Record<string, string> = KEYS) {
+async function start(env: Record<string, string> = { ...KEYS, ...MAIL }) {
   store = memoryDb();
+  sent = [];
   app = await buildApp({
     config: loadConfig({ ...BASE, ...env }),
     db: store.db,
     rate: async () => null,
     logger: false,
     now: () => NOW,
+    sendMail: async (message) => {
+      sent.push(message);
+    },
   });
   return app;
 }
@@ -282,25 +379,61 @@ function cookieOf(response: LightMyRequestResponse): string {
   return header.split(';')[0];
 }
 
-/** Registers, enrols TOTP and signs in a buyer; returns its cookie and backup codes. */
+const register = (email: string, fullName = 'Ana Prueba') =>
+  post('/v1/auth/register', { email, password: PASSWORD, fullName });
+
+async function login(email: string) {
+  return (await post('/v1/auth/login', { email, password: PASSWORD })).json<{
+    challengeId: string;
+    next: string;
+    channel: string;
+  }>();
+}
+
+/** The code a challenge mailed, read from its queued (encrypted) message. */
+function mailedCode(challengeId: string): string {
+  const row = store.outbox.find(
+    (r) => r.type === 'SIGN_IN_CODE' && r.payload.includes(challengeId)
+  );
+  const { code } = JSON.parse(String(row?.payload)) as { code: string };
+  return decryptTotpSecret(TOTP_KEY, challengeId, code).toString('utf8');
+}
+
+/** Gives the only registered user one role instead of customer. */
+function makeOnly(role: string) {
+  const [user] = [...store.users.values()];
+  store.userRoles.splice(0, store.userRoles.length, [String(user.id), role]);
+  return String(user.id);
+}
+
+/** Registers and signs in a buyer with the mailed code; returns its cookie. */
 async function signedInBuyer(email = 'ana@example.test') {
-  await post('/v1/auth/register', {
-    email,
-    password: PASSWORD,
-    fullName: 'Ana Prueba',
+  await register(email);
+  const { challengeId } = await login(email);
+  const verify = await post('/v1/auth/verify', {
+    challengeId,
+    code: mailedCode(challengeId),
   });
-  const login = await post('/v1/auth/login', { email, password: PASSWORD });
-  const { challengeId } = login.json();
+  return { cookie: cookieOf(verify), verify };
+}
+
+/** Registers staff, passes the mailed code and enrols the authenticator; signed in. */
+async function signedInStaff(email = 'staff@example.test') {
+  await register(email, 'Staff');
+  makeOnly('staff_orders');
+  const { challengeId } = await login(email);
+  await post('/v1/auth/verify', { challengeId, code: mailedCode(challengeId) });
   const { secret } = (
     await post('/v1/auth/totp/enroll', { challengeId })
-  ).json();
+  ).json<{ secret: string }>();
   const confirm = await post('/v1/auth/totp/confirm', {
     challengeId,
     code: codeNow(secret),
   });
   return {
     cookie: cookieOf(confirm),
-    backupCodes: confirm.json().backupCodes as string[],
+    confirm,
+    backupCodes: confirm.json<{ backupCodes: string[] }>().backupCodes,
     secret,
   };
 }
@@ -317,16 +450,8 @@ afterEach(async () => {
 describe('A07 identification and authentication', () => {
   it('registers a buyer with an Argon2id hash and never says whether the e-mail existed', async () => {
     await start();
-    const first = await post('/v1/auth/register', {
-      email: ' Ana@Example.test ',
-      password: PASSWORD,
-      fullName: 'Ana',
-    });
-    const again = await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
-    });
+    const first = await register(' Ana@Example.test ', 'Ana');
+    const again = await register('ana@example.test', 'Ana');
     expect([first.statusCode, again.statusCode]).toEqual([202, 202]);
     expect(again.json()).toEqual({ status: 'accepted' });
     const [user] = [...store.users.values()];
@@ -356,11 +481,7 @@ describe('A07 identification and authentication', () => {
 
   it('answers the same 401 to a wrong password and to an unknown e-mail', async () => {
     await start();
-    await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
-    });
+    await register('ana@example.test');
     const wrong = await post('/v1/auth/login', {
       email: 'ana@example.test',
       password: 'wrong password!',
@@ -373,82 +494,147 @@ describe('A07 identification and authentication', () => {
     expect(unknown.json()).toEqual(wrong.json());
   });
 
-  it('opens only a challenge after the password, never a session (T2.1a)', async () => {
+  it('opens only a challenge after the password, and queues its code in the same transaction (T2.1a, T2.4b)', async () => {
     await start();
-    await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
-    });
-    const login = await post('/v1/auth/login', {
+    await register('ana@example.test');
+    const response = await post('/v1/auth/login', {
       email: 'ana@example.test',
       password: PASSWORD,
     });
-    expect(login.statusCode).toBe(200);
-    expect(login.json()).toMatchObject({ next: 'enroll_totp' });
-    expect(login.headers['set-cookie']).toBeUndefined();
+    expect(response.statusCode).toBe(200);
+    const { challengeId, ...rest } = response.json();
+    expect(rest).toEqual({ next: 'verify', channel: 'email' });
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(store.sessions.size).toBe(0);
+    const [queued] = store.outbox;
+    expect(queued.type).toBe('SIGN_IN_CODE');
+    // Ids and ciphertext only: no address, no code in clear.
+    const payload = JSON.parse(queued.payload) as Record<string, string>;
+    expect(Object.keys(payload).sort()).toEqual([
+      'challengeId',
+      'code',
+      'userId',
+    ]);
+    expect(payload.challengeId).toBe(challengeId);
+    expect(payload.code).toMatch(/^v1:/);
+    expect(queued.payload).not.toContain(mailedCode(challengeId));
+    expect(queued.payload).not.toContain('@');
+  });
+
+  it('mails the code after the answer, through the dispatcher (T1.3, T2.4a)', async () => {
+    await start();
+    await register('ana@example.test');
+    const { challengeId } = await login('ana@example.test');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({
+      to: 'ana@example.test',
+      subject: 'Tu código de acceso a YĒKORA',
+    });
+    expect(sent[0].text).toContain(mailedCode(challengeId));
+    expect(store.outbox[0].status).toBe('SENT');
+  });
+
+  it('signs a buyer in with the mailed code: hardened 8 h cookie, e-mail verified', async () => {
+    await start();
+    const { cookie, verify } = await signedInBuyer();
+    expect(verify.json()).toEqual({ status: 'signed_in' });
+    expect(String(verify.headers['set-cookie'])).toMatch(
+      /^__Host-yekora_session=[\w-]{43}; Path=\/; Max-Age=28800; HttpOnly; Secure; SameSite=Strict$/
+    );
+    expect(String(verify.headers['set-cookie'])).not.toContain('Domain');
+    expect([...store.sessions.keys()]).toEqual([
+      tokenHash(cookie.split('=')[1]),
+    ]);
+    const [user] = [...store.users.values()];
+    expect(user.email_verified_at).toEqual(NOW);
+  });
+
+  it('counts a wrong mailed code against the challenge, and spends it after 5 (T1.1 T)', async () => {
+    await start();
+    await register('ana@example.test');
+    const { challengeId } = await login('ana@example.test');
+    const right = mailedCode(challengeId);
+    const wrong = right === '000000' ? '111111' : '000000';
+    for (const code of [wrong, wrong, wrong, wrong, '12345678']) {
+      const response = await post('/v1/auth/verify', { challengeId, code });
+      expect(response.json()).toMatchObject({ detail: 'INVALID_CODE' });
+    }
+    const spent = await post('/v1/auth/verify', { challengeId, code: right });
+    expect(spent.json()).toMatchObject({ detail: 'INVALID_CHALLENGE' });
     expect(store.sessions.size).toBe(0);
   });
 
-  it('enrols TOTP, issues 8 backup codes once and signs in with a hardened cookie', async () => {
+  it('makes staff prove the mailbox before enrolling the authenticator, then signs in for 2 h (T2.1a)', async () => {
     await start();
-    const { cookie, backupCodes } = await signedInBuyer();
-    expect(backupCodes).toHaveLength(8);
-    expect(store.backup.map((b) => b.hash)).not.toContain(backupCodes[0]);
-    expect(cookie.startsWith(`${SESSION_COOKIE}=`)).toBe(true);
-    const [user] = [...store.users.values()];
-    expect(String(store.totp.get(String(user.id))?.secret)).toMatch(/^v1:/);
-    const sessionIds = [...store.sessions.keys()];
-    expect(sessionIds).toEqual([tokenHash(cookie.split('=')[1])]);
-  });
-
-  it('sets the cookie HttpOnly, Secure, SameSite=Strict, host-only, 8 h for a buyer', async () => {
-    await start();
-    await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
+    await register('staff@example.test', 'Staff');
+    makeOnly('staff_orders');
+    const { challengeId } = await login('staff@example.test');
+    // Before the mailed code, the authenticator cannot be enrolled with this challenge.
+    for (const [url, payload] of [
+      ['/v1/auth/totp/enroll', { challengeId }],
+      ['/v1/auth/totp/confirm', { challengeId, code: '000000' }],
+    ] as const) {
+      expect((await post(url, payload)).json()).toMatchObject({
+        detail: 'INVALID_CHALLENGE',
+      });
+    }
+    const passed = await post('/v1/auth/verify', {
+      challengeId,
+      code: mailedCode(challengeId),
     });
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
+    expect(passed.statusCode).toBe(409);
+    expect(passed.json()).toMatchObject({ detail: 'TOTP_NOT_ENROLLED' });
+    expect(passed.headers['set-cookie']).toBeUndefined();
+    // Still no authenticator: neither confirm nor verify can sign in yet.
+    for (const url of ['/v1/auth/totp/confirm', '/v1/auth/verify']) {
+      expect(
+        (await post(url, { challengeId, code: '000000' })).json()
+      ).toMatchObject({ detail: 'TOTP_NOT_ENROLLED' });
+    }
     const { secret } = (
       await post('/v1/auth/totp/enroll', { challengeId })
-    ).json();
+    ).json<{ secret: string }>();
+    expect(
+      (await post('/v1/auth/totp/confirm', { challengeId, code: '000000' }))
+        .statusCode
+    ).toBe(401);
     const confirm = await post('/v1/auth/totp/confirm', {
       challengeId,
       code: codeNow(secret),
     });
-    expect(String(confirm.headers['set-cookie'])).toMatch(
-      /^__Host-yekora_session=[\w-]{43}; Path=\/; Max-Age=28800; HttpOnly; Secure; SameSite=Strict$/
-    );
-    expect(String(confirm.headers['set-cookie'])).not.toContain('Domain');
+    const { backupCodes } = confirm.json<{ backupCodes: string[] }>();
+    expect(backupCodes).toHaveLength(8);
+    expect(store.backup.map((b) => b.hash)).not.toContain(backupCodes[0]);
+    expect(String(confirm.headers['set-cookie'])).toContain('Max-Age=7200');
+    const [user] = [...store.users.values()];
+    expect(String(store.totp.get(String(user.id))?.secret)).toMatch(/^v1:/);
   });
 
-  it('signs in again with TOTP, or once with each backup code', async () => {
+  it('queues the security alert with the authenticator, and mails it', async () => {
     await start();
-    const { backupCodes, secret } = await signedInBuyer();
-    const totpLogin = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
-    expect(totpLogin.next).toBe('verify');
+    await signedInStaff();
+    expect(store.outbox.map((r) => r.type)).toEqual([
+      'SIGN_IN_CODE',
+      'TOTP_ENABLED',
+    ]);
+    await vi.waitFor(() => expect(sent).toHaveLength(2), { timeout: 5000 });
+    expect(sent[1]).toMatchObject({
+      to: 'staff@example.test',
+      subject: 'Activaste la verificación en dos pasos en YĒKORA',
+    });
+  });
+
+  it('signs staff in again with the authenticator, or once with each backup code', async () => {
+    await start();
+    const { backupCodes, secret } = await signedInStaff();
+    const again = await login('staff@example.test');
+    expect(again.channel).toBe('authenticator');
     const viaTotp = await post('/v1/auth/verify', {
-      challengeId: totpLogin.challengeId,
+      challengeId: again.challengeId,
       code: codeNow(secret),
     });
     expect(viaTotp.json()).toEqual({ status: 'signed_in' });
-    const once = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
+    const once = await login('staff@example.test');
     expect(
       (
         await post('/v1/auth/verify', {
@@ -457,12 +643,7 @@ describe('A07 identification and authentication', () => {
         })
       ).statusCode
     ).toBe(200);
-    const twice = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
+    const twice = await login('staff@example.test');
     expect(
       (
         await post('/v1/auth/verify', {
@@ -473,15 +654,10 @@ describe('A07 identification and authentication', () => {
     ).toBe(401);
   });
 
-  it('spends a challenge after 5 wrong codes, and refuses an unknown one', async () => {
+  it('spends an authenticator challenge after 5 wrong codes, and refuses an unknown one', async () => {
     await start();
-    await signedInBuyer();
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
+    await signedInStaff();
+    const { challengeId } = await login('staff@example.test');
     for (let i = 0; i < 5; i++) {
       const wrong = await post('/v1/auth/verify', {
         challengeId,
@@ -494,65 +670,20 @@ describe('A07 identification and authentication', () => {
       code: '000000',
     });
     expect(spent.json()).toMatchObject({ detail: 'INVALID_CHALLENGE' });
-    const unknown = await post('/v1/auth/verify', {
-      challengeId: '11111111-1111-4111-8111-111111111111',
-      code: '000000',
-    });
-    expect(unknown.statusCode).toBe(401);
+    const unknown = '11111111-1111-4111-8111-111111111111';
+    for (const [url, payload] of [
+      ['/v1/auth/verify', { challengeId: unknown, code: '000000' }],
+      ['/v1/auth/totp/enroll', { challengeId: unknown }],
+      ['/v1/auth/totp/confirm', { challengeId: unknown, code: '000000' }],
+    ] as const) {
+      expect((await post(url, payload)).statusCode).toBe(401);
+    }
   });
 
-  it('refuses enrolment or confirmation out of order (409) and a wrong first code (401)', async () => {
+  it('refuses a second enrolment once the authenticator is on', async () => {
     await start();
-    await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
-    });
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
-    expect(
-      (
-        await post('/v1/auth/totp/confirm', { challengeId, code: '123456' })
-      ).json()
-    ).toMatchObject({ detail: 'TOTP_NOT_ENROLLED' });
-    expect(
-      (await post('/v1/auth/verify', { challengeId, code: '123456' })).json()
-    ).toMatchObject({ detail: 'TOTP_NOT_ENROLLED' });
-    await post('/v1/auth/totp/enroll', { challengeId });
-    expect(
-      (await post('/v1/auth/totp/confirm', { challengeId, code: '000000' }))
-        .statusCode
-    ).toBe(401);
-    expect(
-      (
-        await post('/v1/auth/totp/enroll', {
-          challengeId: '11111111-1111-4111-8111-111111111111',
-        })
-      ).statusCode
-    ).toBe(401);
-    expect(
-      (
-        await post('/v1/auth/totp/confirm', {
-          challengeId: '11111111-1111-4111-8111-111111111111',
-          code: '000000',
-        })
-      ).statusCode
-    ).toBe(401);
-  });
-
-  it('refuses a second enrolment once TOTP is on', async () => {
-    await start();
-    await signedInBuyer();
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
+    await signedInStaff();
+    const { challengeId } = await login('staff@example.test');
     expect(
       (await post('/v1/auth/totp/enroll', { challengeId })).json()
     ).toMatchObject({ detail: 'TOTP_ALREADY_ENABLED' });
@@ -582,30 +713,14 @@ describe('A07 identification and authentication', () => {
     ).toBe(401);
   });
 
-  it('gives staff a 2-hour session, and refuses staff without TOTP (403, T2.1a)', async () => {
+  it('refuses staff whose authenticator is off (403, T2.1a)', async () => {
     await start();
-    const { cookie } = await signedInBuyer('staff@example.test');
+    const { cookie } = await signedInStaff();
     const [user] = [...store.users.values()];
-    store.userRoles.splice(0, store.userRoles.length, [
-      String(user.id),
-      'staff_orders',
-    ]);
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'staff@example.test',
-        password: PASSWORD,
-      })
-    ).json();
-    const [, secret] = [cookie, store.totp.get(String(user.id))];
-    expect(secret?.enabled).toBe(1);
-    store.totp.set(String(user.id), {
-      secret: String(secret?.secret),
-      enabled: 0,
-    });
+    Object.assign(store.totp.get(String(user.id)) ?? {}, { enabled: 0 });
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
     expect(me.statusCode).toBe(403);
     expect(me.json()).toMatchObject({ detail: 'SECOND_FACTOR_REQUIRED' });
-    expect(challengeId).toMatch(/^[\da-f-]{36}$/);
   });
 
   it('refuses a session without the route’s permission (403)', async () => {
@@ -647,6 +762,47 @@ describe('A07 identification and authentication', () => {
     });
   });
 
+  it('answers 503 MAIL_UNAVAILABLE without the SMTP account, but lets the authenticator in', async () => {
+    await start(KEYS);
+    await register('ana@example.test');
+    const byMail = await post('/v1/auth/login', {
+      email: 'ana@example.test',
+      password: PASSWORD,
+    });
+    expect(byMail.statusCode).toBe(503);
+    expect(byMail.json()).toMatchObject({ detail: 'MAIL_UNAVAILABLE' });
+    const [user] = [...store.users.values()];
+    store.totp.set(String(user.id), { secret: 'v1:a:b:c', enabled: 1 });
+    expect((await login('ana@example.test')).channel).toBe('authenticator');
+  });
+
+  it('keeps the security alert queued while the SMTP account is missing', async () => {
+    await start(KEYS);
+    await register('staff@example.test', 'Staff');
+    const userId = makeOnly('staff_orders');
+    // The mailbox was proved earlier; the challenge waits for the authenticator now.
+    store.challenges.set('22222222-2222-4222-8222-222222222222', {
+      user: userId,
+      type: 'TOTP',
+      hash: '0'.repeat(64),
+      expires: new Date(NOW.getTime() + 60_000),
+      attempts: 0,
+    });
+    const challengeId = '22222222-2222-4222-8222-222222222222';
+    const { secret } = (
+      await post('/v1/auth/totp/enroll', { challengeId })
+    ).json<{ secret: string }>();
+    const confirm = await post('/v1/auth/totp/confirm', {
+      challengeId,
+      code: codeNow(secret),
+    });
+    expect(confirm.statusCode).toBe(200);
+    expect(store.outbox.map((r) => [r.type, r.status])).toEqual([
+      ['TOTP_ENABLED', 'PENDING'],
+    ]);
+    expect(sent).toEqual([]);
+  });
+
   it('carries the session only from the site, with credentials', async () => {
     await start();
     const preflight = await app.inject({
@@ -665,17 +821,13 @@ describe('A07 identification and authentication', () => {
 
   it('shows the authenticator secret in base32 and as a scannable URI', async () => {
     await start();
-    await post('/v1/auth/register', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-      fullName: 'Ana',
+    await register('staff@example.test', 'Staff');
+    makeOnly('admin');
+    const { challengeId } = await login('staff@example.test');
+    await post('/v1/auth/verify', {
+      challengeId,
+      code: mailedCode(challengeId),
     });
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'ana@example.test',
-        password: PASSWORD,
-      })
-    ).json();
     const enrol = (await post('/v1/auth/totp/enroll', { challengeId })).json();
     expect(enrol.secret).toBe(base32(fromBase32(enrol.secret)));
     expect(enrol.otpauthUri).toContain(`secret=${enrol.secret}`);
@@ -696,48 +848,15 @@ describe('A07 identification and authentication', () => {
     }
   });
 
-  it('gives a staff member who signs in a 2-hour cookie', async () => {
-    await start();
-    await post('/v1/auth/register', {
-      email: 'staff@example.test',
-      password: PASSWORD,
-      fullName: 'Staff',
-    });
-    const [user] = [...store.users.values()];
-    store.userRoles.splice(0, store.userRoles.length, [
-      String(user.id),
-      'staff_orders',
-    ]);
-    const { challengeId } = (
-      await post('/v1/auth/login', {
-        email: 'staff@example.test',
-        password: PASSWORD,
-      })
-    ).json();
-    const { secret } = (
-      await post('/v1/auth/totp/enroll', { challengeId })
-    ).json();
-    const confirm = await post('/v1/auth/totp/confirm', {
-      challengeId,
-      code: codeNow(secret),
-    });
-    expect(String(confirm.headers['set-cookie'])).toContain('Max-Age=7200');
-  });
-
   it('reads a role without permissions and a user without a 2FA row as having none', async () => {
     await start();
     const { cookie } = await signedInBuyer();
-    const [user] = [...store.users.values()];
-    store.totp.delete(String(user.id));
     expect(
       (await app.inject({ url: '/v1/account/me', headers: { cookie } })).json()
     ).toMatchObject({
       roles: ['customer'],
     });
-    store.userRoles.splice(0, store.userRoles.length, [
-      String(user.id),
-      'staff_catalog',
-    ]);
+    makeOnly('staff_catalog');
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
     expect(me.json()).toMatchObject({ detail: 'SECOND_FACTOR_REQUIRED' });
   });

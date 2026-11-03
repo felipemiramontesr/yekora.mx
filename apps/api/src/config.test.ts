@@ -30,6 +30,8 @@ describe('loadConfig', () => {
       },
       // FC 028: no identity secrets, so /v1/auth and /v1/account stay closed (503).
       auth: null,
+      // FC 028 F1: no SMTP account, so the outbox keeps every message unsent.
+      mail: null,
     });
   });
 
@@ -275,5 +277,31 @@ describe('loadConfig · identity (FC 028, 277_AN V2)', () => {
     ],
   ])('refuses to start with %s', (_case, env, message) => {
     expect(() => loadConfig({ ...base, ...env })).toThrow(message);
+  });
+});
+
+describe('loadConfig · mail (FC 028 F1, ADR 0013)', () => {
+  const mail = {
+    SMTP_HOST: 'smtp.hostinger.com',
+    SMTP_PORT: '465',
+    SMTP_USER: 'no-reply@yekora.mx',
+    SMTP_PASSWORD: 'mailbox password',
+    MAIL_FROM: 'YĒKORA <no-reply@yekora.mx>',
+  };
+
+  it('reads the SMTP account of the outbox', () => {
+    expect(loadConfig({ ...base, ...mail }).mail).toEqual({
+      host: 'smtp.hostinger.com',
+      port: 465,
+      user: 'no-reply@yekora.mx',
+      password: 'mailbox password',
+      from: 'YĒKORA <no-reply@yekora.mx>',
+    });
+  });
+
+  it('refuses to start with only part of the account', () => {
+    expect(() =>
+      loadConfig({ ...base, ...mail, SMTP_PASSWORD: undefined })
+    ).toThrow('Mail needs all of its settings or none');
   });
 });
