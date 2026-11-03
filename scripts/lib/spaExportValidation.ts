@@ -10,8 +10,14 @@
  * @module
  */
 
-/** Areas of the site that are client-rendered behind a session (FC 028 onward). */
-export const SPA_AREAS = ['cuenta', 'admin'] as const;
+/**
+ * Areas of the site that are client-rendered behind a session (FC 028 onward): the Spanish
+ * folder and its English slug (`/cuenta/` and `/en/account/`).
+ */
+export const SPA_AREAS = [
+  { es: 'cuenta', en: 'account' },
+  { es: 'admin', en: 'admin' },
+] as const;
 
 /**
  * Checks that Next.js builds a static export, with no server runtime.

@@ -68,8 +68,37 @@ describe('POST /v1/checkout', () => {
     expect(outcome).toHaveBeenCalledWith(
       expect.objectContaining({ db, payments: config.payments }),
       { method: 'SPEI' },
-      'en'
+      'en',
+      null
     );
+  });
+
+  it('gives the order to the signed-in buyer, and keeps a guest order without a live session (FC 028 1a)', async () => {
+    outcome.mockResolvedValue({ ok: true, session: SESSION });
+    const buyer = 'b0000000-0000-4000-8000-000000000001';
+    const signedIn: Db & Transactional = {
+      ...db,
+      query: async <Row>(sql: string) =>
+        (sql.startsWith('SELECT s.id, s.user_id')
+          ? [{ id: 'x', user_id: buyer, email: 'a@b.mx', full_name: 'A' }]
+          : []) as Row[],
+    };
+    app = await buildApp({
+      config,
+      db: signedIn,
+      rate: async () => null,
+      logger: false,
+    });
+    const send = (cookie: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/checkout',
+        payload: { method: 'CARD' },
+        headers: { cookie },
+      });
+    await send(`__Host-yekora_session=${'s'.repeat(43)}`);
+    await send('__Host-yekora_session=too-short');
+    expect(outcome.mock.calls.map((call) => call[3])).toEqual([buyer, null]);
   });
 
   it('defaults to Spanish return pages', async () => {

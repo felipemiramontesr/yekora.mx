@@ -16,9 +16,8 @@ import {
   type OrderView,
 } from '@/lib/checkout/checkoutTypes';
 import type { OrderAccess } from '@/lib/checkout/orderAccess';
+import { API_URL, call, json, type TransportFailure } from './http';
 
-/** The API. E2E tests intercept it; they never reach production. */
-const API_URL = 'https://apiv1.yekora.mx';
 /** Opening a payment waits on the processor: a wider budget than the cart's 5 s. */
 const CHECKOUT_TIMEOUT_MS = 20_000;
 const ORDER_TIMEOUT_MS = 8000;
@@ -35,9 +34,6 @@ const CHECKOUT_CODES = [
   'INSUFFICIENT_STOCK',
 ] as const;
 
-/** Why a request did not give an answer within the contract. */
-type TransportFailure = 'offline' | 'timeout' | 'server' | 'invalid';
-
 /** Why no payment could be opened. */
 export type CheckoutFailure =
   (typeof CHECKOUT_CODES)[number] | TransportFailure;
@@ -50,31 +46,6 @@ type Session = ReturnType<typeof checkoutSessionSchema.parse>;
 /** Injectable fetch, for tests. */
 interface ClientOptions {
   fetchImpl?: typeof fetch;
-}
-
-/** Sends one request with a timeout; network and timeout failures become their reason. */
-async function call(
-  fetchImpl: typeof fetch,
-  url: string,
-  init: RequestInit,
-  timeoutMs: number
-): Promise<Response | TransportFailure> {
-  if (globalThis.navigator?.onLine === false) return 'offline';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const answer = await fetchImpl(url, {
-    ...init,
-    signal: controller.signal,
-  }).catch((): TransportFailure =>
-    controller.signal.aborted ? 'timeout' : 'offline'
-  );
-  clearTimeout(timer);
-  return answer;
-}
-
-/** Body of an answer as JSON, or undefined when it is not JSON. */
-function json(answer: Response): Promise<unknown> {
-  return answer.json().catch(() => undefined);
 }
 
 /**
@@ -98,6 +69,8 @@ export async function submitCheckout(
     `${API_URL}/v1/checkout?lang=${locale}`,
     {
       method: 'POST',
+      // FC 028 decision 1a: a signed-in buyer's session goes along, so the order joins the account.
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

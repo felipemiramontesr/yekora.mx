@@ -38,6 +38,9 @@ const ROUTE_MAP = {
     'es-MX': '/checkout/cancelado/',
     en: '/en/checkout/cancel/',
   },
+  // Account area and panel (FC 028 F2): one client-rendered page per language; its sub-paths
+  // (an order) fall back to it in public/.htaccess. noindex: private.
+  account: { 'es-MX': '/cuenta/', en: '/en/account/' },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 /** A page that exists in every language (key of the route map). */
@@ -82,7 +85,8 @@ export function productPath(slug: string, locale: Locale): string {
 
 /**
  * The current page in another language, for the language switcher: a product page maps to the
- * same product, any other path to its page in the route map.
+ * same product, a path inside the account area to the same view (lib/account/accountPaths.ts),
+ * any other path to its page in the route map.
  *
  * @param pathname - Current URL path, with or without the final slash.
  * @param target - Language to switch to.
@@ -93,6 +97,11 @@ export function translatePath(pathname: string, target: Locale): string {
   for (const prefix of Object.values(ROUTE_MAP.catalog)) {
     if (path.startsWith(prefix) && path.length > prefix.length) {
       return productPath(path.slice(prefix.length, -1), target);
+    }
+  }
+  for (const prefix of Object.values(ROUTE_MAP.account)) {
+    if (path.startsWith(prefix)) {
+      return `${ROUTE_MAP.account[target]}${path.slice(prefix.length)}`;
     }
   }
   return routeFor(pageFromPath(path), target);
@@ -109,6 +118,7 @@ function pageTitle(messages: Messages, page: Page): string {
     return messages.checkout.return.success.metaTitle;
   if (page === 'checkoutCancel')
     return messages.checkout.return.cancel.metaTitle;
+  if (page === 'account') return messages.account.metaTitle;
   return messages.legal[page].metaTitle;
 }
 

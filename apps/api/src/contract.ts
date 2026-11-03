@@ -26,6 +26,18 @@ import {
   orderViewSchema,
 } from '../../../lib/checkout/checkoutTypes';
 import {
+  challengeRequestSchema,
+  codeRequestSchema,
+  confirmResponseSchema,
+  enrollResponseSchema,
+  loginRequestSchema,
+  loginResponseSchema,
+  meResponseSchema,
+  registeredSchema,
+  registerRequestSchema,
+  signedInSchema,
+} from '../../../lib/account/authTypes';
+import {
   accountOrdersQuery,
   adminOrdersQuery,
   orderDetailSchema,
@@ -34,18 +46,6 @@ import {
 import { languageQuery } from './lib/language';
 import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
-import { meResponseSchema } from './routes/account';
-import {
-  challengeRequestSchema,
-  codeRequestSchema,
-  confirmResponseSchema,
-  enrollResponseSchema,
-  loginRequestSchema,
-  loginResponseSchema,
-  registeredSchema,
-  registerRequestSchema,
-  signedInSchema,
-} from './routes/auth';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
 import {

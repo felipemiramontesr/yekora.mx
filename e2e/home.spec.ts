@@ -151,7 +151,8 @@ test('the mobile menu opens without client JavaScript', async ({
   });
   const page = await context.newPage();
   await page.goto('/');
-  await page.getByText('Menú').click();
+  // FC 028: below 640 px the menu shows only its icon; its name stays for assistive technology.
+  await page.getByRole('banner').locator('summary').click();
   const menu = page.locator('details nav');
   await expect(menu.getByRole('link', { name: 'Cañonismo' })).toBeVisible();
   await context.close();

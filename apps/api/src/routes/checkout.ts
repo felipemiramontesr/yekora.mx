@@ -8,13 +8,19 @@
  * Its rate limit (10/min per IP) is stricter than the cart's: each accepted call holds stock
  * for the method's reservation time, so automated calls must not be able to empty the shelves.
  *
+ * FC 028 decision 1a: a buyer who pays signed in (the session cookie travels with the request)
+ * gets the order in their account; without a live session the order stays a guest one, as
+ * before. The checkout never refuses for the session: it is optional here.
+ *
  * @module
  */
 import type { FastifyInstance } from 'fastify';
 import { checkoutSessionSchema } from '../../../../lib/checkout/checkoutTypes';
 import { languageSchema } from '../lib/language';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
+import { readSessionToken } from '../lib/session';
 import { type CheckoutDeps, createCheckout } from '../services/checkout';
+import { sessionUser } from '../services/identity';
 
 const TITLES: Record<string, string> = {
   INVALID_REQUEST: 'Invalid checkout request',
@@ -47,8 +53,17 @@ export function registerCheckoutRoutes(
       const language = languageSchema.safeParse(
         (request.query as { lang?: unknown }).lang
       );
+      const token = readSessionToken(request.headers.cookie);
+      const buyer = token
+        ? await sessionUser(deps.db, token, deps.now())
+        : null;
       const outcome = language.success
-        ? await createCheckout(deps, request.body, language.data)
+        ? await createCheckout(
+            deps,
+            request.body,
+            language.data,
+            buyer?.userId ?? null
+          )
         : ({ ok: false, status: 400, code: 'INVALID_REQUEST' } as const);
       if (!outcome.ok) {
         return reply

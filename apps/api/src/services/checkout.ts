@@ -268,6 +268,8 @@ interface NewOrder {
   methodId: number;
   now: Date;
   expiresAt: Date;
+  /** The signed-in buyer's account (FC 028 decision 1a), or null for a guest. */
+  userId: string | null;
 }
 
 /** T1.2 I and the order itself, in one transaction: every line reserved, or nothing kept. */
@@ -286,9 +288,10 @@ async function persist(
     return await deps.db.transaction(async (tx) => {
       const productIds = await reserveLines(tx, request.items);
       const inserted = await tx.query(
-        'INSERT INTO orders (order_number, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?',
+        'INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?',
         [
           order.orderNumber,
+          order.userId,
           order.methodId,
           summary.itemsBaseMxnCents,
           summary.itemsTaxMxnCents,
@@ -342,12 +345,15 @@ async function persist(
  * @param deps - Database, rates, processors, configuration and clock.
  * @param body - The request body as received (validated here).
  * @param lang - Language of the return pages and product names.
+ * @param userId - The signed-in buyer, whose account the order joins (FC 028 decision 1a);
+ *   null for a guest, as every order was before.
  * @returns The session to redirect to, or the first refusal of the truth tables.
  */
 export async function createCheckout(
   deps: CheckoutDeps,
   body: unknown,
-  lang: 'es-MX' | 'en'
+  lang: 'es-MX' | 'en',
+  userId: string | null = null
 ): Promise<CheckoutOutcome> {
   const admitted = admit(deps, body);
   if ('ok' in admitted) return admitted;
@@ -369,6 +375,7 @@ export async function createCheckout(
     expiresAt: new Date(
       now.getTime() + Number(methodRow.hold_minutes) * 60_000
     ),
+    userId,
   };
   const orderId = await persist(deps, admitted, quote, order);
   if (typeof orderId !== 'number') return orderId;

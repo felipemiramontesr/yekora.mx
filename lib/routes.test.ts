@@ -45,6 +45,14 @@ describe('routes', () => {
     expect(translatePath('/catalogo/', 'en')).toBe('/en/catalog/');
   });
 
+  it('keeps the open view of the account area across languages (FC 028 F2)', () => {
+    expect(translatePath('/cuenta/', 'en')).toBe('/en/account/');
+    expect(translatePath('/cuenta/YEK-2026-AB12CD34/', 'en')).toBe(
+      '/en/account/YEK-2026-AB12CD34/'
+    );
+    expect(translatePath('/en/account/panel', 'es-MX')).toBe('/cuenta/panel/');
+  });
+
   it('keeps the product when translating a product page (FC 008)', () => {
     expect(productPath('arnes-alpino', 'es-MX')).toBe(
       '/catalogo/arnes-alpino/'

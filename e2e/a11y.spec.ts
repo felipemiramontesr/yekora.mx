@@ -1,9 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { mockAccountApi } from './support/accountApi';
 import { mockQuoteApi } from './support/quoteApi';
 
 /**
- * FC 026 T1.2 A · WCAG 2.0 and 2.1, levels A and AA, measured by axe on the 15 main public
+ * FC 026 T1.2 A · WCAG 2.0 and 2.1, levels A and AA, measured by axe on the 17 main public
  * routes in Spanish and English, in every project of the matrix (desktop Chrome, iPhone,
  * Android): zero violations on each route.
  *
@@ -23,11 +24,13 @@ const ROUTES = [
   '/terminos/',
   '/cookies/',
   '/envios-y-devoluciones/',
+  '/cuenta/',
   '/en/',
   '/en/about/',
   '/en/catalog/',
   '/en/cart/',
   '/en/checkout/',
+  '/en/account/',
 ];
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -38,6 +41,9 @@ const SETTLED: Readonly<Record<string, string>> = {
   '/en/cart/': 'main [data-cart-empty]',
   '/checkout/': 'main [data-checkout-empty]',
   '/en/checkout/': 'main [data-checkout-empty]',
+  // FC 028: signed out, the account area shows its sign-in form.
+  '/cuenta/': 'main form',
+  '/en/account/': 'main form',
 };
 
 /**
@@ -69,6 +75,7 @@ async function violationsOn(page: import('@playwright/test').Page) {
 test.describe('WCAG 2.1 AA with axe (FC 026)', () => {
   test.beforeEach(async ({ page }) => {
     await mockQuoteApi(page);
+    await mockAccountApi(page);
   });
 
   for (const route of ROUTES) {

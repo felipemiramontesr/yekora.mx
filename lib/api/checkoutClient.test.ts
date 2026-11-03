@@ -47,6 +47,8 @@ describe('submitCheckout', () => {
     expect(url).toBe('https://apiv1.yekora.mx/v1/checkout?lang=en');
     expect(init).toMatchObject({
       method: 'POST',
+      // FC 028 decision 1a: the session goes along, so a signed-in buyer's order joins the account.
+      credentials: 'include',
       body: JSON.stringify(REQUEST),
       headers: { 'Content-Type': 'application/json' },
     });

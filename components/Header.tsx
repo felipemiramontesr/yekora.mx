@@ -1,4 +1,4 @@
-import { Menu } from 'lucide-react';
+import { Menu, UserRound } from 'lucide-react';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 import { CartButton } from './cart/CartButton';
@@ -48,13 +48,13 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
 
 /**
  * Site header: brand lockup linking home, the discipline anchors, About, the catalog, the
- * language switcher and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
+ * language switcher, the account link (FC 028) and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
  * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
  */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <header className="sticky top-0 z-40 bg-petroleo text-marfil">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-6">
         <a
           href={routeFor('home', locale)}
           aria-label={messages.brand.homeLink}
@@ -89,6 +89,15 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
             messages={messages.languageSwitcher}
           />
         </div>
+        {/* FC 028: the account area, always visible next to the cart. On narrow phones the bar
+            tightens its gaps and the menu shows only its icon, so the three icons fit 360 px. */}
+        <a
+          href={routeFor('account', locale)}
+          aria-label={messages.header.account}
+          className="tap-target shrink-0 justify-center"
+        >
+          <UserRound aria-hidden="true" size={24} />
+        </a>
         {/* FC 009: always visible, on every screen size, outside the collapsible menu. */}
         <CartButton
           locale={locale}
@@ -100,7 +109,9 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
         <details className="relative xl:hidden">
           <summary className="tap-target cursor-pointer list-none gap-2 px-1 text-sm">
             <Menu aria-hidden="true" size={22} />
-            {messages.header.menu}
+            <span className="sr-only sm:not-sr-only">
+              {messages.header.menu}
+            </span>
           </summary>
           <nav
             aria-label={messages.header.navLabel}

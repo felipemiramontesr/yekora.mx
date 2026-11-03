@@ -1,8 +1,8 @@
 /**
  * Platform guards of FC 027 (ADR 0011 and ADR 0013), over committed files only.
  *   a) next.config.ts builds a static export (T2.4).
- *   b) Every SPA area the site has (`cuenta`, `admin`, in both languages) has its Apache
- *      fallback to its own index.html (T2.4). None exists before FC 028.
+ *   b) Every SPA area the site has (`cuenta` and `en/account`; `admin` and `en/admin`) has its
+ *      Apache fallback to its own index.html (T2.4, FC 028 T2.6c).
  *   c) No module of apps/api/src imports an SMTP client except the outbox dispatcher, and no
  *      route imports the dispatcher (T2.5).
  *   d) FC 035 T1.2: no source of the site imports next/font/google or names a Google Fonts host,
@@ -35,9 +35,9 @@ function sources(dir: string, tsx = false): Map<string, string> {
   return files;
 }
 
-const areas = SPA_AREAS.flatMap((area) => [
-  ...(existsSync(join('app', '(es)', area)) ? [area] : []),
-  ...(existsSync(join('app', '(en)', 'en', area)) ? [`en/${area}`] : []),
+const areas = SPA_AREAS.flatMap(({ es, en }) => [
+  ...(existsSync(join('app', '(es)', es)) ? [es] : []),
+  ...(existsSync(join('app', '(en)', 'en', en)) ? [`en/${en}`] : []),
 ]);
 const failures = [
   ...staticExportViolations(readFileSync('next.config.ts', 'utf8')).map(

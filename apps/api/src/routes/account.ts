@@ -13,7 +13,7 @@
  * @module
  */
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
+import { meResponseSchema } from '../../../../lib/account/authTypes';
 import {
   accountOrdersQuery,
   orderDetailSchema,
@@ -26,15 +26,6 @@ import type { Db, Transactional } from '../services/db';
 import { closeSession, type SessionUser } from '../services/identity';
 import { listOrders } from '../services/orderReads';
 import { lookUpOrder } from './orders';
-
-/** Answer of `GET /v1/account/me`. */
-export const meResponseSchema = z.object({
-  id: z.uuid(),
-  email: z.email(),
-  fullName: z.string(),
-  roles: z.array(z.string()),
-  permissions: z.array(z.string()),
-});
 
 /** Dependencies of the account routes. */
 interface AccountDeps {

@@ -10,6 +10,14 @@ RewriteEngine On
 # Preventive: the earlier /es-MX/ prefix moved to the root.
 RewriteRule ^es-MX/?(.*)$ /$1 [R=301,L]
 
+# Account area (FC 028 T2.6c, ADR 0011): one client-rendered page per language. Any sub-path that
+# is not a real file (an order, the panel) is answered by that area's own index.html, never the
+# home page, and the page opens the view the path names.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^cuenta/. /cuenta/index.html [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^en/account/. /en/account/index.html [L]
+
 # PWA (FC 007): the manifest needs its own MIME type, and the service worker and manifest must
 # never be cached by HTTP, so a new deploy (new SHA inside sw.js) reaches browsers right away.
 AddType application/manifest+json .webmanifest

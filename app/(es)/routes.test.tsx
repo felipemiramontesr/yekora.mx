@@ -19,6 +19,7 @@ import Layout, { metadata as layoutMeta } from './layout';
 import Catalog, { metadata as CatalogMeta } from './catalogo/page';
 import Cart, { metadata as CartMeta } from './carrito/page';
 import Checkout, { metadata as CheckoutMeta } from './checkout/page';
+import Account, { metadata as AccountMeta } from './cuenta/page';
 import Success, { metadata as SuccessMeta } from './checkout/exito/page';
 import Cancel, { metadata as CancelMeta } from './checkout/cancelado/page';
 import * as ProductPage from './catalogo/[slug]/page';
@@ -97,6 +98,18 @@ describe('es-MX routes', () => {
     const html = renderToStaticMarkup(<Cart />);
     expect(html).toContain('Tu mochila');
     expect(html).toContain('Tu mochila está vacía');
+  });
+
+  it('account area is at /cuenta/, never indexed, and prerenders its loading line (FC 028)', () => {
+    expect(AccountMeta.alternates?.canonical).toBe('/cuenta/');
+    expect(AccountMeta.alternates?.languages).toMatchObject({
+      en: '/en/account/',
+    });
+    expect(AccountMeta.title).toBe('Mi cuenta | YĒKORA');
+    expect(AccountMeta.robots).toEqual({ index: false, follow: false });
+    const html = renderToStaticMarkup(<Account />);
+    expect(html).toContain('<h1');
+    expect(html).toContain('Cargando tu cuenta');
   });
 
   it('checkout is at /checkout/, never indexed, and prerenders the empty state', () => {

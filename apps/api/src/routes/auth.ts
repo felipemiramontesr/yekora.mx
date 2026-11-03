@@ -21,7 +21,18 @@
  * @module
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { z } from 'zod';
+import type { z } from 'zod';
+import {
+  challengeRequestSchema,
+  codeRequestSchema,
+  confirmResponseSchema,
+  enrollResponseSchema,
+  loginRequestSchema,
+  loginResponseSchema,
+  registeredSchema,
+  registerRequestSchema,
+  signedInSchema,
+} from '../../../../lib/account/authTypes';
 import type { AuthSecrets } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
@@ -60,60 +71,6 @@ import {
 } from '../services/identity';
 import { enqueueMail } from '../services/outbox';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
-
-/** An e-mail as typed: surrounding spaces are dropped before it is validated. */
-const emailField = z.string().trim().pipe(z.email().max(255));
-
-/** Body of `POST /v1/auth/register`. */
-export const registerRequestSchema = z.strictObject({
-  email: emailField,
-  // NIST SP 800-63B: length over composition rules; 12 to 128 characters.
-  password: z.string().min(12).max(128),
-  fullName: z.string().trim().min(2).max(150),
-});
-
-/** Body of `POST /v1/auth/login`. */
-export const loginRequestSchema = z.strictObject({
-  email: emailField,
-  password: z.string().min(1).max(128),
-});
-
-/** Body of `POST /v1/auth/totp/enroll`. */
-export const challengeRequestSchema = z.strictObject({
-  challengeId: z.uuid(),
-});
-
-/** Body of `POST /v1/auth/totp/confirm` and `POST /v1/auth/verify`. */
-export const codeRequestSchema = z.strictObject({
-  challengeId: z.uuid(),
-  code: z.string().regex(/^(?:\d{6}|\d{8})$/),
-});
-
-/** Answer of `POST /v1/auth/login`: what the second step must be. */
-export const loginResponseSchema = z.object({
-  challengeId: z.uuid(),
-  // `enroll_totp` is no longer answered: enrolment now comes after the mailed code.
-  next: z.enum(['verify', 'enroll_totp']),
-  /** Where the code of `verify` comes from. */
-  channel: z.enum(['email', 'authenticator']),
-});
-
-/** Answer of `POST /v1/auth/totp/enroll`: the secret, for the app or typed by hand. */
-export const enrollResponseSchema = z.object({
-  secret: z.string().regex(/^[A-Z2-7]+$/),
-  otpauthUri: z.string().startsWith('otpauth://totp/'),
-});
-
-/** Answer of `POST /v1/auth/totp/confirm`: the backup codes, shown this once. */
-export const confirmResponseSchema = z.object({
-  backupCodes: z.array(z.string().regex(/^\d{8}$/)).length(8),
-});
-
-/** Answer of a successful `POST /v1/auth/verify`. */
-export const signedInSchema = z.object({ status: z.literal('signed_in') });
-
-/** Answer of `POST /v1/auth/register`, whatever happened to the e-mail. */
-export const registeredSchema = z.object({ status: z.literal('accepted') });
 
 /** Dependencies of the auth routes. */
 interface AuthDeps {

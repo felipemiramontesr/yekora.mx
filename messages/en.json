@@ -328,7 +328,8 @@
     "navLabel": "Main navigation",
     "menu": "Menu",
     "about": "About us",
-    "catalog": "Catalog"
+    "catalog": "Catalog",
+    "account": "My account"
   },
   "disciplines": {
     "senderismo": "Hiking",
@@ -644,6 +645,138 @@
       "retry": "Check again",
       "toCatalog": "Keep exploring",
       "toCart": "Back to your pack"
+    }
+  },
+  "account": {
+    "metaTitle": "My account | YĒKORA",
+    "title": "My account",
+    "loading": "Loading your account…",
+    "signIn": {
+      "title": "Sign in",
+      "intro": "Sign in with your e-mail and password. We will ask for a code to confirm it is you.",
+      "email": "E-mail",
+      "password": "Password",
+      "submit": "Continue",
+      "submitting": "Checking…",
+      "toRegister": "No account yet? Create one"
+    },
+    "register": {
+      "title": "Create an account",
+      "intro": "With your account you can follow your orders.",
+      "fullName": "Full name",
+      "email": "E-mail",
+      "password": "Password",
+      "passwordHint": "At least 12 characters. A long phrase is safer than a word with symbols.",
+      "submit": "Create account",
+      "submitting": "Creating…",
+      "toSignIn": "Already have an account? Sign in",
+      "accepted": "Done. If that e-mail had no account, it has one now: sign in with it and your password."
+    },
+    "code": {
+      "titleEmail": "Check your e-mail",
+      "titleAuthenticator": "Open your authenticator app",
+      "hintEmail": "We sent a 6-digit code to {email}. It expires in 5 minutes.",
+      "hintAuthenticator": "Type the 6-digit code your app shows, or one of your 8-digit backup codes.",
+      "label": "Code",
+      "submit": "Confirm",
+      "submitting": "Confirming…",
+      "restart": "Start over"
+    },
+    "enroll": {
+      "title": "Turn on two-step verification",
+      "intro": "Your account can open the panel, so it needs an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password or another).",
+      "scan": "Scan this code with your app:",
+      "qrAlt": "QR code for your authenticator app",
+      "manual": "If you cannot scan it, type this key into your app:",
+      "openApp": "Open in my app (on this device)",
+      "label": "Code your app shows",
+      "submit": "Turn on",
+      "submitting": "Turning on…",
+      "loading": "Preparing your key…"
+    },
+    "backup": {
+      "title": "Save your backup codes",
+      "intro": "If you lose your phone, each of these codes lets you in once. You will only see them now.",
+      "listLabel": "Backup codes",
+      "continue": "I saved them"
+    },
+    "dashboard": {
+      "greeting": "Hello, {name}",
+      "signOut": "Sign out",
+      "signingOut": "Signing out…",
+      "tabsLabel": "Sections of your account",
+      "orders": "My orders",
+      "panel": "Panel: orders"
+    },
+    "orders": {
+      "loading": "Loading orders…",
+      "empty": "You have no orders with this account yet. Purchases made while signed in will show up here.",
+      "emptyPanel": "No orders match this filter.",
+      "caption": "Orders, newest first",
+      "number": "Order",
+      "date": "Date",
+      "status": "Status",
+      "total": "Total",
+      "open": "See the details of order {number}",
+      "filter": "Status",
+      "allStatuses": "All",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {pages}",
+      "back": "Back to the list",
+      "test": "Test",
+      "detailTitle": "Order {number}",
+      "method": "Payment method",
+      "placed": "Order date",
+      "paidAt": "Paid on",
+      "expiresAt": "Pay by",
+      "itemsTotal": "Products (VAT included)",
+      "shipping": "Shipping",
+      "lines": "Products",
+      "sku": "SKU",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "lineTotal": "Amount",
+      "payments": "Payment events",
+      "noPayments": "No payment events yet.",
+      "processor": "Processor",
+      "event": "Event",
+      "amount": "Amount",
+      "result": "Result",
+      "received": "Received",
+      "alert": "Needs review",
+      "noChange": "No change"
+    },
+    "statuses": {
+      "PENDING_PAYMENT": "Awaiting payment",
+      "PAID": "Paid",
+      "EXPIRED": "Expired",
+      "CANCELLED": "Cancelled",
+      "REFUNDED": "Refunded",
+      "NEEDS_REVIEW": "Under review"
+    },
+    "errors": {
+      "AUTH_UNAVAILABLE": "Accounts are not available right now. Try again later.",
+      "MAIL_UNAVAILABLE": "We cannot e-mail your code right now. Try again later.",
+      "INVALID_REQUEST": "Check your details: a field does not have the right format.",
+      "INVALID_CREDENTIALS": "The e-mail or the password is not correct.",
+      "INVALID_CHALLENGE": "The code expired or was tried too many times. Start over.",
+      "INVALID_CODE": "The code is not correct. Check it and try again.",
+      "TOTP_ALREADY_ENABLED": "Your authenticator app is already on. Start over.",
+      "TOTP_NOT_ENROLLED": "Turn on your authenticator app first.",
+      "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+      "SECOND_FACTOR_REQUIRED": "Your account needs two-step verification. Sign in again to turn it on.",
+      "PERMISSION_DENIED": "Your account cannot open this section.",
+      "DATA_DOMAIN_FORBIDDEN": "That order does not belong to your account.",
+      "not_found": "We could not find that order.",
+      "rate_limited": "Too many attempts. Wait a minute and try again.",
+      "offline": "You are offline. Check your connection and try again.",
+      "timeout": "The server took too long to answer. Try again.",
+      "server": "Something went wrong. Try again.",
+      "invalid": "Something went wrong. Try again.",
+      "codeFormat": "Type the 6 digits (or the 8 of a backup code).",
+      "required": "Fill in every field.",
+      "passwordLength": "The password needs at least 12 characters."
     }
   }
 }

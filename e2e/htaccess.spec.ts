@@ -84,3 +84,19 @@ test('folders without an index are never listed', async ({ request }) => {
   const response = await request.get('/brand/', { maxRedirects: 0 });
   expect(response.status()).toBe(403);
 });
+
+// FC 028 T2.6c: a sub-path of the account area (an order, the panel) answers the area's own page,
+// in both languages, so a link to an order works on a fresh load and on reload.
+test('every sub-path of the account area answers its own page', async ({
+  request,
+}) => {
+  for (const [path, title] of [
+    ['/cuenta/YEK-2026-AB12CD34/', 'Mi cuenta'],
+    ['/cuenta/panel/', 'Mi cuenta'],
+    ['/en/account/panel/YEK-2026-AB12CD34/', 'My account'],
+  ]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain(title);
+  }
+});

@@ -129,7 +129,7 @@ function memoryDb(
       id,
       params: p,
       status: 1,
-      expiresAt: p[16] as Date,
+      expiresAt: p[17] as Date,
       reference: null,
     });
     return { insertId: id };
@@ -542,8 +542,10 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     expect(order.status).toBe(1);
     expect(order.reference).toBe(`ref_${orderNumber}`);
     // Amounts as quoted: items 185 000 (159 483 + 25 517), shipping 15 000 (12 931 + 2 069).
-    expect(p.slice(0, 9)).toEqual([
+    // A guest order: no account (FC 028 decision 1a).
+    expect(p.slice(0, 10)).toEqual([
       orderNumber,
+      null,
       1,
       159483,
       25517,
@@ -554,20 +556,20 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
       200000,
     ]);
     expect(
-      openPii(PII_KEY, orderNumber, 'customer_email', p[10] as Buffer)
+      openPii(PII_KEY, orderNumber, 'customer_email', p[11] as Buffer)
     ).toBe('Ana@Example.com');
     expect(
       JSON.parse(
-        openPii(PII_KEY, orderNumber, 'shipping_address', p[12] as Buffer)
+        openPii(PII_KEY, orderNumber, 'shipping_address', p[13] as Buffer)
       )
     ).toMatchObject({
       stateCode: 'ZAC',
       postalCode: '98612',
     });
-    expect((p[14] as Buffer).equals(tokenHash(TOKEN_PEPPER, accessToken))).toBe(
+    expect((p[15] as Buffer).equals(tokenHash(TOKEN_PEPPER, accessToken))).toBe(
       true
     );
-    expect(p.slice(15, 19)).toEqual([
+    expect(p.slice(16, 20)).toEqual([
       NOW,
       new Date(NOW.getTime() + 60 * MIN),
       1,
@@ -603,7 +605,12 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
         payments: payments({ mode: 'live' }),
       }),
       body({ method: 'SPEI' }),
-      'en'
+      'en',
+      'b0000000-0000-4000-8000-000000000001'
+    );
+    // Paid signed in: the order joins the buyer's account (FC 028 decision 1a).
+    expect((state().orders[0].params as unknown[])[1]).toBe(
+      'b0000000-0000-4000-8000-000000000001'
     );
     expect(outcome.ok).toBe(true);
     expect(mp.requests[0]).toMatchObject({
@@ -613,7 +620,7 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
       cancelUrl: 'https://yekora.mx/en/checkout/cancel/',
       notificationUrl: 'https://apiv1.yekora.mx/v1/webhooks/mercadopago',
     });
-    expect((state().orders[0].params as unknown[])[17]).toBe(0);
+    expect((state().orders[0].params as unknown[])[18]).toBe(0);
   });
 
   it('a retired method is 503 SERVICE_UNAVAILABLE without reserving', async () => {

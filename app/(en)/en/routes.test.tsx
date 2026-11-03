@@ -19,6 +19,7 @@ import Layout, { metadata as layoutMeta } from './layout';
 import Catalog, { metadata as CatalogMeta } from './catalog/page';
 import Cart, { metadata as CartMeta } from './cart/page';
 import Checkout, { metadata as CheckoutMeta } from './checkout/page';
+import Account, { metadata as AccountMeta } from './account/page';
 import Success, { metadata as SuccessMeta } from './checkout/success/page';
 import Cancel, { metadata as CancelMeta } from './checkout/cancel/page';
 import * as ProductPage from './catalog/[slug]/page';
@@ -79,6 +80,13 @@ describe('en routes', () => {
     expect(CartMeta.title).toBe('Your pack | YĒKORA');
     expect(CartMeta.robots).toEqual({ index: false, follow: false });
     expect(renderToStaticMarkup(<Cart />)).toContain('Your pack is empty');
+  });
+
+  it('account area is at /en/account/, never indexed, and prerenders its loading line (FC 028)', () => {
+    expect(AccountMeta.alternates?.canonical).toBe('/en/account/');
+    expect(AccountMeta.title).toBe('My account | YĒKORA');
+    expect(AccountMeta.robots).toEqual({ index: false, follow: false });
+    expect(renderToStaticMarkup(<Account />)).toContain('Loading your account');
   });
 
   it('checkout is at /en/checkout/, never indexed, and prerenders the empty state', () => {

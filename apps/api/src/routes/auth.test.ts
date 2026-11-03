@@ -447,7 +447,9 @@ afterEach(async () => {
   await app.close();
 });
 
-describe('A07 identification and authentication', () => {
+// Each test chains several Argon2id hashes (sign-up and sign-ins), slow on purpose (OWASP
+// profile); on a busy machine a few of them pass 5 s, so the block has its own budget.
+describe('A07 identification and authentication', { timeout: 20_000 }, () => {
   it('registers a buyer with an Argon2id hash and never says whether the e-mail existed', async () => {
     await start();
     const first = await register(' Ana@Example.test ', 'Ana');

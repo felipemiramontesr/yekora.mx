@@ -328,7 +328,8 @@
     "navLabel": "Navegación principal",
     "menu": "Menú",
     "about": "Nosotros",
-    "catalog": "Catálogo"
+    "catalog": "Catálogo",
+    "account": "Mi cuenta"
   },
   "disciplines": {
     "senderismo": "Senderismo",
@@ -644,6 +645,138 @@
       "retry": "Consultar de nuevo",
       "toCatalog": "Seguir explorando",
       "toCart": "Volver a tu mochila"
+    }
+  },
+  "account": {
+    "metaTitle": "Mi cuenta | YĒKORA",
+    "title": "Mi cuenta",
+    "loading": "Cargando tu cuenta…",
+    "signIn": {
+      "title": "Entrar",
+      "intro": "Entra con tu correo y tu contraseña. Te pediremos un código para confirmar que eres tú.",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "submit": "Continuar",
+      "submitting": "Revisando…",
+      "toRegister": "¿No tienes cuenta? Crea una"
+    },
+    "register": {
+      "title": "Crear cuenta",
+      "intro": "Con tu cuenta ves el estado de tus pedidos.",
+      "fullName": "Nombre completo",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "passwordHint": "Mínimo 12 caracteres. Una frase larga es más segura que una palabra con símbolos.",
+      "submit": "Crear cuenta",
+      "submitting": "Creando…",
+      "toSignIn": "¿Ya tienes cuenta? Entra",
+      "accepted": "Listo. Si el correo no tenía cuenta, ya la tiene: entra con él y tu contraseña."
+    },
+    "code": {
+      "titleEmail": "Revisa tu correo",
+      "titleAuthenticator": "Abre tu app de autenticación",
+      "hintEmail": "Te enviamos un código de 6 dígitos a {email}. Vence en 5 minutos.",
+      "hintAuthenticator": "Escribe el código de 6 dígitos que muestra tu app, o uno de tus códigos de respaldo de 8 dígitos.",
+      "label": "Código",
+      "submit": "Confirmar",
+      "submitting": "Confirmando…",
+      "restart": "Volver a empezar"
+    },
+    "enroll": {
+      "title": "Activa la verificación en dos pasos",
+      "intro": "Tu cuenta tiene acceso al panel, así que necesita una app de autenticación (Google Authenticator, Microsoft Authenticator, 1Password u otra).",
+      "scan": "Escanea este código con tu app:",
+      "qrAlt": "Código QR para tu app de autenticación",
+      "manual": "Si no puedes escanearlo, escribe esta clave en tu app:",
+      "openApp": "Abrir en mi app (en este dispositivo)",
+      "label": "Código que muestra tu app",
+      "submit": "Activar",
+      "submitting": "Activando…",
+      "loading": "Preparando tu clave…"
+    },
+    "backup": {
+      "title": "Guarda tus códigos de respaldo",
+      "intro": "Si pierdes tu teléfono, cada uno de estos códigos te deja entrar una vez. Solo los verás ahora.",
+      "listLabel": "Códigos de respaldo",
+      "continue": "Ya los guardé"
+    },
+    "dashboard": {
+      "greeting": "Hola, {name}",
+      "signOut": "Salir",
+      "signingOut": "Saliendo…",
+      "tabsLabel": "Secciones de tu cuenta",
+      "orders": "Mis pedidos",
+      "panel": "Panel: pedidos"
+    },
+    "orders": {
+      "loading": "Cargando pedidos…",
+      "empty": "Aún no tienes pedidos con esta cuenta. Las compras que hagas con tu sesión iniciada aparecerán aquí.",
+      "emptyPanel": "No hay pedidos con este filtro.",
+      "caption": "Pedidos, del más reciente al más antiguo",
+      "number": "Pedido",
+      "date": "Fecha",
+      "status": "Estado",
+      "total": "Total",
+      "open": "Ver detalle del pedido {number}",
+      "filter": "Estado",
+      "allStatuses": "Todos",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "page": "Página {page} de {pages}",
+      "back": "Volver a la lista",
+      "test": "Prueba",
+      "detailTitle": "Pedido {number}",
+      "method": "Método de pago",
+      "placed": "Fecha del pedido",
+      "paidAt": "Pagado el",
+      "expiresAt": "Fecha límite de pago",
+      "itemsTotal": "Productos (IVA incluido)",
+      "shipping": "Envío",
+      "lines": "Productos",
+      "sku": "Clave",
+      "quantity": "Cantidad",
+      "unitPrice": "Precio unitario",
+      "lineTotal": "Importe",
+      "payments": "Eventos de pago",
+      "noPayments": "Todavía no hay eventos de pago.",
+      "processor": "Procesador",
+      "event": "Evento",
+      "amount": "Monto",
+      "result": "Resultado",
+      "received": "Recibido",
+      "alert": "Requiere revisión",
+      "noChange": "Sin cambio"
+    },
+    "statuses": {
+      "PENDING_PAYMENT": "Esperando pago",
+      "PAID": "Pagado",
+      "EXPIRED": "Vencido",
+      "CANCELLED": "Cancelado",
+      "REFUNDED": "Reembolsado",
+      "NEEDS_REVIEW": "En revisión"
+    },
+    "errors": {
+      "AUTH_UNAVAILABLE": "Las cuentas no están disponibles en este momento. Intenta más tarde.",
+      "MAIL_UNAVAILABLE": "No podemos enviar tu código por correo en este momento. Intenta más tarde.",
+      "INVALID_REQUEST": "Revisa los datos: algún campo no tiene el formato correcto.",
+      "INVALID_CREDENTIALS": "El correo o la contraseña no son correctos.",
+      "INVALID_CHALLENGE": "El código venció o se usó demasiadas veces. Vuelve a empezar.",
+      "INVALID_CODE": "El código no es correcto. Revísalo e intenta de nuevo.",
+      "TOTP_ALREADY_ENABLED": "Tu app de autenticación ya está activa. Vuelve a empezar.",
+      "TOTP_NOT_ENROLLED": "Primero activa tu app de autenticación.",
+      "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Entra de nuevo.",
+      "SECOND_FACTOR_REQUIRED": "Tu cuenta necesita la verificación en dos pasos. Entra de nuevo para activarla.",
+      "PERMISSION_DENIED": "Tu cuenta no tiene acceso a esta sección.",
+      "DATA_DOMAIN_FORBIDDEN": "Ese pedido no pertenece a tu cuenta.",
+      "not_found": "No encontramos ese pedido.",
+      "rate_limited": "Demasiados intentos. Espera un minuto e intenta de nuevo.",
+      "offline": "Sin conexión. Revisa tu internet e intenta de nuevo.",
+      "timeout": "El servidor tardó demasiado en responder. Intenta de nuevo.",
+      "server": "Algo salió mal. Intenta de nuevo.",
+      "invalid": "Algo salió mal. Intenta de nuevo.",
+      "codeFormat": "Escribe los 6 dígitos (u 8 de un código de respaldo).",
+      "required": "Completa todos los campos.",
+      "passwordLength": "La contraseña necesita al menos 12 caracteres."
     }
   }
 }

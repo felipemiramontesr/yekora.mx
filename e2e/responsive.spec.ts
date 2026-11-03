@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockAccountApi } from './support/accountApi';
 
 /**
  * FC 003 F2 · Gate RWD (Amendment 2, Archon parity). For every public page in both languages
@@ -42,6 +43,9 @@ const PAGES = [
   // Checkout and its return pages (FC 012): 25 routes × 6 viewports = 150 cells.
   '/checkout/',
   '/en/checkout/',
+  // FC 028: the account area, signed out (its sign-in form).
+  '/cuenta/',
+  '/en/account/',
   '/checkout/exito/',
   '/checkout/cancelado/',
   '/en/checkout/success/',
@@ -83,6 +87,7 @@ for (const viewport of VIEWPORTS) {
 
     for (const path of PAGES) {
       test(`${path} fits the screen`, async ({ page }) => {
+        await mockAccountApi(page);
         await page.goto(path);
         // The cookie notice mounts after hydration; wait so its targets are always measured.
         await expect(
