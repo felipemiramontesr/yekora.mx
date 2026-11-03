@@ -190,9 +190,16 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
   [
     'INSERT INTO two_factor_backup_codes',
     (s, p) =>
-      write(() =>
-        s.backup.push({ user: p[0] as string, hash: p[1] as string, used: 0 })
-      ),
+      write(() => {
+        // One multi-row INSERT: (user, hash) pairs.
+        for (let i = 0; i < p.length; i += 2) {
+          s.backup.push({
+            user: p[i] as string,
+            hash: p[i + 1] as string,
+            used: 0,
+          });
+        }
+      }),
   ],
   ['UPDATE two_factor_backup_codes', spendBackup],
   [

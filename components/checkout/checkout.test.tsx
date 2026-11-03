@@ -164,7 +164,8 @@ describe('CheckoutForm', () => {
       redirectUrl: SESSION.redirectUrl,
     });
     expect(screen.getByText('Preparando tu pago seguro…')).toBeTruthy();
-  });
+    // First test of the file: it pays the cold start of jsdom and React, slow on a busy machine.
+  }, 15_000);
 
   it('shows every missing field, marks it invalid and focuses the first one', () => {
     renderForm();

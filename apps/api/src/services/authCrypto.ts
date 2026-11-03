@@ -127,7 +127,7 @@ function totpCode(secret: Buffer, step: number): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(step));
   const mac = createHmac('sha1', secret).update(counter).digest();
-  const offset = mac[mac.length - 1] & 0x0f;
+  const offset = mac.readUInt8(mac.length - 1) & 0x0f;
   const value = mac.readUInt32BE(offset) & 0x7fffffff;
   return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, '0');
 }

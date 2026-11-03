@@ -20,6 +20,9 @@ const MAX_ATTEMPTS = 5;
 /** Session lifetime for buyers and for staff or admin. */
 const SESSION_MS = { customer: 8 * 3_600_000, privileged: 2 * 3_600_000 };
 
+/** Alphabetical order for role and permission names, the same on every runtime. */
+const byName = (a: string, b: string) => a.localeCompare(b, 'en');
+
 /** A user as the sign-in reads it. */
 interface UserRow {
   id: string;
@@ -161,12 +164,12 @@ export async function capabilitiesOf(
     [userId]
   );
   return {
-    roles: [...new Set(rows.map((row) => row.role_id))].sort(),
+    roles: [...new Set(rows.map((row) => row.role_id))].sort(byName),
     permissions: [
       ...new Set(
         rows.flatMap((row) => (row.permission_id ? [row.permission_id] : []))
       ),
-    ].sort(),
+    ].sort(byName),
     totpEnabled: Number(totp?.is_totp_enabled ?? 0) === 1,
   };
 }
@@ -295,12 +298,11 @@ export async function enableTotp(
   await tx.query('DELETE FROM two_factor_backup_codes WHERE user_id = ?', [
     userId,
   ]);
-  for (const hash of codeHashes) {
-    await tx.query(
-      'INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES (?, ?)',
-      [userId, hash]
-    );
-  }
+  // One multi-row INSERT: one round trip for the whole set.
+  await tx.query(
+    `INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES ${codeHashes.map(() => '(?, ?)').join(', ')}`,
+    codeHashes.flatMap((hash) => [userId, hash])
+  );
 }
 
 /**

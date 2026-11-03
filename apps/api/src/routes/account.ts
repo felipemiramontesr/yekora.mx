@@ -34,15 +34,17 @@ export function registerAccountRoutes(
   app: FastifyInstance,
   deps: { db: Db }
 ): void {
-  app.get('/v1/account/me', async (request) => {
+  app.get('/v1/account/me', (request, reply) => {
     const user = request.user as SessionUser;
-    return meResponseSchema.parse({
-      id: user.userId,
-      email: user.email,
-      fullName: user.fullName,
-      roles: user.roles,
-      permissions: user.permissions,
-    });
+    return reply.send(
+      meResponseSchema.parse({
+        id: user.userId,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+        permissions: user.permissions,
+      })
+    );
   });
 
   app.post('/v1/account/logout', async (request, reply) => {
