@@ -66,8 +66,9 @@ function summary(row: OrderRow): OrderSummary {
 export async function listOrders(
   db: Db,
   scope: OrderScope,
-  { page, pageSize }: Paging
+  paging: Paging
 ): Promise<{ items: OrderSummary[]; total: number }> {
+  const { page, pageSize } = paging;
   const offset = (page - 1) * pageSize;
   const [rows, [count]] =
     'userId' in scope
