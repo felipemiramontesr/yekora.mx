@@ -1,7 +1,7 @@
 /**
  * Real-SQL suite (FC 025 T1.2 S): the API's own services against a migrated MariaDB, with the
  * real pool and no fake `Db`. Only the Database (SQL) job runs it (vitest.db.config.ts), after
- * it has applied migrations 001–003 to its `yekora_ci` service.
+ * it has applied migrations 001–004 to its `yekora_ci` service.
  *
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
@@ -342,5 +342,88 @@ describe('constraints MariaDB enforces (CHECK and FOREIGN KEY)', () => {
     ],
   ])('rejects %s', async (_case, sql, constraint) => {
     await expect(db.query(sql)).rejects.toThrow(`CONSTRAINT \`${constraint}\``);
+  });
+});
+
+describe('identity schema of migration 004 (FC 028 F0)', () => {
+  const USER = '00000000-0000-4000-8000-000000000028';
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+
+  it('gives admin the union of every permission, and each other role its own set', async () => {
+    const [{ missing }] = await db.query<{ missing: number }>(
+      "SELECT COUNT(*) AS missing FROM permissions p WHERE NOT EXISTS (SELECT 1 FROM role_permissions r WHERE r.role_id = 'admin' AND r.permission_id = p.id)"
+    );
+    expect(Number(missing)).toBe(0);
+    const customer = await db.query<{ permission_id: string }>(
+      "SELECT permission_id FROM role_permissions WHERE role_id = 'customer'"
+    );
+    expect(customer.map((row) => row.permission_id)).toEqual(['account:self']);
+  });
+
+  it('stores only Argon2id password hashes (ck_users_hash)', async () => {
+    await expect(
+      db.query(
+        "INSERT INTO users (id, email, password_hash, full_name) VALUES ('00000000-0000-4000-8000-0000000000aa', 'plain@example.test', 'secret', 'Plain')"
+      )
+    ).rejects.toThrow('CONSTRAINT `ck_users_hash`');
+    await db.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, 'buyer@example.test', ?, 'Comprador de prueba')",
+      [USER, ARGON]
+    );
+  });
+
+  it('links an order to its buyer and keeps the order when the user is deleted (T2.7)', async () => {
+    const [order] = await db.query<{ id: number }>(
+      'SELECT id FROM orders ORDER BY id LIMIT 1'
+    );
+    await db.query('UPDATE orders SET user_id = ? WHERE id = ?', [
+      USER,
+      order.id,
+    ]);
+    await db.query(
+      "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
+      [USER]
+    );
+    await db.query('DELETE FROM users WHERE id = ?', [USER]);
+    const [kept] = await db.query<{ user_id: string | null }>(
+      'SELECT user_id FROM orders WHERE id = ?',
+      [order.id]
+    );
+    expect(kept.user_id).toBeNull();
+    const [{ roles }] = await db.query<{ roles: number }>(
+      'SELECT COUNT(*) AS roles FROM user_roles WHERE user_id = ?',
+      [USER]
+    );
+    expect(Number(roles)).toBe(0);
+  });
+
+  it.each([
+    [
+      'an outbox payload that is not JSON (ck_outbox_events_payload)',
+      "INSERT INTO outbox_events (event_type, payload) VALUES ('AUTH_2FA_EMAIL', 'not json')",
+      'ck_outbox_events_payload',
+    ],
+    [
+      'an outbox status outside its life cycle (ck_outbox_events_status)',
+      "INSERT INTO outbox_events (event_type, payload, status) VALUES ('AUTH_2FA_EMAIL', '{}', 'LOST')",
+      'ck_outbox_events_status',
+    ],
+  ])('rejects %s', async (_case, sql, constraint) => {
+    await expect(db.query(sql)).rejects.toThrow(`CONSTRAINT \`${constraint}\``);
+  });
+
+  it('accepts only EMAIL and TOTP challenges (ck_two_factor_challenges_type)', async () => {
+    const user = '00000000-0000-4000-8000-0000000000bb';
+    await db.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, 'challenge@example.test', ?, 'Reto')",
+      [user, ARGON]
+    );
+    await expect(
+      db.query(
+        "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (UUID(), ?, 'SMS', REPEAT('0', 64), UTC_TIMESTAMP())",
+        [user]
+      )
+    ).rejects.toThrow('CONSTRAINT `ck_two_factor_challenges_type`');
   });
 });
