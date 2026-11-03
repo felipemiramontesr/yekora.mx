@@ -99646,6 +99646,49 @@ var CHECKOUT_RETURN_PATHS = {
   en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
 };
 
+// ../../lib/account/authTypes.ts
+var emailField = external_exports.string().trim().pipe(external_exports.email().max(255));
+var registerRequestSchema = external_exports.strictObject({
+  email: emailField,
+  // NIST SP 800-63B: length over composition rules; 12 to 128 characters.
+  password: external_exports.string().min(12).max(128),
+  fullName: external_exports.string().trim().min(2).max(150)
+});
+var loginRequestSchema = external_exports.strictObject({
+  email: emailField,
+  password: external_exports.string().min(1).max(128)
+});
+var challengeRequestSchema = external_exports.strictObject({
+  challengeId: external_exports.uuid()
+});
+var codeRequestSchema = external_exports.strictObject({
+  challengeId: external_exports.uuid(),
+  code: external_exports.string().regex(/^(?:\d{6}|\d{8})$/)
+});
+var loginResponseSchema = external_exports.object({
+  challengeId: external_exports.uuid(),
+  // `enroll_totp` is no longer answered: enrolment now comes after the mailed code.
+  next: external_exports.enum(["verify", "enroll_totp"]),
+  /** Where the code of `verify` comes from. */
+  channel: external_exports.enum(["email", "authenticator"])
+});
+var enrollResponseSchema = external_exports.object({
+  secret: external_exports.string().regex(/^[A-Z2-7]+$/),
+  otpauthUri: external_exports.string().startsWith("otpauth://totp/")
+});
+var confirmResponseSchema = external_exports.object({
+  backupCodes: external_exports.array(external_exports.string().regex(/^\d{8}$/)).length(8)
+});
+var signedInSchema = external_exports.object({ status: external_exports.literal("signed_in") });
+var registeredSchema = external_exports.object({ status: external_exports.literal("accepted") });
+var meResponseSchema = external_exports.object({
+  id: external_exports.uuid(),
+  email: external_exports.email(),
+  fullName: external_exports.string(),
+  roles: external_exports.array(external_exports.string()),
+  permissions: external_exports.array(external_exports.string())
+});
+
 // ../../lib/account/orderTypes.ts
 var orderSummarySchema = orderViewSchema.extend({
   /** When the order was placed, ISO 8601. */
@@ -99709,25 +99752,6 @@ var problemSchema = external_exports.object({
 var PROBLEM_TYPE = "application/problem+json";
 function problem(status, title, detail) {
   return detail === void 0 ? { type: "about:blank", title, status } : { type: "about:blank", title, status, detail };
-}
-
-// src/lib/session.ts
-var SESSION_COOKIE = "__Host-yekora_session";
-function readSessionToken(header3) {
-  for (const part of (header3 ?? "").split(";")) {
-    const [name2, ...value] = part.trim().split("=");
-    if (name2 === SESSION_COOKIE) {
-      const token = value.join("=");
-      return /^[\w-]{43}$/.test(token) ? token : null;
-    }
-  }
-  return null;
-}
-function sessionCookie(token, maxAgeSeconds) {
-  return `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Strict`;
-}
-function clearedSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
 }
 
 // src/lib/money.ts
@@ -99892,924 +99916,6 @@ async function quoteCartToDestination(db, lines, rate, lang, destination, provid
     remaining: null
   };
   return { ok: true, quote: buildQuote(lines, rows, rate, lang, shipping) };
-}
-
-// src/services/checkout.ts
-var PROCESSOR_OF = {
-  CARD: "STRIPE",
-  OXXO: "STRIPE",
-  SPEI: "MERCADO_PAGO",
-  MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
-};
-var refuse = (status, code) => ({ ok: false, status, code });
-function affected(result) {
-  return result.affectedRows;
-}
-async function expireOverdueOrders(db, now) {
-  return db.transaction(async (tx) => {
-    const overdue = await tx.query(
-      "SELECT id FROM orders WHERE status_id = 1 AND expires_at < ? FOR UPDATE",
-      [now]
-    );
-    if (overdue.length === 0) return 0;
-    const ids = overdue.map((row2) => row2.id);
-    await tx.query(
-      "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
-      [ids]
-    );
-    await tx.query(
-      "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
-      [ids]
-    );
-    return ids.length;
-  });
-}
-var InsufficientStock = class extends Error {
-};
-async function reserveLines(tx, lines) {
-  const reserved = await Promise.all(
-    lines.map(async (line) => {
-      const result = await tx.query(
-        "UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?",
-        [line.quantity, line.sku, line.quantity]
-      );
-      if (affected(result) !== 1) return null;
-      const [row2] = await tx.query(
-        "SELECT id FROM products WHERE sku = ?",
-        [line.sku]
-      );
-      return [line.sku, row2.id];
-    })
-  );
-  if (reserved.includes(null)) throw new InsufficientStock();
-  return new Map(reserved);
-}
-async function cancelOrder(db, orderId) {
-  await db.transaction(async (tx) => {
-    const result = await tx.query(
-      "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
-      [orderId]
-    );
-    if (affected(result) !== 1) return;
-    await tx.query(
-      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
-      [orderId]
-    );
-  });
-}
-function methodOf(body) {
-  const method = body?.method;
-  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
-}
-function admit(deps, body) {
-  const method = methodOf(body);
-  if (method === null) return refuse(400, "INVALID_REQUEST");
-  const processorCode = PROCESSOR_OF[method];
-  const processor = deps.processors[processorCode];
-  const secrets = deps.payments.checkout;
-  if (processor === void 0 || secrets === null) {
-    return refuse(503, "SERVICE_UNAVAILABLE");
-  }
-  const parsed = checkoutRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    const buyerData = parsed.error.issues.some(
-      (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
-    );
-    return refuse(
-      400,
-      buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
-    );
-  }
-  if (!parsed.data.privacyConsent) {
-    return refuse(400, "PRIVACY_CONSENT_REQUIRED");
-  }
-  return { request: parsed.data, method, processorCode, processor, secrets };
-}
-async function price(deps, request, lang) {
-  const quoted = await quoteCartToDestination(
-    deps.db,
-    request.items,
-    await deps.rate(),
-    lang,
-    {
-      stateCode: request.address.stateCode,
-      postalCode: request.address.postalCode
-    },
-    deps.shipping
-  );
-  if (!quoted.ok) {
-    return refuse(
-      400,
-      quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
-    );
-  }
-  const { shippingCode, totalMxnCents } = quoted.quote.summary;
-  if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
-    return refuse(400, "UNSERVICEABLE_DESTINATION");
-  }
-  if (totalMxnCents !== request.expectedTotalMxnCents) {
-    return refuse(409, "PRICE_CHANGED");
-  }
-  return quoted.quote;
-}
-async function persist(deps, admitted, quote, order) {
-  const { request, secrets } = admitted;
-  const { customer, address } = request;
-  const summary2 = quote.summary;
-  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
-  try {
-    return await deps.db.transaction(async (tx) => {
-      const productIds = await reserveLines(tx, request.items);
-      const inserted = await tx.query(
-        "INSERT INTO orders (order_number, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
-        [
-          order.orderNumber,
-          order.methodId,
-          summary2.itemsBaseMxnCents,
-          summary2.itemsTaxMxnCents,
-          summary2.itemsTotalMxnCents,
-          summary2.shippingBaseMxnCents,
-          summary2.shippingTaxMxnCents,
-          summary2.shippingTotalMxnCents,
-          summary2.totalMxnCents,
-          seal("customer_name", customer.name),
-          seal("customer_email", customer.email),
-          seal("customer_phone", customer.phone),
-          seal("shipping_address", JSON.stringify(address)),
-          emailHmac(secrets.emailPepper, customer.email),
-          tokenHash2(secrets.tokenPepper, order.accessToken),
-          order.now,
-          order.expiresAt,
-          deps.payments.mode === "sandbox" ? 1 : 0,
-          address.stateCode
-        ]
-      );
-      const id = inserted.insertId;
-      await tx.query(
-        "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
-        [
-          quote.items.map((item) => [
-            id,
-            productIds.get(item.sku),
-            item.sku,
-            item.quantity,
-            item.unitPriceMxnCents,
-            item.lineBaseMxnCents,
-            item.lineTaxMxnCents,
-            item.lineTotalMxnCents
-          ])
-        ]
-      );
-      return id;
-    });
-  } catch (error63) {
-    if (error63 instanceof InsufficientStock) {
-      return refuse(409, "INSUFFICIENT_STOCK");
-    }
-    throw error63;
-  }
-}
-async function createCheckout(deps, body, lang) {
-  const admitted = admit(deps, body);
-  if ("ok" in admitted) return admitted;
-  const now = deps.now();
-  await expireOverdueOrders(deps.db, now);
-  const quote = await price(deps, admitted.request, lang);
-  if ("ok" in quote) return quote;
-  const [methodRow] = await deps.db.query(
-    "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
-    [admitted.method]
-  );
-  if (methodRow === void 0) return refuse(503, "SERVICE_UNAVAILABLE");
-  const order = {
-    orderNumber: newOrderNumber(now),
-    accessToken: newAccessToken(),
-    methodId: methodRow.id,
-    now,
-    expiresAt: new Date(
-      now.getTime() + Number(methodRow.hold_minutes) * 6e4
-    )
-  };
-  const orderId = await persist(deps, admitted, quote, order);
-  if (typeof orderId !== "number") return orderId;
-  const paths = CHECKOUT_RETURN_PATHS[lang];
-  const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
-  const total = quote.summary.totalMxnCents;
-  try {
-    const session = await admitted.processor.createSession({
-      orderNumber: order.orderNumber,
-      method: admitted.method,
-      totalMxnCents: total,
-      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
-      expiresAt: order.expiresAt,
-      now,
-      successUrl: `${deps.payments.siteUrl}${paths.success}`,
-      cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
-      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
-    });
-    await deps.db.query(
-      "UPDATE orders SET processor_reference = ? WHERE id = ?",
-      [session.reference, orderId]
-    );
-    return {
-      ok: true,
-      session: {
-        orderNumber: order.orderNumber,
-        accessToken: order.accessToken,
-        redirectUrl: session.redirectUrl,
-        expiresAt: order.expiresAt.toISOString(),
-        totalMxnCents: total
-      }
-    };
-  } catch {
-    await cancelOrder(deps.db, orderId);
-    return refuse(503, "SERVICE_UNAVAILABLE");
-  }
-}
-
-// src/services/identity.ts
-var import_node_crypto3 = require("node:crypto");
-
-// src/lib/permissions.ts
-var PERMISSIONS = [
-  "account:self",
-  "orders:read",
-  "catalog:write",
-  "users:manage",
-  "audit:read"
-];
-function isPrivileged(roles) {
-  return roles.some((role) => role !== "customer");
-}
-
-// src/services/identity.ts
-var CHALLENGE_MS = 5 * 6e4;
-var MAX_ATTEMPTS = 5;
-var SESSION_MS = { customer: 8 * 36e5, privileged: 2 * 36e5 };
-var byName = (a, b) => a.localeCompare(b, "en");
-function canonicalEmail(email3) {
-  return email3.trim().toLowerCase();
-}
-function clientFacts(ip, userAgent) {
-  return { ip: ip || null, userAgent: userAgent?.slice(0, 500) ?? null };
-}
-async function findUserByEmail(db, email3) {
-  const [row2] = await db.query(
-    "SELECT id, email, password_hash, full_name, is_active FROM users WHERE email = ? AND is_active = 1",
-    [email3]
-  );
-  return row2 ?? null;
-}
-async function emailOf(db, userId) {
-  const [row2] = await db.query(
-    "SELECT email FROM users WHERE id = ?",
-    [userId]
-  );
-  return row2.email;
-}
-function createCustomer(db, user) {
-  return db.transaction(async (tx) => {
-    const [taken] = await tx.query(
-      "SELECT id FROM users WHERE email = ? FOR UPDATE",
-      [user.email]
-    );
-    if (taken) return false;
-    const id = (0, import_node_crypto3.randomUUID)();
-    await tx.query(
-      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
-      [id, user.email, user.passwordHash, user.fullName]
-    );
-    await tx.query(
-      "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
-      [id]
-    );
-    return true;
-  });
-}
-async function capabilitiesOf(db, userId) {
-  const rows = await db.query(
-    "SELECT ur.role_id, rp.permission_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id AND r.is_active = 1 LEFT JOIN role_permissions rp ON rp.role_id = ur.role_id WHERE ur.user_id = ?",
-    [userId]
-  );
-  const [totp] = await db.query(
-    "SELECT is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
-    [userId]
-  );
-  return {
-    roles: [...new Set(rows.map((row2) => row2.role_id))].sort(byName),
-    permissions: [
-      ...new Set(
-        rows.flatMap((row2) => row2.permission_id ? [row2.permission_id] : [])
-      )
-    ].sort(byName),
-    totpEnabled: Number(totp?.is_totp_enabled ?? 0) === 1
-  };
-}
-async function openChallenge(db, secret, userId, now, emailCode) {
-  const id = (0, import_node_crypto3.randomUUID)();
-  await db.query(
-    "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
-    [
-      id,
-      userId,
-      emailCode === void 0 ? "TOTP" : "EMAIL",
-      codeHash(secret, emailCode ?? id),
-      new Date(now.getTime() + CHALLENGE_MS)
-    ]
-  );
-  return id;
-}
-async function passEmailChallenge(db, secret, id) {
-  await db.query(
-    "UPDATE two_factor_challenges SET challenge_type = 'TOTP', code_hash = ? WHERE id = ? AND challenge_type = 'EMAIL'",
-    [codeHash(secret, id), id]
-  );
-}
-async function markEmailVerified(db, userId, now) {
-  await db.query(
-    "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
-    [now, userId]
-  );
-}
-async function liveChallenge(db, id, now) {
-  const [row2] = await db.query(
-    "SELECT id, user_id, challenge_type, code_hash, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?",
-    [id, now, MAX_ATTEMPTS]
-  );
-  return row2 ? {
-    id: row2.id,
-    userId: row2.user_id,
-    type: row2.challenge_type,
-    codeHash: row2.code_hash,
-    attempts: Number(row2.attempts)
-  } : null;
-}
-async function failChallenge(db, id) {
-  await db.query(
-    "UPDATE two_factor_challenges SET attempts = attempts + 1 WHERE id = ? AND attempts < ?",
-    [id, MAX_ATTEMPTS]
-  );
-}
-async function totpOf(db, userId) {
-  const [row2] = await db.query(
-    "SELECT totp_secret_encrypted, is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
-    [userId]
-  );
-  if (!row2?.totp_secret_encrypted) return null;
-  return {
-    encrypted: row2.totp_secret_encrypted,
-    enabled: Number(row2.is_totp_enabled) === 1
-  };
-}
-async function savePendingTotp(db, userId, encrypted) {
-  await db.query(
-    "INSERT INTO two_factor_auth (user_id, totp_secret_encrypted, is_totp_enabled) VALUES (?, ?, 0) ON DUPLICATE KEY UPDATE totp_secret_encrypted = VALUES(totp_secret_encrypted), is_totp_enabled = 0",
-    [userId, encrypted]
-  );
-}
-async function enableTotp(tx, userId, codeHashes) {
-  await tx.query(
-    "UPDATE two_factor_auth SET is_totp_enabled = 1 WHERE user_id = ?",
-    [userId]
-  );
-  await tx.query("DELETE FROM two_factor_backup_codes WHERE user_id = ?", [
-    userId
-  ]);
-  await Promise.all(
-    codeHashes.map(
-      (hash2) => tx.query(
-        "INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES (?, ?)",
-        [userId, hash2]
-      )
-    )
-  );
-}
-async function useBackupCode(db, userId, hash2, now) {
-  const result = await db.query(
-    "UPDATE two_factor_backup_codes SET is_used = 1, used_at = ? WHERE user_id = ? AND code_hash = ? AND is_used = 0",
-    [now, userId, hash2]
-  );
-  return result.affectedRows === 1;
-}
-async function openSession(tx, input2) {
-  const token = newToken();
-  const lifetime = input2.privileged ? SESSION_MS.privileged : SESSION_MS.customer;
-  await tx.query("DELETE FROM two_factor_challenges WHERE id = ?", [
-    input2.challengeId
-  ]);
-  await tx.query(
-    "INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [
-      tokenHash(token),
-      input2.userId,
-      // Reserved for the refresh flow; no refresh token is issued yet, so nothing can match it.
-      tokenHash(newToken()),
-      input2.ip,
-      input2.userAgent,
-      new Date(input2.now.getTime() + lifetime)
-    ]
-  );
-  return { token, maxAgeSeconds: lifetime / 1e3 };
-}
-async function sessionUser(db, token, now) {
-  const [row2] = await db.query(
-    "SELECT s.id, s.user_id, u.email, u.full_name FROM user_sessions s JOIN users u ON u.id = s.user_id AND u.is_active = 1 WHERE s.id = ? AND s.expires_at > ?",
-    [tokenHash(token), now]
-  );
-  if (!row2) return null;
-  const capabilities = await capabilitiesOf(db, row2.user_id);
-  return {
-    sessionId: row2.id,
-    userId: row2.user_id,
-    email: row2.email,
-    fullName: row2.full_name,
-    ...capabilities
-  };
-}
-async function closeSession(db, sessionId) {
-  await db.query("DELETE FROM user_sessions WHERE id = ?", [sessionId]);
-}
-function secondFactorSatisfied(user) {
-  return !isPrivileged(user.roles) || user.totpEnabled;
-}
-
-// src/services/orderReads.ts
-var iso = (date5) => new Date(date5).toISOString();
-function summary(row2) {
-  return {
-    orderNumber: row2.order_number,
-    status: row2.status,
-    method: row2.method,
-    itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
-    shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
-    totalMxnCents: Number(row2.total_mxn_cents),
-    createdAt: iso(row2.created_at),
-    expiresAt: iso(row2.expires_at),
-    paidAt: row2.paid_at === null ? null : iso(row2.paid_at),
-    isTest: Number(row2.is_test) === 1
-  };
-}
-async function listOrders(db, scope, paging2) {
-  const { page, pageSize } = paging2;
-  const offset = (page - 1) * pageSize;
-  const [rows, [count]] = "userId" in scope ? await Promise.all([
-    db.query(
-      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.user_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
-      [scope.userId, pageSize, offset]
-    ),
-    db.query(
-      "SELECT COUNT(*) AS n FROM orders WHERE user_id = ?",
-      [scope.userId]
-    )
-  ]) : await Promise.all([
-    db.query(
-      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE (? IS NULL OR s.code = ?) ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
-      [scope.status, scope.status, pageSize, offset]
-    ),
-    db.query(
-      "SELECT COUNT(*) AS n FROM orders o JOIN order_statuses s ON s.id = o.status_id WHERE (? IS NULL OR s.code = ?)",
-      [scope.status, scope.status]
-    )
-  ]);
-  return { items: rows.map(summary), total: Number(count.n) };
-}
-async function findOrder(db, orderNumber) {
-  const [row2] = await db.query(
-    "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
-    [orderNumber]
-  );
-  if (row2 === void 0) return null;
-  const [lines, events] = await Promise.all([
-    db.query(
-      "SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id",
-      [row2.id]
-    ),
-    db.query(
-      "SELECT p.code AS processor, e.event_type, e.processor_status, e.amount_mxn_cents, r.code AS resulting_status, e.is_alert, e.received_at FROM payment_events e JOIN payment_processors p ON p.id = e.processor_id LEFT JOIN order_statuses r ON r.id = e.resulting_status_id WHERE e.order_id = ? ORDER BY e.received_at, e.id",
-      [row2.id]
-    )
-  ]);
-  return {
-    ownerId: row2.user_id,
-    order: {
-      ...summary(row2),
-      lines: lines.map((line) => ({
-        sku: line.sku,
-        quantity: Number(line.quantity),
-        unitPriceMxnCents: Number(line.unit_price_mxn_cents),
-        lineTotalMxnCents: Number(line.line_total_mxn_cents)
-      })),
-      paymentEvents: events.map((event) => ({
-        processor: event.processor,
-        eventType: event.event_type,
-        processorStatus: event.processor_status,
-        amountMxnCents: event.amount_mxn_cents === null ? null : Number(event.amount_mxn_cents),
-        resultingStatus: event.resulting_status,
-        isAlert: Number(event.is_alert) === 1,
-        receivedAt: iso(event.received_at)
-      }))
-    }
-  };
-}
-
-// src/routes/orders.ts
-var import_node_crypto4 = require("node:crypto");
-var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
-var BEARER = /^Bearer ([\w-]{43})$/;
-var ORDER_PATHS = [
-  "/v1/orders/:order_number",
-  "/v1/account/orders",
-  "/v1/account/orders/:order_number",
-  "/v1/admin/orders",
-  "/v1/admin/orders/:order_number"
-];
-var WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
-function registerOrderWriteRefusals(app) {
-  for (const url2 of ORDER_PATHS) {
-    app.route({
-      method: [...WRITE_METHODS],
-      url: url2,
-      handler: (_request, reply) => reply.code(405).header("Allow", "GET, HEAD").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "ORDERS_READ_ONLY"))
-    });
-  }
-}
-async function lookUpOrder(deps, orderNumber) {
-  if (!ORDER_NUMBER.test(orderNumber)) return null;
-  await expireOverdueOrders(deps.db, deps.now());
-  return findOrder(deps.db, orderNumber);
-}
-function registerOrderRoutes(app, deps) {
-  app.get(
-    "/v1/orders/:order_number",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
-    async (request, reply) => {
-      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
-      const secrets = deps.payments.checkout;
-      if (secrets === null) {
-        return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
-      }
-      const { order_number: orderNumber } = request.params;
-      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
-      if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
-        return notFound();
-      await expireOverdueOrders(deps.db, deps.now());
-      const [row2] = await deps.db.query(
-        "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
-        [orderNumber]
-      );
-      if (row2 === void 0 || !(0, import_node_crypto4.timingSafeEqual)(
-        Buffer.from(row2.access_token_hash),
-        tokenHash2(secrets.tokenPepper, token)
-      )) {
-        return notFound();
-      }
-      return orderViewSchema.parse({
-        orderNumber: row2.order_number,
-        status: row2.status,
-        method: row2.method,
-        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
-        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
-        totalMxnCents: Number(row2.total_mxn_cents),
-        expiresAt: new Date(row2.expires_at).toISOString(),
-        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
-      });
-    }
-  );
-}
-
-// src/routes/account.ts
-var meResponseSchema = external_exports.object({
-  id: external_exports.uuid(),
-  email: external_exports.email(),
-  fullName: external_exports.string(),
-  roles: external_exports.array(external_exports.string()),
-  permissions: external_exports.array(external_exports.string())
-});
-function registerAccountRoutes(app, deps) {
-  app.get("/v1/account/me", (request, reply) => {
-    const user = request.user;
-    return reply.send(
-      meResponseSchema.parse({
-        id: user.userId,
-        email: user.email,
-        fullName: user.fullName,
-        roles: user.roles,
-        permissions: user.permissions
-      })
-    );
-  });
-  app.post("/v1/account/logout", async (request, reply) => {
-    await closeSession(deps.db, request.user.sessionId);
-    return reply.header("Set-Cookie", clearedSessionCookie()).code(204).send();
-  });
-  app.get("/v1/account/orders", async (request, reply) => {
-    const query = accountOrdersQuery.safeParse(request.query);
-    if (!query.success) {
-      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
-    }
-    await expireOverdueOrders(deps.db, deps.now());
-    const { items, total } = await listOrders(
-      deps.db,
-      { userId: request.user.userId },
-      query.data
-    );
-    return orderPageSchema.parse({ items, total, ...query.data });
-  });
-  app.get("/v1/account/orders/:order_number", async (request, reply) => {
-    const { order_number: orderNumber } = request.params;
-    const found = await lookUpOrder(deps, orderNumber);
-    if (found === null) {
-      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
-    }
-    if (found.ownerId !== request.user.userId) {
-      return reply.code(403).type(PROBLEM_TYPE).send(problem(403, "Not your order", "DATA_DOMAIN_FORBIDDEN"));
-    }
-    return orderDetailSchema.parse(found.order);
-  });
-}
-
-// src/services/outbox.ts
-async function enqueueMail(tx, event) {
-  const { type, ...payload } = event;
-  await tx.query(
-    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
-    [type, JSON.stringify(payload)]
-  );
-}
-
-// src/services/passwords.ts
-var import_node_crypto5 = require("node:crypto");
-var import_hash_wasm = __toESM(require_index_umd(), 1);
-var PARAMETERS = {
-  memorySize: 19456,
-  iterations: 2,
-  parallelism: 1,
-  hashLength: 32
-};
-function hashPassword(password) {
-  return (0, import_hash_wasm.argon2id)({
-    ...PARAMETERS,
-    password,
-    salt: (0, import_node_crypto5.randomBytes)(16),
-    outputType: "encoded"
-  });
-}
-async function verifyPassword(hash2, password) {
-  try {
-    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
-  } catch {
-    return false;
-  }
-}
-var decoy;
-function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto5.randomBytes)(32).toString("base64url"));
-  return decoy;
-}
-
-// src/routes/auth.ts
-var emailField = external_exports.string().trim().pipe(external_exports.email().max(255));
-var registerRequestSchema = external_exports.strictObject({
-  email: emailField,
-  // NIST SP 800-63B: length over composition rules; 12 to 128 characters.
-  password: external_exports.string().min(12).max(128),
-  fullName: external_exports.string().trim().min(2).max(150)
-});
-var loginRequestSchema = external_exports.strictObject({
-  email: emailField,
-  password: external_exports.string().min(1).max(128)
-});
-var challengeRequestSchema = external_exports.strictObject({
-  challengeId: external_exports.uuid()
-});
-var codeRequestSchema = external_exports.strictObject({
-  challengeId: external_exports.uuid(),
-  code: external_exports.string().regex(/^(?:\d{6}|\d{8})$/)
-});
-var loginResponseSchema = external_exports.object({
-  challengeId: external_exports.uuid(),
-  // `enroll_totp` is no longer answered: enrolment now comes after the mailed code.
-  next: external_exports.enum(["verify", "enroll_totp"]),
-  /** Where the code of `verify` comes from. */
-  channel: external_exports.enum(["email", "authenticator"])
-});
-var enrollResponseSchema = external_exports.object({
-  secret: external_exports.string().regex(/^[A-Z2-7]+$/),
-  otpauthUri: external_exports.string().startsWith("otpauth://totp/")
-});
-var confirmResponseSchema = external_exports.object({
-  backupCodes: external_exports.array(external_exports.string().regex(/^\d{8}$/)).length(8)
-});
-var signedInSchema = external_exports.object({ status: external_exports.literal("signed_in") });
-var registeredSchema = external_exports.object({ status: external_exports.literal("accepted") });
-var TITLES = {
-  AUTH_UNAVAILABLE: "Sign-in unavailable",
-  MAIL_UNAVAILABLE: "Sign-in by e-mail unavailable",
-  INVALID_REQUEST: "Invalid request",
-  INVALID_CREDENTIALS: "Invalid e-mail or password",
-  INVALID_CHALLENGE: "Sign-in expired, start again",
-  INVALID_CODE: "Invalid code",
-  TOTP_ALREADY_ENABLED: "Authenticator already enabled",
-  TOTP_NOT_ENROLLED: "Set up the authenticator first"
-};
-function refuse2(reply, status, code) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
-}
-var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
-function registerAuthRoutes(app, deps) {
-  function parse4(schema2, request, reply) {
-    if (deps.auth === null) {
-      void refuse2(reply, 503, "AUTH_UNAVAILABLE");
-      return null;
-    }
-    const body = schema2.safeParse(request.body);
-    if (!body.success) {
-      void refuse2(reply, 400, "INVALID_REQUEST");
-      return null;
-    }
-    return { auth: deps.auth, body: body.data };
-  }
-  async function challengeOf(challengeId, types, reply) {
-    const challenge = await liveChallenge(deps.db, challengeId, deps.now());
-    if (challenge && types.includes(challenge.type)) return challenge;
-    void refuse2(reply, 401, "INVALID_CHALLENGE");
-    return null;
-  }
-  async function passMailedCode(request, reply, auth2, challenge, code) {
-    if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code))) {
-      await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
-    }
-    await markEmailVerified(deps.db, challenge.userId, deps.now());
-    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    if (isPrivileged(roles)) {
-      await passEmailChallenge(deps.db, auth2.secret, challenge.id);
-      return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
-    }
-    await signIn(request, reply, challenge, roles);
-    return signedInSchema.parse({ status: "signed_in" });
-  }
-  async function signIn(request, reply, challenge, roles) {
-    const { token, maxAgeSeconds } = await deps.db.transaction(
-      (tx) => openSession(tx, {
-        challengeId: challenge.id,
-        userId: challenge.userId,
-        privileged: isPrivileged(roles),
-        ...clientFacts(request.ip, request.headers["user-agent"]),
-        now: deps.now()
-      })
-    );
-    reply.header("Set-Cookie", sessionCookie(token, maxAgeSeconds));
-  }
-  app.post("/v1/auth/register", LIMITED, async (request, reply) => {
-    const parsed = parse4(registerRequestSchema, request, reply);
-    if (parsed === null) return reply;
-    const { body } = parsed;
-    await createCustomer(deps.db, {
-      email: canonicalEmail(body.email),
-      passwordHash: await hashPassword(body.password),
-      fullName: body.fullName
-    });
-    return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
-  });
-  app.post("/v1/auth/login", LIMITED, async (request, reply) => {
-    const parsed = parse4(loginRequestSchema, request, reply);
-    if (parsed === null) return reply;
-    const { auth: auth2, body } = parsed;
-    const user = await findUserByEmail(deps.db, canonicalEmail(body.email));
-    const valid = await verifyPassword(
-      user?.password_hash ?? await decoyHash(),
-      body.password
-    );
-    if (user === null || !valid) {
-      return refuse2(reply, 401, "INVALID_CREDENTIALS");
-    }
-    if ((await totpOf(deps.db, user.id))?.enabled) {
-      const challengeId2 = await openChallenge(
-        deps.db,
-        auth2.secret,
-        user.id,
-        deps.now()
-      );
-      return loginResponseSchema.parse({
-        challengeId: challengeId2,
-        next: "verify",
-        channel: "authenticator"
-      });
-    }
-    if (!deps.mailReady) return refuse2(reply, 503, "MAIL_UNAVAILABLE");
-    const code = newEmailCode();
-    const challengeId = await deps.db.transaction(async (tx) => {
-      const id = await openChallenge(
-        tx,
-        auth2.secret,
-        user.id,
-        deps.now(),
-        code
-      );
-      await enqueueMail(tx, {
-        type: "SIGN_IN_CODE",
-        userId: user.id,
-        challengeId: id,
-        code: encryptTotpSecret(auth2.totpKey, id, Buffer.from(code, "utf8"))
-      });
-      return id;
-    });
-    request.outboxQueued = true;
-    return loginResponseSchema.parse({
-      challengeId,
-      next: "verify",
-      channel: "email"
-    });
-  });
-  app.post("/v1/auth/totp/enroll", LIMITED, async (request, reply) => {
-    const parsed = parse4(challengeRequestSchema, request, reply);
-    if (parsed === null) return reply;
-    const { auth: auth2, body } = parsed;
-    const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
-    if (challenge === null) return reply;
-    if ((await totpOf(deps.db, challenge.userId))?.enabled) {
-      return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
-    }
-    const email3 = await emailOf(deps.db, challenge.userId);
-    const secret = newTotpSecret();
-    await savePendingTotp(
-      deps.db,
-      challenge.userId,
-      encryptTotpSecret(auth2.totpKey, challenge.userId, secret)
-    );
-    return enrollResponseSchema.parse({
-      secret: base32(secret),
-      otpauthUri: otpauthUri(email3, secret)
-    });
-  });
-  app.post("/v1/auth/totp/confirm", LIMITED, async (request, reply) => {
-    const parsed = parse4(codeRequestSchema, request, reply);
-    if (parsed === null) return reply;
-    const { auth: auth2, body } = parsed;
-    const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
-    if (challenge === null) return reply;
-    const totp = await totpOf(deps.db, challenge.userId);
-    if (totp === null) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
-    if (totp.enabled) return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
-    const secret = decryptTotpSecret(
-      auth2.totpKey,
-      challenge.userId,
-      totp.encrypted
-    );
-    if (!verifyTotp(secret, body.code, deps.now())) {
-      await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
-    }
-    const backupCodes = newBackupCodes();
-    await deps.db.transaction(async (tx) => {
-      await enableTotp(
-        tx,
-        challenge.userId,
-        backupCodes.map((code) => codeHash(auth2.secret, code))
-      );
-      await enqueueMail(tx, { type: "TOTP_ENABLED", userId: challenge.userId });
-    });
-    request.outboxQueued = true;
-    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles);
-    return confirmResponseSchema.parse({ backupCodes });
-  });
-  app.post("/v1/auth/verify", LIMITED, async (request, reply) => {
-    const parsed = parse4(codeRequestSchema, request, reply);
-    if (parsed === null) return reply;
-    const { auth: auth2, body } = parsed;
-    const challenge = await challengeOf(
-      body.challengeId,
-      ["EMAIL", "TOTP"],
-      reply
-    );
-    if (challenge === null) return reply;
-    if (challenge.type === "EMAIL") {
-      return passMailedCode(request, reply, auth2, challenge, body.code);
-    }
-    const totp = await totpOf(deps.db, challenge.userId);
-    if (!totp?.enabled) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
-    const passed = await (body.code.length === 6 ? Promise.resolve(
-      verifyTotp(
-        decryptTotpSecret(auth2.totpKey, challenge.userId, totp.encrypted),
-        body.code,
-        deps.now()
-      )
-    ) : useBackupCode(
-      deps.db,
-      challenge.userId,
-      codeHash(auth2.secret, body.code),
-      deps.now()
-    ));
-    if (!passed) {
-      await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
-    }
-    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles);
-    return signedInSchema.parse({ status: "signed_in" });
-  });
 }
 
 // src/routes/cart.ts
@@ -100980,6 +100086,387 @@ function registerCatalogRoutes(app, deps) {
       exchangeRate: rate
     };
   });
+}
+
+// src/routes/orders.ts
+var import_node_crypto3 = require("node:crypto");
+
+// src/services/checkout.ts
+var PROCESSOR_OF = {
+  CARD: "STRIPE",
+  OXXO: "STRIPE",
+  SPEI: "MERCADO_PAGO",
+  MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
+};
+var refuse = (status, code) => ({ ok: false, status, code });
+function affected(result) {
+  return result.affectedRows;
+}
+async function expireOverdueOrders(db, now) {
+  return db.transaction(async (tx) => {
+    const overdue = await tx.query(
+      "SELECT id FROM orders WHERE status_id = 1 AND expires_at < ? FOR UPDATE",
+      [now]
+    );
+    if (overdue.length === 0) return 0;
+    const ids = overdue.map((row2) => row2.id);
+    await tx.query(
+      "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
+      [ids]
+    );
+    await tx.query(
+      "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
+      [ids]
+    );
+    return ids.length;
+  });
+}
+var InsufficientStock = class extends Error {
+};
+async function reserveLines(tx, lines) {
+  const reserved = await Promise.all(
+    lines.map(async (line) => {
+      const result = await tx.query(
+        "UPDATE products SET reserved_stock = reserved_stock + ? WHERE sku = ? AND is_active = 1 AND stock - reserved_stock >= ?",
+        [line.quantity, line.sku, line.quantity]
+      );
+      if (affected(result) !== 1) return null;
+      const [row2] = await tx.query(
+        "SELECT id FROM products WHERE sku = ?",
+        [line.sku]
+      );
+      return [line.sku, row2.id];
+    })
+  );
+  if (reserved.includes(null)) throw new InsufficientStock();
+  return new Map(reserved);
+}
+async function cancelOrder(db, orderId) {
+  await db.transaction(async (tx) => {
+    const result = await tx.query(
+      "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
+      [orderId]
+    );
+    if (affected(result) !== 1) return;
+    await tx.query(
+      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
+      [orderId]
+    );
+  });
+}
+function methodOf(body) {
+  const method = body?.method;
+  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
+}
+function admit(deps, body) {
+  const method = methodOf(body);
+  if (method === null) return refuse(400, "INVALID_REQUEST");
+  const processorCode = PROCESSOR_OF[method];
+  const processor = deps.processors[processorCode];
+  const secrets = deps.payments.checkout;
+  if (processor === void 0 || secrets === null) {
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
+  const parsed = checkoutRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const buyerData = parsed.error.issues.some(
+      (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
+    );
+    return refuse(
+      400,
+      buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
+    );
+  }
+  if (!parsed.data.privacyConsent) {
+    return refuse(400, "PRIVACY_CONSENT_REQUIRED");
+  }
+  return { request: parsed.data, method, processorCode, processor, secrets };
+}
+async function price(deps, request, lang) {
+  const quoted = await quoteCartToDestination(
+    deps.db,
+    request.items,
+    await deps.rate(),
+    lang,
+    {
+      stateCode: request.address.stateCode,
+      postalCode: request.address.postalCode
+    },
+    deps.shipping
+  );
+  if (!quoted.ok) {
+    return refuse(
+      400,
+      quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
+    );
+  }
+  const { shippingCode, totalMxnCents } = quoted.quote.summary;
+  if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
+    return refuse(400, "UNSERVICEABLE_DESTINATION");
+  }
+  if (totalMxnCents !== request.expectedTotalMxnCents) {
+    return refuse(409, "PRICE_CHANGED");
+  }
+  return quoted.quote;
+}
+async function persist(deps, admitted, quote, order) {
+  const { request, secrets } = admitted;
+  const { customer, address } = request;
+  const summary2 = quote.summary;
+  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
+  try {
+    return await deps.db.transaction(async (tx) => {
+      const productIds = await reserveLines(tx, request.items);
+      const inserted = await tx.query(
+        "INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
+        [
+          order.orderNumber,
+          order.userId,
+          order.methodId,
+          summary2.itemsBaseMxnCents,
+          summary2.itemsTaxMxnCents,
+          summary2.itemsTotalMxnCents,
+          summary2.shippingBaseMxnCents,
+          summary2.shippingTaxMxnCents,
+          summary2.shippingTotalMxnCents,
+          summary2.totalMxnCents,
+          seal("customer_name", customer.name),
+          seal("customer_email", customer.email),
+          seal("customer_phone", customer.phone),
+          seal("shipping_address", JSON.stringify(address)),
+          emailHmac(secrets.emailPepper, customer.email),
+          tokenHash2(secrets.tokenPepper, order.accessToken),
+          order.now,
+          order.expiresAt,
+          deps.payments.mode === "sandbox" ? 1 : 0,
+          address.stateCode
+        ]
+      );
+      const id = inserted.insertId;
+      await tx.query(
+        "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
+        [
+          quote.items.map((item) => [
+            id,
+            productIds.get(item.sku),
+            item.sku,
+            item.quantity,
+            item.unitPriceMxnCents,
+            item.lineBaseMxnCents,
+            item.lineTaxMxnCents,
+            item.lineTotalMxnCents
+          ])
+        ]
+      );
+      return id;
+    });
+  } catch (error63) {
+    if (error63 instanceof InsufficientStock) {
+      return refuse(409, "INSUFFICIENT_STOCK");
+    }
+    throw error63;
+  }
+}
+async function createCheckout(deps, body, lang, userId = null) {
+  const admitted = admit(deps, body);
+  if ("ok" in admitted) return admitted;
+  const now = deps.now();
+  await expireOverdueOrders(deps.db, now);
+  const quote = await price(deps, admitted.request, lang);
+  if ("ok" in quote) return quote;
+  const [methodRow] = await deps.db.query(
+    "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
+    [admitted.method]
+  );
+  if (methodRow === void 0) return refuse(503, "SERVICE_UNAVAILABLE");
+  const order = {
+    orderNumber: newOrderNumber(now),
+    accessToken: newAccessToken(),
+    methodId: methodRow.id,
+    now,
+    expiresAt: new Date(
+      now.getTime() + Number(methodRow.hold_minutes) * 6e4
+    ),
+    userId
+  };
+  const orderId = await persist(deps, admitted, quote, order);
+  if (typeof orderId !== "number") return orderId;
+  const paths = CHECKOUT_RETURN_PATHS[lang];
+  const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
+  const total = quote.summary.totalMxnCents;
+  try {
+    const session = await admitted.processor.createSession({
+      orderNumber: order.orderNumber,
+      method: admitted.method,
+      totalMxnCents: total,
+      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
+      expiresAt: order.expiresAt,
+      now,
+      successUrl: `${deps.payments.siteUrl}${paths.success}`,
+      cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
+      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
+    });
+    await deps.db.query(
+      "UPDATE orders SET processor_reference = ? WHERE id = ?",
+      [session.reference, orderId]
+    );
+    return {
+      ok: true,
+      session: {
+        orderNumber: order.orderNumber,
+        accessToken: order.accessToken,
+        redirectUrl: session.redirectUrl,
+        expiresAt: order.expiresAt.toISOString(),
+        totalMxnCents: total
+      }
+    };
+  } catch {
+    await cancelOrder(deps.db, orderId);
+    return refuse(503, "SERVICE_UNAVAILABLE");
+  }
+}
+
+// src/services/orderReads.ts
+var iso = (date5) => new Date(date5).toISOString();
+function summary(row2) {
+  return {
+    orderNumber: row2.order_number,
+    status: row2.status,
+    method: row2.method,
+    itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
+    shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
+    totalMxnCents: Number(row2.total_mxn_cents),
+    createdAt: iso(row2.created_at),
+    expiresAt: iso(row2.expires_at),
+    paidAt: row2.paid_at === null ? null : iso(row2.paid_at),
+    isTest: Number(row2.is_test) === 1
+  };
+}
+async function listOrders(db, scope, paging2) {
+  const { page, pageSize } = paging2;
+  const offset = (page - 1) * pageSize;
+  const [rows, [count]] = "userId" in scope ? await Promise.all([
+    db.query(
+      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.user_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
+      [scope.userId, pageSize, offset]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM orders WHERE user_id = ?",
+      [scope.userId]
+    )
+  ]) : await Promise.all([
+    db.query(
+      "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE (? IS NULL OR s.code = ?) ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?",
+      [scope.status, scope.status, pageSize, offset]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM orders o JOIN order_statuses s ON s.id = o.status_id WHERE (? IS NULL OR s.code = ?)",
+      [scope.status, scope.status]
+    )
+  ]);
+  return { items: rows.map(summary), total: Number(count.n) };
+}
+async function findOrder(db, orderNumber) {
+  const [row2] = await db.query(
+    "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+    [orderNumber]
+  );
+  if (row2 === void 0) return null;
+  const [lines, events] = await Promise.all([
+    db.query(
+      "SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id",
+      [row2.id]
+    ),
+    db.query(
+      "SELECT p.code AS processor, e.event_type, e.processor_status, e.amount_mxn_cents, r.code AS resulting_status, e.is_alert, e.received_at FROM payment_events e JOIN payment_processors p ON p.id = e.processor_id LEFT JOIN order_statuses r ON r.id = e.resulting_status_id WHERE e.order_id = ? ORDER BY e.received_at, e.id",
+      [row2.id]
+    )
+  ]);
+  return {
+    ownerId: row2.user_id,
+    order: {
+      ...summary(row2),
+      lines: lines.map((line) => ({
+        sku: line.sku,
+        quantity: Number(line.quantity),
+        unitPriceMxnCents: Number(line.unit_price_mxn_cents),
+        lineTotalMxnCents: Number(line.line_total_mxn_cents)
+      })),
+      paymentEvents: events.map((event) => ({
+        processor: event.processor,
+        eventType: event.event_type,
+        processorStatus: event.processor_status,
+        amountMxnCents: event.amount_mxn_cents === null ? null : Number(event.amount_mxn_cents),
+        resultingStatus: event.resulting_status,
+        isAlert: Number(event.is_alert) === 1,
+        receivedAt: iso(event.received_at)
+      }))
+    }
+  };
+}
+
+// src/routes/orders.ts
+var ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
+var BEARER = /^Bearer ([\w-]{43})$/;
+var ORDER_PATHS = [
+  "/v1/orders/:order_number",
+  "/v1/account/orders",
+  "/v1/account/orders/:order_number",
+  "/v1/admin/orders",
+  "/v1/admin/orders/:order_number"
+];
+var WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+function registerOrderWriteRefusals(app) {
+  for (const url2 of ORDER_PATHS) {
+    app.route({
+      method: [...WRITE_METHODS],
+      url: url2,
+      handler: (_request, reply) => reply.code(405).header("Allow", "GET, HEAD").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "ORDERS_READ_ONLY"))
+    });
+  }
+}
+async function lookUpOrder(deps, orderNumber) {
+  if (!ORDER_NUMBER.test(orderNumber)) return null;
+  await expireOverdueOrders(deps.db, deps.now());
+  return findOrder(deps.db, orderNumber);
+}
+function registerOrderRoutes(app, deps) {
+  app.get(
+    "/v1/orders/:order_number",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+      const secrets = deps.payments.checkout;
+      if (secrets === null) {
+        return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
+      }
+      const { order_number: orderNumber } = request.params;
+      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
+      if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
+        return notFound();
+      await expireOverdueOrders(deps.db, deps.now());
+      const [row2] = await deps.db.query(
+        "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+        [orderNumber]
+      );
+      if (row2 === void 0 || !(0, import_node_crypto3.timingSafeEqual)(
+        Buffer.from(row2.access_token_hash),
+        tokenHash2(secrets.tokenPepper, token)
+      )) {
+        return notFound();
+      }
+      return orderViewSchema.parse({
+        orderNumber: row2.order_number,
+        status: row2.status,
+        method: row2.method,
+        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
+        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
+        totalMxnCents: Number(row2.total_mxn_cents),
+        expiresAt: new Date(row2.expires_at).toISOString(),
+        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
+      });
+    }
+  );
 }
 
 // src/contract.ts
@@ -101209,8 +100696,233 @@ var ROUTE_CONTRACTS = [
   ...ORDER_PATHS.flatMap(readOnly)
 ];
 
+// src/services/identity.ts
+var import_node_crypto4 = require("node:crypto");
+
+// src/lib/permissions.ts
+var PERMISSIONS = [
+  "account:self",
+  "orders:read",
+  "catalog:write",
+  "users:manage",
+  "audit:read"
+];
+function isPrivileged(roles) {
+  return roles.some((role) => role !== "customer");
+}
+
+// src/services/identity.ts
+var CHALLENGE_MS = 5 * 6e4;
+var MAX_ATTEMPTS = 5;
+var SESSION_MS = { customer: 8 * 36e5, privileged: 2 * 36e5 };
+var byName = (a, b) => a.localeCompare(b, "en");
+function canonicalEmail(email3) {
+  return email3.trim().toLowerCase();
+}
+function clientFacts(ip, userAgent) {
+  return { ip: ip || null, userAgent: userAgent?.slice(0, 500) ?? null };
+}
+async function findUserByEmail(db, email3) {
+  const [row2] = await db.query(
+    "SELECT id, email, password_hash, full_name, is_active FROM users WHERE email = ? AND is_active = 1",
+    [email3]
+  );
+  return row2 ?? null;
+}
+async function emailOf(db, userId) {
+  const [row2] = await db.query(
+    "SELECT email FROM users WHERE id = ?",
+    [userId]
+  );
+  return row2.email;
+}
+function createCustomer(db, user) {
+  return db.transaction(async (tx) => {
+    const [taken] = await tx.query(
+      "SELECT id FROM users WHERE email = ? FOR UPDATE",
+      [user.email]
+    );
+    if (taken) return false;
+    const id = (0, import_node_crypto4.randomUUID)();
+    await tx.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
+      [id, user.email, user.passwordHash, user.fullName]
+    );
+    await tx.query(
+      "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
+      [id]
+    );
+    return true;
+  });
+}
+async function capabilitiesOf(db, userId) {
+  const rows = await db.query(
+    "SELECT ur.role_id, rp.permission_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id AND r.is_active = 1 LEFT JOIN role_permissions rp ON rp.role_id = ur.role_id WHERE ur.user_id = ?",
+    [userId]
+  );
+  const [totp] = await db.query(
+    "SELECT is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
+    [userId]
+  );
+  return {
+    roles: [...new Set(rows.map((row2) => row2.role_id))].sort(byName),
+    permissions: [
+      ...new Set(
+        rows.flatMap((row2) => row2.permission_id ? [row2.permission_id] : [])
+      )
+    ].sort(byName),
+    totpEnabled: Number(totp?.is_totp_enabled ?? 0) === 1
+  };
+}
+async function openChallenge(db, secret, userId, now, emailCode) {
+  const id = (0, import_node_crypto4.randomUUID)();
+  await db.query(
+    "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
+    [
+      id,
+      userId,
+      emailCode === void 0 ? "TOTP" : "EMAIL",
+      codeHash(secret, emailCode ?? id),
+      new Date(now.getTime() + CHALLENGE_MS)
+    ]
+  );
+  return id;
+}
+async function passEmailChallenge(db, secret, id) {
+  await db.query(
+    "UPDATE two_factor_challenges SET challenge_type = 'TOTP', code_hash = ? WHERE id = ? AND challenge_type = 'EMAIL'",
+    [codeHash(secret, id), id]
+  );
+}
+async function markEmailVerified(db, userId, now) {
+  await db.query(
+    "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
+    [now, userId]
+  );
+}
+async function liveChallenge(db, id, now) {
+  const [row2] = await db.query(
+    "SELECT id, user_id, challenge_type, code_hash, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?",
+    [id, now, MAX_ATTEMPTS]
+  );
+  return row2 ? {
+    id: row2.id,
+    userId: row2.user_id,
+    type: row2.challenge_type,
+    codeHash: row2.code_hash,
+    attempts: Number(row2.attempts)
+  } : null;
+}
+async function failChallenge(db, id) {
+  await db.query(
+    "UPDATE two_factor_challenges SET attempts = attempts + 1 WHERE id = ? AND attempts < ?",
+    [id, MAX_ATTEMPTS]
+  );
+}
+async function totpOf(db, userId) {
+  const [row2] = await db.query(
+    "SELECT totp_secret_encrypted, is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
+    [userId]
+  );
+  if (!row2?.totp_secret_encrypted) return null;
+  return {
+    encrypted: row2.totp_secret_encrypted,
+    enabled: Number(row2.is_totp_enabled) === 1
+  };
+}
+async function savePendingTotp(db, userId, encrypted) {
+  await db.query(
+    "INSERT INTO two_factor_auth (user_id, totp_secret_encrypted, is_totp_enabled) VALUES (?, ?, 0) ON DUPLICATE KEY UPDATE totp_secret_encrypted = VALUES(totp_secret_encrypted), is_totp_enabled = 0",
+    [userId, encrypted]
+  );
+}
+async function enableTotp(tx, userId, codeHashes) {
+  await tx.query(
+    "UPDATE two_factor_auth SET is_totp_enabled = 1 WHERE user_id = ?",
+    [userId]
+  );
+  await tx.query("DELETE FROM two_factor_backup_codes WHERE user_id = ?", [
+    userId
+  ]);
+  await Promise.all(
+    codeHashes.map(
+      (hash2) => tx.query(
+        "INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES (?, ?)",
+        [userId, hash2]
+      )
+    )
+  );
+}
+async function useBackupCode(db, userId, hash2, now) {
+  const result = await db.query(
+    "UPDATE two_factor_backup_codes SET is_used = 1, used_at = ? WHERE user_id = ? AND code_hash = ? AND is_used = 0",
+    [now, userId, hash2]
+  );
+  return result.affectedRows === 1;
+}
+async function openSession(tx, input2) {
+  const token = newToken();
+  const lifetime = input2.privileged ? SESSION_MS.privileged : SESSION_MS.customer;
+  await tx.query("DELETE FROM two_factor_challenges WHERE id = ?", [
+    input2.challengeId
+  ]);
+  await tx.query(
+    "INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      tokenHash(token),
+      input2.userId,
+      // Reserved for the refresh flow; no refresh token is issued yet, so nothing can match it.
+      tokenHash(newToken()),
+      input2.ip,
+      input2.userAgent,
+      new Date(input2.now.getTime() + lifetime)
+    ]
+  );
+  return { token, maxAgeSeconds: lifetime / 1e3 };
+}
+async function sessionUser(db, token, now) {
+  const [row2] = await db.query(
+    "SELECT s.id, s.user_id, u.email, u.full_name FROM user_sessions s JOIN users u ON u.id = s.user_id AND u.is_active = 1 WHERE s.id = ? AND s.expires_at > ?",
+    [tokenHash(token), now]
+  );
+  if (!row2) return null;
+  const capabilities = await capabilitiesOf(db, row2.user_id);
+  return {
+    sessionId: row2.id,
+    userId: row2.user_id,
+    email: row2.email,
+    fullName: row2.full_name,
+    ...capabilities
+  };
+}
+async function closeSession(db, sessionId) {
+  await db.query("DELETE FROM user_sessions WHERE id = ?", [sessionId]);
+}
+function secondFactorSatisfied(user) {
+  return !isPrivileged(user.roles) || user.totpEnabled;
+}
+
+// src/lib/session.ts
+var SESSION_COOKIE = "__Host-yekora_session";
+function readSessionToken(header3) {
+  for (const part of (header3 ?? "").split(";")) {
+    const [name2, ...value] = part.trim().split("=");
+    if (name2 === SESSION_COOKIE) {
+      const token = value.join("=");
+      return /^[\w-]{43}$/.test(token) ? token : null;
+    }
+  }
+  return null;
+}
+function sessionCookie(token, maxAgeSeconds) {
+  return `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Strict`;
+}
+function clearedSessionCookie() {
+  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+}
+
 // src/lib/guard.ts
-var TITLES2 = {
+var TITLES = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
   SESSION_INVALID_OR_EXPIRED: "Sign in first",
   SECOND_FACTOR_REQUIRED: "Two-step verification required",
@@ -101218,7 +100930,7 @@ var TITLES2 = {
 };
 function permissionGuard(deps) {
   return (permission) => async (request, reply) => {
-    const refuse3 = (status, code) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code], code));
+    const refuse3 = (status, code) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
     if (deps.auth === null) return refuse3(503, "AUTH_UNAVAILABLE");
     const token = readSessionToken(request.headers.cookie);
     const user = token ? await sessionUser(deps.db, token, deps.now()) : null;
@@ -101229,6 +100941,50 @@ function permissionGuard(deps) {
       return refuse3(403, "PERMISSION_DENIED");
     request.user = user;
   };
+}
+
+// src/routes/account.ts
+function registerAccountRoutes(app, deps) {
+  app.get("/v1/account/me", (request, reply) => {
+    const user = request.user;
+    return reply.send(
+      meResponseSchema.parse({
+        id: user.userId,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+        permissions: user.permissions
+      })
+    );
+  });
+  app.post("/v1/account/logout", async (request, reply) => {
+    await closeSession(deps.db, request.user.sessionId);
+    return reply.header("Set-Cookie", clearedSessionCookie()).code(204).send();
+  });
+  app.get("/v1/account/orders", async (request, reply) => {
+    const query = accountOrdersQuery.safeParse(request.query);
+    if (!query.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
+    }
+    await expireOverdueOrders(deps.db, deps.now());
+    const { items, total } = await listOrders(
+      deps.db,
+      { userId: request.user.userId },
+      query.data
+    );
+    return orderPageSchema.parse({ items, total, ...query.data });
+  });
+  app.get("/v1/account/orders/:order_number", async (request, reply) => {
+    const { order_number: orderNumber } = request.params;
+    const found = await lookUpOrder(deps, orderNumber);
+    if (found === null) {
+      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+    }
+    if (found.ownerId !== request.user.userId) {
+      return reply.code(403).type(PROBLEM_TYPE).send(problem(403, "Not your order", "DATA_DOMAIN_FORBIDDEN"));
+    }
+    return orderDetailSchema.parse(found.order);
+  });
 }
 
 // src/routes/admin.ts
@@ -101257,6 +101013,256 @@ function registerAdminRoutes(app, deps) {
   });
 }
 
+// src/services/outbox.ts
+async function enqueueMail(tx, event) {
+  const { type, ...payload } = event;
+  await tx.query(
+    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
+    [type, JSON.stringify(payload)]
+  );
+}
+
+// src/services/passwords.ts
+var import_node_crypto5 = require("node:crypto");
+var import_hash_wasm = __toESM(require_index_umd(), 1);
+var PARAMETERS = {
+  memorySize: 19456,
+  iterations: 2,
+  parallelism: 1,
+  hashLength: 32
+};
+function hashPassword(password) {
+  return (0, import_hash_wasm.argon2id)({
+    ...PARAMETERS,
+    password,
+    salt: (0, import_node_crypto5.randomBytes)(16),
+    outputType: "encoded"
+  });
+}
+async function verifyPassword(hash2, password) {
+  try {
+    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
+  } catch {
+    return false;
+  }
+}
+var decoy;
+function decoyHash() {
+  decoy ??= hashPassword((0, import_node_crypto5.randomBytes)(32).toString("base64url"));
+  return decoy;
+}
+
+// src/routes/auth.ts
+var TITLES2 = {
+  AUTH_UNAVAILABLE: "Sign-in unavailable",
+  MAIL_UNAVAILABLE: "Sign-in by e-mail unavailable",
+  INVALID_REQUEST: "Invalid request",
+  INVALID_CREDENTIALS: "Invalid e-mail or password",
+  INVALID_CHALLENGE: "Sign-in expired, start again",
+  INVALID_CODE: "Invalid code",
+  TOTP_ALREADY_ENABLED: "Authenticator already enabled",
+  TOTP_NOT_ENROLLED: "Set up the authenticator first"
+};
+function refuse2(reply, status, code) {
+  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code], code));
+}
+var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+function registerAuthRoutes(app, deps) {
+  function parse4(schema2, request, reply) {
+    if (deps.auth === null) {
+      void refuse2(reply, 503, "AUTH_UNAVAILABLE");
+      return null;
+    }
+    const body = schema2.safeParse(request.body);
+    if (!body.success) {
+      void refuse2(reply, 400, "INVALID_REQUEST");
+      return null;
+    }
+    return { auth: deps.auth, body: body.data };
+  }
+  async function challengeOf(challengeId, types, reply) {
+    const challenge = await liveChallenge(deps.db, challengeId, deps.now());
+    if (challenge && types.includes(challenge.type)) return challenge;
+    void refuse2(reply, 401, "INVALID_CHALLENGE");
+    return null;
+  }
+  async function passMailedCode(request, reply, auth2, challenge, code) {
+    if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code))) {
+      await failChallenge(deps.db, challenge.id);
+      return refuse2(reply, 401, "INVALID_CODE");
+    }
+    await markEmailVerified(deps.db, challenge.userId, deps.now());
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    if (isPrivileged(roles)) {
+      await passEmailChallenge(deps.db, auth2.secret, challenge.id);
+      return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+    }
+    await signIn(request, reply, challenge, roles);
+    return signedInSchema.parse({ status: "signed_in" });
+  }
+  async function signIn(request, reply, challenge, roles) {
+    const { token, maxAgeSeconds } = await deps.db.transaction(
+      (tx) => openSession(tx, {
+        challengeId: challenge.id,
+        userId: challenge.userId,
+        privileged: isPrivileged(roles),
+        ...clientFacts(request.ip, request.headers["user-agent"]),
+        now: deps.now()
+      })
+    );
+    reply.header("Set-Cookie", sessionCookie(token, maxAgeSeconds));
+  }
+  app.post("/v1/auth/register", LIMITED, async (request, reply) => {
+    const parsed = parse4(registerRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { body } = parsed;
+    await createCustomer(deps.db, {
+      email: canonicalEmail(body.email),
+      passwordHash: await hashPassword(body.password),
+      fullName: body.fullName
+    });
+    return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
+  });
+  app.post("/v1/auth/login", LIMITED, async (request, reply) => {
+    const parsed = parse4(loginRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { auth: auth2, body } = parsed;
+    const user = await findUserByEmail(deps.db, canonicalEmail(body.email));
+    const valid = await verifyPassword(
+      user?.password_hash ?? await decoyHash(),
+      body.password
+    );
+    if (user === null || !valid) {
+      return refuse2(reply, 401, "INVALID_CREDENTIALS");
+    }
+    if ((await totpOf(deps.db, user.id))?.enabled) {
+      const challengeId2 = await openChallenge(
+        deps.db,
+        auth2.secret,
+        user.id,
+        deps.now()
+      );
+      return loginResponseSchema.parse({
+        challengeId: challengeId2,
+        next: "verify",
+        channel: "authenticator"
+      });
+    }
+    if (!deps.mailReady) return refuse2(reply, 503, "MAIL_UNAVAILABLE");
+    const code = newEmailCode();
+    const challengeId = await deps.db.transaction(async (tx) => {
+      const id = await openChallenge(
+        tx,
+        auth2.secret,
+        user.id,
+        deps.now(),
+        code
+      );
+      await enqueueMail(tx, {
+        type: "SIGN_IN_CODE",
+        userId: user.id,
+        challengeId: id,
+        code: encryptTotpSecret(auth2.totpKey, id, Buffer.from(code, "utf8"))
+      });
+      return id;
+    });
+    request.outboxQueued = true;
+    return loginResponseSchema.parse({
+      challengeId,
+      next: "verify",
+      channel: "email"
+    });
+  });
+  app.post("/v1/auth/totp/enroll", LIMITED, async (request, reply) => {
+    const parsed = parse4(challengeRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { auth: auth2, body } = parsed;
+    const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
+    if (challenge === null) return reply;
+    if ((await totpOf(deps.db, challenge.userId))?.enabled) {
+      return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
+    }
+    const email3 = await emailOf(deps.db, challenge.userId);
+    const secret = newTotpSecret();
+    await savePendingTotp(
+      deps.db,
+      challenge.userId,
+      encryptTotpSecret(auth2.totpKey, challenge.userId, secret)
+    );
+    return enrollResponseSchema.parse({
+      secret: base32(secret),
+      otpauthUri: otpauthUri(email3, secret)
+    });
+  });
+  app.post("/v1/auth/totp/confirm", LIMITED, async (request, reply) => {
+    const parsed = parse4(codeRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { auth: auth2, body } = parsed;
+    const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
+    if (challenge === null) return reply;
+    const totp = await totpOf(deps.db, challenge.userId);
+    if (totp === null) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+    if (totp.enabled) return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
+    const secret = decryptTotpSecret(
+      auth2.totpKey,
+      challenge.userId,
+      totp.encrypted
+    );
+    if (!verifyTotp(secret, body.code, deps.now())) {
+      await failChallenge(deps.db, challenge.id);
+      return refuse2(reply, 401, "INVALID_CODE");
+    }
+    const backupCodes = newBackupCodes();
+    await deps.db.transaction(async (tx) => {
+      await enableTotp(
+        tx,
+        challenge.userId,
+        backupCodes.map((code) => codeHash(auth2.secret, code))
+      );
+      await enqueueMail(tx, { type: "TOTP_ENABLED", userId: challenge.userId });
+    });
+    request.outboxQueued = true;
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    await signIn(request, reply, challenge, roles);
+    return confirmResponseSchema.parse({ backupCodes });
+  });
+  app.post("/v1/auth/verify", LIMITED, async (request, reply) => {
+    const parsed = parse4(codeRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { auth: auth2, body } = parsed;
+    const challenge = await challengeOf(
+      body.challengeId,
+      ["EMAIL", "TOTP"],
+      reply
+    );
+    if (challenge === null) return reply;
+    if (challenge.type === "EMAIL") {
+      return passMailedCode(request, reply, auth2, challenge, body.code);
+    }
+    const totp = await totpOf(deps.db, challenge.userId);
+    if (!totp?.enabled) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+    const passed = await (body.code.length === 6 ? Promise.resolve(
+      verifyTotp(
+        decryptTotpSecret(auth2.totpKey, challenge.userId, totp.encrypted),
+        body.code,
+        deps.now()
+      )
+    ) : useBackupCode(
+      deps.db,
+      challenge.userId,
+      codeHash(auth2.secret, body.code),
+      deps.now()
+    ));
+    if (!passed) {
+      await failChallenge(deps.db, challenge.id);
+      return refuse2(reply, 401, "INVALID_CODE");
+    }
+    const { roles } = await capabilitiesOf(deps.db, challenge.userId);
+    await signIn(request, reply, challenge, roles);
+    return signedInSchema.parse({ status: "signed_in" });
+  });
+}
+
 // src/routes/checkout.ts
 var TITLES3 = {
   INVALID_REQUEST: "Invalid checkout request",
@@ -101279,7 +101285,14 @@ function registerCheckoutRoutes(app, deps) {
       const language = languageSchema.safeParse(
         request.query.lang
       );
-      const outcome = language.success ? await createCheckout(deps, request.body, language.data) : { ok: false, status: 400, code: "INVALID_REQUEST" };
+      const token = readSessionToken(request.headers.cookie);
+      const buyer = token ? await sessionUser(deps.db, token, deps.now()) : null;
+      const outcome = language.success ? await createCheckout(
+        deps,
+        request.body,
+        language.data,
+        buyer?.userId ?? null
+      ) : { ok: false, status: 400, code: "INVALID_REQUEST" };
       if (!outcome.ok) {
         return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES3[outcome.code], outcome.code));
       }
@@ -115379,7 +115392,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "a35e1da0c22b6dbbc7ae784015cd326dcfea3103" : void 0;
+var sha = true ? "c74c1ad3bc94638b077401601bc9dffa08f860df" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
