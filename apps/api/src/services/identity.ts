@@ -298,10 +298,14 @@ export async function enableTotp(
   await tx.query('DELETE FROM two_factor_backup_codes WHERE user_id = ?', [
     userId,
   ]);
-  // One multi-row INSERT: one round trip for the whole set.
-  await tx.query(
-    `INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES ${codeHashes.map(() => '(?, ?)').join(', ')}`,
-    codeHashes.flatMap((hash) => [userId, hash])
+  // Static SQL per code (ADR 0003); the transaction's connection queues them in order.
+  await Promise.all(
+    codeHashes.map((hash) =>
+      tx.query(
+        'INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES (?, ?)',
+        [userId, hash]
+      )
+    )
   );
 }
 
