@@ -185,11 +185,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         })
       : null;
   app.decorateRequest('outboxQueued', false);
-  app.addHook('onResponse', async (request) => {
+  // Callback-style hooks: both only start work and wait for nothing.
+  app.addHook('onResponse', (request, _reply, done) => {
     if (request.outboxQueued) dispatcher?.kick();
+    done();
   });
   if (dispatcher) {
-    app.addHook('onReady', async () => dispatcher.start());
+    app.addHook('onReady', (done) => {
+      dispatcher.start();
+      done();
+    });
     app.addHook('onClose', async () => {
       dispatcher.stop();
       await dispatcher.drain();
