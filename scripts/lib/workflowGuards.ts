@@ -382,6 +382,8 @@ function boundedNetworkViolations(workflow: string): string[] {
   for (const required of [
     'SECONDS + 300',
     'sleep 3',
+    // FC 039: the wait itself demands this commit with status ok and its database connected.
+    HEALTHY_PROBE,
     'getent ahosts apiv1.yekora.mx',
     'curl -4',
     'curl -6',
@@ -396,6 +398,12 @@ function boundedNetworkViolations(workflow: string): string[] {
   violations.push(...browserCacheViolations(code, blocks));
   return violations;
 }
+
+/**
+ * FC 039 (270_AN): the jq filter every wait for the released API uses. It yields the sha only
+ * when the API is healthy and connected to MariaDB, so a restart's 503 keeps the loop waiting.
+ */
+const HEALTHY_PROBE = `jq -r 'select(.status == "ok" and .db == "connected") | .sha'`;
 
 /** The deploy builds after certification and syncs only once the API serves this commit. */
 function siteGateViolations(block: readonly string[]): string[] {
@@ -415,6 +423,7 @@ function siteGateViolations(block: readonly string[]): string[] {
     'name: prod-static-out',
     'https://apiv1.yekora.mx/health',
     '$GITHUB_SHA',
+    HEALTHY_PROBE,
     'SECONDS + 120',
     'sleep 3',
     'exit 1',
@@ -500,6 +509,27 @@ export function dependencyViolations(packageJson: string): string[] {
   return 'wait-on' in { ...dependencies, ...devDependencies }
     ? ['wait-on is back in package.json (FC 026)']
     : [];
+}
+
+/**
+ * FC 039 (270_AN): no E2E suite waits for `networkidle`. It needs 500 ms with no request, which
+ * WebKit sometimes never reports (run 41542562137); a suite waits for what the page shows.
+ * Comment lines are skipped, so the reason can be written down where the wait was replaced.
+ *
+ * @param files - Path → text of every file under e2e/ and of the two Playwright configs.
+ * @returns One message per file that still waits for an idle network.
+ */
+export function networkIdleViolations(
+  files: ReadonlyMap<string, string>
+): string[] {
+  const isComment = (line: string) => /^\s*(?:\/\/|\/\*|\*)/.test(line);
+  return [...files]
+    .filter(([, text]) =>
+      text
+        .split(/\r?\n/)
+        .some((line) => !isComment(line) && line.includes('networkidle'))
+    )
+    .map(([path]) => `${path} waits for networkidle (wait for page content)`);
 }
 
 /**

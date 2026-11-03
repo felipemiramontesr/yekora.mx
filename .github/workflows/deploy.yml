@@ -741,10 +741,12 @@ jobs:
         # fails if it ever comes back). FC 026 Enmienda 9: a 300 s deadline polled every 3 s, every
         # curl bounded; on timeout it prints DNS and IPv4/IPv6 reachability, so a blocked runner,
         # an IPv6 route and a down server read differently (run 41248127975 hung 73 min blind).
+        # FC 039 (270_AN): this commit, healthy and with its database, in one condition. Waiting for
+        # the sha alone let a restart's 503 (pool not connected yet) fail the next check.
         run: |
           set -uo pipefail
           DEADLINE=$((SECONDS + 300))
-          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS "https://apiv1.yekora.mx/health" | jq -r '.sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
+          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS "https://apiv1.yekora.mx/health" | jq -r 'select(.status == "ok" and .db == "connected") | .sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
             if [ "$SECONDS" -ge "$DEADLINE" ]; then
               echo "FATAL: apiv1.yekora.mx does not run $GITHUB_SHA after 300 s. Network diagnosis:"
               getent ahosts apiv1.yekora.mx || echo "DNS: no answer"
@@ -824,7 +826,7 @@ jobs:
         run: |
           set -uo pipefail
           DEADLINE=$((SECONDS + 120))
-          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -r '.sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
+          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -r 'select(.status == "ok" and .db == "connected") | .sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
             if [ "$SECONDS" -ge "$DEADLINE" ]; then
               echo "FATAL: apiv1.yekora.mx does not serve $GITHUB_SHA after 120 s; the site is not deployed."
               exit 1

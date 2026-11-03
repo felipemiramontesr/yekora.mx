@@ -8,6 +8,7 @@ import {
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
+  networkIdleViolations,
   serviceWorkerViolations,
   unpinnedActions,
   workflowTriggers,
@@ -832,6 +833,35 @@ describe('FC 026 Enmienda 5–8 · shards, no wait-on, service workers', () => {
       'e2e/pwa.spec.ts must allow the service worker it tests',
     ]);
   });
+
+  it('networkIdleViolations (FC 039): the real suites never wait for an idle network', () => {
+    const real = new Map(
+      [
+        'e2e/a11y.spec.ts',
+        'e2e/catalog.spec.ts',
+        'playwright.local.config.ts',
+      ].map((path) => [path, readFileSync(path, 'utf8')])
+    );
+    expect(networkIdleViolations(real)).toEqual([]);
+  });
+
+  it('flags a networkidle wait in code, never in a comment', () => {
+    const suites = new Map([
+      ['e2e/a11y.spec.ts', "await page.waitForLoadState('networkidle');"],
+      [
+        'e2e/cart.spec.ts',
+        "await page.goto('/', { waitUntil: 'networkidle' });",
+      ],
+      [
+        'e2e/home.spec.ts',
+        "// networkidle is not used here\n * networkidle neither\n/* or here */\nawait page.goto('/');",
+      ],
+    ]);
+    expect(networkIdleViolations(suites)).toEqual([
+      'e2e/a11y.spec.ts waits for networkidle (wait for page content)',
+      'e2e/cart.spec.ts waits for networkidle (wait for page content)',
+    ]);
+  });
 });
 
 describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
@@ -895,6 +925,18 @@ describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
         ),
       [
         'the hostinger-deployment job must wait for global-certification and site-build only, found: global-certification, site-build, api-release',
+      ],
+    ],
+    [
+      'API waits that trust the sha alone (FC 039: a restart answers 503 before the db connects)',
+      (w: string) =>
+        w.replaceAll(
+          `jq -r 'select(.status == "ok" and .db == "connected") | .sha'`,
+          "jq -r '.sha'"
+        ),
+      [
+        `the api-release smoke must run: jq -r 'select(.status == "ok" and .db == "connected") | .sha'`,
+        `the deploy must check before its rsync: jq -r 'select(.status == "ok" and .db == "connected") | .sha'`,
       ],
     ],
     [

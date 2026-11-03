@@ -17,6 +17,8 @@
  *      whole file otherwise, and the text rules above cannot see it.
  *   j) FC 037: dependabot-automerge.yml auto-merges Dependabot patches only, behind the Global
  *      Certification check, with SECURITY_AUTOFIX_TOKEN; minor and major wait for Ω.
+ *   k) FC 039: no E2E suite waits for networkidle, and every wait for the released API demands
+ *      this commit with status ok and its database connected.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
@@ -30,6 +32,7 @@ import {
   deployWorkflowViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
+  networkIdleViolations,
   serviceWorkerViolations,
   yamlSyntaxViolations,
 } from './lib/workflowGuards';
@@ -186,6 +189,9 @@ const playwrightFiles = new Map([
 for (const violation of serviceWorkerViolations(playwrightFiles)) {
   failures.push(`h) ${violation}`);
 }
+for (const violation of networkIdleViolations(playwrightFiles)) {
+  failures.push(`k) ${violation}`);
+}
 
 if (failures.length > 0) {
   console.error('[FAIL] A08 pipeline integrity:');
@@ -193,5 +199,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit, Dependabot policy and patch-only auto-merge in place.'
+  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit, Dependabot policy and patch-only auto-merge in place, E2E without networkidle, API waits on a healthy database.'
 );

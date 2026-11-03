@@ -32,6 +32,28 @@ const ROUTES = [
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
+/** What the cart and checkout pages show once their client state is in (empty in this suite). */
+const SETTLED: Readonly<Record<string, string>> = {
+  '/carrito/': 'main [data-cart-empty]',
+  '/en/cart/': 'main [data-cart-empty]',
+  '/checkout/': 'main [data-checkout-empty]',
+  '/en/checkout/': 'main [data-checkout-empty]',
+};
+
+/**
+ * FC 039 (270_AN): waits for what axe reads, never for an idle network. `networkidle` needs
+ * 500 ms with no request, which WebKit sometimes never reports (run 41542562137). The page is
+ * settled when it has loaded, its fonts are in, `main` is shown and, on the cart and checkout,
+ * their client state is rendered.
+ */
+async function settle(page: import('@playwright/test').Page, route: string) {
+  await page.waitForLoadState('load');
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('main')).toBeVisible();
+  const marker = SETTLED[route];
+  if (marker) await expect(page.locator(marker)).toBeVisible();
+}
+
 /** Rule id, impact and the first offending selectors: enough to find the fix in a CI log. */
 async function violationsOn(page: import('@playwright/test').Page) {
   const { violations } = await new AxeBuilder({ page })
@@ -59,7 +81,7 @@ test.describe('WCAG 2.1 AA with axe (FC 026)', () => {
         { name: 'yekora_cookie_consent', value: '1', url: baseURL ?? '' },
       ]);
       await page.goto(route);
-      await page.waitForLoadState('networkidle');
+      await settle(page, route);
       expect(await violationsOn(page)).toEqual([]);
     });
   }
