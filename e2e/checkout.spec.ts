@@ -14,7 +14,12 @@ const TOKEN = 'k'.repeat(43);
 const STRIPE_PAGE = 'https://checkout.stripe.com/c/pay/cs_test_e2e';
 const MP_PAGE =
   'https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=e2e';
-const CORS = { 'access-control-allow-origin': 'http://localhost:3100' };
+// FC 028 decision 1a: the checkout sends its credentials (a signed-in buyer's session), so the
+// answer must allow them, as the real API does (@fastify/cors with credentials).
+const CORS = {
+  'access-control-allow-origin': 'http://localhost:3100',
+  'access-control-allow-credentials': 'true',
+};
 
 /**
  * FC 026: the CORS preflight the browser sends before a JSON POST or an Authorization header,
