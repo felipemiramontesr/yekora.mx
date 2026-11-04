@@ -823,13 +823,15 @@ jobs:
         with:
           name: prod-static-out
           path: out
-      - name: ⏱️ Wait for the API release — apiv1.yekora.mx serves this commit (≤ 120 s)
+      # 282_AN (run 41892573422): Hostinger once took over 120 s to publish the API, and the site
+      # waited no longer; 300 s, the same deadline as the API smoke.
+      - name: ⏱️ Wait for the API release — apiv1.yekora.mx serves this commit (≤ 300 s)
         run: |
           set -uo pipefail
-          DEADLINE=$((SECONDS + 120))
+          DEADLINE=$((SECONDS + 300))
           until [ "$(curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -r 'select(.status == "ok" and .db == "connected") | .sha' 2> /dev/null)" = "$GITHUB_SHA" ]; do
             if [ "$SECONDS" -ge "$DEADLINE" ]; then
-              echo "FATAL: apiv1.yekora.mx does not serve $GITHUB_SHA after 120 s; the site is not deployed."
+              echo "FATAL: apiv1.yekora.mx does not serve $GITHUB_SHA after 300 s; the site is not deployed."
               exit 1
             fi
             sleep 3

@@ -363,7 +363,7 @@ const CURL_LIMITS = ['--connect-timeout 5', '--max-time 10'];
 /**
  * FC 026 Enmienda 9 (run 41248127975 hung 73 min): every curl is bounded; the API smoke waits
  * 300 s polling every 3 s and prints DNS and IPv4/IPv6 reachability on timeout; the site waits
- * for the released API (120 s) before its rsync; the browser cache follows Playwright only.
+ * for the released API (300 s, 282_AN) before its rsync; the browser cache follows Playwright only.
  */
 function boundedNetworkViolations(workflow: string): string[] {
   const violations: string[] = [];
@@ -424,7 +424,7 @@ function siteGateViolations(block: readonly string[]): string[] {
     'https://apiv1.yekora.mx/health',
     '$GITHUB_SHA',
     HEALTHY_PROBE,
-    'SECONDS + 120',
+    'SECONDS + 300',
     'sleep 3',
     'exit 1',
     // Rebuilt against the released API only when this push changed apps/api; any doubt rebuilds.

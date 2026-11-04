@@ -915,7 +915,12 @@ describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
     '.github/workflows/dependency-audit-cron.yml',
     'utf8'
   ).replace(/\r\n/g, '\n');
-  const GATE_DEADLINE = 'DEADLINE=$((SECONDS + 120))';
+  // 282_AN: the site waits up to 300 s for the released API before its rsync.
+  // The API smoke has the same deadline; the site's wait is the one whose URL is unquoted.
+  const SITE_DEADLINE = [
+    'DEADLINE=$((SECONDS + 300))',
+    '          until [ "$(curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health',
+  ].join('\n');
 
   it.each([
     [
@@ -985,8 +990,12 @@ describe('FC 026 Enmienda 9 · time limits and a fast, bounded deploy', () => {
     ],
     [
       'a deploy that syncs without waiting for the released API',
-      (w: string) => w.replace(GATE_DEADLINE, 'DEADLINE=$SECONDS'),
-      ['the deploy must check before its rsync: SECONDS + 120'],
+      (w: string) =>
+        w.replace(
+          SITE_DEADLINE,
+          SITE_DEADLINE.replace('$((SECONDS + 300))', '$SECONDS')
+        ),
+      ['the deploy must check before its rsync: SECONDS + 300'],
     ],
     [
       'a browser cache keyed on the whole lockfile again',
