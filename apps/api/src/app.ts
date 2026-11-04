@@ -15,7 +15,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
-import { CORS_ORIGINS, type ApiConfig } from './config';
+import type { ApiConfig } from './config';
 import { ROUTE_CONTRACTS } from './contract';
 import { permissionGuard } from './lib/guard';
 import { PERMISSIONS } from './lib/permissions';
@@ -120,7 +120,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(helmet);
   // FC 028: the session cookie travels only with credentials, from the site's exact origins.
   await app.register(cors, {
-    origin: CORS_ORIGINS,
+    origin: deps.config.corsOrigins,
     methods: ['GET', 'POST', 'PATCH'],
     credentials: true,
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORS_ORIGINS, loadConfig } from './config';
+import { loadConfig } from './config';
 
 const base = { DB_HOST: '127.0.0.1', DB_USER: 'root', DB_NAME: 'yekora_dev' };
 
@@ -7,6 +7,11 @@ describe('loadConfig', () => {
   it('fills safe defaults for local development', () => {
     expect(loadConfig(base)).toEqual({
       isProduction: false,
+      corsOrigins: [
+        'https://yekora.mx',
+        'http://localhost:3000',
+        'http://localhost:3100',
+      ],
       port: 3001,
       host: '0.0.0.0',
       db: {
@@ -82,12 +87,16 @@ describe('loadConfig', () => {
     ).toBeUndefined();
   });
 
-  it('allows only the public site and the local servers as CORS origins', () => {
-    expect(CORS_ORIGINS).toEqual([
-      'https://yekora.mx',
-      'http://localhost:3000',
-      'http://localhost:3100',
-    ]);
+  it('answers only the public site in production or on Hostinger’s database (T2.2d2, 295_AN)', () => {
+    const site = ['https://yekora.mx'];
+    expect(
+      loadConfig({ ...base, NODE_ENV: 'production', DB_PASSWORD: 'x' })
+        .corsOrigins
+    ).toEqual(site);
+    // Without NODE_ENV, the database alone keeps the local servers out.
+    expect(
+      loadConfig({ ...base, DB_NAME: 'u123456789_yekora' }).corsOrigins
+    ).toEqual(site);
   });
 });
 

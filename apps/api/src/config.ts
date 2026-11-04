@@ -31,12 +31,20 @@ import { parsePiiKey } from './services/checkoutCrypto';
 import type { MercadoPagoSecrets } from './services/mercadoPagoAdapter';
 import type { StripeSecrets } from './services/stripeAdapter';
 
-/** Origins allowed by CORS: the public site and the two local servers (dev and E2E). */
-export const CORS_ORIGINS = [
-  'https://yekora.mx',
-  'http://localhost:3000',
-  'http://localhost:3100',
-];
+/** The public site: the only origin a production deployment answers to. */
+const SITE_ORIGIN = 'https://yekora.mx';
+/** The local servers (dev and E2E), allowed only next to a local database. */
+const LOCAL_ORIGINS = ['http://localhost:3000', 'http://localhost:3100'];
+
+/**
+ * Origins allowed by CORS (FC 028 T2.2d2, 295_AN): only the public site in production. The two
+ * local servers are allowed only when the database is a local one (`yekora_…`), so a deployment
+ * on Hostinger's database (`u<id>_yekora…`) never answers them, even without NODE_ENV.
+ */
+function corsOrigins(isProduction: boolean, database: string): string[] {
+  const local = !isProduction && database.startsWith('yekora_');
+  return local ? [SITE_ORIGIN, ...LOCAL_ORIGINS] : [SITE_ORIGIN];
+}
 
 const schema = z.object({
   NODE_ENV: z.string().default('development'),
@@ -155,6 +163,8 @@ export interface DbConfig {
 export interface ApiConfig {
   /** Whether this is the production deployment. */
   isProduction: boolean;
+  /** Origins CORS answers to, credentials included. */
+  corsOrigins: string[];
   /** Port to listen on (Hostinger sets PORT). */
   port: number;
   /** Interface to bind. */
@@ -268,6 +278,7 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
   }
   return {
     isProduction,
+    corsOrigins: corsOrigins(isProduction, parsed.DB_NAME),
     port: parsed.PORT,
     host: parsed.HOST,
     db: {

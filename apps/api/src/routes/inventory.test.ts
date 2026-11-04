@@ -150,6 +150,41 @@ describe('A01 closed route inventory', () => {
     });
     expect(preflight.headers['access-control-allow-origin']).toBeUndefined();
   });
+
+  it('answers no local server in production, credentials or not (T2.2d2, 295_AN)', async () => {
+    const production = await buildApp({
+      config: loadConfig({
+        DB_HOST: '127.0.0.1',
+        DB_USER: 'u123456789_yekora',
+        DB_NAME: 'u123456789_yekora',
+      }),
+      db: emptyDb,
+      rate: async () => null,
+      logger: false,
+    });
+    try {
+      for (const origin of ['http://localhost:3000', 'http://localhost:3100']) {
+        const preflight = await production.inject({
+          method: 'OPTIONS',
+          url: '/v1/account/me',
+          headers: { origin, 'access-control-request-method': 'GET' },
+        });
+        expect(
+          preflight.headers['access-control-allow-origin']
+        ).toBeUndefined();
+      }
+      const site = await production.inject({
+        url: '/health',
+        headers: { origin: 'https://yekora.mx' },
+      });
+      expect(site.headers['access-control-allow-origin']).toBe(
+        'https://yekora.mx'
+      );
+      expect(site.headers['access-control-allow-credentials']).toBe('true');
+    } finally {
+      await production.close();
+    }
+  });
 });
 
 describe('A01 signed-in surface behind the guard (FC 028)', () => {
