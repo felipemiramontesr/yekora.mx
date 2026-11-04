@@ -1737,7 +1737,7 @@ var require_helmet = __commonJS({
 var require_helmet2 = __commonJS({
   "../../node_modules/@fastify/helmet/index.js"(exports2, module2) {
     "use strict";
-    var { randomBytes: randomBytes4 } = require("node:crypto");
+    var { randomBytes: randomBytes5 } = require("node:crypto");
     var fp = require_fastify_plugin();
     var helmet2 = require_helmet();
     async function fastifyHelmet(fastify, options) {
@@ -1791,8 +1791,8 @@ var require_helmet2 = __commonJS({
     async function replyDecorators(request, reply, configuration, enableCSP) {
       if (enableCSP) {
         reply.cspNonce = {
-          script: randomBytes4(16).toString("hex"),
-          style: randomBytes4(16).toString("hex")
+          script: randomBytes5(16).toString("hex"),
+          style: randomBytes5(16).toString("hex")
         };
       }
       reply.helmet = function(opts) {
@@ -53267,13 +53267,13 @@ function parseCookie(str, options) {
   } while (index < len);
   return obj;
 }
-function stringifyCookie(cookie, options) {
+function stringifyCookie(cookie2, options) {
   const enc = options?.encode || defaultEncode;
-  const keys = Object.keys(cookie);
+  const keys = Object.keys(cookie2);
   let str = "";
   for (let i = 0; i < keys.length; i++) {
     const name2 = keys[i];
-    const val = cookie[name2];
+    const val = cookie2[name2];
     if (val === void 0)
       continue;
     if (!cookieNameRegExp.test(name2)) {
@@ -53289,51 +53289,51 @@ function stringifyCookie(cookie, options) {
   }
   return str;
 }
-function stringifySetCookie(cookie, options) {
+function stringifySetCookie(cookie2, options) {
   const enc = options?.encode || defaultEncode;
-  if (!cookieNameRegExp.test(cookie.name)) {
-    throw new TypeError(`argument name is invalid: ${cookie.name}`);
+  if (!cookieNameRegExp.test(cookie2.name)) {
+    throw new TypeError(`argument name is invalid: ${cookie2.name}`);
   }
-  const value = cookie.value == null ? "" : enc(cookie.value);
+  const value = cookie2.value == null ? "" : enc(cookie2.value);
   if (!cookieValueRegExp.test(value)) {
-    throw new TypeError(`argument val is invalid: ${cookie.value}`);
+    throw new TypeError(`argument val is invalid: ${cookie2.value}`);
   }
-  let str = cookie.name + "=" + value;
-  if (cookie.maxAge !== void 0) {
-    if (!Number.isInteger(cookie.maxAge)) {
-      throw new TypeError(`option maxAge is invalid: ${cookie.maxAge}`);
+  let str = cookie2.name + "=" + value;
+  if (cookie2.maxAge !== void 0) {
+    if (!Number.isInteger(cookie2.maxAge)) {
+      throw new TypeError(`option maxAge is invalid: ${cookie2.maxAge}`);
     }
-    str += "; Max-Age=" + cookie.maxAge;
+    str += "; Max-Age=" + cookie2.maxAge;
   }
-  if (cookie.domain) {
-    if (!domainValueRegExp.test(cookie.domain)) {
-      throw new TypeError(`option domain is invalid: ${cookie.domain}`);
+  if (cookie2.domain) {
+    if (!domainValueRegExp.test(cookie2.domain)) {
+      throw new TypeError(`option domain is invalid: ${cookie2.domain}`);
     }
-    str += "; Domain=" + cookie.domain;
+    str += "; Domain=" + cookie2.domain;
   }
-  if (cookie.path) {
-    if (!pathValueRegExp.test(cookie.path)) {
-      throw new TypeError(`option path is invalid: ${cookie.path}`);
+  if (cookie2.path) {
+    if (!pathValueRegExp.test(cookie2.path)) {
+      throw new TypeError(`option path is invalid: ${cookie2.path}`);
     }
-    str += "; Path=" + cookie.path;
+    str += "; Path=" + cookie2.path;
   }
-  if (cookie.expires) {
-    if (!Number.isFinite(cookie.expires.valueOf())) {
-      throw new TypeError(`option expires is invalid: ${cookie.expires}`);
+  if (cookie2.expires) {
+    if (!Number.isFinite(cookie2.expires.valueOf())) {
+      throw new TypeError(`option expires is invalid: ${cookie2.expires}`);
     }
-    str += "; Expires=" + cookie.expires.toUTCString();
+    str += "; Expires=" + cookie2.expires.toUTCString();
   }
-  if (cookie.httpOnly) {
+  if (cookie2.httpOnly) {
     str += "; HttpOnly";
   }
-  if (cookie.secure) {
+  if (cookie2.secure) {
     str += "; Secure";
   }
-  if (cookie.partitioned) {
+  if (cookie2.partitioned) {
     str += "; Partitioned";
   }
-  if (cookie.priority) {
-    const priority = typeof cookie.priority === "string" ? cookie.priority.toLowerCase() : void 0;
+  if (cookie2.priority) {
+    const priority = typeof cookie2.priority === "string" ? cookie2.priority.toLowerCase() : void 0;
     switch (priority) {
       case "low":
         str += "; Priority=Low";
@@ -53345,11 +53345,11 @@ function stringifySetCookie(cookie, options) {
         str += "; Priority=High";
         break;
       default:
-        throw new TypeError(`option priority is invalid: ${cookie.priority}`);
+        throw new TypeError(`option priority is invalid: ${cookie2.priority}`);
     }
   }
-  if (cookie.sameSite) {
-    const sameSite = typeof cookie.sameSite === "string" ? cookie.sameSite.toLowerCase() : cookie.sameSite;
+  if (cookie2.sameSite) {
+    const sameSite = typeof cookie2.sameSite === "string" ? cookie2.sameSite.toLowerCase() : cookie2.sameSite;
     switch (sameSite) {
       case true:
       case "strict":
@@ -53362,7 +53362,7 @@ function stringifySetCookie(cookie, options) {
         str += "; SameSite=None";
         break;
       default:
-        throw new TypeError(`option sameSite is invalid: ${cookie.sameSite}`);
+        throw new TypeError(`option sameSite is invalid: ${cookie2.sameSite}`);
     }
   }
   return str;
@@ -53907,9 +53907,9 @@ var require_set_cookie = __commonJS({
           e
         );
       }
-      var cookie = createNullObj();
-      cookie.name = name2;
-      cookie.value = value;
+      var cookie2 = createNullObj();
+      cookie2.name = name2;
+      cookie2.value = value;
       parts.forEach(function(part) {
         var sides = part.split("=");
         var key = sides.shift().trim().toLowerCase();
@@ -53919,22 +53919,22 @@ var require_set_cookie = __commonJS({
         var value2 = sides.join("=").trim();
         if (key === "expires") {
           var expires = new Date(value2);
-          if (!Number.isNaN(expires.getTime())) cookie.expires = expires;
+          if (!Number.isNaN(expires.getTime())) cookie2.expires = expires;
         } else if (key === "max-age") {
-          if (/^-?\d+$/.test(value2)) cookie.maxAge = parseInt(value2, 10);
+          if (/^-?\d+$/.test(value2)) cookie2.maxAge = parseInt(value2, 10);
         } else if (key === "secure") {
-          cookie.secure = true;
+          cookie2.secure = true;
         } else if (key === "httponly") {
-          cookie.httpOnly = true;
+          cookie2.httpOnly = true;
         } else if (key === "samesite") {
-          cookie.sameSite = value2;
+          cookie2.sameSite = value2;
         } else if (key === "partitioned") {
-          cookie.partitioned = true;
+          cookie2.partitioned = true;
         } else if (key) {
-          cookie[key] = value2;
+          cookie2[key] = value2;
         }
       });
-      return cookie;
+      return cookie2;
     }
     function parseNameValuePair(nameValuePairStr) {
       var name2 = "";
@@ -54007,9 +54007,9 @@ var require_set_cookie = __commonJS({
       } else {
         var cookies = createNullObj();
         return input2.reduce(function(cookies2, str) {
-          var cookie = parseString(str, options);
-          if (cookie && !isForbiddenKey(cookie.name)) {
-            cookies2[cookie.name] = cookie;
+          var cookie2 = parseString(str, options);
+          if (cookie2 && !isForbiddenKey(cookie2.name)) {
+            cookies2[cookie2.name] = cookie2;
           }
           return cookies2;
         }, cookies);
@@ -57663,7 +57663,7 @@ var require_index_umd = __commonJS({
       }
       const mutex$9 = new Mutex();
       let wasmCache$9 = null;
-      function sha256(data2) {
+      function sha2562(data2) {
         if (wasmCache$9 === null) {
           return lockedCreate(mutex$9, wasmJson$a, 32).then((wasm) => {
             wasmCache$9 = wasm;
@@ -58583,7 +58583,7 @@ var require_index_umd = __commonJS({
       exports3.scrypt = scrypt;
       exports3.sha1 = sha1;
       exports3.sha224 = sha224;
-      exports3.sha256 = sha256;
+      exports3.sha256 = sha2562;
       exports3.sha3 = sha3;
       exports3.sha384 = sha384;
       exports3.sha512 = sha512;
@@ -68414,7 +68414,7 @@ var require_lib4 = __commonJS({
       var trail = encoder.end();
       return trail && trail.length > 0 ? Buffer2.concat([res, trail]) : res;
     };
-    module2.exports.decode = function decode5(buf, encoding, options) {
+    module2.exports.decode = function decode6(buf, encoding, options) {
       if (typeof buf === "string") {
         if (!module2.exports.skipDecodeWarning) {
           console.error("Iconv-lite warning: decode()-ing strings is deprecated. Refer to https://github.com/ashtuchkin/iconv-lite/wiki/Use-Buffers-when-decoding");
@@ -69282,7 +69282,7 @@ var require_packet = __commonJS({
         if (length === 0) {
           return "00:00:00";
         }
-        const sign2 = this.readInt8() ? -1 : 1;
+        const sign3 = this.readInt8() ? -1 : 1;
         let d = 0;
         let H = 0;
         let M = 0;
@@ -69302,10 +69302,10 @@ var require_packet = __commonJS({
           M += H * 60;
           S += M * 60;
           ms += S * 1e3;
-          ms *= sign2;
+          ms *= sign3;
           return ms;
         }
-        return (sign2 === -1 ? "-" : "") + [leftPad(2, d * 24 + H), leftPad(2, M), leftPad(2, S)].join(":") + (ms ? `.${leftPad(6, ms)}`.replace(/0+$/, "") : "");
+        return (sign3 === -1 ? "-" : "") + [leftPad(2, d * 24 + H), leftPad(2, M), leftPad(2, S)].join(":") + (ms ? `.${leftPad(6, ms)}`.replace(/0+$/, "") : "");
       }
       readLengthCodedString(encoding) {
         const len = this.readLengthCodedNumber();
@@ -69373,13 +69373,13 @@ var require_packet = __commonJS({
         let result = 0;
         const start2 = this.offset;
         const end = this.offset + len;
-        let sign2 = 1;
+        let sign3 = 1;
         if (len === 0) {
           return 0;
         }
         if (this.buffer[this.offset] === minus) {
           this.offset++;
-          sign2 = -1;
+          sign3 = -1;
         }
         let str;
         const numDigits = end - this.offset;
@@ -69387,14 +69387,14 @@ var require_packet = __commonJS({
           if (numDigits >= 15) {
             str = this.readString(end - this.offset, "binary");
             result = parseInt(str, 10);
-            if (Number.isSafeInteger(sign2 * result)) {
-              return sign2 * result;
+            if (Number.isSafeInteger(sign3 * result)) {
+              return sign3 * result;
             }
-            return sign2 === -1 ? `-${str}` : str;
+            return sign3 === -1 ? `-${str}` : str;
           }
           if (numDigits > 16) {
             str = this.readString(end - this.offset);
-            return sign2 === -1 ? `-${str}` : str;
+            return sign3 === -1 ? `-${str}` : str;
           }
         }
         if (this.buffer[this.offset] === plus) {
@@ -69405,7 +69405,7 @@ var require_packet = __commonJS({
           result += this.buffer[this.offset] - 48;
           this.offset++;
         }
-        const num = result * sign2;
+        const num = result * sign3;
         if (!supportBigNumbers) {
           return num;
         }
@@ -69424,13 +69424,13 @@ var require_packet = __commonJS({
         }
         let result = 0;
         const end = this.offset + len;
-        let sign2 = 1;
+        let sign3 = 1;
         if (len === 0) {
           return 0;
         }
         if (this.buffer[this.offset] === minus) {
           this.offset++;
-          sign2 = -1;
+          sign3 = -1;
         }
         if (this.buffer[this.offset] === plus) {
           this.offset++;
@@ -69440,7 +69440,7 @@ var require_packet = __commonJS({
           result += this.buffer[this.offset] - 48;
           this.offset++;
         }
-        return result * sign2;
+        return result * sign3;
       }
       // adapted from https://github.com/mysqljs/mysql/blob/dc9c152a87ec51a1f647447268917243d2eab1fd/lib/protocol/Parser.js
       parseGeometryValue() {
@@ -72937,7 +72937,7 @@ var require_caching_sha2_password = __commonJS({
     var STATE_TOKEN_SENT = 1;
     var STATE_WAIT_SERVER_KEY = 2;
     var STATE_FINAL = -1;
-    function sha256(msg) {
+    function sha2562(msg) {
       const hash2 = crypto8.createHash("sha256");
       hash2.update(msg);
       return hash2.digest();
@@ -72946,9 +72946,9 @@ var require_caching_sha2_password = __commonJS({
       if (!password) {
         return Buffer.alloc(0);
       }
-      const stage1 = sha256(Buffer.from(password));
-      const stage2 = sha256(stage1);
-      const stage3 = sha256(Buffer.concat([stage2, scramble]));
+      const stage1 = sha2562(Buffer.from(password));
+      const stage2 = sha2562(stage1);
+      const stage3 = sha2562(Buffer.concat([stage2, scramble]));
       return xor2(stage1, stage3);
     }
     function encrypt(password, scramble, key) {
@@ -99648,15 +99648,18 @@ var CHECKOUT_RETURN_PATHS = {
 
 // ../../lib/account/authTypes.ts
 var emailField = external_exports.string().trim().pipe(external_exports.email().max(255));
+var altchaField = external_exports.string().min(1).max(2e3).optional();
 var registerRequestSchema = external_exports.strictObject({
   email: emailField,
   // NIST SP 800-63B: length over composition rules; 12 to 128 characters.
   password: external_exports.string().min(12).max(128),
-  fullName: external_exports.string().trim().min(2).max(150)
+  fullName: external_exports.string().trim().min(2).max(150),
+  altcha: altchaField
 });
 var loginRequestSchema = external_exports.strictObject({
   email: emailField,
-  password: external_exports.string().min(1).max(128)
+  password: external_exports.string().min(1).max(128),
+  altcha: altchaField
 });
 var challengeRequestSchema = external_exports.strictObject({
   challengeId: external_exports.uuid()
@@ -99664,6 +99667,16 @@ var challengeRequestSchema = external_exports.strictObject({
 var codeRequestSchema = external_exports.strictObject({
   challengeId: external_exports.uuid(),
   code: external_exports.string().regex(/^(?:\d{6}|\d{8})$/)
+});
+var verifyRequestSchema = codeRequestSchema.extend({
+  rememberDevice: external_exports.boolean().optional()
+});
+var botChallengeSchema = external_exports.object({
+  algorithm: external_exports.literal("SHA-256"),
+  challenge: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  maxnumber: external_exports.number().int().positive(),
+  salt: external_exports.string().min(1).max(200),
+  signature: external_exports.string().regex(/^[0-9a-f]{64}$/)
 });
 var loginResponseSchema = external_exports.object({
   challengeId: external_exports.uuid(),
@@ -100605,11 +100618,19 @@ var ROUTE_CONTRACTS = [
     registerRequestSchema,
     { 202: registeredSchema }
   ),
+  {
+    method: "GET",
+    path: "/v1/auth/bot-challenge",
+    summary: "A proof-of-work challenge for sign-up and sign-in (ALTCHA format, 30/min)",
+    permission: "public",
+    request: {},
+    responses: { 200: botChallengeSchema, 503: problemSchema }
+  },
   auth(
     "/v1/auth/login",
-    "Checks the password and opens a 5-minute second-factor challenge",
+    "Checks the password; opens a 5-minute second-factor challenge, or signs a buyer in on a trusted device (201)",
     loginRequestSchema,
-    { 200: loginResponseSchema, 401: problemSchema }
+    { 200: loginResponseSchema, 201: signedInSchema, 401: problemSchema }
   ),
   auth(
     "/v1/auth/totp/enroll",
@@ -100625,8 +100646,8 @@ var ROUTE_CONTRACTS = [
   ),
   auth(
     "/v1/auth/verify",
-    "Signs in with the mailed code, an authenticator code or a backup code",
-    codeRequestSchema,
+    "Signs in with the mailed code, an authenticator code or a backup code; may remember a buyer\u2019s device",
+    verifyRequestSchema,
     { 200: signedInSchema, 401: problemSchema, 409: problemSchema }
   ),
   {
@@ -100636,6 +100657,14 @@ var ROUTE_CONTRACTS = [
     permission: "account:self",
     request: {},
     responses: { 200: meResponseSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/forget-device",
+    summary: "Forgets this browser\u2019s trusted device and expires its cookie",
+    permission: "account:self",
+    request: {},
+    responses: { 204: external_exports.null(), ...SIGNED_IN_REFUSALS }
   },
   {
     method: "POST",
@@ -100863,9 +100892,11 @@ async function useBackupCode(db, userId, hash2, now) {
 async function openSession(tx, input2) {
   const token = newToken();
   const lifetime = input2.privileged ? SESSION_MS.privileged : SESSION_MS.customer;
-  await tx.query("DELETE FROM two_factor_challenges WHERE id = ?", [
-    input2.challengeId
-  ]);
+  if (input2.challengeId !== null) {
+    await tx.query("DELETE FROM two_factor_challenges WHERE id = ?", [
+      input2.challengeId
+    ]);
+  }
   await tx.query(
     "INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
     [
@@ -100902,23 +100933,68 @@ function secondFactorSatisfied(user) {
   return !isPrivileged(user.roles) || user.totpEnabled;
 }
 
+// src/services/trustedDevices.ts
+var DEVICE_SECONDS = 30 * 24 * 3600;
+async function rememberDevice(db, device) {
+  const token = newToken();
+  await db.query(
+    "INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at, user_agent, ip_address) VALUES (?, ?, ?, ?, ?)",
+    [
+      device.userId,
+      tokenHash(token),
+      new Date(device.now.getTime() + DEVICE_SECONDS * 1e3),
+      device.userAgent,
+      device.ip
+    ]
+  );
+  return token;
+}
+async function isTrustedDevice(db, token, userId, now) {
+  const [row2] = await db.query(
+    "SELECT id FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ? AND expires_at > ?",
+    [tokenHash(token), userId, now]
+  );
+  return row2 !== void 0;
+}
+async function forgetDevice(db, token, userId) {
+  await db.query(
+    "DELETE FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ?",
+    [tokenHash(token), userId]
+  );
+}
+
 // src/lib/session.ts
 var SESSION_COOKIE = "__Host-yekora_session";
-function readSessionToken(header3) {
+var DEVICE_COOKIE = "__Host-yekora_device";
+var FLAGS = "HttpOnly; Secure; SameSite=Strict";
+var cookie = (name2, value, maxAgeSeconds) => `${name2}=${value}; Path=/; Max-Age=${maxAgeSeconds}; ${FLAGS}`;
+function readToken(header3, wanted) {
   for (const part of (header3 ?? "").split(";")) {
     const [name2, ...value] = part.trim().split("=");
-    if (name2 === SESSION_COOKIE) {
+    if (name2 === wanted) {
       const token = value.join("=");
       return /^[\w-]{43}$/.test(token) ? token : null;
     }
   }
   return null;
 }
+function readSessionToken(header3) {
+  return readToken(header3, SESSION_COOKIE);
+}
+function readDeviceToken(header3) {
+  return readToken(header3, DEVICE_COOKIE);
+}
 function sessionCookie(token, maxAgeSeconds) {
-  return `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Strict`;
+  return cookie(SESSION_COOKIE, token, maxAgeSeconds);
 }
 function clearedSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+  return cookie(SESSION_COOKIE, "", 0);
+}
+function deviceCookie(token) {
+  return cookie(DEVICE_COOKIE, token, DEVICE_SECONDS);
+}
+function clearedDeviceCookie() {
+  return cookie(DEVICE_COOKIE, "", 0);
 }
 
 // src/lib/guard.ts
@@ -100956,6 +101032,13 @@ function registerAccountRoutes(app, deps) {
         permissions: user.permissions
       })
     );
+  });
+  app.post("/v1/account/forget-device", async (request, reply) => {
+    const token = readDeviceToken(request.headers.cookie);
+    if (token !== null) {
+      await forgetDevice(deps.db, token, request.user.userId);
+    }
+    return reply.header("Set-Cookie", clearedDeviceCookie()).code(204).send();
   });
   app.post("/v1/account/logout", async (request, reply) => {
     await closeSession(deps.db, request.user.sessionId);
@@ -101013,6 +101096,65 @@ function registerAdminRoutes(app, deps) {
   });
 }
 
+// src/services/botChallenge.ts
+var import_node_crypto5 = require("node:crypto");
+var MAX_NUMBER = 2e4;
+var CHALLENGE_MS2 = 5 * 6e4;
+var HEX_64 = /^[0-9a-f]{64}$/;
+var solutionSchema = external_exports.object({
+  algorithm: external_exports.literal("SHA-256"),
+  challenge: external_exports.string().regex(HEX_64),
+  number: external_exports.number().int().nonnegative().max(MAX_NUMBER),
+  salt: external_exports.string().min(1).max(200),
+  signature: external_exports.string().regex(HEX_64)
+});
+var sha256 = (value) => (0, import_node_crypto5.createHash)("sha256").update(value).digest("hex");
+function signingKey(secret) {
+  return (0, import_node_crypto5.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+}
+var sign = (secret, challenge) => (0, import_node_crypto5.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+function issueChallenge(secret, now) {
+  const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
+  const salt = `${(0, import_node_crypto5.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto5.randomInt)(0, MAX_NUMBER + 1)}`);
+  return {
+    algorithm: "SHA-256",
+    challenge,
+    maxnumber: MAX_NUMBER,
+    salt,
+    signature: sign(secret, challenge)
+  };
+}
+function decode4(payload) {
+  try {
+    const parsed = solutionSchema.safeParse(
+      JSON.parse(Buffer.from(payload, "base64").toString("utf8"))
+    );
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function expiryOf(salt) {
+  const expires = Number(
+    new URLSearchParams(salt.split("?")[1] ?? "").get("expires")
+  );
+  return Number.isInteger(expires) && expires > 0 ? expires : null;
+}
+async function checkChallenge(db, secret, payload, now) {
+  if (!payload) return "BOT_CHALLENGE_REQUIRED";
+  const solution = decode4(payload);
+  const expires = solution ? expiryOf(solution.salt) : null;
+  const valid = solution !== null && expires !== null && expires * 1e3 > now.getTime() && sameHex(sign(secret, solution.challenge), solution.signature) && sameHex(sha256(`${solution.salt}${solution.number}`), solution.challenge);
+  if (!valid) return "BOT_CHALLENGE_FAILED";
+  const spent = await db.query(
+    "INSERT IGNORE INTO auth_challenge_nonces (nonce_hash, expires_at) VALUES (?, ?)",
+    [solution.challenge, new Date(expires * 1e3)]
+  );
+  return spent.affectedRows === 1 ? "passed" : "BOT_CHALLENGE_FAILED";
+}
+
 // src/services/outbox.ts
 async function enqueueMail(tx, event) {
   const { type, ...payload } = event;
@@ -101023,7 +101165,7 @@ async function enqueueMail(tx, event) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -101035,7 +101177,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto5.randomBytes)(16),
+    salt: (0, import_node_crypto6.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -101048,7 +101190,7 @@ async function verifyPassword(hash2, password) {
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto5.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto6.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -101061,12 +101203,17 @@ var TITLES2 = {
   INVALID_CHALLENGE: "Sign-in expired, start again",
   INVALID_CODE: "Invalid code",
   TOTP_ALREADY_ENABLED: "Authenticator already enabled",
-  TOTP_NOT_ENROLLED: "Set up the authenticator first"
+  TOTP_NOT_ENROLLED: "Set up the authenticator first",
+  BOT_CHALLENGE_REQUIRED: "Anti-bot check required",
+  BOT_CHALLENGE_FAILED: "Anti-bot check failed"
 };
 function refuse2(reply, status, code) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code], code));
 }
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+var CHALLENGE_LIMIT = {
+  config: { rateLimit: { max: 30, timeWindow: "1 minute" } }
+};
 function registerAuthRoutes(app, deps) {
   function parse4(schema2, request, reply) {
     if (deps.auth === null) {
@@ -101086,7 +101233,7 @@ function registerAuthRoutes(app, deps) {
     void refuse2(reply, 401, "INVALID_CHALLENGE");
     return null;
   }
-  async function passMailedCode(request, reply, auth2, challenge, code) {
+  async function passMailedCode(request, reply, auth2, challenge, code, remember) {
     if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code))) {
       await failChallenge(deps.db, challenge.id);
       return refuse2(reply, 401, "INVALID_CODE");
@@ -101097,25 +101244,56 @@ function registerAuthRoutes(app, deps) {
       await passEmailChallenge(deps.db, auth2.secret, challenge.id);
       return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
     }
-    await signIn(request, reply, challenge, roles);
+    await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
   }
-  async function signIn(request, reply, challenge, roles) {
-    const { token, maxAgeSeconds } = await deps.db.transaction(
-      (tx) => openSession(tx, {
-        challengeId: challenge.id,
-        userId: challenge.userId,
-        privileged: isPrivileged(roles),
-        ...clientFacts(request.ip, request.headers["user-agent"]),
+  async function signIn(request, reply, passed, roles, remember = false) {
+    const privileged = isPrivileged(roles);
+    const facts = clientFacts(request.ip, request.headers["user-agent"]);
+    const cookies = await deps.db.transaction(async (tx) => {
+      const { token, maxAgeSeconds } = await openSession(tx, {
+        challengeId: passed.id,
+        userId: passed.userId,
+        privileged,
+        ...facts,
         now: deps.now()
-      })
-    );
-    reply.header("Set-Cookie", sessionCookie(token, maxAgeSeconds));
+      });
+      const session = sessionCookie(token, maxAgeSeconds);
+      if (!remember || privileged) return [session];
+      const device = await rememberDevice(tx, {
+        userId: passed.userId,
+        ...facts,
+        now: deps.now()
+      });
+      return [session, deviceCookie(device)];
+    });
+    reply.header("Set-Cookie", cookies);
   }
+  async function botCheck(auth2, altcha, reply) {
+    const outcome = await checkChallenge(
+      deps.db,
+      auth2.secret,
+      altcha,
+      deps.now()
+    );
+    if (outcome === "passed") return true;
+    void refuse2(reply, 400, outcome);
+    return false;
+  }
+  app.get(
+    "/v1/auth/bot-challenge",
+    CHALLENGE_LIMIT,
+    async (_request, reply) => {
+      if (deps.auth === null) return refuse2(reply, 503, "AUTH_UNAVAILABLE");
+      reply.header("Cache-Control", "no-store");
+      return issueChallenge(deps.auth.secret, deps.now());
+    }
+  );
   app.post("/v1/auth/register", LIMITED, async (request, reply) => {
     const parsed = parse4(registerRequestSchema, request, reply);
     if (parsed === null) return reply;
-    const { body } = parsed;
+    const { auth: auth2, body } = parsed;
+    if (!await botCheck(auth2, body.altcha, reply)) return reply;
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
@@ -101127,6 +101305,7 @@ function registerAuthRoutes(app, deps) {
     const parsed = parse4(loginRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
+    if (!await botCheck(auth2, body.altcha, reply)) return reply;
     const user = await findUserByEmail(deps.db, canonicalEmail(body.email));
     const valid = await verifyPassword(
       user?.password_hash ?? await decoyHash(),
@@ -101134,6 +101313,15 @@ function registerAuthRoutes(app, deps) {
     );
     if (user === null || !valid) {
       return refuse2(reply, 401, "INVALID_CREDENTIALS");
+    }
+    const device = readDeviceToken(request.headers.cookie);
+    if (device !== null) {
+      const { roles } = await capabilitiesOf(deps.db, user.id);
+      const trusted = !isPrivileged(roles) && await isTrustedDevice(deps.db, device, user.id, deps.now());
+      if (trusted) {
+        await signIn(request, reply, { id: null, userId: user.id }, roles);
+        return reply.code(201).send(signedInSchema.parse({ status: "signed_in" }));
+      }
     }
     if ((await totpOf(deps.db, user.id))?.enabled) {
       const challengeId2 = await openChallenge(
@@ -101227,9 +101415,10 @@ function registerAuthRoutes(app, deps) {
     return confirmResponseSchema.parse({ backupCodes });
   });
   app.post("/v1/auth/verify", LIMITED, async (request, reply) => {
-    const parsed = parse4(codeRequestSchema, request, reply);
+    const parsed = parse4(verifyRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
+    const remember = body.rememberDevice === true;
     const challenge = await challengeOf(
       body.challengeId,
       ["EMAIL", "TOTP"],
@@ -101237,7 +101426,14 @@ function registerAuthRoutes(app, deps) {
     );
     if (challenge === null) return reply;
     if (challenge.type === "EMAIL") {
-      return passMailedCode(request, reply, auth2, challenge, body.code);
+      return passMailedCode(
+        request,
+        reply,
+        auth2,
+        challenge,
+        body.code,
+        remember
+      );
     }
     const totp = await totpOf(deps.db, challenge.userId);
     if (!totp?.enabled) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
@@ -101258,7 +101454,7 @@ function registerAuthRoutes(app, deps) {
       return refuse2(reply, 401, "INVALID_CODE");
     }
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles);
+    await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
   });
 }
@@ -101549,7 +101745,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -101694,9 +101890,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto6.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto7.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto6.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto7.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -101831,7 +102027,7 @@ var adapt = function(delta, numPoints, firstTime) {
   }
   return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
 };
-var decode4 = function(input2) {
+var decode5 = function(input2) {
   const output2 = [];
   const inputLength = input2.length;
   let i = 0;
@@ -101941,7 +102137,7 @@ var encode3 = function(input2) {
 };
 var toUnicode = function(input2) {
   return mapDomain(input2, function(string4) {
-    return regexPunycode.test(string4) ? decode4(string4.slice(4).toLowerCase()) : string4;
+    return regexPunycode.test(string4) ? decode5(string4.slice(4).toLowerCase()) : string4;
   });
 };
 var toASCII = function(input2) {
@@ -102107,10 +102303,10 @@ var Cookies = class {
    */
   set(cookieStr, url2) {
     const urlparts = parse3(url2 || "");
-    const cookie = this.parse(cookieStr);
+    const cookie2 = this.parse(cookieStr);
     let domain2;
-    if (cookie.domain) {
-      domain2 = cookie.domain.replace(/^\./, "");
+    if (cookie2.domain) {
+      domain2 = cookie2.domain.replace(/^\./, "");
       if (
         // can't be valid if the requested domain is shorter than current hostname
         urlparts.hostname.length < domain2.length || // a top level domain is not a valid scope, 'Domain=com' would otherwise be
@@ -102119,18 +102315,18 @@ var Cookies = class {
         import_node_net2.default.isIP(urlparts.hostname) || // prefix domains with dot to be sure that partial matches are not used
         !("." + urlparts.hostname).endsWith("." + domain2)
       ) {
-        cookie.domain = urlparts.hostname;
+        cookie2.domain = urlparts.hostname;
       }
     } else {
-      cookie.domain = urlparts.hostname;
+      cookie2.domain = urlparts.hostname;
     }
-    if (!cookie.path) {
-      cookie.path = this.getPath(urlparts.pathname);
+    if (!cookie2.path) {
+      cookie2.path = this.getPath(urlparts.pathname);
     }
-    if (!cookie.expires) {
-      cookie.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1e3);
+    if (!cookie2.expires) {
+      cookie2.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1e3);
     }
-    return this.add(cookie);
+    return this.add(cookie2);
   }
   /**
    * Returns cookie string for the 'Cookie:' header.
@@ -102139,7 +102335,7 @@ var Cookies = class {
    * @returns Cookie header or empty string if no matches were found
    */
   get(url2) {
-    return this.list(url2).map((cookie) => cookie.name + "=" + cookie.value).join("; ");
+    return this.list(url2).map((cookie2) => cookie2.name + "=" + cookie2.value).join("; ");
   }
   /**
    * Lists all valied cookie objects for the specified URL
@@ -102150,13 +102346,13 @@ var Cookies = class {
   list(url2) {
     const result = [];
     for (let i = this.cookies.length - 1; i >= 0; i--) {
-      const cookie = this.cookies[i];
-      if (this.isExpired(cookie)) {
+      const cookie2 = this.cookies[i];
+      if (this.isExpired(cookie2)) {
         this.cookies.splice(i, 1);
         continue;
       }
-      if (this.match(cookie, url2)) {
-        result.unshift(cookie);
+      if (this.match(cookie2, url2)) {
+        result.unshift(cookie2);
       }
     }
     return result;
@@ -102168,7 +102364,7 @@ var Cookies = class {
    * @returns Cookie object
    */
   parse(cookieStr) {
-    const cookie = {};
+    const cookie2 = {};
     let hasNameValue = false;
     (cookieStr || "").toString().split(";").forEach((cookiePart) => {
       if (!cookiePart.trim()) {
@@ -102181,8 +102377,8 @@ var Cookies = class {
       if (!hasNameValue) {
         hasNameValue = true;
         if (name2) {
-          cookie.name = name2;
-          cookie.value = value;
+          cookie2.name = name2;
+          cookie2.value = value;
         }
         return;
       }
@@ -102190,32 +102386,32 @@ var Cookies = class {
         case "expires": {
           const expires = new Date(value);
           if (expires.toString() !== "Invalid Date") {
-            cookie.expires = expires;
+            cookie2.expires = expires;
           }
           break;
         }
         case "path":
-          cookie.path = value;
+          cookie2.path = value;
           break;
         case "domain":
           domain2 = value.toLowerCase();
           if (domain2.length && domain2.charAt(0) !== ".") {
             domain2 = "." + domain2;
           }
-          cookie.domain = domain2;
+          cookie2.domain = domain2;
           break;
         case "max-age":
-          cookie.expires = new Date(Date.now() + (Number(value) || 0) * 1e3);
+          cookie2.expires = new Date(Date.now() + (Number(value) || 0) * 1e3);
           break;
         case "secure":
-          cookie.secure = true;
+          cookie2.secure = true;
           break;
         case "httponly":
-          cookie.httponly = true;
+          cookie2.httponly = true;
           break;
       }
     });
-    return cookie;
+    return cookie2;
   }
   /**
    * Checks if a cookie object is valid for a specified URL
@@ -102224,18 +102420,18 @@ var Cookies = class {
    * @param url URL to check for
    * @returns true if cookie is valid for specifiec URL
    */
-  match(cookie, url2) {
+  match(cookie2, url2) {
     const urlparts = parse3(url2 || "");
-    if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
+    if (urlparts.hostname !== cookie2.domain && (cookie2.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie2.domain.length) !== cookie2.domain)) {
       return false;
     }
     const pathname = urlparts.pathname || "/";
-    const cookiePath = cookie.path;
+    const cookiePath = cookie2.path;
     const pathMatches = pathname === cookiePath || pathname.startsWith(cookiePath) && (cookiePath.endsWith("/") || pathname.charAt(cookiePath.length) === "/");
     if (!pathMatches) {
       return false;
     }
-    if (cookie.secure && urlparts.protocol !== "https:") {
+    if (cookie2.secure && urlparts.protocol !== "https:") {
       return false;
     }
     return true;
@@ -102245,22 +102441,22 @@ var Cookies = class {
    *
    * @param cookie Cookie value to be stored
    */
-  add(cookie) {
-    if (!cookie || !cookie.name) {
+  add(cookie2) {
+    if (!cookie2 || !cookie2.name) {
       return false;
     }
     for (let i = 0, len = this.cookies.length; i < len; i++) {
-      if (this.compare(this.cookies[i], cookie)) {
-        if (this.isExpired(cookie)) {
+      if (this.compare(this.cookies[i], cookie2)) {
+        if (this.isExpired(cookie2)) {
           this.cookies.splice(i, 1);
           return false;
         }
-        this.cookies[i] = cookie;
+        this.cookies[i] = cookie2;
         return true;
       }
     }
-    if (!this.isExpired(cookie)) {
-      this.cookies.push(cookie);
+    if (!this.isExpired(cookie2)) {
+      this.cookies.push(cookie2);
     }
     return true;
   }
@@ -102280,8 +102476,8 @@ var Cookies = class {
    * @param cookie Cookie object to check against
    * @returns True, if the cookie is expired
    */
-  isExpired(cookie) {
-    return cookie.expires && cookie.expires < /* @__PURE__ */ new Date() || !cookie.value;
+  isExpired(cookie2) {
+    return cookie2.expires && cookie2.expires < /* @__PURE__ */ new Date() || !cookie2.value;
   }
   /**
    * Returns the default path for an URL path argument, the default-path of
@@ -102420,8 +102616,8 @@ function nmfetch(url2, options) {
     return fetchRes;
   }
   if (options.cookie) {
-    [].concat(options.cookie || []).forEach((cookie) => {
-      options.cookies.set(cookie, url2);
+    [].concat(options.cookie || []).forEach((cookie2) => {
+      options.cookies.set(cookie2, url2);
     });
     options.cookie = false;
   }
@@ -102570,8 +102766,8 @@ function nmfetch(url2, options) {
         break;
     }
     if (res.headers["set-cookie"]) {
-      [].concat(res.headers["set-cookie"] || []).forEach((cookie) => {
-        options.cookies.set(cookie, url2);
+      [].concat(res.headers["set-cookie"] || []).forEach((cookie2) => {
+        options.cookies.set(cookie2, url2);
       });
     }
     if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
@@ -105314,7 +105510,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto7 = __toESM(require("node:crypto"), 1);
+var import_node_crypto8 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -107047,7 +107243,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto7.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto8.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -108224,8 +108420,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto7.default.randomBytes(len).toString("hex"),
-      import_node_crypto7.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto8.default.randomBytes(len).toString("hex"),
+      import_node_crypto8.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -108913,7 +109109,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto8 = __toESM(require("node:crypto"), 1);
+var import_node_crypto9 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -108924,7 +109120,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto8.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto9.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -109034,13 +109230,13 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto9 = __toESM(require("node:crypto"), 1);
+var import_node_crypto10 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
   return err;
 }
-function sign(headers, hashAlgo, bodyHash, options) {
+function sign2(headers, hashAlgo, bodyHash, options) {
   options = options || {};
   const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive:OTP-Token";
   const fieldNames = options.headerFieldNames || defaultFieldNames;
@@ -109049,7 +109245,7 @@ function sign(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto9.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto10.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -109062,9 +109258,9 @@ function sign(headers, hashAlgo, bodyHash, options) {
   }
   return dkimHeader + signature.replace(/(^.{73}|.{75}(?!\r?\n|\r))/g, "$&\r\n ").trim();
 }
-sign.relaxedHeaders = relaxedHeaders;
-sign.unsupportedHashAlgoError = unsupportedHashAlgoError;
-var sign_default = sign;
+sign2.relaxedHeaders = relaxedHeaders;
+sign2.unsupportedHashAlgoError = unsupportedHashAlgoError;
+var sign_default = sign2;
 function generateDKIMHeader(domainName, keySelector, fieldNames, hashAlgo, bodyHash) {
   const cleanTagValue = (value) => (value || "").toString().replace(/[\x00-\x1f\x7f;=]/g, "");
   const dkim = [
@@ -109116,7 +109312,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto10 = __toESM(require("node:crypto"), 1);
+var import_node_crypto11 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -109129,7 +109325,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto10.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto11.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -109739,7 +109935,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto11 = __toESM(require("node:crypto"), 1);
+var import_node_crypto12 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -110057,7 +110253,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto11.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto12.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -110092,7 +110288,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto12 = __toESM(require("node:crypto"), 1);
+var import_node_crypto13 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -110257,7 +110453,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto12.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto13.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -111605,7 +111801,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto12.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto13.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -111939,7 +112135,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -112262,7 +112458,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto13.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto14.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -114787,6 +114983,9 @@ function createOutboxDispatcher(deps) {
   }
   async function runOnce() {
     const now = deps.now();
+    await db.query("DELETE FROM auth_challenge_nonces WHERE expires_at < ?", [
+      now
+    ]);
     await db.query(
       "UPDATE outbox_events SET status = 'PENDING' WHERE status = 'PROCESSING' AND next_retry_at < ?",
       [now]
@@ -114979,7 +115178,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS2 = 1e4;
@@ -115039,10 +115238,10 @@ function header2(headers, name2) {
   const value = headers[name2];
   return Array.isArray(value) ? value[0] : value;
 }
-function sameHex(expected, given) {
+function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto14.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto15.timingSafeEqual)(a, b);
 }
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   async function call(path3, init) {
@@ -115093,8 +115292,8 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto14.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
-      if (!candidates.some((candidate) => sameHex(expected, candidate)))
+      const expected = (0, import_node_crypto15.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
       try {
@@ -115392,7 +115591,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "836dd32de765a860e46b29bdee984841219b31d8" : void 0;
+var sha = true ? "14348f4e9ee48225edf9adccf84fb61aceb8a2b9" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
