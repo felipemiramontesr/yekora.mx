@@ -99138,310 +99138,6 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// src/services/authCrypto.ts
-var import_node_crypto = require("node:crypto");
-var KEY_BYTES = 32;
-var TOTP_STEP_SECONDS = 30;
-var TOTP_DIGITS = 6;
-var BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-function parseAuthKey(name2, base643) {
-  const key = Buffer.from(base643, "base64");
-  if (key.length !== KEY_BYTES || key.toString("base64") !== base643) {
-    throw new Error(`${name2} must be 32 random bytes in base64`);
-  }
-  return key;
-}
-function newToken() {
-  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
-}
-function tokenHash(token) {
-  return (0, import_node_crypto.createHash)("sha256").update(token, "utf8").digest("hex");
-}
-function codeHash(secret, code) {
-  return (0, import_node_crypto.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
-}
-function newEmailCode() {
-  return String((0, import_node_crypto.randomInt)(0, 1e6)).padStart(6, "0");
-}
-function sameHash(a, b) {
-  const left = Buffer.from(a, "hex");
-  const right = Buffer.from(b, "hex");
-  return left.length === right.length && (0, import_node_crypto.timingSafeEqual)(left, right);
-}
-function newBackupCodes() {
-  const codes = /* @__PURE__ */ new Set();
-  while (codes.size < 8)
-    codes.add(String((0, import_node_crypto.randomInt)(0, 1e8)).padStart(8, "0"));
-  return [...codes];
-}
-function newTotpSecret() {
-  return (0, import_node_crypto.randomBytes)(20);
-}
-function base32(bytes) {
-  let bits = "";
-  for (const byte of bytes) bits += byte.toString(2).padStart(8, "0");
-  let out = "";
-  for (let i = 0; i < bits.length; i += 5) {
-    out += BASE32[Number.parseInt(bits.slice(i, i + 5).padEnd(5, "0"), 2)];
-  }
-  return out;
-}
-function otpauthUri(email3, secret) {
-  const label = encodeURIComponent(`Y\u0112KORA:${email3}`);
-  return `otpauth://totp/${label}?secret=${base32(secret)}&issuer=${encodeURIComponent("Y\u0112KORA")}&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_STEP_SECONDS}`;
-}
-function totpCode(secret, step) {
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(step));
-  const mac3 = (0, import_node_crypto.createHmac)("sha1", secret).update(counter).digest();
-  const offset = mac3.readUInt8(mac3.length - 1) & 15;
-  const value = mac3.readUInt32BE(offset) & 2147483647;
-  return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
-}
-function verifyTotp(secret, code, now) {
-  if (!/^\d{6}$/.test(code)) return false;
-  const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
-  return [step - 1, step, step + 1].some(
-    (candidate) => (0, import_node_crypto.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
-  );
-}
-function encryptTotpSecret(key, userId, secret) {
-  const iv = (0, import_node_crypto.randomBytes)(12);
-  const cipher = (0, import_node_crypto.createCipheriv)("aes-256-gcm", key, iv);
-  cipher.setAAD(Buffer.from(userId, "utf8"));
-  const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
-  const parts = [iv, cipher.getAuthTag(), ciphertext].map(
-    (b) => b.toString("base64url")
-  );
-  return `v1:${parts.join(":")}`;
-}
-function decryptTotpSecret(key, userId, stored) {
-  const [version3, iv, tag, ciphertext] = stored.split(":");
-  if (version3 !== "v1" || ciphertext === void 0) {
-    throw new Error("Unknown TOTP secret format");
-  }
-  const decipher = (0, import_node_crypto.createDecipheriv)(
-    "aes-256-gcm",
-    key,
-    Buffer.from(iv, "base64url")
-  );
-  decipher.setAAD(Buffer.from(userId, "utf8"));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertext, "base64url")),
-    decipher.final()
-  ]);
-}
-
-// src/services/checkoutCrypto.ts
-var import_node_crypto2 = require("node:crypto");
-var FORMAT_V1 = 1;
-var IV_BYTES = 12;
-var TAG_BYTES = 16;
-var KEY_BYTES2 = 32;
-var ORDER_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-function parsePiiKey(base643) {
-  const key = Buffer.from(base643, "base64");
-  if (key.length !== KEY_BYTES2 || key.toString("base64") !== base643) {
-    throw new Error("CHECKOUT_PII_KEY must be 32 random bytes in base64");
-  }
-  return key;
-}
-function additionalData(orderNumber, field) {
-  return Buffer.from(`${orderNumber}|${field}`, "utf8");
-}
-function encryptPii(key, orderNumber, field, value) {
-  const iv = (0, import_node_crypto2.randomBytes)(IV_BYTES);
-  const cipher = (0, import_node_crypto2.createCipheriv)("aes-256-gcm", key, iv, {
-    authTagLength: TAG_BYTES
-  });
-  cipher.setAAD(additionalData(orderNumber, field));
-  const body = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  return Buffer.concat([
-    Buffer.from([FORMAT_V1]),
-    iv,
-    body,
-    cipher.getAuthTag()
-  ]);
-}
-function emailHmac(pepper, email3) {
-  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
-}
-function tokenHash2(pepper, token) {
-  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(token, "utf8").digest();
-}
-function newAccessToken() {
-  return (0, import_node_crypto2.randomBytes)(32).toString("base64url");
-}
-function newOrderNumber(now) {
-  let tail = "";
-  for (let i = 0; i < 8; i += 1)
-    tail += ORDER_ALPHABET[(0, import_node_crypto2.randomInt)(ORDER_ALPHABET.length)];
-  return `YEK-${now.getUTCFullYear()}-${tail}`;
-}
-
-// src/config.ts
-var CORS_ORIGINS = [
-  "https://yekora.mx",
-  "http://localhost:3000",
-  "http://localhost:3100"
-];
-var schema = external_exports.object({
-  NODE_ENV: external_exports.string().default("development"),
-  PORT: external_exports.coerce.number().int().nonnegative().default(3001),
-  HOST: external_exports.string().default("0.0.0.0"),
-  DB_HOST: external_exports.string().min(1),
-  DB_PORT: external_exports.coerce.number().int().positive().default(3306),
-  DB_USER: external_exports.string().min(1),
-  DB_PASSWORD: external_exports.string().default(""),
-  // Same rule as scripts/lib/migrations.ts::isYekoraDatabase: `yekora_…` locally, Hostinger's
-  // `u<digits>_yekora[_…]` in production; never another project's database.
-  DB_NAME: external_exports.string().regex(
-    /^(?:u\d+_yekora(?:_[a-z0-9_]+)?|yekora_[a-z0-9_]+)$/,
-    "must be a Yekora database"
-  ),
-  BANXICO_TOKEN: external_exports.string().optional(),
-  API_VERSION: external_exports.string().default("0.8.6"),
-  GIT_SHA: external_exports.string().default("dev"),
-  PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
-  SITE_URL: external_exports.url().default("https://yekora.mx"),
-  API_PUBLIC_URL: external_exports.url().default("https://apiv1.yekora.mx"),
-  STRIPE_SECRET_KEY: external_exports.string().optional(),
-  STRIPE_WEBHOOK_SECRET: external_exports.string().optional(),
-  MP_ACCESS_TOKEN: external_exports.string().optional(),
-  MP_WEBHOOK_SECRET: external_exports.string().optional(),
-  MP_SANDBOX_IS_TEST_ACCOUNT: external_exports.enum(["true", "false"]).default("false"),
-  CHECKOUT_PII_KEY: external_exports.string().optional(),
-  CUSTOMER_EMAIL_HMAC_PEPPER: external_exports.string().optional(),
-  ORDER_TOKEN_PEPPER: external_exports.string().optional(),
-  AUTH_SECRET: external_exports.string().optional(),
-  TOTP_ENCRYPTION_KEY: external_exports.string().optional(),
-  SMTP_HOST: external_exports.string().optional(),
-  SMTP_PORT: external_exports.coerce.number().int().positive().optional(),
-  SMTP_USER: external_exports.string().optional(),
-  SMTP_PASSWORD: external_exports.string().optional(),
-  MAIL_FROM: external_exports.string().optional()
-});
-var KEY_PREFIXES = {
-  sandbox: {
-    stripe: ["sk_test_", "rk_test_"],
-    mercadoPago: ["TEST-", "APP_USR-"]
-  },
-  live: { stripe: ["sk_live_", "rk_live_"], mercadoPago: ["APP_USR-"] }
-};
-function pair(name2, a, b) {
-  if (!a && !b) return null;
-  if (!a || !b) throw new Error(`${name2} needs both of its secrets or none`);
-  return [a, b];
-}
-function checkMode(name2, key, prefixes) {
-  if (!prefixes.some((prefix) => key.startsWith(prefix))) {
-    throw new Error(`${name2} does not match PAYMENTS_MODE`);
-  }
-}
-function loadPayments(parsed) {
-  const mode = parsed.PAYMENTS_MODE;
-  const prefixes = KEY_PREFIXES[mode];
-  const stripe = pair(
-    "Stripe",
-    parsed.STRIPE_SECRET_KEY,
-    parsed.STRIPE_WEBHOOK_SECRET
-  );
-  if (stripe) checkMode("STRIPE_SECRET_KEY", stripe[0], prefixes.stripe);
-  const mercadoPago = pair(
-    "Mercado Pago",
-    parsed.MP_ACCESS_TOKEN,
-    parsed.MP_WEBHOOK_SECRET
-  );
-  if (mercadoPago) {
-    checkMode("MP_ACCESS_TOKEN", mercadoPago[0], prefixes.mercadoPago);
-    if (mode === "sandbox" && mercadoPago[0].startsWith("APP_USR-") && parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== "true") {
-      throw new Error(
-        "MISSING_APP_USR_CONFIRMATION: MP_ACCESS_TOKEN with APP_USR- in sandbox requires explicit MP_SANDBOX_IS_TEST_ACCOUNT=true"
-      );
-    }
-  }
-  const key = parsed.CHECKOUT_PII_KEY;
-  const peppers = pair(
-    "The checkout",
-    parsed.CUSTOMER_EMAIL_HMAC_PEPPER,
-    parsed.ORDER_TOKEN_PEPPER
-  );
-  if (Boolean(key) !== Boolean(peppers)) {
-    throw new Error("The checkout needs its three secrets or none");
-  }
-  if (peppers?.some((pepper) => pepper.length < 32)) {
-    throw new Error("Checkout peppers must be at least 32 characters");
-  }
-  return {
-    mode,
-    siteUrl: parsed.SITE_URL.replace(/\/$/, ""),
-    apiUrl: parsed.API_PUBLIC_URL.replace(/\/$/, ""),
-    stripe: stripe && { apiKey: stripe[0], webhookSecret: stripe[1] },
-    mercadoPago: mercadoPago && {
-      accessToken: mercadoPago[0],
-      webhookSecret: mercadoPago[1]
-    },
-    checkout: key && peppers ? {
-      piiKey: parsePiiKey(key),
-      emailPepper: peppers[0],
-      tokenPepper: peppers[1]
-    } : null
-  };
-}
-function loadConfig(env2) {
-  const parsed = schema.parse(env2);
-  const isProduction = parsed.NODE_ENV === "production";
-  if (isProduction && parsed.DB_PASSWORD === "") {
-    throw new Error("DB_PASSWORD is required in production");
-  }
-  return {
-    isProduction,
-    port: parsed.PORT,
-    host: parsed.HOST,
-    db: {
-      host: parsed.DB_HOST,
-      port: parsed.DB_PORT,
-      user: parsed.DB_USER,
-      password: parsed.DB_PASSWORD,
-      database: parsed.DB_NAME
-    },
-    banxicoToken: parsed.BANXICO_TOKEN || void 0,
-    version: parsed.API_VERSION,
-    sha: parsed.GIT_SHA,
-    payments: loadPayments(parsed),
-    auth: loadAuth(parsed),
-    mail: loadMail(parsed)
-  };
-}
-function loadMail(parsed) {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM } = parsed;
-  const settings = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM];
-  const given = settings.filter(Boolean).length;
-  if (given === 0) return null;
-  if (given < settings.length) {
-    throw new Error("Mail needs all of its settings or none");
-  }
-  return {
-    host: String(SMTP_HOST),
-    port: Number(SMTP_PORT),
-    user: String(SMTP_USER),
-    password: String(SMTP_PASSWORD),
-    from: String(MAIL_FROM)
-  };
-}
-function loadAuth(parsed) {
-  const secrets = pair(
-    "Identity",
-    parsed.AUTH_SECRET,
-    parsed.TOTP_ENCRYPTION_KEY
-  );
-  return secrets && {
-    secret: parseAuthKey("AUTH_SECRET", secrets[0]),
-    totpKey: parseAuthKey("TOTP_ENCRYPTION_KEY", secrets[1])
-  };
-}
-
 // ../../lib/api/catalogClient.ts
 var slug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 var exchangeRateSchema = external_exports.object({
@@ -100102,7 +99798,54 @@ function registerCatalogRoutes(app, deps) {
 }
 
 // src/routes/orders.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto2 = require("node:crypto");
+
+// src/services/checkoutCrypto.ts
+var import_node_crypto = require("node:crypto");
+var FORMAT_V1 = 1;
+var IV_BYTES = 12;
+var TAG_BYTES = 16;
+var KEY_BYTES = 32;
+var ORDER_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function parsePiiKey(base643) {
+  const key = Buffer.from(base643, "base64");
+  if (key.length !== KEY_BYTES || key.toString("base64") !== base643) {
+    throw new Error("CHECKOUT_PII_KEY must be 32 random bytes in base64");
+  }
+  return key;
+}
+function additionalData(orderNumber, field) {
+  return Buffer.from(`${orderNumber}|${field}`, "utf8");
+}
+function encryptPii(key, orderNumber, field, value) {
+  const iv = (0, import_node_crypto.randomBytes)(IV_BYTES);
+  const cipher = (0, import_node_crypto.createCipheriv)("aes-256-gcm", key, iv, {
+    authTagLength: TAG_BYTES
+  });
+  cipher.setAAD(additionalData(orderNumber, field));
+  const body = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  return Buffer.concat([
+    Buffer.from([FORMAT_V1]),
+    iv,
+    body,
+    cipher.getAuthTag()
+  ]);
+}
+function emailHmac(pepper, email3) {
+  return (0, import_node_crypto.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
+}
+function tokenHash(pepper, token) {
+  return (0, import_node_crypto.createHmac)("sha256", pepper).update(token, "utf8").digest();
+}
+function newAccessToken() {
+  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
+}
+function newOrderNumber(now) {
+  let tail = "";
+  for (let i = 0; i < 8; i += 1)
+    tail += ORDER_ALPHABET[(0, import_node_crypto.randomInt)(ORDER_ALPHABET.length)];
+  return `YEK-${now.getUTCFullYear()}-${tail}`;
+}
 
 // src/services/checkout.ts
 var PROCESSOR_OF = {
@@ -100248,7 +99991,7 @@ async function persist(deps, admitted, quote, order) {
           seal("customer_phone", customer.phone),
           seal("shipping_address", JSON.stringify(address)),
           emailHmac(secrets.emailPepper, customer.email),
-          tokenHash2(secrets.tokenPepper, order.accessToken),
+          tokenHash(secrets.tokenPepper, order.accessToken),
           order.now,
           order.expiresAt,
           deps.payments.mode === "sandbox" ? 1 : 0,
@@ -100462,9 +100205,9 @@ function registerOrderRoutes(app, deps) {
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row2 === void 0 || !(0, import_node_crypto3.timingSafeEqual)(
+      if (row2 === void 0 || !(0, import_node_crypto2.timingSafeEqual)(
         Buffer.from(row2.access_token_hash),
-        tokenHash2(secrets.tokenPepper, token)
+        tokenHash(secrets.tokenPepper, token)
       )) {
         return notFound();
       }
@@ -100740,6 +100483,101 @@ function isPrivileged(roles) {
   return roles.some((role) => role !== "customer");
 }
 
+// src/services/authCrypto.ts
+var import_node_crypto3 = require("node:crypto");
+var KEY_BYTES2 = 32;
+var TOTP_STEP_SECONDS = 30;
+var TOTP_DIGITS = 6;
+var BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function parseAuthKey(name2, base643) {
+  const key = Buffer.from(base643, "base64");
+  if (key.length !== KEY_BYTES2 || key.toString("base64") !== base643) {
+    throw new Error(`${name2} must be 32 random bytes in base64`);
+  }
+  return key;
+}
+function newToken() {
+  return (0, import_node_crypto3.randomBytes)(32).toString("base64url");
+}
+function tokenHash2(token) {
+  return (0, import_node_crypto3.createHash)("sha256").update(token, "utf8").digest("hex");
+}
+function codeHash(secret, code) {
+  return (0, import_node_crypto3.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
+}
+function newEmailCode() {
+  return String((0, import_node_crypto3.randomInt)(0, 1e6)).padStart(6, "0");
+}
+function sameHash(a, b) {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && (0, import_node_crypto3.timingSafeEqual)(left, right);
+}
+function newBackupCodes() {
+  const codes = /* @__PURE__ */ new Set();
+  while (codes.size < 8)
+    codes.add(String((0, import_node_crypto3.randomInt)(0, 1e8)).padStart(8, "0"));
+  return [...codes];
+}
+function newTotpSecret() {
+  return (0, import_node_crypto3.randomBytes)(20);
+}
+function base32(bytes) {
+  let bits = "";
+  for (const byte of bytes) bits += byte.toString(2).padStart(8, "0");
+  let out = "";
+  for (let i = 0; i < bits.length; i += 5) {
+    out += BASE32[Number.parseInt(bits.slice(i, i + 5).padEnd(5, "0"), 2)];
+  }
+  return out;
+}
+function otpauthUri(email3, secret) {
+  const label = encodeURIComponent(`Y\u0112KORA:${email3}`);
+  return `otpauth://totp/${label}?secret=${base32(secret)}&issuer=${encodeURIComponent("Y\u0112KORA")}&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_STEP_SECONDS}`;
+}
+function totpCode(secret, step) {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(step));
+  const mac3 = (0, import_node_crypto3.createHmac)("sha1", secret).update(counter).digest();
+  const offset = mac3.readUInt8(mac3.length - 1) & 15;
+  const value = mac3.readUInt32BE(offset) & 2147483647;
+  return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
+}
+function verifyTotp(secret, code, now) {
+  if (!/^\d{6}$/.test(code)) return false;
+  const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
+  return [step - 1, step, step + 1].some(
+    (candidate) => (0, import_node_crypto3.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
+  );
+}
+function encryptTotpSecret(key, userId, secret) {
+  const iv = (0, import_node_crypto3.randomBytes)(12);
+  const cipher = (0, import_node_crypto3.createCipheriv)("aes-256-gcm", key, iv);
+  cipher.setAAD(Buffer.from(userId, "utf8"));
+  const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
+  const parts = [iv, cipher.getAuthTag(), ciphertext].map(
+    (b) => b.toString("base64url")
+  );
+  return `v1:${parts.join(":")}`;
+}
+function decryptTotpSecret(key, userId, stored) {
+  const [version3, iv, tag, ciphertext] = stored.split(":");
+  if (version3 !== "v1" || ciphertext === void 0) {
+    throw new Error("Unknown TOTP secret format");
+  }
+  const decipher = (0, import_node_crypto3.createDecipheriv)(
+    "aes-256-gcm",
+    key,
+    Buffer.from(iv, "base64url")
+  );
+  decipher.setAAD(Buffer.from(userId, "utf8"));
+  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, "base64url")),
+    decipher.final()
+  ]);
+}
+
 // src/services/identity.ts
 var CHALLENGE_MS = 5 * 6e4;
 var MAX_ATTEMPTS = 5;
@@ -100900,10 +100738,10 @@ async function openSession(tx, input2) {
   await tx.query(
     "INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
     [
-      tokenHash(token),
+      tokenHash2(token),
       input2.userId,
       // Reserved for the refresh flow; no refresh token is issued yet, so nothing can match it.
-      tokenHash(newToken()),
+      tokenHash2(newToken()),
       input2.ip,
       input2.userAgent,
       new Date(input2.now.getTime() + lifetime)
@@ -100914,7 +100752,7 @@ async function openSession(tx, input2) {
 async function sessionUser(db, token, now) {
   const [row2] = await db.query(
     "SELECT s.id, s.user_id, u.email, u.full_name FROM user_sessions s JOIN users u ON u.id = s.user_id AND u.is_active = 1 WHERE s.id = ? AND s.expires_at > ?",
-    [tokenHash(token), now]
+    [tokenHash2(token), now]
   );
   if (!row2) return null;
   const capabilities = await capabilitiesOf(db, row2.user_id);
@@ -100941,7 +100779,7 @@ async function rememberDevice(db, device) {
     "INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at, user_agent, ip_address) VALUES (?, ?, ?, ?, ?)",
     [
       device.userId,
-      tokenHash(token),
+      tokenHash2(token),
       new Date(device.now.getTime() + DEVICE_SECONDS * 1e3),
       device.userAgent,
       device.ip
@@ -100952,14 +100790,14 @@ async function rememberDevice(db, device) {
 async function isTrustedDevice(db, token, userId, now) {
   const [row2] = await db.query(
     "SELECT id FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ? AND expires_at > ?",
-    [tokenHash(token), userId, now]
+    [tokenHash2(token), userId, now]
   );
   return row2 !== void 0;
 }
 async function forgetDevice(db, token, userId) {
   await db.query(
     "DELETE FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ?",
-    [tokenHash(token), userId]
+    [tokenHash2(token), userId]
   );
 }
 
@@ -115373,7 +115211,7 @@ async function buildApp(deps) {
   });
   await app.register(import_helmet.default);
   await app.register(import_cors.default, {
-    origin: CORS_ORIGINS,
+    origin: deps.config.corsOrigins,
     methods: ["GET", "POST", "PATCH"],
     credentials: true
   });
@@ -115453,6 +115291,170 @@ async function buildApp(deps) {
     now
   });
   return app;
+}
+
+// src/config.ts
+var SITE_ORIGIN = "https://yekora.mx";
+var LOCAL_ORIGINS = ["http://localhost:3000", "http://localhost:3100"];
+function corsOrigins(isProduction, database) {
+  const local = !isProduction && database.startsWith("yekora_");
+  return local ? [SITE_ORIGIN, ...LOCAL_ORIGINS] : [SITE_ORIGIN];
+}
+var schema = external_exports.object({
+  NODE_ENV: external_exports.string().default("development"),
+  PORT: external_exports.coerce.number().int().nonnegative().default(3001),
+  HOST: external_exports.string().default("0.0.0.0"),
+  DB_HOST: external_exports.string().min(1),
+  DB_PORT: external_exports.coerce.number().int().positive().default(3306),
+  DB_USER: external_exports.string().min(1),
+  DB_PASSWORD: external_exports.string().default(""),
+  // Same rule as scripts/lib/migrations.ts::isYekoraDatabase: `yekora_…` locally, Hostinger's
+  // `u<digits>_yekora[_…]` in production; never another project's database.
+  DB_NAME: external_exports.string().regex(
+    /^(?:u\d+_yekora(?:_[a-z0-9_]+)?|yekora_[a-z0-9_]+)$/,
+    "must be a Yekora database"
+  ),
+  BANXICO_TOKEN: external_exports.string().optional(),
+  API_VERSION: external_exports.string().default("0.8.6"),
+  GIT_SHA: external_exports.string().default("dev"),
+  PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
+  SITE_URL: external_exports.url().default("https://yekora.mx"),
+  API_PUBLIC_URL: external_exports.url().default("https://apiv1.yekora.mx"),
+  STRIPE_SECRET_KEY: external_exports.string().optional(),
+  STRIPE_WEBHOOK_SECRET: external_exports.string().optional(),
+  MP_ACCESS_TOKEN: external_exports.string().optional(),
+  MP_WEBHOOK_SECRET: external_exports.string().optional(),
+  MP_SANDBOX_IS_TEST_ACCOUNT: external_exports.enum(["true", "false"]).default("false"),
+  CHECKOUT_PII_KEY: external_exports.string().optional(),
+  CUSTOMER_EMAIL_HMAC_PEPPER: external_exports.string().optional(),
+  ORDER_TOKEN_PEPPER: external_exports.string().optional(),
+  AUTH_SECRET: external_exports.string().optional(),
+  TOTP_ENCRYPTION_KEY: external_exports.string().optional(),
+  SMTP_HOST: external_exports.string().optional(),
+  SMTP_PORT: external_exports.coerce.number().int().positive().optional(),
+  SMTP_USER: external_exports.string().optional(),
+  SMTP_PASSWORD: external_exports.string().optional(),
+  MAIL_FROM: external_exports.string().optional()
+});
+var KEY_PREFIXES = {
+  sandbox: {
+    stripe: ["sk_test_", "rk_test_"],
+    mercadoPago: ["TEST-", "APP_USR-"]
+  },
+  live: { stripe: ["sk_live_", "rk_live_"], mercadoPago: ["APP_USR-"] }
+};
+function pair(name2, a, b) {
+  if (!a && !b) return null;
+  if (!a || !b) throw new Error(`${name2} needs both of its secrets or none`);
+  return [a, b];
+}
+function checkMode(name2, key, prefixes) {
+  if (!prefixes.some((prefix) => key.startsWith(prefix))) {
+    throw new Error(`${name2} does not match PAYMENTS_MODE`);
+  }
+}
+function loadPayments(parsed) {
+  const mode = parsed.PAYMENTS_MODE;
+  const prefixes = KEY_PREFIXES[mode];
+  const stripe = pair(
+    "Stripe",
+    parsed.STRIPE_SECRET_KEY,
+    parsed.STRIPE_WEBHOOK_SECRET
+  );
+  if (stripe) checkMode("STRIPE_SECRET_KEY", stripe[0], prefixes.stripe);
+  const mercadoPago = pair(
+    "Mercado Pago",
+    parsed.MP_ACCESS_TOKEN,
+    parsed.MP_WEBHOOK_SECRET
+  );
+  if (mercadoPago) {
+    checkMode("MP_ACCESS_TOKEN", mercadoPago[0], prefixes.mercadoPago);
+    if (mode === "sandbox" && mercadoPago[0].startsWith("APP_USR-") && parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== "true") {
+      throw new Error(
+        "MISSING_APP_USR_CONFIRMATION: MP_ACCESS_TOKEN with APP_USR- in sandbox requires explicit MP_SANDBOX_IS_TEST_ACCOUNT=true"
+      );
+    }
+  }
+  const key = parsed.CHECKOUT_PII_KEY;
+  const peppers = pair(
+    "The checkout",
+    parsed.CUSTOMER_EMAIL_HMAC_PEPPER,
+    parsed.ORDER_TOKEN_PEPPER
+  );
+  if (Boolean(key) !== Boolean(peppers)) {
+    throw new Error("The checkout needs its three secrets or none");
+  }
+  if (peppers?.some((pepper) => pepper.length < 32)) {
+    throw new Error("Checkout peppers must be at least 32 characters");
+  }
+  return {
+    mode,
+    siteUrl: parsed.SITE_URL.replace(/\/$/, ""),
+    apiUrl: parsed.API_PUBLIC_URL.replace(/\/$/, ""),
+    stripe: stripe && { apiKey: stripe[0], webhookSecret: stripe[1] },
+    mercadoPago: mercadoPago && {
+      accessToken: mercadoPago[0],
+      webhookSecret: mercadoPago[1]
+    },
+    checkout: key && peppers ? {
+      piiKey: parsePiiKey(key),
+      emailPepper: peppers[0],
+      tokenPepper: peppers[1]
+    } : null
+  };
+}
+function loadConfig(env2) {
+  const parsed = schema.parse(env2);
+  const isProduction = parsed.NODE_ENV === "production";
+  if (isProduction && parsed.DB_PASSWORD === "") {
+    throw new Error("DB_PASSWORD is required in production");
+  }
+  return {
+    isProduction,
+    corsOrigins: corsOrigins(isProduction, parsed.DB_NAME),
+    port: parsed.PORT,
+    host: parsed.HOST,
+    db: {
+      host: parsed.DB_HOST,
+      port: parsed.DB_PORT,
+      user: parsed.DB_USER,
+      password: parsed.DB_PASSWORD,
+      database: parsed.DB_NAME
+    },
+    banxicoToken: parsed.BANXICO_TOKEN || void 0,
+    version: parsed.API_VERSION,
+    sha: parsed.GIT_SHA,
+    payments: loadPayments(parsed),
+    auth: loadAuth(parsed),
+    mail: loadMail(parsed)
+  };
+}
+function loadMail(parsed) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM } = parsed;
+  const settings = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM];
+  const given = settings.filter(Boolean).length;
+  if (given === 0) return null;
+  if (given < settings.length) {
+    throw new Error("Mail needs all of its settings or none");
+  }
+  return {
+    host: String(SMTP_HOST),
+    port: Number(SMTP_PORT),
+    user: String(SMTP_USER),
+    password: String(SMTP_PASSWORD),
+    from: String(MAIL_FROM)
+  };
+}
+function loadAuth(parsed) {
+  const secrets = pair(
+    "Identity",
+    parsed.AUTH_SECRET,
+    parsed.TOTP_ENCRYPTION_KEY
+  );
+  return secrets && {
+    secret: parseAuthKey("AUTH_SECRET", secrets[0]),
+    totpKey: parseAuthKey("TOTP_ENCRYPTION_KEY", secrets[1])
+  };
 }
 
 // src/services/db.ts
@@ -115591,7 +115593,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "14348f4e9ee48225edf9adccf84fb61aceb8a2b9" : void 0;
+var sha = true ? "1f11daf7f9a982fe3454879d08008dad6f8adab4" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
