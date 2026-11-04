@@ -260,12 +260,13 @@ describe('migrations/NNN_verify.sql (FC 015 §4)', () => {
   const files = readdirSync(join(ROOT, 'migrations'));
   const verifies = files.filter((name) => name.endsWith('_verify.sql'));
 
-  it('exist for 001 to 004 and are never applied as migrations', () => {
+  it('exist for 001 to 005 and are never applied as migrations', () => {
     expect(verifies.sort()).toEqual([
       '001_verify.sql',
       '002_verify.sql',
       '003_verify.sql',
       '004_verify.sql',
+      '005_verify.sql',
     ]);
     expect(verifies.filter((name) => MIGRATION_NAME.test(name))).toEqual([]);
     expect(pendingOrder(verifies)).toEqual([]);

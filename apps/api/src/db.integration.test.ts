@@ -1,7 +1,7 @@
 /**
  * Real-SQL suite (FC 025 T1.2 S): the API's own services against a migrated MariaDB, with the
  * real pool and no fake `Db`. Only the Database (SQL) job runs it (vitest.db.config.ts), after
- * it has applied migrations 001–004 to its `yekora_ci` service.
+ * it has applied migrations 001–005 to its `yekora_ci` service.
  *
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
@@ -772,5 +772,61 @@ describe('mailed code and outbox on real SQL (identity.ts, outbox.ts, outboxDisp
       retry_count: 1,
       error_message: 'smtp down',
     });
+  });
+});
+
+describe('anti-bot nonces and trusted devices of migration 005 (FC 028 Enmienda 1, T2.10)', () => {
+  const hash = (letter: string) => letter.repeat(64);
+  const later = new Date(Date.now() + 5 * 60_000);
+
+  it('spends a challenge nonce once: the primary key refuses the replay (T2.8b)', async () => {
+    await db.query(
+      'INSERT INTO auth_challenge_nonces (nonce_hash, expires_at) VALUES (?, ?)',
+      [hash('a'), later]
+    );
+    await expect(
+      db.query(
+        'INSERT INTO auth_challenge_nonces (nonce_hash, expires_at) VALUES (?, ?)',
+        [hash('a'), later]
+      )
+    ).rejects.toThrow('Duplicate entry');
+    const [key] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_challenge_nonces' AND INDEX_NAME = 'idx_expires' AND COLUMN_NAME = 'expires_at'"
+    );
+    expect(Number(key.n)).toBe(1);
+  });
+
+  it('keeps one row per device token, and drops a user’s devices with the user (CASCADE)', async () => {
+    const passwordHash = await hashPassword('trusted devices passphrase');
+    await createCustomer(db, {
+      email: 'devices@example.test',
+      passwordHash,
+      fullName: 'Devices',
+    });
+    const userId = String(
+      (await findUserByEmail(db, 'devices@example.test'))?.id
+    );
+    await db.query(
+      'INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at) VALUES (?, ?, ?)',
+      [userId, hash('b'), later]
+    );
+    await expect(
+      db.query(
+        'INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at) VALUES (?, ?, ?)',
+        [userId, hash('b'), later]
+      )
+    ).rejects.toThrow('Duplicate entry');
+    await expect(
+      db.query(
+        'INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at) VALUES (?, ?, ?)',
+        [userId, 'short', later]
+      )
+    ).rejects.toThrow('ck_user_trusted_devices_hash');
+    await db.query('DELETE FROM users WHERE id = ?', [userId]);
+    const [left] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM user_trusted_devices WHERE user_id = ?',
+      [userId]
+    );
+    expect(Number(left.n)).toBe(0);
   });
 });
