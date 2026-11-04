@@ -115392,7 +115392,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "3875f9c48a5fe5c36bfb5acd2ed3d26c6680dcbc" : void 0;
+var sha = true ? "836dd32de765a860e46b29bdee984841219b31d8" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
