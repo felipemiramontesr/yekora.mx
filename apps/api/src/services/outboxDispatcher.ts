@@ -163,6 +163,10 @@ export function createOutboxDispatcher(deps: {
   /** One run: frees expired claims, then sends the due messages in order. */
   async function runOnce(): Promise<number> {
     const now = deps.now();
+    // Housekeeping of migration 005: spent anti-bot challenges are useless once expired.
+    await db.query('DELETE FROM auth_challenge_nonces WHERE expires_at < ?', [
+      now,
+    ]);
     await db.query(
       "UPDATE outbox_events SET status = 'PENDING' WHERE status = 'PROCESSING' AND next_retry_at < ?",
       [now]

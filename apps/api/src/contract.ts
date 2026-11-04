@@ -36,6 +36,8 @@ import {
   registeredSchema,
   registerRequestSchema,
   signedInSchema,
+  verifyRequestSchema,
+  botChallengeSchema,
 } from '../../../lib/account/authTypes';
 import {
   accountOrdersQuery,
@@ -245,11 +247,20 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     registerRequestSchema,
     { 202: registeredSchema }
   ),
+  {
+    method: 'GET',
+    path: '/v1/auth/bot-challenge',
+    summary:
+      'A proof-of-work challenge for sign-up and sign-in (ALTCHA format, 30/min)',
+    permission: 'public',
+    request: {},
+    responses: { 200: botChallengeSchema, 503: problemSchema },
+  },
   auth(
     '/v1/auth/login',
-    'Checks the password and opens a 5-minute second-factor challenge',
+    'Checks the password; opens a 5-minute second-factor challenge, or signs a buyer in on a trusted device (201)',
     loginRequestSchema,
-    { 200: loginResponseSchema, 401: problemSchema }
+    { 200: loginResponseSchema, 201: signedInSchema, 401: problemSchema }
   ),
   auth(
     '/v1/auth/totp/enroll',
@@ -265,8 +276,8 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   ),
   auth(
     '/v1/auth/verify',
-    'Signs in with the mailed code, an authenticator code or a backup code',
-    codeRequestSchema,
+    'Signs in with the mailed code, an authenticator code or a backup code; may remember a buyer’s device',
+    verifyRequestSchema,
     { 200: signedInSchema, 401: problemSchema, 409: problemSchema }
   ),
   {
@@ -276,6 +287,14 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     permission: 'account:self',
     request: {},
     responses: { 200: meResponseSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/forget-device',
+    summary: 'Forgets this browser’s trusted device and expires its cookie',
+    permission: 'account:self',
+    request: {},
+    responses: { 204: z.null(), ...SIGNED_IN_REFUSALS },
   },
   {
     method: 'POST',

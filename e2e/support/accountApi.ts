@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import type { Page, Route } from '@playwright/test';
 
 /**
  * The account API as the E2E suites see it (FC 028 F2): `/v1/auth/*` and `/v1/account/*`,
  * `/v1/admin/*` intercepted in the browser, with a session that only opens after the right code,
- * so no test ever reaches production. Shared by account.spec.ts, a11y.spec.ts and
+ * so no test ever reaches production. Sign-in asks for a solved anti-bot challenge and honours a
+ * remembered device (FC 028 Enmienda 1, E1 and E2), as the real API does. Shared by account.spec.ts, a11y.spec.ts and
  * responsive.spec.ts (signed out by default).
  */
 
@@ -13,6 +15,28 @@ export const E2E_CODE = '482913';
 const CHALLENGE = 'c0000000-0000-4000-8000-000000000001';
 
 export const E2E_ORDER = 'YEK-2026-E2E00001';
+
+/** A small anti-bot challenge (secret number 42) the browser solves for real. */
+const SALT = 'e2e0salt?expires=4102444800';
+const BOT = {
+  algorithm: 'SHA-256',
+  challenge: createHash('sha256').update(`${SALT}42`).digest('hex'),
+  maxnumber: 1000,
+  salt: SALT,
+  signature: 'e'.repeat(64),
+};
+
+/** Whether a request carries the solution of `BOT`. */
+function solved(altcha: unknown): boolean {
+  try {
+    const solution = JSON.parse(
+      Buffer.from(String(altcha), 'base64').toString('utf8')
+    ) as { challenge?: string; number?: number };
+    return solution.challenge === BOT.challenge && solution.number === 42;
+  } catch {
+    return false;
+  }
+}
 
 const SUMMARY = {
   orderNumber: E2E_ORDER,
@@ -114,13 +138,22 @@ export async function mockAccountApi(
   options: { signedIn?: Persona; persona?: Persona } = {}
 ): Promise<void> {
   let user: Persona | null = options.signedIn ?? null;
+  let trusted = false;
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   await page.route(
     'https://apiv1.yekora.mx/v1/auth/**',
     withCors(async (route) => {
       const path = new URL(route.request().url()).pathname;
-      const body = route.request().postDataJSON() as Record<string, string>;
+      if (path === '/v1/auth/bot-challenge') return json(route, 200, BOT);
+      const body = route.request().postDataJSON() as Record<string, unknown>;
       if (path === '/v1/auth/login') {
+        if (!solved(body.altcha)) {
+          return problem(route, 400, 'BOT_CHALLENGE_REQUIRED');
+        }
+        if (trusted) {
+          user = persona;
+          return json(route, 201, { status: 'signed_in' });
+        }
         return json(route, 200, {
           challengeId: CHALLENGE,
           next: 'verify',
@@ -130,6 +163,7 @@ export async function mockAccountApi(
       if (path === '/v1/auth/verify') {
         if (body.code !== E2E_CODE) return problem(route, 401, 'INVALID_CODE');
         user = persona;
+        trusted = trusted || body.rememberDevice === true;
         return json(route, 200, { status: 'signed_in' });
       }
       return problem(route, 404, 'NOT_FOUND');
@@ -141,7 +175,8 @@ export async function mockAccountApi(
       answerAccount(
         route,
         () => user,
-        () => (user = null)
+        () => (user = null),
+        () => (trusted = false)
       )
     )
   );
@@ -159,7 +194,8 @@ export async function mockAccountApi(
 function answerAccount(
   route: Route,
   who: () => Persona | null,
-  signOut: () => void
+  signOut: () => void,
+  forget: () => void
 ) {
   const user = who();
   if (user === null) return problem(route, 401, 'SESSION_INVALID_OR_EXPIRED');
@@ -167,6 +203,10 @@ function answerAccount(
   if (path === '/v1/account/me') return json(route, 200, USERS[user]);
   if (path === '/v1/account/logout') {
     signOut();
+    return json(route, 204);
+  }
+  if (path === '/v1/account/forget-device') {
+    forget();
     return json(route, 204);
   }
   return answerOrders(route);

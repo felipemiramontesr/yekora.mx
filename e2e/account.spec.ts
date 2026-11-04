@@ -46,6 +46,33 @@ test('a buyer signs in with the mailed code and opens an order', async ({
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
 });
 
+test('a buyer remembers this device, signs in again without a code, then forgets it (Enmienda 1, E2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page);
+  await page.goto('/cuenta/');
+  const signIn = async () => {
+    await page.getByLabel('Correo electrónico').fill('ana@example.test');
+    await page.getByLabel('Contraseña').fill('correct horse battery');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+  };
+  await signIn();
+  await page.getByLabel('Recordar este dispositivo 30 días').check();
+  await page.getByLabel('Código').fill(E2E_CODE);
+  await page.getByRole('button', { name: 'Confirmar' }).click();
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await page.getByRole('button', { name: 'Salir' }).click();
+  await signIn();
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await page.getByRole('button', { name: 'Olvidar este dispositivo' }).click();
+  await expect(page.getByText('te pediremos el código')).toBeVisible();
+  await page.getByRole('button', { name: 'Salir' }).click();
+  await signIn();
+  await expect(
+    page.getByRole('heading', { name: 'Revisa tu correo' })
+  ).toBeVisible();
+});
+
 test('staff see the panel’s orders, in English too', async ({ page }) => {
   await mockAccountApi(page, { signedIn: 'staff' });
   await page.goto('/en/account/');

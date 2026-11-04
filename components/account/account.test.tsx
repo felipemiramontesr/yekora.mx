@@ -13,6 +13,7 @@ import type { OrderDetail } from '@/lib/account/orderTypes';
 import {
   confirm,
   enroll,
+  forgetDevice,
   listOrders,
   login,
   logout,
@@ -30,6 +31,7 @@ vi.mock('@/lib/api/accountClient', () => ({
   verify: vi.fn(),
   enroll: vi.fn(),
   confirm: vi.fn(),
+  forgetDevice: vi.fn(),
   me: vi.fn(),
   logout: vi.fn(),
   listOrders: vi.fn(),
@@ -42,6 +44,7 @@ const api = {
   verify: vi.mocked(verify),
   enroll: vi.mocked(enroll),
   confirm: vi.mocked(confirm),
+  forgetDevice: vi.mocked(forgetDevice),
   me: vi.mocked(me),
   logout: vi.mocked(logout),
   listOrders: vi.mocked(listOrders),
@@ -352,6 +355,67 @@ describe('account area · signing in (FC 028 F2)', () => {
       secret(ok({ secret: 'A', otpauthUri: 'otpauth://totp/x' }))
     );
     expect(screen.queryByAltText(account.enroll.qrAlt)).toBeNull();
+  });
+});
+
+describe('account area · trusted device (FC 028 Enmienda 1, E2)', () => {
+  it('tells the buyer to look in Spam if the code is late (T2.6f), and remembers the device when asked', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    api.login.mockResolvedValueOnce(
+      ok({ challengeId: CHALLENGE, next: 'verify', channel: 'email' })
+    );
+    type(account.signIn.email, 'ana@example.test');
+    type(account.signIn.password, 'p');
+    press(account.signIn.submit);
+    await screen.findByRole('heading', { name: account.code.titleEmail });
+    expect(screen.getByText(/Spam/).textContent).toContain('ana@example.test');
+    expect(screen.getByText(account.code.rememberHint)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(account.code.remember));
+    api.verify.mockResolvedValueOnce(ok({ status: 'signed_in' }));
+    api.me.mockResolvedValueOnce(ok(BUYER));
+    type(account.code.label, '123456');
+    press(account.code.submit);
+    await screen.findByText('Hola, Ana Flores');
+    expect(api.verify).toHaveBeenLastCalledWith({
+      challengeId: CHALLENGE,
+      code: '123456',
+      rememberDevice: true,
+    });
+  });
+
+  it('never offers to remember the device when the code comes from the authenticator', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    api.login.mockResolvedValueOnce(
+      ok({ challengeId: CHALLENGE, next: 'verify', channel: 'authenticator' })
+    );
+    type(account.signIn.email, 'luis@example.test');
+    type(account.signIn.password, 'p');
+    press(account.signIn.submit);
+    await screen.findByRole('heading', {
+      name: account.code.titleAuthenticator,
+    });
+    expect(screen.queryByLabelText(account.code.remember)).toBeNull();
+  });
+
+  it('signs straight in on a remembered device (201), and forgets it on request', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    api.login.mockResolvedValueOnce(ok({ status: 'signed_in' }) as never);
+    api.me.mockResolvedValueOnce(ok(BUYER));
+    type(account.signIn.email, 'ana@example.test');
+    type(account.signIn.password, 'p');
+    press(account.signIn.submit);
+    await screen.findByText('Hola, Ana Flores');
+    expect(api.verify).not.toHaveBeenCalled();
+    api.forgetDevice.mockResolvedValueOnce(no('offline'));
+    press(account.dashboard.forgetDevice);
+    expect(screen.getByText(account.dashboard.forgettingDevice)).toBeTruthy();
+    await screen.findByText(account.errors.offline);
+    api.forgetDevice.mockResolvedValueOnce(ok(null));
+    press(account.dashboard.forgetDevice);
+    await screen.findByText(account.dashboard.deviceForgotten);
   });
 });
 

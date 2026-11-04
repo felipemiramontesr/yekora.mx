@@ -104,9 +104,17 @@ describe('outbox dispatcher (FC 028 T1.3 S)', () => {
     const { outbox, send, wait } = dispatcher(db);
     outbox.kick();
     await outbox.drain();
-    expect(sql[0].text).toBe(
-      "UPDATE outbox_events SET status = 'PENDING' WHERE status = 'PROCESSING' AND next_retry_at < ?"
-    );
+    // Housekeeping first (migration 005), then expired claims go back to the queue.
+    expect(sql.slice(0, 2)).toEqual([
+      {
+        text: 'DELETE FROM auth_challenge_nonces WHERE expires_at < ?',
+        params: [NOW],
+      },
+      {
+        text: "UPDATE outbox_events SET status = 'PENDING' WHERE status = 'PROCESSING' AND next_retry_at < ?",
+        params: [NOW],
+      },
+    ]);
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'ana@example.test',

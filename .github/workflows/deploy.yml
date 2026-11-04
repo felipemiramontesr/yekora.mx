@@ -220,8 +220,8 @@ jobs:
       DB_USER: root
       DB_PASSWORD: ci-only-root
       DB_NAME: yekora_ci
-      # Fingerprint after 001–004 (FC 028 F0), measured on yekora_dev; production must match it
-      # once 004 is applied with db-migrations.yml (Rule 23). After 001–003 it was 7f5c74dd….
+      # Fingerprint after 001–005 (FC 028 Enmienda 1), measured on yekora_dev and published by
+      # production on 2026-11-04 with db-migrations.yml (Rule 23). After 001–004 it was 56660e98….
       EXPECTED_FINGERPRINT: 4dc9d3dfc4c81ffbf4d1022a362c96a1 (440 elementos)
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

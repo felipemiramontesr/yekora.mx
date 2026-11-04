@@ -8,7 +8,7 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { base32, decryptTotpSecret, tokenHash } from '../services/authCrypto';
 import type { Db, Transactional, TxQuery } from '../services/db';
 
@@ -78,6 +78,8 @@ function freshState() {
       payload: string;
       status: string;
     }[],
+    nonces: new Set<string>(),
+    devices: [] as { user: string; hash: string; expires: Date }[],
   };
 }
 type State = ReturnType<typeof freshState>;
@@ -155,6 +157,25 @@ const sessionRow = (s: State, p: Params) => {
       ]
     : [];
 };
+const spendNonce = (s: State, p: Params) => {
+  const fresh = !s.nonces.has(p[0] as string);
+  s.nonces.add(p[0] as string);
+  return { affectedRows: fresh ? 1 : 0 };
+};
+const trustedRow = (s: State, p: Params) =>
+  s.devices
+    .filter(
+      (d) => d.hash === p[0] && d.user === p[1] && d.expires > (p[2] as Date)
+    )
+    .map(() => ({ id: 1 }));
+const forgetRow = (s: State, p: Params) =>
+  write(() =>
+    s.devices.splice(
+      0,
+      s.devices.length,
+      ...s.devices.filter((d) => !(d.hash === p[0] && d.user === p[1]))
+    )
+  );
 const claimOutbox = (s: State, p: Params) => {
   const row = s.outbox.find((r) => r.id === p[1] && r.status === 'PENDING');
   if (row) row.status = 'PROCESSING';
@@ -304,6 +325,21 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
       ),
   ],
   ["UPDATE outbox_events SET status = 'PENDING'", () => []],
+  ['DELETE FROM auth_challenge_nonces', () => []],
+  ['INSERT IGNORE INTO auth_challenge_nonces', spendNonce],
+  [
+    'INSERT INTO user_trusted_devices',
+    (s, p) =>
+      write(() =>
+        s.devices.push({
+          user: p[0] as string,
+          hash: p[1] as string,
+          expires: p[2] as Date,
+        })
+      ),
+  ],
+  ['SELECT id FROM user_trusted_devices', trustedRow],
+  ['DELETE FROM user_trusted_devices', forgetRow],
   [
     'SELECT id, event_type, payload',
     (s) =>
@@ -365,6 +401,24 @@ async function start(env: Record<string, string> = { ...KEYS, ...MAIL }) {
   return app;
 }
 
+/** Solves the anti-bot challenge as the browser does: tries numbers until the hash matches. */
+async function solved(): Promise<string> {
+  const challenge = (await app.inject('/v1/auth/bot-challenge')).json<{
+    algorithm: string;
+    challenge: string;
+    maxnumber: number;
+    salt: string;
+    signature: string;
+  }>();
+  const sha = (value: string) =>
+    createHash('sha256').update(value).digest('hex');
+  let number = 0;
+  while (sha(`${challenge.salt}${number}`) !== challenge.challenge) number += 1;
+  return Buffer.from(JSON.stringify({ ...challenge, number })).toString(
+    'base64'
+  );
+}
+
 const post = (url: string, payload: object, cookie?: string) =>
   app.inject({
     method: 'POST',
@@ -379,11 +433,26 @@ function cookieOf(response: LightMyRequestResponse): string {
   return header.split(';')[0];
 }
 
-const register = (email: string, fullName = 'Ana Prueba') =>
-  post('/v1/auth/register', { email, password: PASSWORD, fullName });
+async function register(email: string, fullName = 'Ana Prueba') {
+  return post('/v1/auth/register', {
+    email,
+    password: PASSWORD,
+    fullName,
+    altcha: await solved(),
+  });
+}
+
+/** A login request with a fresh solved challenge. */
+async function loginAs(email: string, password = PASSWORD, cookie?: string) {
+  return post(
+    '/v1/auth/login',
+    { email, password, altcha: await solved() },
+    cookie
+  );
+}
 
 async function login(email: string) {
-  return (await post('/v1/auth/login', { email, password: PASSWORD })).json<{
+  return (await loginAs(email)).json<{
     challengeId: string;
     next: string;
     channel: string;
@@ -484,14 +553,8 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
   it('answers the same 401 to a wrong password and to an unknown e-mail', async () => {
     await start();
     await register('ana@example.test');
-    const wrong = await post('/v1/auth/login', {
-      email: 'ana@example.test',
-      password: 'wrong password!',
-    });
-    const unknown = await post('/v1/auth/login', {
-      email: 'nadie@example.test',
-      password: PASSWORD,
-    });
+    const wrong = await loginAs('ana@example.test', 'wrong password!');
+    const unknown = await loginAs('nadie@example.test');
     expect(wrong.statusCode).toBe(401);
     expect(unknown.json()).toEqual(wrong.json());
   });
@@ -499,10 +562,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
   it('opens only a challenge after the password, and queues its code in the same transaction (T2.1a, T2.4b)', async () => {
     await start();
     await register('ana@example.test');
-    const response = await post('/v1/auth/login', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-    });
+    const response = await loginAs('ana@example.test');
     expect(response.statusCode).toBe(200);
     const { challengeId, ...rest } = response.json();
     expect(rest).toEqual({ next: 'verify', channel: 'email' });
@@ -767,10 +827,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
   it('answers 503 MAIL_UNAVAILABLE without the SMTP account, but lets the authenticator in', async () => {
     await start(KEYS);
     await register('ana@example.test');
-    const byMail = await post('/v1/auth/login', {
-      email: 'ana@example.test',
-      password: PASSWORD,
-    });
+    const byMail = await loginAs('ana@example.test');
     expect(byMail.statusCode).toBe(503);
     expect(byMail.json()).toMatchObject({ detail: 'MAIL_UNAVAILABLE' });
     const [user] = [...store.users.values()];
@@ -863,3 +920,259 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(me.json()).toMatchObject({ detail: 'SECOND_FACTOR_REQUIRED' });
   });
 });
+
+describe(
+  'anti-bot challenge (FC 028 Enmienda 1, E1: T1.4, T2.8a–e)',
+  { timeout: 20_000 },
+  () => {
+    it('hands out an ALTCHA-format challenge of difficulty 20 000 that expires in 5 minutes, never cached', async () => {
+      await start();
+      const response = await app.inject('/v1/auth/bot-challenge');
+      expect(response.headers['cache-control']).toBe('no-store');
+      const challenge = response.json<{ maxnumber: number; salt: string }>();
+      expect(challenge).toMatchObject({
+        algorithm: 'SHA-256',
+        maxnumber: 20_000,
+      });
+      const expires = Number(
+        new URLSearchParams(challenge.salt.split('?')[1]).get('expires')
+      );
+      expect(expires * 1000 - NOW.getTime()).toBe(5 * 60_000);
+    });
+
+    it('refuses register and login without a solution (BOT_CHALLENGE_REQUIRED), before any password work (T2.8a)', async () => {
+      await start();
+      const register = await post('/v1/auth/register', {
+        email: 'ana@example.test',
+        password: PASSWORD,
+        fullName: 'Ana',
+      });
+      const login = await post('/v1/auth/login', {
+        email: 'ana@example.test',
+        password: PASSWORD,
+      });
+      for (const response of [register, login]) {
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({
+          detail: 'BOT_CHALLENGE_REQUIRED',
+        });
+      }
+      expect(store.users.size).toBe(0);
+      expect(store.outbox).toEqual([]);
+    });
+
+    it('refuses a forged, tampered, malformed or spent solution (BOT_CHALLENGE_FAILED, T2.8b)', async () => {
+      await start();
+      await register('ana@example.test');
+      const good = await solved();
+      const decoded = JSON.parse(Buffer.from(good, 'base64').toString());
+      const encode = (value: object) =>
+        Buffer.from(JSON.stringify(value)).toString('base64');
+      const attempts = [
+        encode({ ...decoded, number: (decoded.number + 1) % 20_001 }),
+        encode({ ...decoded, signature: 'f'.repeat(64) }),
+        encode({ ...decoded, salt: `${decoded.salt}x` }),
+        encode({ ...decoded, salt: 'no-expiry' }),
+        'not base64 json',
+        encode({ algorithm: 'SHA-1' }),
+      ];
+      for (const altcha of attempts) {
+        const response = await post('/v1/auth/login', {
+          email: 'ana@example.test',
+          password: PASSWORD,
+          altcha,
+        });
+        expect(response.json()).toMatchObject({
+          detail: 'BOT_CHALLENGE_FAILED',
+        });
+      }
+      const first = await post('/v1/auth/login', {
+        email: 'ana@example.test',
+        password: PASSWORD,
+        altcha: good,
+      });
+      const replay = await post('/v1/auth/login', {
+        email: 'ana@example.test',
+        password: PASSWORD,
+        altcha: good,
+      });
+      expect(first.statusCode).toBe(200);
+      expect(replay.json()).toMatchObject({ detail: 'BOT_CHALLENGE_FAILED' });
+    });
+
+    it('refuses a solution whose 5 minutes are over', async () => {
+      store = memoryDb();
+      sent = [];
+      let clock = NOW;
+      app = await buildApp({
+        config: loadConfig({ ...BASE, ...KEYS, ...MAIL }),
+        db: store.db,
+        rate: async () => null,
+        logger: false,
+        now: () => clock,
+        sendMail: async () => undefined,
+      });
+      const altcha = await solved();
+      clock = new Date(NOW.getTime() + 5 * 60_000 + 1000);
+      const response = await post('/v1/auth/login', {
+        email: 'ana@example.test',
+        password: PASSWORD,
+        altcha,
+      });
+      expect(response.json()).toMatchObject({ detail: 'BOT_CHALLENGE_FAILED' });
+    });
+
+    it('limits the challenge endpoint to 30 per minute per IP (T2.8e), and closes it without the keys', async () => {
+      await start();
+      const codes = [];
+      for (let i = 0; i < 31; i++) {
+        codes.push((await app.inject('/v1/auth/bot-challenge')).statusCode);
+      }
+      expect(codes.filter((code) => code === 200)).toHaveLength(30);
+      expect(codes.at(-1)).toBe(429);
+      await app.close();
+      await start({});
+      expect((await app.inject('/v1/auth/bot-challenge')).json()).toMatchObject(
+        {
+          detail: 'AUTH_UNAVAILABLE',
+        }
+      );
+    });
+  }
+);
+
+describe(
+  'trusted device (FC 028 Enmienda 1, E2: T1.1 T, T2.9a–d)',
+  { timeout: 20_000 },
+  () => {
+    /** Registers a buyer, passes the mailed code asking to remember the device; its cookies. */
+    async function rememberedBuyer(email = 'ana@example.test') {
+      await register(email);
+      const { challengeId } = await login(email);
+      const verify = await post('/v1/auth/verify', {
+        challengeId,
+        code: mailedCode(challengeId),
+        rememberDevice: true,
+      });
+      const cookies = [verify.headers['set-cookie']].flat().map(String);
+      return { verify, cookies, device: cookies[1]?.split(';')[0] };
+    }
+
+    it('remembers a buyer’s device for 30 days in a hardened cookie, storing only its SHA-256 (T2.9a, T2.9c)', async () => {
+      await start();
+      const { cookies, device } = await rememberedBuyer();
+      expect(cookies).toHaveLength(2);
+      expect(cookies[1]).toMatch(
+        /^__Host-yekora_device=[\w-]{43}; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict$/
+      );
+      const token = String(device).split('=')[1];
+      expect(store.devices.map((d) => d.hash)).toEqual([tokenHash(token)]);
+      expect(store.devices[0].expires).toEqual(
+        new Date(NOW.getTime() + 2_592_000_000)
+      );
+    });
+
+    it('signs the buyer in after the password alone on that device (201), and asks for the code elsewhere (T1.1 T)', async () => {
+      await start();
+      const { device } = await rememberedBuyer();
+      const trusted = await loginAs(
+        'ana@example.test',
+        PASSWORD,
+        String(device)
+      );
+      expect(trusted.statusCode).toBe(201);
+      expect(trusted.json()).toEqual({ status: 'signed_in' });
+      expect(String(trusted.headers['set-cookie'])).toMatch(
+        /^__Host-yekora_session=/
+      );
+      const elsewhere = await loginAs('ana@example.test');
+      expect(elsewhere.json()).toMatchObject({
+        next: 'verify',
+        channel: 'email',
+      });
+      const forged = await loginAs(
+        'ana@example.test',
+        PASSWORD,
+        `__Host-yekora_device=${'x'.repeat(43)}`
+      );
+      expect(forged.statusCode).toBe(200);
+    });
+
+    it('never lets a device stand in for a wrong password, or for another account', async () => {
+      await start();
+      const { device } = await rememberedBuyer();
+      await register('luis@example.test', 'Luis');
+      const wrong = await loginAs(
+        'ana@example.test',
+        'wrong password!',
+        String(device)
+      );
+      expect(wrong.statusCode).toBe(401);
+      const other = await loginAs(
+        'luis@example.test',
+        PASSWORD,
+        String(device)
+      );
+      expect(other.statusCode).toBe(200);
+    });
+
+    it('forgets an expired device on its own: after 30 days the code is asked again', async () => {
+      await start();
+      const { device } = await rememberedBuyer();
+      store.devices[0].expires = new Date(NOW.getTime() - 1);
+      const response = await loginAs(
+        'ana@example.test',
+        PASSWORD,
+        String(device)
+      );
+      expect(response.json()).toMatchObject({ next: 'verify' });
+    });
+
+    it('never remembers or honours a device for staff or admin (T2.9b)', async () => {
+      await start();
+      const { cookie, secret } = await signedInStaff();
+      expect(cookie).toMatch(/^__Host-yekora_session=/);
+      const again = await login('staff@example.test');
+      const verify = await post('/v1/auth/verify', {
+        challengeId: again.challengeId,
+        code: codeNow(secret),
+        rememberDevice: true,
+      });
+      expect([verify.headers['set-cookie']].flat()).toHaveLength(1);
+      expect(store.devices).toEqual([]);
+      const [user] = [...store.users.values()];
+      store.devices.push({
+        user: String(user.id),
+        hash: tokenHash('d'.repeat(43)),
+        expires: new Date(NOW.getTime() + 60_000),
+      });
+      const planted = await loginAs(
+        'staff@example.test',
+        PASSWORD,
+        `__Host-yekora_device=${'d'.repeat(43)}`
+      );
+      expect(planted.json()).toMatchObject({
+        next: 'verify',
+        channel: 'authenticator',
+      });
+    });
+
+    it('forgets this device on request: the row goes and the cookie expires (T2.9d)', async () => {
+      await start();
+      const { cookies, device } = await rememberedBuyer();
+      const session = cookies[0].split(';')[0];
+      const forget = await post(
+        '/v1/account/forget-device',
+        {},
+        `${session}; ${device}`
+      );
+      expect(forget.statusCode).toBe(204);
+      expect(String(forget.headers['set-cookie'])).toBe(
+        '__Host-yekora_device=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict'
+      );
+      expect(store.devices).toEqual([]);
+      const without = await post('/v1/account/forget-device', {}, session);
+      expect(without.statusCode).toBe(204);
+    });
+  }
+);

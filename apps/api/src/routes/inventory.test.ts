@@ -25,12 +25,15 @@ const INVENTORY = [
   // FC 028 T2.6a: every order path also declares the writes, only to refuse them with 405.
   '├── /v1/orders/:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 028: sign-up and sign-in (public, rate limited), the account and the panel (guarded).
+  // FC 028 Enmienda 1: the anti-bot challenge, public and rate limited.
+  '├── /v1/auth/bot-challenge (GET, HEAD)',
   '├── /v1/auth/register (POST)',
   '├── /v1/auth/login (POST)',
   '├── /v1/auth/totp/enroll (POST)',
   '├── /v1/auth/totp/confirm (POST)',
   '├── /v1/auth/verify (POST)',
   '├── /v1/account/me (GET, HEAD)',
+  '├── /v1/account/forget-device (POST)',
   '├── /v1/account/logout (POST)',
   '├── /v1/account/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',

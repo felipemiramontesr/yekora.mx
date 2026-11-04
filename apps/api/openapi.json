@@ -1776,6 +1776,11 @@
                     "type": "string",
                     "minLength": 2,
                     "maxLength": 150
+                  },
+                  "altcha": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
                   }
                 },
                 "required": ["email", "password", "fullName"],
@@ -1862,9 +1867,88 @@
         }
       }
     },
+    "/v1/auth/bot-challenge": {
+      "get": {
+        "summary": "A proof-of-work challenge for sign-up and sign-in (ALTCHA format, 30/min)",
+        "x-permission": "public",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "algorithm": {
+                      "type": "string",
+                      "const": "SHA-256"
+                    },
+                    "challenge": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "maxnumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "salt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "signature": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "challenge",
+                    "maxnumber",
+                    "salt",
+                    "signature"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/login": {
       "post": {
-        "summary": "Checks the password and opens a 5-minute second-factor challenge",
+        "summary": "Checks the password; opens a 5-minute second-factor challenge, or signs a buyer in on a trusted device (201)",
         "x-permission": "public",
         "parameters": [],
         "requestBody": {
@@ -1881,6 +1965,11 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128
+                  },
+                  "altcha": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
                   }
                 },
                 "required": ["email", "password"],
@@ -1912,6 +2001,24 @@
                     }
                   },
                   "required": ["challengeId", "next", "channel"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "signed_in"
+                    }
+                  },
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -2336,7 +2443,7 @@
     },
     "/v1/auth/verify": {
       "post": {
-        "summary": "Signs in with the mailed code, an authenticator code or a backup code",
+        "summary": "Signs in with the mailed code, an authenticator code or a backup code; may remember a buyer’s device",
         "x-permission": "public",
         "parameters": [],
         "requestBody": {
@@ -2354,6 +2461,9 @@
                   "code": {
                     "type": "string",
                     "pattern": "^(?:\\d{6}|\\d{8})$"
+                  },
+                  "rememberDevice": {
+                    "type": "boolean"
                   }
                 },
                 "required": ["challengeId", "code"],
@@ -2543,6 +2653,109 @@
                     "permissions"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/forget-device": {
+      "post": {
+        "summary": "Forgets this browser’s trusted device and expires its cookie",
+        "x-permission": "account:self",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
                 }
               }
             }

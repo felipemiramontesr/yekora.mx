@@ -397,13 +397,14 @@ export async function useBackupCode(
  * Ends a challenge and opens the session, in one transaction.
  *
  * @param tx - Transaction.
- * @param input - Challenge, user, privilege, client and clock.
+ * @param input - Challenge (null when a buyer's trusted device stood in for the second factor,
+ *   Enmienda 1), user, privilege, client and clock.
  * @returns The session token for the cookie, and its lifetime in seconds.
  */
 export async function openSession(
   tx: Pick<Db, 'query'>,
   input: {
-    challengeId: string;
+    challengeId: string | null;
     userId: string;
     privileged: boolean;
     ip: string | null;
@@ -415,9 +416,11 @@ export async function openSession(
   const lifetime = input.privileged
     ? SESSION_MS.privileged
     : SESSION_MS.customer;
-  await tx.query('DELETE FROM two_factor_challenges WHERE id = ?', [
-    input.challengeId,
-  ]);
+  if (input.challengeId !== null) {
+    await tx.query('DELETE FROM two_factor_challenges WHERE id = ?', [
+      input.challengeId,
+    ]);
+  }
   await tx.query(
     'INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
     [

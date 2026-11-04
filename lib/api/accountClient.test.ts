@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   confirm,
   enroll,
+  forgetDevice,
   listOrders,
   login,
   logout,
@@ -24,6 +26,30 @@ function answer(status: number, body?: unknown) {
           headers: { 'Content-Type': 'application/json' },
         })
   );
+}
+
+/** A small anti-bot challenge whose secret number is 7. */
+const SALT = 'a1b2c3?expires=1793000000';
+const BOT = {
+  algorithm: 'SHA-256',
+  challenge: createHash('sha256').update(`${SALT}7`).digest('hex'),
+  maxnumber: 10,
+  salt: SALT,
+  signature: 'f'.repeat(64),
+};
+
+/** A fetch that hands out a challenge first, then answers the request itself. */
+function proved(status: number, body: unknown, challenge: unknown = BOT) {
+  return vi.fn<typeof fetch>(async (url) =>
+    (url as string).endsWith('/v1/auth/bot-challenge')
+      ? new Response(JSON.stringify(challenge), { status: 200 })
+      : new Response(JSON.stringify(body), { status })
+  );
+}
+
+/** The URL and options of the call after the challenge. */
+function provedCall(fetchImpl: ReturnType<typeof proved>) {
+  return fetchImpl.mock.calls[1] as unknown as [string, RequestInit];
 }
 
 /** The URL and options of the only call. */
@@ -49,21 +75,96 @@ afterEach(() => {
 });
 
 describe('account client (FC 028 F2)', () => {
-  it('signs up with the session cookie allowed, and reads the acceptance', async () => {
-    const fetchImpl = answer(202, { status: 'accepted' });
+  it('signs up with the session cookie allowed and a solved challenge, and reads the acceptance', async () => {
+    const fetchImpl = proved(202, { status: 'accepted' });
     const body = { email: 'a@b.mx', password: 'x'.repeat(12), fullName: 'A' };
     expect(await register(body, { fetchImpl })).toEqual({
       ok: true,
       data: { status: 'accepted' },
     });
-    const [url, init] = sent(fetchImpl);
+    const [url, init] = provedCall(fetchImpl);
     expect(url).toBe('https://apiv1.yekora.mx/v1/auth/register');
     expect(init).toMatchObject({
       method: 'POST',
       credentials: 'include',
-      body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     });
+    const { altcha, ...rest } = JSON.parse(String(init.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(rest).toEqual(body);
+    expect(JSON.parse(atob(String(altcha)))).toEqual({ ...BOT, number: 7 });
+  });
+
+  it('never sends sign-in without a solved challenge (Enmienda 1, E1)', async () => {
+    const refused = answer(503, { detail: 'AUTH_UNAVAILABLE' });
+    expect(
+      await login({ email: 'a@b.mx', password: 'p' }, { fetchImpl: refused })
+    ).toEqual({ ok: false, reason: 'AUTH_UNAVAILABLE' });
+    expect(refused).toHaveBeenCalledTimes(1);
+    // A challenge no number solves can only be forged.
+    const forged = proved(200, {}, { ...BOT, challenge: 'e'.repeat(64) });
+    expect(
+      await login({ email: 'a@b.mx', password: 'p' }, { fetchImpl: forged })
+    ).toEqual({ ok: false, reason: 'invalid' });
+    expect(forged).toHaveBeenCalledTimes(1);
+    const spent = proved(400, { detail: 'BOT_CHALLENGE_FAILED' });
+    expect(
+      await login({ email: 'a@b.mx', password: 'p' }, { fetchImpl: spent })
+    ).toEqual({ ok: false, reason: 'BOT_CHALLENGE_FAILED' });
+  });
+
+  it('signs in without a code on a trusted device (201), and asks to remember one (Enmienda 1, E2)', async () => {
+    expect(
+      await login(
+        { email: 'a@b.mx', password: 'p' },
+        { fetchImpl: proved(201, { status: 'signed_in' }) }
+      )
+    ).toEqual({ ok: true, data: { status: 'signed_in' } });
+    const remembering = answer(200, { status: 'signed_in' });
+    await verify(
+      { challengeId: CHALLENGE, code: '123456', rememberDevice: true },
+      { fetchImpl: remembering }
+    );
+    expect(JSON.parse(String(sent(remembering)[1].body))).toEqual({
+      challengeId: CHALLENGE,
+      code: '123456',
+      rememberDevice: true,
+    });
+    const forget = answer(204);
+    expect(await forgetDevice({ fetchImpl: forget })).toEqual({
+      ok: true,
+      data: null,
+    });
+    expect(sent(forget)).toEqual([
+      'https://apiv1.yekora.mx/v1/account/forget-device',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    ]);
+  });
+
+  it('waits 25 s for a sleeping API before giving up (282_AN P1, T2.6d)', async () => {
+    vi.useFakeTimers();
+    try {
+      const hanging = vi.fn(
+        (_url: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            );
+          })
+      );
+      let settled = false;
+      const pending = me({ fetchImpl: hanging }).finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(24_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ ok: false, reason: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens a challenge, sends its code, enrols and confirms the authenticator', async () => {
@@ -75,7 +176,7 @@ describe('account client (FC 028 F2)', () => {
     expect(
       await login(
         { email: 'a@b.mx', password: 'p' },
-        { fetchImpl: answer(200, challenge) }
+        { fetchImpl: proved(200, challenge) }
       )
     ).toEqual({ ok: true, data: challenge });
     expect(
@@ -204,6 +305,7 @@ describe('account client (FC 028 F2)', () => {
   it('uses the browser fetch by default', async () => {
     const fetchImpl = answer(200, { status: 'signed_in' });
     vi.stubGlobal('fetch', fetchImpl);
+    await forgetDevice();
     await verify({ challengeId: CHALLENGE, code: '123456' });
     await logout();
     await me();
@@ -213,6 +315,7 @@ describe('account client (FC 028 F2)', () => {
     await login({ email: 'a@b.mx', password: 'p' });
     await enroll(CHALLENGE);
     await confirm({ challengeId: CHALLENGE, code: '123456' });
-    expect(fetchImpl).toHaveBeenCalledTimes(9);
+    // Sign-up and sign-in stop at the challenge, which this answer does not fit.
+    expect(fetchImpl).toHaveBeenCalledTimes(10);
   });
 });

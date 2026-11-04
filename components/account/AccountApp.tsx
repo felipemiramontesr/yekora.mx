@@ -8,7 +8,7 @@ import {
   parseAccountPath,
 } from '@/lib/account/accountPaths';
 import type { MeResponse } from '@/lib/account/authTypes';
-import { logout, me } from '@/lib/api/accountClient';
+import { forgetDevice, logout, me } from '@/lib/api/accountClient';
 import { fill } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import {
@@ -112,6 +112,7 @@ export function AccountApp({
           initialEmail={stage.email}
           notice={stage.notice}
           onChallenge={(challenge) => setStage({ kind: 'code', ...challenge })}
+          onSignedIn={() => void loadSession()}
           onRegister={() => setStage({ kind: 'register' })}
         />
       )}
@@ -189,6 +190,8 @@ function Dashboard({
 }>) {
   const { dashboard } = texts.account;
   const [leaving, setLeaving] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+  const [deviceNote, setDeviceNote] = useState<string | null>(null);
   const panel = user.permissions.includes(PANEL_PERMISSION);
   // Without the permission the panel is not offered; the API would refuse it anyway.
   const tab = panel ? view.tab : 'orders';
@@ -213,6 +216,27 @@ function Dashboard({
         >
           {leaving ? dashboard.signingOut : dashboard.signOut}
         </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          disabled={forgetting}
+          onClick={() => {
+            setForgetting(true);
+            void forgetDevice().then((result) => {
+              setForgetting(false);
+              setDeviceNote(
+                result.ok
+                  ? dashboard.deviceForgotten
+                  : failureText(texts.account, result.reason)
+              );
+            });
+          }}
+          className="tap-target self-start text-sm underline underline-offset-4"
+        >
+          {forgetting ? dashboard.forgettingDevice : dashboard.forgetDevice}
+        </button>
+        {deviceNote && <output className="block text-sm">{deviceNote}</output>}
       </div>
       <nav aria-label={dashboard.tabsLabel}>
         <ul className="flex gap-6 border-b border-petroleo/20">

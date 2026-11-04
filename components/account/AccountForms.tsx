@@ -1,7 +1,13 @@
 'use client';
 
 import qrcode from 'qrcode-generator';
-import { type SubmitEvent, useEffect, useId, useState } from 'react';
+import {
+  type ReactNode,
+  type SubmitEvent,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import type { Messages } from '@/app/i18n';
 import {
   type AccountFailure,
@@ -45,12 +51,14 @@ export function failureText(
 }
 
 /**
- * Sign-in with e-mail and password (step one): opens the challenge whose code comes next.
+ * Sign-in with e-mail and password (step one): opens the challenge whose code comes next, or
+ * signs a buyer straight in on a device remembered for 30 days (Enmienda 1, E2).
  *
  * @param messages - `account` texts.
  * @param initialEmail - The e-mail just registered, if any.
  * @param notice - A message to show above the form (e.g. after registering).
  * @param onChallenge - Called with the open challenge.
+ * @param onSignedIn - The session is open without a code (trusted device).
  * @param onRegister - Switches to the sign-up form.
  */
 export function SignInForm({
@@ -58,6 +66,7 @@ export function SignInForm({
   initialEmail,
   notice,
   onChallenge,
+  onSignedIn,
   onRegister,
 }: Readonly<{
   messages: AccountMessages;
@@ -68,6 +77,7 @@ export function SignInForm({
     channel: Channel;
     email: string;
   }) => void;
+  onSignedIn: () => void;
   onRegister: () => void;
 }>) {
   const base = useId();
@@ -85,15 +95,18 @@ export function SignInForm({
     setBusy(true);
     const result = await login({ email, password });
     setBusy(false);
-    if (result.ok) {
-      onChallenge({
-        challengeId: result.data.challengeId,
-        channel: result.data.channel,
-        email: email.trim(),
-      });
+    if (!result.ok) {
+      setError(failureText(messages, result.reason));
       return;
     }
-    setError(failureText(messages, result.reason));
+    const answer = result.data;
+    if ('status' in answer) onSignedIn();
+    else
+      onChallenge({
+        challengeId: answer.challengeId,
+        channel: answer.channel,
+        email: email.trim(),
+      });
   }
 
   return (
@@ -225,6 +238,7 @@ function CodeInput({
   busy,
   submit,
   submitting,
+  before,
 }: Readonly<{
   id: string;
   label: string;
@@ -233,6 +247,8 @@ function CodeInput({
   busy: boolean;
   submit: string;
   submitting: string;
+  /** Shown between the input and the button. */
+  before?: ReactNode;
 }>) {
   return (
     <>
@@ -247,6 +263,7 @@ function CodeInput({
           maxLength: 8,
         }}
       />
+      {before}
       <button type="submit" disabled={busy} className={BUTTON}>
         {busy ? submitting : submit}
       </button>
@@ -278,6 +295,7 @@ export function CodeForm({
 }>) {
   const base = useId();
   const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const byMail = challenge.channel === 'email';
@@ -289,7 +307,12 @@ export function CodeForm({
       return;
     }
     setBusy(true);
-    const result = await verify({ challengeId: challenge.challengeId, code });
+    const result = await verify({
+      challengeId: challenge.challengeId,
+      code,
+      // Only the mailed code offers it: staff sign in with the authenticator and are never remembered.
+      ...(byMail && remember ? { rememberDevice: true } : {}),
+    });
     setBusy(false);
     if (result.ok) onSignedIn();
     else if (result.reason === 'TOTP_NOT_ENROLLED') onEnroll();
@@ -315,6 +338,28 @@ export function CodeForm({
         busy={busy}
         submit={messages.code.submit}
         submitting={messages.code.submitting}
+        before={
+          byMail && (
+            <div className="flex flex-col gap-1">
+              <label className="flex min-h-11 items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(event) => setRemember(event.target.checked)}
+                  aria-describedby={`${base}-remember-hint`}
+                  className="size-5 accent-petroleo"
+                />
+                {messages.code.remember}
+              </label>
+              <p
+                id={`${base}-remember-hint`}
+                className="text-sm text-petroleo/80"
+              >
+                {messages.code.rememberHint}
+              </p>
+            </div>
+          )
+        }
       />
       <button type="button" onClick={onRestart} className={LINK_BUTTON}>
         {messages.code.restart}

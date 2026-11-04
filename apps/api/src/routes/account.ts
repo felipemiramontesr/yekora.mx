@@ -5,7 +5,9 @@
  *
  * - `me` answers who is signed in, with the roles and permissions the interface may show
  *   (143_AN B4: the interface only hides; the API decides).
- * - `logout` ends the session and clears the cookie.
+ * - `logout` ends the session and clears the cookie. A trusted device stays remembered.
+ * - `forget-device` (Enmienda 1, T2.9d) forgets this browser's trusted device: the row goes and
+ *   the cookie expires. Only the signed-in user's own device is touched.
  * - `orders` lists the buyer's own orders, always filtered by the session's user (T2.6b), and
  *   `orders/:order_number` shows one of them; another account's order, or a guest purchase, is
  *   refused with 403 DATA_DOMAIN_FORBIDDEN (T1.2 D). Read-only (T2.6a, routes/orders.ts).
@@ -20,11 +22,16 @@ import {
   orderPageSchema,
 } from '../../../../lib/account/orderTypes';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
-import { clearedSessionCookie } from '../lib/session';
+import {
+  clearedDeviceCookie,
+  clearedSessionCookie,
+  readDeviceToken,
+} from '../lib/session';
 import { expireOverdueOrders } from '../services/checkout';
 import type { Db, Transactional } from '../services/db';
 import { closeSession, type SessionUser } from '../services/identity';
 import { listOrders } from '../services/orderReads';
+import { forgetDevice } from '../services/trustedDevices';
 import { lookUpOrder } from './orders';
 
 /** Dependencies of the account routes. */
@@ -56,6 +63,14 @@ export function registerAccountRoutes(
         permissions: user.permissions,
       })
     );
+  });
+
+  app.post('/v1/account/forget-device', async (request, reply) => {
+    const token = readDeviceToken(request.headers.cookie);
+    if (token !== null) {
+      await forgetDevice(deps.db, token, (request.user as SessionUser).userId);
+    }
+    return reply.header('Set-Cookie', clearedDeviceCookie()).code(204).send();
   });
 
   app.post('/v1/account/logout', async (request, reply) => {

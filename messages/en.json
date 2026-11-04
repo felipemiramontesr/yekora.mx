@@ -680,7 +680,9 @@
       "label": "Code",
       "submit": "Confirm",
       "submitting": "Confirming… this can take a few seconds",
-      "restart": "Start over"
+      "restart": "Start over",
+      "remember": "Remember this device for 30 days",
+      "rememberHint": "Only on a device of your own: here we will not ask for the code for 30 days. Do not tick it on a shared computer."
     },
     "enroll": {
       "title": "Turn on two-step verification",
@@ -706,7 +708,10 @@
       "signingOut": "Signing out…",
       "tabsLabel": "Sections of your account",
       "orders": "My orders",
-      "panel": "Panel: orders"
+      "panel": "Panel: orders",
+      "forgetDevice": "Forget this device",
+      "forgettingDevice": "Forgetting…",
+      "deviceForgotten": "Done. Next time you sign in from here we will ask for the code."
     },
     "orders": {
       "loading": "Loading orders…",
@@ -776,7 +781,9 @@
       "invalid": "Something went wrong. Try again.",
       "codeFormat": "Type the 6 digits (or the 8 of a backup code).",
       "required": "Fill in every field.",
-      "passwordLength": "The password needs at least 12 characters."
+      "passwordLength": "The password needs at least 12 characters.",
+      "BOT_CHALLENGE_REQUIRED": "We could not confirm you are a person. Reload the page and try again.",
+      "BOT_CHALLENGE_FAILED": "The security check expired. Try again."
     }
   }
 }

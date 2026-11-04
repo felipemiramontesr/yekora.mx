@@ -4,14 +4,15 @@
  *
  * Every request carries credentials, so the `__Host-yekora_session` cookie travels to
  * apiv1.yekora.mx (same site, so SameSite=Strict lets it through) and comes back set by the
- * sign-in. Like the other clients it never throws: offline, a timeout, an answer outside the
+ * sign-in. Sign-up and sign-in first solve the anti-bot challenge (Enmienda 1, E1). Like the other clients it never throws: offline, a timeout, an answer outside the
  * contract or a refusal become a typed reason, the refusal by its machine code (the problem's
  * `detail`), so the page can say exactly what happened.
  *
  * @module
  */
-import type { z } from 'zod';
+import { z } from 'zod';
 import {
+  botChallengeSchema,
   confirmResponseSchema,
   enrollResponseSchema,
   loginResponseSchema,
@@ -19,6 +20,7 @@ import {
   registeredSchema,
   signedInSchema,
 } from '@/lib/account/authTypes';
+import { solveBotChallenge } from '@/lib/account/botSolver';
 import {
   type OrderDetail,
   orderDetailSchema,
@@ -44,6 +46,8 @@ const CODES = [
   'SECOND_FACTOR_REQUIRED',
   'PERMISSION_DENIED',
   'DATA_DOMAIN_FORBIDDEN',
+  'BOT_CHALLENGE_REQUIRED',
+  'BOT_CHALLENGE_FAILED',
 ] as const;
 
 /** Why a request gave no usable answer. */
@@ -97,6 +101,43 @@ async function request<T>(
 }
 
 /**
+ * Fetches an anti-bot challenge and solves it (Enmienda 1, E1). A challenge no number solves can
+ * only be forged, so it reads as an answer outside the contract.
+ */
+async function botProof(
+  options: ClientOptions
+): Promise<AccountResult<string>> {
+  const challenge = await request(
+    '/v1/auth/bot-challenge',
+    botChallengeSchema,
+    {},
+    options
+  );
+  if (!challenge.ok) return challenge;
+  const solution = await solveBotChallenge(challenge.data);
+  return solution === null
+    ? { ok: false, reason: 'invalid' }
+    : { ok: true, data: solution };
+}
+
+/** A sign-up or sign-in request, sent with a freshly solved challenge. */
+async function withProof<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  body: object,
+  options: ClientOptions
+): Promise<AccountResult<T>> {
+  const proof = await botProof(options);
+  if (!proof.ok) return proof;
+  return request(
+    path,
+    schema,
+    { method: 'POST', body: { ...body, altcha: proof.data } },
+    options
+  );
+}
+
+/**
  * Creates a buyer account. The API answers the same whether the e-mail existed or not.
  *
  * @param body - E-mail, password (12 to 128 characters) and full name.
@@ -107,43 +148,38 @@ export function register(
   body: { email: string; password: string; fullName: string },
   options: ClientOptions = {}
 ) {
-  return request(
-    '/v1/auth/register',
-    registeredSchema,
-    { method: 'POST', body },
-    options
-  );
+  return withProof('/v1/auth/register', registeredSchema, body, options);
 }
 
+/** What sign-in answers: a challenge whose code comes next, or signed in on a trusted device. */
+const loginAnswerSchema = z.union([loginResponseSchema, signedInSchema]);
+
 /**
- * Checks the password and opens a 5-minute challenge.
+ * Checks the password and opens a 5-minute challenge, unless this device is trusted (E2).
  *
  * @param body - E-mail and password.
  * @param options - Injectable fetch.
- * @returns The challenge and where its code comes from (mail or authenticator).
+ * @returns The challenge and where its code comes from (mail or authenticator), or
+ *   `{ status: 'signed_in' }` when a buyer's remembered device skips the code.
  */
 export function login(
   body: { email: string; password: string },
   options: ClientOptions = {}
 ) {
-  return request(
-    '/v1/auth/login',
-    loginResponseSchema,
-    { method: 'POST', body },
-    options
-  );
+  return withProof('/v1/auth/login', loginAnswerSchema, body, options);
 }
 
 /**
  * Sends the code of a challenge: the mailed one, an authenticator code or a backup code.
  *
- * @param body - Challenge id and code (6 or 8 digits).
+ * @param body - Challenge id, code (6 or 8 digits) and whether to remember this device for 30
+ *   days (buyers only; the API ignores it for staff).
  * @param options - Injectable fetch.
  * @returns Signed in (the cookie is set), or why not; `TOTP_NOT_ENROLLED` asks staff to
  *   enrol the authenticator with the same challenge.
  */
 export function verify(
-  body: { challengeId: string; code: string },
+  body: { challengeId: string; code: string; rememberDevice?: boolean },
   options: ClientOptions = {}
 ) {
   return request(
@@ -199,19 +235,14 @@ export function me(options: ClientOptions = {}) {
   return request('/v1/account/me', meResponseSchema, {}, options);
 }
 
-/**
- * Ends the session; the API clears the cookie.
- *
- * @param options - Injectable fetch.
- * @returns Done, or why not.
- */
-export async function logout(
-  options: ClientOptions = {}
+/** A POST of the signed-in area that answers 204 with no body. */
+async function emptyPost(
+  path: string,
+  { fetchImpl = fetch }: ClientOptions
 ): Promise<AccountResult<null>> {
-  const { fetchImpl = fetch } = options;
   const answer = await call(
     fetchImpl,
-    `${API_URL}/v1/account/logout`,
+    `${API_URL}${path}`,
     { method: 'POST', credentials: 'include' },
     TIMEOUT_MS
   );
@@ -219,6 +250,26 @@ export async function logout(
   return answer.ok
     ? { ok: true, data: null }
     : { ok: false, reason: refusal(answer.status, await json(answer)) };
+}
+
+/**
+ * Ends the session; the API clears the cookie.
+ *
+ * @param options - Injectable fetch.
+ * @returns Done, or why not.
+ */
+export function logout(options: ClientOptions = {}) {
+  return emptyPost('/v1/account/logout', options);
+}
+
+/**
+ * Forgets this device (Enmienda 1, E2): the next sign-in asks for the mailed code again.
+ *
+ * @param options - Injectable fetch.
+ * @returns Done, or why not.
+ */
+export function forgetDevice(options: ClientOptions = {}) {
+  return emptyPost('/v1/account/forget-device', options);
 }
 
 /** Whose orders: the buyer's own, or every order for the panel. */

@@ -680,7 +680,9 @@
       "label": "Código",
       "submit": "Confirmar",
       "submitting": "Confirmando… puede tardar unos segundos",
-      "restart": "Volver a empezar"
+      "restart": "Volver a empezar",
+      "remember": "Recordar este dispositivo 30 días",
+      "rememberHint": "Solo en un dispositivo tuyo: aquí no te pediremos el código durante 30 días. No lo marques en una computadora compartida."
     },
     "enroll": {
       "title": "Activa la verificación en dos pasos",
@@ -706,7 +708,10 @@
       "signingOut": "Saliendo…",
       "tabsLabel": "Secciones de tu cuenta",
       "orders": "Mis pedidos",
-      "panel": "Panel: pedidos"
+      "panel": "Panel: pedidos",
+      "forgetDevice": "Olvidar este dispositivo",
+      "forgettingDevice": "Olvidando…",
+      "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código."
     },
     "orders": {
       "loading": "Cargando pedidos…",
@@ -776,7 +781,9 @@
       "invalid": "Algo salió mal. Intenta de nuevo.",
       "codeFormat": "Escribe los 6 dígitos (u 8 de un código de respaldo).",
       "required": "Completa todos los campos.",
-      "passwordLength": "La contraseña necesita al menos 12 caracteres."
+      "passwordLength": "La contraseña necesita al menos 12 caracteres.",
+      "BOT_CHALLENGE_REQUIRED": "No pudimos confirmar que eres una persona. Recarga la página e intenta de nuevo.",
+      "BOT_CHALLENGE_FAILED": "La verificación de seguridad venció. Intenta de nuevo."
     }
   }
 }

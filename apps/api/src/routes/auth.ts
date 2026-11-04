@@ -11,12 +11,19 @@
  * - `totp/enroll` and `totp/confirm` turn the authenticator on, only after the mailbox was
  *   proved; confirming issues the 8 backup codes, shown once, queues a security alert in the
  *   same transaction (T2.4b) and opens the session.
+ * - `bot-challenge` (Enmienda 1, E1) hands out a proof-of-work challenge. `register` and `login`
+ *   check its solution (`altcha`) before anything else: without a valid, unspent one no password
+ *   is checked and no mail is queued (T2.8a), and the answer is 400 BOT_CHALLENGE_REQUIRED or
+ *   BOT_CHALLENGE_FAILED (T1.4).
+ * - A buyer may ask `verify` to remember the device for 30 days (E2). On that device `login` then
+ *   answers 201 signed in after the password alone. Never for staff or admin (T2.9b).
  * A wrong code counts against the challenge (5 at most). Without AUTH_SECRET and
  * TOTP_ENCRYPTION_KEY every route answers 503; without the SMTP account, a sign-in that needs the
  * mailed code answers 503 MAIL_UNAVAILABLE.
  *
  * The /v1 contract is published, so the mailed code arrived without breaking it (FC 027 Q03):
- * `login` gained a property and `verify` answers with the 409 it already declared.
+ * `login` gained a property and `verify` answers with the 409 it already declared. Enmienda 1
+ * adds only optional body fields, a new status (201) and new routes.
  *
  * @module
  */
@@ -32,11 +39,12 @@ import {
   registeredSchema,
   registerRequestSchema,
   signedInSchema,
+  verifyRequestSchema,
 } from '../../../../lib/account/authTypes';
 import type { AuthSecrets } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
-import { sessionCookie } from '../lib/session';
+import { deviceCookie, readDeviceToken, sessionCookie } from '../lib/session';
 import {
   base32,
   codeHash,
@@ -49,6 +57,7 @@ import {
   sameHash,
   verifyTotp,
 } from '../services/authCrypto';
+import { checkChallenge, issueChallenge } from '../services/botChallenge';
 import type { Db, Transactional } from '../services/db';
 import {
   canonicalEmail,
@@ -71,6 +80,7 @@ import {
 } from '../services/identity';
 import { enqueueMail } from '../services/outbox';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
+import { isTrustedDevice, rememberDevice } from '../services/trustedDevices';
 
 /** Dependencies of the auth routes. */
 interface AuthDeps {
@@ -90,6 +100,8 @@ const TITLES: Record<string, string> = {
   INVALID_CODE: 'Invalid code',
   TOTP_ALREADY_ENABLED: 'Authenticator already enabled',
   TOTP_NOT_ENROLLED: 'Set up the authenticator first',
+  BOT_CHALLENGE_REQUIRED: 'Anti-bot check required',
+  BOT_CHALLENGE_FAILED: 'Anti-bot check failed',
 };
 
 /** An RFC 7807 refusal whose detail is its machine code. */
@@ -101,6 +113,10 @@ function refuse(reply: FastifyReply, status: number, code: string) {
 }
 
 const LIMITED = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+/** T2.8e: the challenge endpoint, 30 per minute per IP. */
+const CHALLENGE_LIMIT = {
+  config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+};
 
 /**
  * Registers the sign-up and sign-in routes.
@@ -148,7 +164,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     reply: FastifyReply,
     auth: AuthSecrets,
     challenge: Challenge,
-    code: string
+    code: string,
+    remember: boolean
   ) {
     if (!sameHash(challenge.codeHash, codeHash(auth.secret, code))) {
       await failChallenge(deps.db, challenge.id);
@@ -160,33 +177,75 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
       await passEmailChallenge(deps.db, auth.secret, challenge.id);
       return refuse(reply, 409, 'TOTP_NOT_ENROLLED');
     }
-    await signIn(request, reply, challenge, roles);
+    await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: 'signed_in' });
   }
 
-  /** Opens the session of a passed challenge and sets the cookie. */
+  /**
+   * Opens the session of a passed challenge (or of a trusted device: no challenge) and sets the
+   * cookie; for a buyer who asked, also remembers the device for 30 days (E2, never staff).
+   */
   async function signIn(
     request: FastifyRequest,
     reply: FastifyReply,
-    challenge: Challenge,
-    roles: readonly string[]
+    passed: { id: string | null; userId: string },
+    roles: readonly string[],
+    remember = false
   ): Promise<void> {
-    const { token, maxAgeSeconds } = await deps.db.transaction((tx) =>
-      openSession(tx, {
-        challengeId: challenge.id,
-        userId: challenge.userId,
-        privileged: isPrivileged(roles),
-        ...clientFacts(request.ip, request.headers['user-agent']),
+    const privileged = isPrivileged(roles);
+    const facts = clientFacts(request.ip, request.headers['user-agent']);
+    const cookies = await deps.db.transaction(async (tx) => {
+      const { token, maxAgeSeconds } = await openSession(tx, {
+        challengeId: passed.id,
+        userId: passed.userId,
+        privileged,
+        ...facts,
         now: deps.now(),
-      })
-    );
-    reply.header('Set-Cookie', sessionCookie(token, maxAgeSeconds));
+      });
+      const session = sessionCookie(token, maxAgeSeconds);
+      if (!remember || privileged) return [session];
+      const device = await rememberDevice(tx, {
+        userId: passed.userId,
+        ...facts,
+        now: deps.now(),
+      });
+      return [session, deviceCookie(device)];
+    });
+    reply.header('Set-Cookie', cookies);
   }
+
+  /** T1.4: the anti-bot check of a body, or a 400 and false. */
+  async function botCheck(
+    auth: AuthSecrets,
+    altcha: string | undefined,
+    reply: FastifyReply
+  ): Promise<boolean> {
+    const outcome = await checkChallenge(
+      deps.db,
+      auth.secret,
+      altcha,
+      deps.now()
+    );
+    if (outcome === 'passed') return true;
+    void refuse(reply, 400, outcome);
+    return false;
+  }
+
+  app.get(
+    '/v1/auth/bot-challenge',
+    CHALLENGE_LIMIT,
+    async (_request, reply) => {
+      if (deps.auth === null) return refuse(reply, 503, 'AUTH_UNAVAILABLE');
+      reply.header('Cache-Control', 'no-store');
+      return issueChallenge(deps.auth.secret, deps.now());
+    }
+  );
 
   app.post('/v1/auth/register', LIMITED, async (request, reply) => {
     const parsed = parse(registerRequestSchema, request, reply);
     if (parsed === null) return reply;
-    const { body } = parsed;
+    const { auth, body } = parsed;
+    if (!(await botCheck(auth, body.altcha, reply))) return reply;
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
@@ -199,6 +258,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const parsed = parse(loginRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
+    if (!(await botCheck(auth, body.altcha, reply))) return reply;
     const user = await findUserByEmail(deps.db, canonicalEmail(body.email));
     // Always one Argon2id verification, against the decoy when the e-mail is unknown.
     const valid = await verifyPassword(
@@ -207,6 +267,20 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     );
     if (user === null || !valid) {
       return refuse(reply, 401, 'INVALID_CREDENTIALS');
+    }
+    // E2 (T1.1 T): a buyer's live trusted device stands in for the second factor.
+    const device = readDeviceToken(request.headers.cookie);
+    if (device !== null) {
+      const { roles } = await capabilitiesOf(deps.db, user.id);
+      const trusted =
+        !isPrivileged(roles) &&
+        (await isTrustedDevice(deps.db, device, user.id, deps.now()));
+      if (trusted) {
+        await signIn(request, reply, { id: null, userId: user.id }, roles);
+        return reply
+          .code(201)
+          .send(signedInSchema.parse({ status: 'signed_in' }));
+      }
     }
     if ((await totpOf(deps.db, user.id))?.enabled) {
       const challengeId = await openChallenge(
@@ -305,9 +379,10 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
   });
 
   app.post('/v1/auth/verify', LIMITED, async (request, reply) => {
-    const parsed = parse(codeRequestSchema, request, reply);
+    const parsed = parse(verifyRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
+    const remember = body.rememberDevice === true;
     const challenge = await challengeOf(
       body.challengeId,
       ['EMAIL', 'TOTP'],
@@ -315,7 +390,14 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     );
     if (challenge === null) return reply;
     if (challenge.type === 'EMAIL') {
-      return passMailedCode(request, reply, auth, challenge, body.code);
+      return passMailedCode(
+        request,
+        reply,
+        auth,
+        challenge,
+        body.code,
+        remember
+      );
     }
     const totp = await totpOf(deps.db, challenge.userId);
     if (!totp?.enabled) return refuse(reply, 409, 'TOTP_NOT_ENROLLED');
@@ -339,7 +421,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
       return refuse(reply, 401, 'INVALID_CODE');
     }
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles);
+    await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: 'signed_in' });
   });
 }
