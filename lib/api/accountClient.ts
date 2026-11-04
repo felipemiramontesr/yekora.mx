@@ -26,7 +26,9 @@ import {
 } from '@/lib/account/orderTypes';
 import { API_URL, call, json, type TransportFailure } from './http';
 
-const TIMEOUT_MS = 8000;
+// FC 028 acceptance round 1 (282_AN P1): Hostinger puts the idle API to sleep, and the first request after a
+// pause pays its whole start-up before the Argon2id work; 8 s was not enough for that request.
+const TIMEOUT_MS = 25_000;
 
 /** Refusals of `/v1/auth` and `/v1/account` the pages explain. */
 const CODES = [

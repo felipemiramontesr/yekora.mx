@@ -657,7 +657,7 @@
       "email": "E-mail",
       "password": "Password",
       "submit": "Continue",
-      "submitting": "Checking…",
+      "submitting": "Checking… this can take a few seconds",
       "toRegister": "No account yet? Create one"
     },
     "register": {
@@ -668,7 +668,7 @@
       "password": "Password",
       "passwordHint": "At least 12 characters. A long phrase is safer than a word with symbols.",
       "submit": "Create account",
-      "submitting": "Creating…",
+      "submitting": "Creating your account… this can take a few seconds",
       "toSignIn": "Already have an account? Sign in",
       "accepted": "Done. If that e-mail had no account, it has one now: sign in with it and your password."
     },
@@ -679,7 +679,7 @@
       "hintAuthenticator": "Type the 6-digit code your app shows, or one of your 8-digit backup codes.",
       "label": "Code",
       "submit": "Confirm",
-      "submitting": "Confirming…",
+      "submitting": "Confirming… this can take a few seconds",
       "restart": "Start over"
     },
     "enroll": {
@@ -691,7 +691,7 @@
       "openApp": "Open in my app (on this device)",
       "label": "Code your app shows",
       "submit": "Turn on",
-      "submitting": "Turning on…",
+      "submitting": "Turning on… this can take a few seconds",
       "loading": "Preparing your key…"
     },
     "backup": {

@@ -657,7 +657,7 @@
       "email": "Correo electrónico",
       "password": "Contraseña",
       "submit": "Continuar",
-      "submitting": "Revisando…",
+      "submitting": "Revisando… puede tardar unos segundos",
       "toRegister": "¿No tienes cuenta? Crea una"
     },
     "register": {
@@ -668,7 +668,7 @@
       "password": "Contraseña",
       "passwordHint": "Mínimo 12 caracteres. Una frase larga es más segura que una palabra con símbolos.",
       "submit": "Crear cuenta",
-      "submitting": "Creando…",
+      "submitting": "Creando tu cuenta… puede tardar unos segundos",
       "toSignIn": "¿Ya tienes cuenta? Entra",
       "accepted": "Listo. Si el correo no tenía cuenta, ya la tiene: entra con él y tu contraseña."
     },
@@ -679,7 +679,7 @@
       "hintAuthenticator": "Escribe el código de 6 dígitos que muestra tu app, o uno de tus códigos de respaldo de 8 dígitos.",
       "label": "Código",
       "submit": "Confirmar",
-      "submitting": "Confirmando…",
+      "submitting": "Confirmando… puede tardar unos segundos",
       "restart": "Volver a empezar"
     },
     "enroll": {
@@ -691,7 +691,7 @@
       "openApp": "Abrir en mi app (en este dispositivo)",
       "label": "Código que muestra tu app",
       "submit": "Activar",
-      "submitting": "Activando…",
+      "submitting": "Activando… puede tardar unos segundos",
       "loading": "Preparando tu clave…"
     },
     "backup": {
