@@ -675,7 +675,7 @@
     "code": {
       "titleEmail": "Revisa tu correo",
       "titleAuthenticator": "Abre tu app de autenticación",
-      "hintEmail": "Te enviamos un código de 6 dígitos a {email}. Vence en 5 minutos.",
+      "hintEmail": "Te enviamos un código de 6 dígitos a {email}. Vence en 5 minutos. Si no llega en 2 minutos, revisa Spam o Promociones.",
       "hintAuthenticator": "Escribe el código de 6 dígitos que muestra tu app, o uno de tus códigos de respaldo de 8 dígitos.",
       "label": "Código",
       "submit": "Confirmar",

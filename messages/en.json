@@ -675,7 +675,7 @@
     "code": {
       "titleEmail": "Check your e-mail",
       "titleAuthenticator": "Open your authenticator app",
-      "hintEmail": "We sent a 6-digit code to {email}. It expires in 5 minutes.",
+      "hintEmail": "We sent a 6-digit code to {email}. It expires in 5 minutes. If it does not arrive within 2 minutes, check Spam or Promotions.",
       "hintAuthenticator": "Type the 6-digit code your app shows, or one of your 8-digit backup codes.",
       "label": "Code",
       "submit": "Confirm",
