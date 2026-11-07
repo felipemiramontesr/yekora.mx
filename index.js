@@ -99138,6 +99138,202 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// ../../lib/catalog/adminTypes.ts
+var SHA256_HEX = /^[0-9a-f]{64}$/;
+var SAFE_IMAGE_TYPES = [
+  "image/webp",
+  "image/jpeg",
+  "image/png"
+];
+var mediaUploadedSchema = external_exports.object({
+  code: external_exports.literal("MEDIA_ACCEPTED"),
+  created: external_exports.boolean(),
+  sha256: external_exports.string().regex(SHA256_HEX),
+  mimeType: external_exports.enum(SAFE_IMAGE_TYPES),
+  width: external_exports.number().int().positive(),
+  height: external_exports.number().int().positive(),
+  sizeBytes: external_exports.number().int().positive()
+});
+var brandSlug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100);
+var code = external_exports.string().regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/).max(50);
+var label = (max) => external_exports.string().trim().min(1).max(max);
+var website = external_exports.url({ protocol: /^https$/ }).max(255).nullable();
+var order = external_exports.number().int().min(-1e3).max(1e3);
+var brandCreate = external_exports.strictObject({
+  slug: brandSlug,
+  name: label(150),
+  website: website.default(null)
+});
+var brandPatch = external_exports.strictObject({
+  name: label(150).optional(),
+  website: website.optional(),
+  isActive: external_exports.boolean().optional()
+});
+var groupFields = {
+  nameEs: label(100),
+  nameEn: label(100),
+  isRequired: external_exports.boolean(),
+  isOrdered: external_exports.boolean(),
+  isFilterable: external_exports.boolean(),
+  showOnLanding: external_exports.boolean(),
+  sortOrder: order
+};
+var facetGroupCreate = external_exports.strictObject({
+  code,
+  nameEs: groupFields.nameEs,
+  nameEn: groupFields.nameEn,
+  isRequired: groupFields.isRequired.default(false),
+  isOrdered: groupFields.isOrdered.default(false),
+  isFilterable: groupFields.isFilterable.default(true),
+  showOnLanding: groupFields.showOnLanding.default(false),
+  sortOrder: groupFields.sortOrder.default(0)
+});
+var facetGroupPatch = external_exports.strictObject({
+  nameEs: groupFields.nameEs.optional(),
+  nameEn: groupFields.nameEn.optional(),
+  isRequired: groupFields.isRequired.optional(),
+  isOrdered: groupFields.isOrdered.optional(),
+  isFilterable: groupFields.isFilterable.optional(),
+  showOnLanding: groupFields.showOnLanding.optional(),
+  isActive: external_exports.boolean().optional(),
+  sortOrder: groupFields.sortOrder.optional()
+});
+var facetValueCreate = external_exports.strictObject({
+  code,
+  valueEs: label(100),
+  valueEn: label(100),
+  sortOrder: order.default(0)
+});
+var facetValuePatch = external_exports.strictObject({
+  valueEs: label(100).optional(),
+  valueEn: label(100).optional(),
+  sortOrder: order.optional()
+});
+var brandSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  slug: external_exports.string(),
+  name: external_exports.string(),
+  website: external_exports.string().nullable(),
+  isActive: external_exports.boolean()
+});
+var facetValueSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  code: external_exports.string(),
+  valueEs: external_exports.string(),
+  valueEn: external_exports.string(),
+  sortOrder: external_exports.number().int()
+});
+var facetGroupSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  code: external_exports.string(),
+  nameEs: external_exports.string(),
+  nameEn: external_exports.string(),
+  isRequired: external_exports.boolean(),
+  isOrdered: external_exports.boolean(),
+  isFilterable: external_exports.boolean(),
+  showOnLanding: external_exports.boolean(),
+  isSystem: external_exports.boolean(),
+  isActive: external_exports.boolean(),
+  sortOrder: external_exports.number().int(),
+  values: external_exports.array(facetValueSchema)
+});
+var productSlug = (max) => external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(max);
+var text = (max) => external_exports.string().trim().min(1).max(max);
+var positive = external_exports.number().int().positive().max(1e8);
+var quantity = external_exports.number().int().min(0).max(1e6);
+var facetIds = external_exports.array(external_exports.number().int().positive()).max(50);
+var fields = {
+  nameEs: text(200),
+  nameEn: text(200),
+  descriptionEs: external_exports.string().max(1e4),
+  descriptionEn: external_exports.string().max(1e4),
+  priceMxnCents: positive,
+  stock: quantity,
+  discipline: productSlug(40),
+  level: productSlug(40),
+  brandId: external_exports.number().int().positive().nullable(),
+  shippingClass: productSlug(40),
+  weightGrams: positive,
+  lengthMm: positive,
+  widthMm: positive,
+  heightMm: positive
+};
+var productCreate = external_exports.strictObject({
+  sku: external_exports.string().regex(/^[A-Z0-9][A-Z0-9-]{0,63}$/).max(64),
+  slug: productSlug(160),
+  ...fields,
+  brandId: fields.brandId.default(null),
+  facetValueIds: facetIds.default([])
+});
+var productPatch = external_exports.strictObject({
+  ...Object.fromEntries(
+    Object.entries(fields).map(([key, schema2]) => [key, schema2.optional()])
+  ),
+  isActive: external_exports.boolean().optional(),
+  facetValueIds: facetIds.optional()
+});
+var altText = external_exports.string().trim().max(255).nullable().default(null);
+var galleryPatch = external_exports.strictObject({
+  images: external_exports.array(
+    external_exports.strictObject({
+      sha256: external_exports.string().regex(SHA256_HEX),
+      altEs: altText,
+      altEn: altText
+    })
+  ).max(12).refine(
+    (images) => new Set(images.map((image) => image.sha256)).size === images.length,
+    "An image appears twice"
+  )
+});
+var productListQuery = external_exports.object({
+  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
+  pageSize: external_exports.coerce.number().int().min(1).max(100).default(50)
+});
+var adminProductSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  sku: external_exports.string(),
+  slug: external_exports.string(),
+  nameEs: external_exports.string(),
+  nameEn: external_exports.string(),
+  descriptionEs: external_exports.string(),
+  descriptionEn: external_exports.string(),
+  priceMxnCents: external_exports.number().int().positive(),
+  stock: external_exports.number().int().nonnegative(),
+  reservedStock: external_exports.number().int().nonnegative(),
+  discipline: external_exports.string(),
+  level: external_exports.string(),
+  brandId: external_exports.number().int().positive().nullable(),
+  shippingClass: external_exports.string(),
+  weightGrams: external_exports.number().int().positive(),
+  lengthMm: external_exports.number().int().positive(),
+  widthMm: external_exports.number().int().positive(),
+  heightMm: external_exports.number().int().positive(),
+  isActive: external_exports.boolean(),
+  isTest: external_exports.boolean(),
+  facetValueIds: external_exports.array(external_exports.number().int().positive()),
+  gallery: external_exports.array(
+    external_exports.object({
+      sha256: external_exports.string().regex(SHA256_HEX),
+      altEs: external_exports.string().nullable(),
+      altEn: external_exports.string().nullable(),
+      sortOrder: external_exports.number().int(),
+      isPrimary: external_exports.boolean()
+    })
+  )
+});
+var adminProductPageSchema = external_exports.object({
+  items: external_exports.array(adminProductSchema),
+  total: external_exports.number().int().nonnegative(),
+  page: external_exports.number().int().positive(),
+  pageSize: external_exports.number().int().positive()
+});
+var publishRequestedSchema = external_exports.object({
+  code: external_exports.literal("CAT_PUBLISH_REQUESTED"),
+  workflow: external_exports.literal("deploy.yml"),
+  ref: external_exports.literal("main"),
+  requestedAt: external_exports.iso.datetime()
+});
+
 // ../../lib/api/catalogClient.ts
 var slug = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 var exchangeRateSchema = external_exports.object({
@@ -99281,7 +99477,7 @@ var PAYMENT_METHOD_CODES = [
   "MERCADO_PAGO_BALANCE"
 ];
 var STATE_CODES = new Set(MEXICAN_STATES.map((state) => state.code));
-var text = (max) => external_exports.string().trim().min(1).max(max);
+var text2 = (max) => external_exports.string().trim().min(1).max(max);
 var customerSchema = external_exports.strictObject({
   name: external_exports.string().trim().min(3).max(120),
   // Trimmed first, then checked as an e-mail (Zod 4 format schema).
@@ -99289,11 +99485,11 @@ var customerSchema = external_exports.strictObject({
   phone: external_exports.string().regex(/^\d{10}$/, "Phone must be 10 digits")
 });
 var shippingAddressSchema = external_exports.strictObject({
-  street: text(120),
-  exteriorNumber: text(20),
+  street: text2(120),
+  exteriorNumber: text2(20),
   interiorNumber: external_exports.string().trim().max(20).optional(),
-  neighborhood: text(120),
-  municipality: text(120),
+  neighborhood: text2(120),
+  municipality: text2(120),
   stateCode: external_exports.string().refine((code2) => STATE_CODES.has(code2), "Unknown Mexican state"),
   postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits"),
   references: external_exports.string().trim().max(200).optional()
@@ -99706,16 +99902,16 @@ async function listProducts(db, query) {
   );
   return { items, total: Number(total) };
 }
-function findProductMedia(db, slug5) {
+function findProductMedia(db, slug3) {
   return db.query(
     "SELECT m.media_sha256 AS sha256, m.alt_text_es, m.alt_text_en FROM product_media m JOIN products p ON p.id = m.product_id WHERE p.slug = ? AND m.is_active = 1 ORDER BY m.is_primary DESC, m.sort_order ASC, m.id ASC",
-    [slug5]
+    [slug3]
   );
 }
-async function findProduct(db, slug5) {
+async function findProduct(db, slug3) {
   const [product] = await db.query(
     "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [slug5]
+    [slug3]
   );
   return product ?? null;
 }
@@ -99924,288 +100120,6 @@ function runIdempotent(db, request, work) {
   });
 }
 
-// src/services/imageProbe.ts
-var SAFE_IMAGE_TYPES = [
-  "image/webp",
-  "image/jpeg",
-  "image/png"
-];
-var PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
-function startsWith(bytes, prefix, offset = 0) {
-  return prefix.every((byte, index) => bytes[offset + index] === byte);
-}
-function probePng(bytes) {
-  if (bytes.length < 24 || !startsWith(bytes, PNG_SIGNATURE)) return null;
-  if (bytes.toString("latin1", 12, 16) !== "IHDR") return null;
-  return {
-    type: "image/png",
-    width: bytes.readUInt32BE(16),
-    height: bytes.readUInt32BE(20)
-  };
-}
-function isStartOfFrame(marker) {
-  return marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
-}
-function probeJpeg(bytes) {
-  if (!startsWith(bytes, [255, 216, 255])) return null;
-  let offset = 2;
-  while (offset + 9 <= bytes.length) {
-    if (bytes[offset] !== 255) return null;
-    const marker = bytes[offset + 1];
-    if (isStartOfFrame(marker)) {
-      return {
-        type: "image/jpeg",
-        height: bytes.readUInt16BE(offset + 5),
-        width: bytes.readUInt16BE(offset + 7)
-      };
-    }
-    offset += 2 + bytes.readUInt16BE(offset + 2);
-  }
-  return null;
-}
-function probeWebp(bytes) {
-  if (bytes.length < 30) return null;
-  if (bytes.toString("latin1", 0, 4) !== "RIFF") return null;
-  if (bytes.toString("latin1", 8, 12) !== "WEBP") return null;
-  const chunk = bytes.toString("latin1", 12, 16);
-  if (chunk === "VP8 " && startsWith(bytes, [157, 1, 42], 23)) {
-    return {
-      type: "image/webp",
-      width: bytes.readUInt16LE(26) & 16383,
-      height: bytes.readUInt16LE(28) & 16383
-    };
-  }
-  if (chunk === "VP8L" && bytes[20] === 47) {
-    const bits = bytes.readUInt32LE(21);
-    return {
-      type: "image/webp",
-      width: (bits & 16383) + 1,
-      height: (bits >>> 14 & 16383) + 1
-    };
-  }
-  if (chunk === "VP8X") {
-    return {
-      type: "image/webp",
-      width: bytes.readUIntLE(24, 3) + 1,
-      height: bytes.readUIntLE(27, 3) + 1
-    };
-  }
-  return null;
-}
-function probeImage(bytes) {
-  return probePng(bytes) ?? probeJpeg(bytes) ?? probeWebp(bytes);
-}
-
-// src/services/media.ts
-var import_node_crypto2 = require("node:crypto");
-var MAX_MEDIA_BYTES = 2097152;
-var CANONICAL_WIDTHS = /* @__PURE__ */ new Set([1200, 600, 300]);
-var MAX_HEIGHT = 1200;
-function inspectMedia(bytes, declaredType) {
-  const probe = probeImage(bytes);
-  if (probe?.type !== declaredType) return { code: "MEDIA_UNSAFE_TYPE" };
-  if (bytes.length > MAX_MEDIA_BYTES) return { code: "MEDIA_SIZE_EXCEEDED" };
-  if (!CANONICAL_WIDTHS.has(probe.width) || probe.height < 1 || probe.height > MAX_HEIGHT) {
-    return { code: "MEDIA_DIMENSIONS_INVALID" };
-  }
-  return {
-    code: "MEDIA_ACCEPTED",
-    sha256: (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex"),
-    mimeType: probe.type,
-    width: probe.width,
-    height: probe.height,
-    sizeBytes: bytes.length
-  };
-}
-async function storeMedia(tx, bytes, verdict) {
-  const [existing] = await tx.query(
-    "SELECT sha256 FROM media_blobs WHERE sha256 = ? FOR UPDATE",
-    [verdict.sha256]
-  );
-  if (existing) return false;
-  await tx.query(
-    "INSERT INTO media_blobs (sha256, mime_type, width, height, size_bytes, media_data) VALUES (?, ?, ?, ?, ?, ?)",
-    [
-      verdict.sha256,
-      verdict.mimeType,
-      verdict.width,
-      verdict.height,
-      verdict.sizeBytes,
-      bytes
-    ]
-  );
-  return true;
-}
-var SHA256_HEX = /^[0-9a-f]{64}$/;
-async function readMedia(db, sha2562) {
-  const [row2] = await db.query(
-    "SELECT mime_type, media_data FROM media_blobs WHERE sha256 = ?",
-    [sha2562]
-  );
-  return row2 ? { mimeType: row2.mime_type, data: row2.media_data } : null;
-}
-function matchesDigest(data, sha2562) {
-  return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
-}
-
-// src/services/catalogAdmin.ts
-var brandOf = (row2) => ({
-  id: Number(row2.id),
-  slug: row2.slug,
-  name: row2.name,
-  website: row2.website,
-  isActive: Number(row2.is_active) === 1
-});
-async function listBrands(db) {
-  const rows = await db.query(
-    "SELECT id, slug, name, website, is_active FROM brands ORDER BY name ASC, id ASC"
-  );
-  return rows.map(brandOf);
-}
-async function lockBrand(tx, id) {
-  const [row2] = await tx.query(
-    "SELECT id, slug, name, website, is_active FROM brands WHERE id = ? FOR UPDATE",
-    [id]
-  );
-  return row2 ? brandOf(row2) : null;
-}
-async function createBrand(tx, input2) {
-  await tx.query("INSERT INTO brands (slug, name, website) VALUES (?, ?, ?)", [
-    input2.slug,
-    input2.name,
-    input2.website
-  ]);
-  const [row2] = await tx.query(
-    "SELECT id, slug, name, website, is_active FROM brands WHERE slug = ?",
-    [input2.slug]
-  );
-  return { before: null, after: brandOf(row2) };
-}
-async function updateBrand(tx, id, patch) {
-  const before = await lockBrand(tx, id);
-  if (before === null) return "CAT_NOT_FOUND";
-  const after = { ...before, ...patch };
-  await tx.query(
-    "UPDATE brands SET name = ?, website = ?, is_active = ? WHERE id = ?",
-    [after.name, after.website, after.isActive ? 1 : 0, id]
-  );
-  return { before, after };
-}
-var flag = (value) => Number(value) === 1;
-var groupOf = (row2, values = []) => ({
-  id: Number(row2.id),
-  code: row2.code,
-  nameEs: row2.name_es,
-  nameEn: row2.name_en,
-  isRequired: flag(row2.is_required),
-  isOrdered: flag(row2.is_ordered),
-  isFilterable: flag(row2.is_filterable),
-  showOnLanding: flag(row2.show_on_landing),
-  isSystem: flag(row2.is_system),
-  isActive: flag(row2.is_active),
-  sortOrder: Number(row2.sort_order),
-  values
-});
-var valueOf = (row2) => ({
-  id: Number(row2.id),
-  code: row2.code,
-  valueEs: row2.value_es,
-  valueEn: row2.value_en,
-  sortOrder: Number(row2.sort_order)
-});
-async function listFacets(db) {
-  const groups = await db.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC"
-  );
-  const values = await db.query(
-    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values ORDER BY sort_order ASC, id ASC"
-  );
-  return groups.map(
-    (group) => groupOf(
-      group,
-      values.filter((value) => Number(value.group_id) === Number(group.id)).map(valueOf)
-    )
-  );
-}
-async function lockGroup(tx, id) {
-  const [row2] = await tx.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
-    [id]
-  );
-  return row2 ? groupOf(row2) : null;
-}
-async function createFacetGroup(tx, input2) {
-  await tx.query(
-    "INSERT INTO product_facet_groups (code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      input2.code,
-      input2.nameEs,
-      input2.nameEn,
-      input2.isRequired ? 1 : 0,
-      input2.isOrdered ? 1 : 0,
-      input2.isFilterable ? 1 : 0,
-      input2.showOnLanding ? 1 : 0,
-      input2.sortOrder
-    ]
-  );
-  const [row2] = await tx.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code = ?",
-    [input2.code]
-  );
-  return { before: null, after: groupOf(row2) };
-}
-async function updateFacetGroup(tx, id, patch) {
-  const before = await lockGroup(tx, id);
-  if (before === null) return "CAT_NOT_FOUND";
-  if (before.isSystem && patch.isActive === false)
-    return "CAT_SYSTEM_GROUP_LOCKED";
-  const after = { ...before, ...patch };
-  await tx.query(
-    "UPDATE product_facet_groups SET name_es = ?, name_en = ?, is_required = ?, is_ordered = ?, is_filterable = ?, show_on_landing = ?, is_active = ?, sort_order = ? WHERE id = ?",
-    [
-      after.nameEs,
-      after.nameEn,
-      after.isRequired ? 1 : 0,
-      after.isOrdered ? 1 : 0,
-      after.isFilterable ? 1 : 0,
-      after.showOnLanding ? 1 : 0,
-      after.isActive ? 1 : 0,
-      after.sortOrder,
-      id
-    ]
-  );
-  return { before, after };
-}
-async function createFacetValue(tx, groupId, input2) {
-  const group = await lockGroup(tx, groupId);
-  if (group === null) return "CAT_NOT_FOUND";
-  if (group.isSystem) return "CAT_SYSTEM_GROUP_LOCKED";
-  await tx.query(
-    "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
-    [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
-  );
-  const [row2] = await tx.query(
-    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id = ? AND code = ?",
-    [groupId, input2.code]
-  );
-  return { before: null, after: valueOf(row2) };
-}
-async function updateFacetValue(tx, id, patch) {
-  const [row2] = await tx.query(
-    "SELECT v.id, v.group_id, v.code, v.value_es, v.value_en, v.sort_order, g.is_system FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ? FOR UPDATE",
-    [id]
-  );
-  if (!row2) return "CAT_NOT_FOUND";
-  if (flag(row2.is_system)) return "CAT_SYSTEM_GROUP_LOCKED";
-  const before = valueOf(row2);
-  const after = { ...before, ...patch };
-  await tx.query(
-    "UPDATE product_facet_values SET value_es = ?, value_en = ?, sort_order = ? WHERE id = ?",
-    [after.valueEs, after.valueEn, after.sortOrder, id]
-  );
-  return { before, after };
-}
-
 // src/routes/catalogMutation.ts
 var mutationHeaders = external_exports.object({
   "idempotency-key": external_exports.string().regex(IDEMPOTENCY_KEY_SYNTAX)
@@ -100297,684 +100211,124 @@ function mutationRoute(app, deps, route) {
   });
 }
 
-// src/routes/catalogEntities.ts
-var slug3 = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100);
-var code = external_exports.string().regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/).max(50);
-var label = (max) => external_exports.string().trim().min(1).max(max);
-var website = external_exports.url({ protocol: /^https$/ }).max(255).nullable();
-var order = external_exports.number().int().min(-1e3).max(1e3);
-var brandCreate = external_exports.strictObject({
-  slug: slug3,
-  name: label(150),
-  website: website.default(null)
-});
-var brandPatch = external_exports.strictObject({
-  name: label(150).optional(),
-  website: website.optional(),
-  isActive: external_exports.boolean().optional()
-});
-var groupFields = {
-  nameEs: label(100),
-  nameEn: label(100),
-  isRequired: external_exports.boolean(),
-  isOrdered: external_exports.boolean(),
-  isFilterable: external_exports.boolean(),
-  showOnLanding: external_exports.boolean(),
-  sortOrder: order
-};
-var facetGroupCreate = external_exports.strictObject({
-  code,
-  nameEs: groupFields.nameEs,
-  nameEn: groupFields.nameEn,
-  isRequired: groupFields.isRequired.default(false),
-  isOrdered: groupFields.isOrdered.default(false),
-  isFilterable: groupFields.isFilterable.default(true),
-  showOnLanding: groupFields.showOnLanding.default(false),
-  sortOrder: groupFields.sortOrder.default(0)
-});
-var facetGroupPatch = external_exports.strictObject({
-  nameEs: groupFields.nameEs.optional(),
-  nameEn: groupFields.nameEn.optional(),
-  isRequired: groupFields.isRequired.optional(),
-  isOrdered: groupFields.isOrdered.optional(),
-  isFilterable: groupFields.isFilterable.optional(),
-  showOnLanding: groupFields.showOnLanding.optional(),
-  isActive: external_exports.boolean().optional(),
-  sortOrder: groupFields.sortOrder.optional()
-});
-var facetValueCreate = external_exports.strictObject({
-  code,
-  valueEs: label(100),
-  valueEn: label(100),
-  sortOrder: order.default(0)
-});
-var facetValuePatch = external_exports.strictObject({
-  valueEs: label(100).optional(),
-  valueEn: label(100).optional(),
-  sortOrder: order.optional()
-});
-var brandSchema = external_exports.object({
-  id: external_exports.number().int().positive(),
-  slug: external_exports.string(),
-  name: external_exports.string(),
-  website: external_exports.string().nullable(),
-  isActive: external_exports.boolean()
-});
-var facetValueSchema = external_exports.object({
-  id: external_exports.number().int().positive(),
-  code: external_exports.string(),
-  valueEs: external_exports.string(),
-  valueEn: external_exports.string(),
-  sortOrder: external_exports.number().int()
-});
-var facetGroupSchema = external_exports.object({
-  id: external_exports.number().int().positive(),
-  code: external_exports.string(),
-  nameEs: external_exports.string(),
-  nameEn: external_exports.string(),
-  isRequired: external_exports.boolean(),
-  isOrdered: external_exports.boolean(),
-  isFilterable: external_exports.boolean(),
-  showOnLanding: external_exports.boolean(),
-  isSystem: external_exports.boolean(),
-  isActive: external_exports.boolean(),
-  sortOrder: external_exports.number().int(),
-  values: external_exports.array(facetValueSchema)
-});
-function registerCatalogEntityRoutes(app, deps) {
-  app.get("/v1/admin/catalog/brands", async () => listBrands(deps.db));
-  app.get("/v1/admin/catalog/facets", async () => listFacets(deps.db));
-  mutationRoute(app, deps, {
-    method: "POST",
-    url: "/v1/admin/catalog/brands",
-    entityType: "brands",
-    body: brandCreate,
-    run: (tx, { body }) => createBrand(tx, body)
-  });
-  mutationRoute(app, deps, {
-    method: "PATCH",
-    url: "/v1/admin/catalog/brands/:id",
-    entityType: "brands",
-    params: idParams,
-    body: brandPatch,
-    run: (tx, { params, body }) => updateBrand(tx, params.id, body)
-  });
-  mutationRoute(app, deps, {
-    method: "POST",
-    url: "/v1/admin/catalog/facet-groups",
-    entityType: "facet_groups",
-    body: facetGroupCreate,
-    run: (tx, { body }) => createFacetGroup(tx, body)
-  });
-  mutationRoute(app, deps, {
-    method: "PATCH",
-    url: "/v1/admin/catalog/facet-groups/:id",
-    entityType: "facet_groups",
-    params: idParams,
-    body: facetGroupPatch,
-    run: (tx, { params, body }) => updateFacetGroup(tx, params.id, body)
-  });
-  mutationRoute(app, deps, {
-    method: "POST",
-    url: "/v1/admin/catalog/facet-groups/:id/values",
-    entityType: "facet_values",
-    params: idParams,
-    body: facetValueCreate,
-    run: (tx, { params, body }) => createFacetValue(tx, params.id, body)
-  });
-  mutationRoute(app, deps, {
-    method: "PATCH",
-    url: "/v1/admin/catalog/facet-values/:id",
-    entityType: "facet_values",
-    params: idParams,
-    body: facetValuePatch,
-    run: (tx, { params, body }) => updateFacetValue(tx, params.id, body)
-  });
-}
+// src/services/media.ts
+var import_node_crypto2 = require("node:crypto");
 
-// src/services/catalogProducts.ts
-var productOf = (row2, facetValueIds = [], gallery = []) => ({
-  id: Number(row2.id),
-  sku: row2.sku,
-  slug: row2.slug,
-  nameEs: row2.name_es,
-  nameEn: row2.name_en,
-  descriptionEs: row2.description_es,
-  descriptionEn: row2.description_en,
-  priceMxnCents: Number(row2.price_mxn_cents),
-  stock: Number(row2.stock),
-  reservedStock: Number(row2.reserved_stock),
-  discipline: row2.discipline,
-  level: row2.level,
-  brandId: row2.brand_id === null ? null : Number(row2.brand_id),
-  shippingClass: row2.shipping_class,
-  weightGrams: Number(row2.weight_grams),
-  lengthMm: Number(row2.length_mm),
-  widthMm: Number(row2.width_mm),
-  heightMm: Number(row2.height_mm),
-  isActive: Number(row2.is_active) === 1,
-  isTest: Number(row2.is_test) === 1,
-  facetValueIds,
-  gallery
-});
-async function listAdminProducts(db, paging2) {
-  const [{ total }] = await db.query(
-    "SELECT COUNT(*) AS total FROM products"
-  );
-  const rows = await db.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
-    [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
-  );
-  return { items: rows.map((row2) => productOf(row2)), total: Number(total) };
+// src/services/imageProbe.ts
+var PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+function startsWith(bytes, prefix, offset = 0) {
+  return prefix.every((byte, index) => bytes[offset + index] === byte);
 }
-async function productRow(tx, id) {
-  const [row2] = await tx.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
-    [id]
-  );
-  return row2;
-}
-async function lockedProduct(tx, id) {
-  const [found] = await tx.query(
-    "SELECT id FROM products WHERE id = ? FOR UPDATE",
-    [id]
-  );
-  return found ? productRow(tx, id) : void 0;
-}
-async function fullProduct(tx, row2) {
-  const values = await tx.query(
-    "SELECT k.value_id FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0 ORDER BY k.value_id ASC",
-    [row2.id]
-  );
-  const images = await tx.query(
-    "SELECT media_sha256, alt_text_es, alt_text_en, sort_order, is_primary FROM product_media WHERE product_id = ? AND is_active = 1 ORDER BY is_primary DESC, sort_order ASC, id ASC",
-    [row2.id]
-  );
-  return productOf(
-    row2,
-    values.map((value) => Number(value.value_id)),
-    images.map((image) => ({
-      sha256: image.media_sha256,
-      altEs: image.alt_text_es,
-      altEn: image.alt_text_en,
-      sortOrder: Number(image.sort_order),
-      isPrimary: Number(image.is_primary) === 1
-    }))
-  );
-}
-async function readAdminProduct(db, id) {
-  const row2 = await productRow(db, id);
-  return row2 ? fullProduct(db, row2) : null;
-}
-async function references(tx, fields2) {
-  const [category] = await tx.query(
-    "SELECT id FROM categories WHERE slug = ? AND is_active = 1",
-    [fields2.discipline]
-  );
-  const [level] = await tx.query(
-    "SELECT id FROM experience_levels WHERE slug = ? AND is_active = 1",
-    [fields2.level]
-  );
-  const [shipping] = await tx.query(
-    "SELECT id FROM shipping_classes WHERE slug = ? AND is_active = 1",
-    [fields2.shippingClass]
-  );
-  const brandOk = fields2.brandId === null || (await tx.query(
-    "SELECT id FROM brands WHERE id = ? AND is_active = 1",
-    [fields2.brandId]
-  )).length === 1;
-  if (!category || !level || !shipping || !brandOk) return null;
-  return { category: category.id, level: level.id, shipping: shipping.id };
-}
-async function facetChoice(tx, ids) {
-  const unique = [...new Set(ids)];
-  const found = await Promise.all(
-    unique.map(async (id) => {
-      const [value] = await tx.query(
-        "SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?",
-        [id]
-      );
-      return { id, value };
-    })
-  );
-  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
-    return "CAT_REFERENCE_INVALID";
-  const ordinary = found.filter(({ value }) => Number(value.is_system) !== 1).map(({ id }) => id);
-  const level = found.find(({ value }) => Number(value.is_system) === 1)?.value.code ?? null;
-  return { ordinary, level };
-}
-async function relinkLevel(tx, productId, level) {
-  await tx.query(
-    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1 AND g.code = 'nivel'",
-    [productId]
-  );
-  await tx.query(
-    "INSERT INTO product_facet_links (product_id, value_id) SELECT ?, v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.is_system = 1 AND g.code = 'nivel' AND v.code = ?",
-    [productId, level]
-  );
-}
-async function relinkFacets(tx, productId, ids) {
-  await tx.query(
-    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0",
-    [productId]
-  );
-  await Promise.all(
-    ids.map(
-      (id) => tx.query(
-        "INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)",
-        [productId, id]
-      )
-    )
-  );
-}
-function settledLevel(given, fromFacets, current) {
-  if (given !== void 0 && fromFacets !== null && given !== fromFacets)
-    return null;
-  return given ?? fromFacets ?? current;
-}
-async function createProduct(tx, input2) {
-  const facets = await facetChoice(tx, input2.facetValueIds);
-  if (facets === "CAT_REFERENCE_INVALID") return facets;
-  const level = settledLevel(input2.level, facets.level, input2.level);
-  if (level === null) return "CAT_VALIDATION_ERROR";
-  const refs = await references(tx, input2);
-  if (refs === null) return "CAT_REFERENCE_INVALID";
-  await tx.query(
-    "INSERT INTO products (sku, slug, category_id, brand_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      input2.sku,
-      input2.slug,
-      refs.category,
-      input2.brandId,
-      refs.level,
-      input2.nameEs,
-      input2.nameEn,
-      input2.descriptionEs,
-      input2.descriptionEn,
-      input2.priceMxnCents,
-      input2.stock,
-      input2.weightGrams,
-      input2.lengthMm,
-      input2.widthMm,
-      input2.heightMm,
-      refs.shipping
-    ]
-  );
-  const [{ id }] = await tx.query(
-    "SELECT id FROM products WHERE sku = ?",
-    [input2.sku]
-  );
-  await relinkLevel(tx, id, level);
-  await relinkFacets(tx, id, facets.ordinary);
-  const row2 = await productRow(tx, id);
-  return { before: null, after: await fullProduct(tx, row2) };
-}
-async function updateProduct(tx, id, patch) {
-  const row2 = await lockedProduct(tx, id);
-  if (!row2) return "CAT_NOT_FOUND";
-  const before = await fullProduct(tx, row2);
-  const facets = await facetChoice(tx, patch.facetValueIds ?? []);
-  if (facets === "CAT_REFERENCE_INVALID") return facets;
-  const level = settledLevel(patch.level, facets.level, before.level);
-  if (level === null) return "CAT_VALIDATION_ERROR";
-  const { facetValueIds, isActive, ...fields2 } = patch;
-  const next = {
-    ...before,
-    ...fields2,
-    level,
-    isActive: isActive ?? before.isActive
+function probePng(bytes) {
+  if (bytes.length < 24 || !startsWith(bytes, PNG_SIGNATURE)) return null;
+  if (bytes.toString("latin1", 12, 16) !== "IHDR") return null;
+  return {
+    type: "image/png",
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20)
   };
-  if (next.stock < before.reservedStock) return "CAT_STOCK_BELOW_RESERVED";
-  const refs = await references(tx, next);
-  if (refs === null) return "CAT_REFERENCE_INVALID";
+}
+function isStartOfFrame(marker) {
+  return marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
+}
+function probeJpeg(bytes) {
+  if (!startsWith(bytes, [255, 216, 255])) return null;
+  let offset = 2;
+  while (offset + 9 <= bytes.length) {
+    if (bytes[offset] !== 255) return null;
+    const marker = bytes[offset + 1];
+    if (isStartOfFrame(marker)) {
+      return {
+        type: "image/jpeg",
+        height: bytes.readUInt16BE(offset + 5),
+        width: bytes.readUInt16BE(offset + 7)
+      };
+    }
+    offset += 2 + bytes.readUInt16BE(offset + 2);
+  }
+  return null;
+}
+function probeWebp(bytes) {
+  if (bytes.length < 30) return null;
+  if (bytes.toString("latin1", 0, 4) !== "RIFF") return null;
+  if (bytes.toString("latin1", 8, 12) !== "WEBP") return null;
+  const chunk = bytes.toString("latin1", 12, 16);
+  if (chunk === "VP8 " && startsWith(bytes, [157, 1, 42], 23)) {
+    return {
+      type: "image/webp",
+      width: bytes.readUInt16LE(26) & 16383,
+      height: bytes.readUInt16LE(28) & 16383
+    };
+  }
+  if (chunk === "VP8L" && bytes[20] === 47) {
+    const bits = bytes.readUInt32LE(21);
+    return {
+      type: "image/webp",
+      width: (bits & 16383) + 1,
+      height: (bits >>> 14 & 16383) + 1
+    };
+  }
+  if (chunk === "VP8X") {
+    return {
+      type: "image/webp",
+      width: bytes.readUIntLE(24, 3) + 1,
+      height: bytes.readUIntLE(27, 3) + 1
+    };
+  }
+  return null;
+}
+function probeImage(bytes) {
+  return probePng(bytes) ?? probeJpeg(bytes) ?? probeWebp(bytes);
+}
+
+// src/services/media.ts
+var MAX_MEDIA_BYTES = 2097152;
+var CANONICAL_WIDTHS = /* @__PURE__ */ new Set([1200, 600, 300]);
+var MAX_HEIGHT = 1200;
+function inspectMedia(bytes, declaredType) {
+  const probe = probeImage(bytes);
+  if (probe?.type !== declaredType) return { code: "MEDIA_UNSAFE_TYPE" };
+  if (bytes.length > MAX_MEDIA_BYTES) return { code: "MEDIA_SIZE_EXCEEDED" };
+  if (!CANONICAL_WIDTHS.has(probe.width) || probe.height < 1 || probe.height > MAX_HEIGHT) {
+    return { code: "MEDIA_DIMENSIONS_INVALID" };
+  }
+  return {
+    code: "MEDIA_ACCEPTED",
+    sha256: (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex"),
+    mimeType: probe.type,
+    width: probe.width,
+    height: probe.height,
+    sizeBytes: bytes.length
+  };
+}
+async function storeMedia(tx, bytes, verdict) {
+  const [existing] = await tx.query(
+    "SELECT sha256 FROM media_blobs WHERE sha256 = ? FOR UPDATE",
+    [verdict.sha256]
+  );
+  if (existing) return false;
   await tx.query(
-    "UPDATE products SET category_id = ?, brand_id = ?, experience_level_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
+    "INSERT INTO media_blobs (sha256, mime_type, width, height, size_bytes, media_data) VALUES (?, ?, ?, ?, ?, ?)",
     [
-      refs.category,
-      next.brandId,
-      refs.level,
-      next.nameEs,
-      next.nameEn,
-      next.descriptionEs,
-      next.descriptionEn,
-      next.priceMxnCents,
-      next.stock,
-      next.weightGrams,
-      next.lengthMm,
-      next.widthMm,
-      next.heightMm,
-      refs.shipping,
-      next.isActive ? 1 : 0,
-      id
+      verdict.sha256,
+      verdict.mimeType,
+      verdict.width,
+      verdict.height,
+      verdict.sizeBytes,
+      bytes
     ]
   );
-  if (level !== before.level) await relinkLevel(tx, id, level);
-  if (facetValueIds !== void 0) await relinkFacets(tx, id, facets.ordinary);
-  const after = await fullProduct(tx, await productRow(tx, id));
-  return { before, after };
+  return true;
 }
-async function placeImage(tx, productId, image, index) {
-  const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
-  const [existing] = await tx.query(
-    "SELECT id FROM product_media WHERE product_id = ? AND media_sha256 = ? ORDER BY id ASC LIMIT 1",
-    [productId, image.sha256]
+async function readMedia(db, sha2562) {
+  const [row2] = await db.query(
+    "SELECT mime_type, media_data FROM media_blobs WHERE sha256 = ?",
+    [sha2562]
   );
-  if (existing) {
-    await tx.query(
-      "UPDATE product_media SET alt_text_es = ?, alt_text_en = ?, sort_order = ?, is_primary = ?, is_active = 1 WHERE id = ?",
-      [...values, existing.id]
-    );
-  } else {
-    await tx.query(
-      "INSERT INTO product_media (alt_text_es, alt_text_en, sort_order, is_primary, product_id, media_sha256) VALUES (?, ?, ?, ?, ?, ?)",
-      [...values, productId, image.sha256]
-    );
-  }
+  return row2 ? { mimeType: row2.mime_type, data: row2.media_data } : null;
 }
-async function replaceGallery(tx, id, images) {
-  const row2 = await lockedProduct(tx, id);
-  if (!row2) return "CAT_NOT_FOUND";
-  const blobs = await Promise.all(
-    images.map(
-      (image) => tx.query(
-        "SELECT sha256 FROM media_blobs WHERE sha256 = ?",
-        [image.sha256]
-      )
-    )
-  );
-  if (blobs.some((rows) => rows.length === 0)) return "CAT_REFERENCE_INVALID";
-  const before = await fullProduct(tx, row2);
-  await tx.query(
-    "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
-    [id]
-  );
-  await Promise.all(
-    images.map((image, index) => placeImage(tx, id, image, index))
-  );
-  return { before, after: await fullProduct(tx, row2) };
-}
-
-// src/routes/catalogProducts.ts
-var slug4 = (max) => external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(max);
-var text2 = (max) => external_exports.string().trim().min(1).max(max);
-var positive = external_exports.number().int().positive().max(1e8);
-var quantity = external_exports.number().int().min(0).max(1e6);
-var facetIds = external_exports.array(external_exports.number().int().positive()).max(50);
-var fields = {
-  nameEs: text2(200),
-  nameEn: text2(200),
-  descriptionEs: external_exports.string().max(1e4),
-  descriptionEn: external_exports.string().max(1e4),
-  priceMxnCents: positive,
-  stock: quantity,
-  discipline: slug4(40),
-  level: slug4(40),
-  brandId: external_exports.number().int().positive().nullable(),
-  shippingClass: slug4(40),
-  weightGrams: positive,
-  lengthMm: positive,
-  widthMm: positive,
-  heightMm: positive
-};
-var productCreate = external_exports.strictObject({
-  sku: external_exports.string().regex(/^[A-Z0-9][A-Z0-9-]{0,63}$/).max(64),
-  slug: slug4(160),
-  ...fields,
-  brandId: fields.brandId.default(null),
-  facetValueIds: facetIds.default([])
-});
-var productPatch = external_exports.strictObject({
-  ...Object.fromEntries(
-    Object.entries(fields).map(([key, schema2]) => [key, schema2.optional()])
-  ),
-  isActive: external_exports.boolean().optional(),
-  facetValueIds: facetIds.optional()
-});
-var altText = external_exports.string().trim().max(255).nullable().default(null);
-var galleryPatch = external_exports.strictObject({
-  images: external_exports.array(
-    external_exports.strictObject({
-      sha256: external_exports.string().regex(SHA256_HEX),
-      altEs: altText,
-      altEn: altText
-    })
-  ).max(12).refine(
-    (images) => new Set(images.map((image) => image.sha256)).size === images.length,
-    "An image appears twice"
-  )
-});
-var productListQuery = external_exports.object({
-  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
-  pageSize: external_exports.coerce.number().int().min(1).max(100).default(50)
-});
-var adminProductSchema = external_exports.object({
-  id: external_exports.number().int().positive(),
-  sku: external_exports.string(),
-  slug: external_exports.string(),
-  nameEs: external_exports.string(),
-  nameEn: external_exports.string(),
-  descriptionEs: external_exports.string(),
-  descriptionEn: external_exports.string(),
-  priceMxnCents: external_exports.number().int().positive(),
-  stock: external_exports.number().int().nonnegative(),
-  reservedStock: external_exports.number().int().nonnegative(),
-  discipline: external_exports.string(),
-  level: external_exports.string(),
-  brandId: external_exports.number().int().positive().nullable(),
-  shippingClass: external_exports.string(),
-  weightGrams: external_exports.number().int().positive(),
-  lengthMm: external_exports.number().int().positive(),
-  widthMm: external_exports.number().int().positive(),
-  heightMm: external_exports.number().int().positive(),
-  isActive: external_exports.boolean(),
-  isTest: external_exports.boolean(),
-  facetValueIds: external_exports.array(external_exports.number().int().positive()),
-  gallery: external_exports.array(
-    external_exports.object({
-      sha256: external_exports.string().regex(SHA256_HEX),
-      altEs: external_exports.string().nullable(),
-      altEn: external_exports.string().nullable(),
-      sortOrder: external_exports.number().int(),
-      isPrimary: external_exports.boolean()
-    })
-  )
-});
-var adminProductPageSchema = external_exports.object({
-  items: external_exports.array(adminProductSchema),
-  total: external_exports.number().int().nonnegative(),
-  page: external_exports.number().int().positive(),
-  pageSize: external_exports.number().int().positive()
-});
-function registerCatalogProductRoutes(app, deps) {
-  app.get("/v1/admin/catalog/products", async (request, reply) => {
-    const query = productListQuery.safeParse(request.query);
-    if (!query.success) {
-      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid catalog data", "CAT_VALIDATION_ERROR"));
-    }
-    return { ...await listAdminProducts(deps.db, query.data), ...query.data };
-  });
-  app.get("/v1/admin/catalog/products/:id", async (request, reply) => {
-    const params = idParams.safeParse(request.params);
-    const product = params.success ? await readAdminProduct(deps.db, params.data.id) : null;
-    if (product === null) {
-      const status = params.success ? 404 : 400;
-      return reply.code(status).type(PROBLEM_TYPE).send(
-        problem(
-          status,
-          params.success ? "Not found" : "Invalid catalog data",
-          params.success ? "CAT_NOT_FOUND" : "CAT_VALIDATION_ERROR"
-        )
-      );
-    }
-    return product;
-  });
-  mutationRoute(app, deps, {
-    method: "POST",
-    url: "/v1/admin/catalog/products",
-    entityType: "products",
-    body: productCreate,
-    run: (tx, { body }) => createProduct(tx, body)
-  });
-  mutationRoute(app, deps, {
-    method: "PATCH",
-    url: "/v1/admin/catalog/products/:id",
-    entityType: "products",
-    params: idParams,
-    body: productPatch,
-    run: (tx, { params, body }) => updateProduct(tx, params.id, body)
-  });
-  mutationRoute(app, deps, {
-    method: "PATCH",
-    url: "/v1/admin/catalog/products/:id/media",
-    entityType: "products",
-    params: idParams,
-    body: galleryPatch,
-    run: (tx, { params, body }) => replaceGallery(tx, params.id, body.images)
-  });
-}
-
-// src/services/publish.ts
-var DISPATCH_URL = "https://api.github.com/repos/felipemiramontesr/yekora.mx/actions/workflows/deploy.yml/dispatches";
-var TIMEOUT_MS = 1e4;
-async function dispatchDeploy(token, fetchImpl = fetch) {
-  try {
-    const answer = await fetchImpl(DISPATCH_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-        "User-Agent": "yekora-api"
-      },
-      body: JSON.stringify({ ref: "main" }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
-    });
-    return answer.status === 204 ? "CAT_PUBLISH_REQUESTED" : "CAT_PUBLISH_FAILED";
-  } catch {
-    return "CAT_PUBLISH_FAILED";
-  }
-}
-
-// src/routes/catalogPublish.ts
-var publishRequestedSchema = external_exports.object({
-  code: external_exports.literal("CAT_PUBLISH_REQUESTED"),
-  workflow: external_exports.literal("deploy.yml"),
-  ref: external_exports.literal("main"),
-  requestedAt: external_exports.iso.datetime()
-});
-function registerCatalogPublishRoute(app, deps) {
-  app.post(
-    "/v1/admin/catalog/publish",
-    { config: { rateLimit: { max: 3, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
-      if (key.code !== "IDEMP_KEY_ACCEPTED") {
-        return refuse(reply, 400, "Idempotency-Key required", key.code);
-      }
-      const token = deps.publishToken;
-      if (token === null) {
-        return refuse(
-          reply,
-          503,
-          "Publishing unavailable",
-          "CAT_PUBLISH_UNAVAILABLE"
-        );
-      }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
-        const outcome = await dispatchDeploy(token);
-        if (outcome === "CAT_PUBLISH_FAILED") {
-          return {
-            status: 502,
-            body: problem(502, "GitHub did not queue the publication", outcome)
-          };
-        }
-        const published = {
-          workflow: "deploy.yml",
-          ref: "main",
-          requestedAt: deps.now().toISOString()
-        };
-        await recordAudit(tx, {
-          userId,
-          action: "POST /v1/admin/catalog/publish",
-          entityType: "publish",
-          entityId: "deploy.yml",
-          before: null,
-          after: published,
-          ip: request.ip
-        });
-        return { status: 202, body: { code: outcome, ...published } };
-      });
-    }
-  );
-}
-
-// src/routes/catalogAdmin.ts
-var mediaUploadedSchema = external_exports.object({
-  code: external_exports.literal("MEDIA_ACCEPTED"),
-  created: external_exports.boolean(),
-  sha256: external_exports.string().regex(SHA256_HEX),
-  mimeType: external_exports.enum(SAFE_IMAGE_TYPES),
-  width: external_exports.number().int().positive(),
-  height: external_exports.number().int().positive(),
-  sizeBytes: external_exports.number().int().positive()
-});
-var UPLOAD_READ_LIMIT = 4 * 1024 * 1024;
-var MEDIA_REFUSALS = {
-  MEDIA_UNSAFE_TYPE: [415, "Unsupported image type"],
-  MEDIA_SIZE_EXCEEDED: [413, "Image too large"],
-  MEDIA_DIMENSIONS_INVALID: [422, "Image dimensions not allowed"]
-};
-function registerCatalogAdminRoutes(app, deps) {
-  app.addContentTypeParser(
-    /^image\/[a-z0-9.+-]+$/,
-    { parseAs: "buffer", bodyLimit: UPLOAD_READ_LIMIT },
-    (_request, body, done) => done(null, body)
-  );
-  app.post(
-    "/v1/admin/catalog/media",
-    {
-      bodyLimit: UPLOAD_READ_LIMIT,
-      errorHandler: (error63, _request, reply) => {
-        if (error63.code !== "FST_ERR_CTP_BODY_TOO_LARGE")
-          throw error63;
-        return refuse(reply, 413, "Image too large", "MEDIA_SIZE_EXCEEDED");
-      }
-    },
-    async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
-      if (key.code !== "IDEMP_KEY_ACCEPTED") {
-        return refuse(reply, 400, "Idempotency-Key required", key.code);
-      }
-      const bytes = request.body;
-      const verdict = Buffer.isBuffer(bytes) ? inspectMedia(bytes, String(request.headers["content-type"])) : { code: "MEDIA_UNSAFE_TYPE" };
-      if (verdict.code !== "MEDIA_ACCEPTED") {
-        const [status, title] = MEDIA_REFUSALS[verdict.code];
-        return refuse(reply, status, title, verdict.code);
-      }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
-        const created = await storeMedia(tx, bytes, verdict);
-        const { code: code2, ...stored } = verdict;
-        await recordAudit(tx, {
-          userId,
-          action: "POST /v1/admin/catalog/media",
-          entityType: "media",
-          entityId: verdict.sha256,
-          before: created ? null : stored,
-          after: stored,
-          ip: request.ip
-        });
-        return { status: 201, body: { code: code2, created, ...stored } };
-      });
-    }
-  );
-  registerCatalogEntityRoutes(app, deps);
-  registerCatalogProductRoutes(app, deps);
-  registerCatalogPublishRoute(app, deps);
-  app.delete(
-    "/v1/admin/catalog/*",
-    (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
-  );
+function matchesDigest(data, sha2562) {
+  return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
 }
 
 // src/routes/media.ts
@@ -102681,6 +102035,656 @@ function registerAuthRoutes(app, deps) {
     await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
   });
+}
+
+// src/services/catalogAdmin.ts
+var brandOf = (row2) => ({
+  id: Number(row2.id),
+  slug: row2.slug,
+  name: row2.name,
+  website: row2.website,
+  isActive: Number(row2.is_active) === 1
+});
+async function listBrands(db) {
+  const rows = await db.query(
+    "SELECT id, slug, name, website, is_active FROM brands ORDER BY name ASC, id ASC"
+  );
+  return rows.map(brandOf);
+}
+async function lockBrand(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT id, slug, name, website, is_active FROM brands WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return row2 ? brandOf(row2) : null;
+}
+async function createBrand(tx, input2) {
+  await tx.query("INSERT INTO brands (slug, name, website) VALUES (?, ?, ?)", [
+    input2.slug,
+    input2.name,
+    input2.website
+  ]);
+  const [row2] = await tx.query(
+    "SELECT id, slug, name, website, is_active FROM brands WHERE slug = ?",
+    [input2.slug]
+  );
+  return { before: null, after: brandOf(row2) };
+}
+async function updateBrand(tx, id, patch) {
+  const before = await lockBrand(tx, id);
+  if (before === null) return "CAT_NOT_FOUND";
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE brands SET name = ?, website = ?, is_active = ? WHERE id = ?",
+    [after.name, after.website, after.isActive ? 1 : 0, id]
+  );
+  return { before, after };
+}
+var flag = (value) => Number(value) === 1;
+var groupOf = (row2, values = []) => ({
+  id: Number(row2.id),
+  code: row2.code,
+  nameEs: row2.name_es,
+  nameEn: row2.name_en,
+  isRequired: flag(row2.is_required),
+  isOrdered: flag(row2.is_ordered),
+  isFilterable: flag(row2.is_filterable),
+  showOnLanding: flag(row2.show_on_landing),
+  isSystem: flag(row2.is_system),
+  isActive: flag(row2.is_active),
+  sortOrder: Number(row2.sort_order),
+  values
+});
+var valueOf = (row2) => ({
+  id: Number(row2.id),
+  code: row2.code,
+  valueEs: row2.value_es,
+  valueEn: row2.value_en,
+  sortOrder: Number(row2.sort_order)
+});
+async function listFacets(db) {
+  const groups = await db.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC"
+  );
+  const values = await db.query(
+    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values ORDER BY sort_order ASC, id ASC"
+  );
+  return groups.map(
+    (group) => groupOf(
+      group,
+      values.filter((value) => Number(value.group_id) === Number(group.id)).map(valueOf)
+    )
+  );
+}
+async function lockGroup(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return row2 ? groupOf(row2) : null;
+}
+async function createFacetGroup(tx, input2) {
+  await tx.query(
+    "INSERT INTO product_facet_groups (code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      input2.code,
+      input2.nameEs,
+      input2.nameEn,
+      input2.isRequired ? 1 : 0,
+      input2.isOrdered ? 1 : 0,
+      input2.isFilterable ? 1 : 0,
+      input2.showOnLanding ? 1 : 0,
+      input2.sortOrder
+    ]
+  );
+  const [row2] = await tx.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code = ?",
+    [input2.code]
+  );
+  return { before: null, after: groupOf(row2) };
+}
+async function updateFacetGroup(tx, id, patch) {
+  const before = await lockGroup(tx, id);
+  if (before === null) return "CAT_NOT_FOUND";
+  if (before.isSystem && patch.isActive === false)
+    return "CAT_SYSTEM_GROUP_LOCKED";
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE product_facet_groups SET name_es = ?, name_en = ?, is_required = ?, is_ordered = ?, is_filterable = ?, show_on_landing = ?, is_active = ?, sort_order = ? WHERE id = ?",
+    [
+      after.nameEs,
+      after.nameEn,
+      after.isRequired ? 1 : 0,
+      after.isOrdered ? 1 : 0,
+      after.isFilterable ? 1 : 0,
+      after.showOnLanding ? 1 : 0,
+      after.isActive ? 1 : 0,
+      after.sortOrder,
+      id
+    ]
+  );
+  return { before, after };
+}
+async function createFacetValue(tx, groupId, input2) {
+  const group = await lockGroup(tx, groupId);
+  if (group === null) return "CAT_NOT_FOUND";
+  if (group.isSystem) return "CAT_SYSTEM_GROUP_LOCKED";
+  await tx.query(
+    "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
+    [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
+  );
+  const [row2] = await tx.query(
+    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id = ? AND code = ?",
+    [groupId, input2.code]
+  );
+  return { before: null, after: valueOf(row2) };
+}
+async function updateFacetValue(tx, id, patch) {
+  const [row2] = await tx.query(
+    "SELECT v.id, v.group_id, v.code, v.value_es, v.value_en, v.sort_order, g.is_system FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ? FOR UPDATE",
+    [id]
+  );
+  if (!row2) return "CAT_NOT_FOUND";
+  if (flag(row2.is_system)) return "CAT_SYSTEM_GROUP_LOCKED";
+  const before = valueOf(row2);
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE product_facet_values SET value_es = ?, value_en = ?, sort_order = ? WHERE id = ?",
+    [after.valueEs, after.valueEn, after.sortOrder, id]
+  );
+  return { before, after };
+}
+
+// src/routes/catalogEntities.ts
+function registerCatalogEntityRoutes(app, deps) {
+  app.get("/v1/admin/catalog/brands", async () => listBrands(deps.db));
+  app.get("/v1/admin/catalog/facets", async () => listFacets(deps.db));
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/brands",
+    entityType: "brands",
+    body: brandCreate,
+    run: (tx, { body }) => createBrand(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/brands/:id",
+    entityType: "brands",
+    params: idParams,
+    body: brandPatch,
+    run: (tx, { params, body }) => updateBrand(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/facet-groups",
+    entityType: "facet_groups",
+    body: facetGroupCreate,
+    run: (tx, { body }) => createFacetGroup(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/facet-groups/:id",
+    entityType: "facet_groups",
+    params: idParams,
+    body: facetGroupPatch,
+    run: (tx, { params, body }) => updateFacetGroup(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/facet-groups/:id/values",
+    entityType: "facet_values",
+    params: idParams,
+    body: facetValueCreate,
+    run: (tx, { params, body }) => createFacetValue(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/facet-values/:id",
+    entityType: "facet_values",
+    params: idParams,
+    body: facetValuePatch,
+    run: (tx, { params, body }) => updateFacetValue(tx, params.id, body)
+  });
+}
+
+// src/services/catalogProducts.ts
+var productOf = (row2, facetValueIds = [], gallery = []) => ({
+  id: Number(row2.id),
+  sku: row2.sku,
+  slug: row2.slug,
+  nameEs: row2.name_es,
+  nameEn: row2.name_en,
+  descriptionEs: row2.description_es,
+  descriptionEn: row2.description_en,
+  priceMxnCents: Number(row2.price_mxn_cents),
+  stock: Number(row2.stock),
+  reservedStock: Number(row2.reserved_stock),
+  discipline: row2.discipline,
+  level: row2.level,
+  brandId: row2.brand_id === null ? null : Number(row2.brand_id),
+  shippingClass: row2.shipping_class,
+  weightGrams: Number(row2.weight_grams),
+  lengthMm: Number(row2.length_mm),
+  widthMm: Number(row2.width_mm),
+  heightMm: Number(row2.height_mm),
+  isActive: Number(row2.is_active) === 1,
+  isTest: Number(row2.is_test) === 1,
+  facetValueIds,
+  gallery
+});
+async function listAdminProducts(db, paging2) {
+  const [{ total }] = await db.query(
+    "SELECT COUNT(*) AS total FROM products"
+  );
+  const rows = await db.query(
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
+    [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
+  );
+  return { items: rows.map((row2) => productOf(row2)), total: Number(total) };
+}
+async function productRow(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
+    [id]
+  );
+  return row2;
+}
+async function lockedProduct(tx, id) {
+  const [found] = await tx.query(
+    "SELECT id FROM products WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return found ? productRow(tx, id) : void 0;
+}
+async function fullProduct(tx, row2) {
+  const values = await tx.query(
+    "SELECT k.value_id FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0 ORDER BY k.value_id ASC",
+    [row2.id]
+  );
+  const images = await tx.query(
+    "SELECT media_sha256, alt_text_es, alt_text_en, sort_order, is_primary FROM product_media WHERE product_id = ? AND is_active = 1 ORDER BY is_primary DESC, sort_order ASC, id ASC",
+    [row2.id]
+  );
+  return productOf(
+    row2,
+    values.map((value) => Number(value.value_id)),
+    images.map((image) => ({
+      sha256: image.media_sha256,
+      altEs: image.alt_text_es,
+      altEn: image.alt_text_en,
+      sortOrder: Number(image.sort_order),
+      isPrimary: Number(image.is_primary) === 1
+    }))
+  );
+}
+async function readAdminProduct(db, id) {
+  const row2 = await productRow(db, id);
+  return row2 ? fullProduct(db, row2) : null;
+}
+async function references(tx, fields2) {
+  const [category] = await tx.query(
+    "SELECT id FROM categories WHERE slug = ? AND is_active = 1",
+    [fields2.discipline]
+  );
+  const [level] = await tx.query(
+    "SELECT id FROM experience_levels WHERE slug = ? AND is_active = 1",
+    [fields2.level]
+  );
+  const [shipping] = await tx.query(
+    "SELECT id FROM shipping_classes WHERE slug = ? AND is_active = 1",
+    [fields2.shippingClass]
+  );
+  const brandOk = fields2.brandId === null || (await tx.query(
+    "SELECT id FROM brands WHERE id = ? AND is_active = 1",
+    [fields2.brandId]
+  )).length === 1;
+  if (!category || !level || !shipping || !brandOk) return null;
+  return { category: category.id, level: level.id, shipping: shipping.id };
+}
+async function facetChoice(tx, ids) {
+  const unique = [...new Set(ids)];
+  const found = await Promise.all(
+    unique.map(async (id) => {
+      const [value] = await tx.query(
+        "SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?",
+        [id]
+      );
+      return { id, value };
+    })
+  );
+  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
+    return "CAT_REFERENCE_INVALID";
+  const ordinary = found.filter(({ value }) => Number(value.is_system) !== 1).map(({ id }) => id);
+  const level = found.find(({ value }) => Number(value.is_system) === 1)?.value.code ?? null;
+  return { ordinary, level };
+}
+async function relinkLevel(tx, productId, level) {
+  await tx.query(
+    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1 AND g.code = 'nivel'",
+    [productId]
+  );
+  await tx.query(
+    "INSERT INTO product_facet_links (product_id, value_id) SELECT ?, v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.is_system = 1 AND g.code = 'nivel' AND v.code = ?",
+    [productId, level]
+  );
+}
+async function relinkFacets(tx, productId, ids) {
+  await tx.query(
+    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0",
+    [productId]
+  );
+  await Promise.all(
+    ids.map(
+      (id) => tx.query(
+        "INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)",
+        [productId, id]
+      )
+    )
+  );
+}
+function settledLevel(given, fromFacets, current) {
+  if (given !== void 0 && fromFacets !== null && given !== fromFacets)
+    return null;
+  return given ?? fromFacets ?? current;
+}
+async function createProduct(tx, input2) {
+  const facets = await facetChoice(tx, input2.facetValueIds);
+  if (facets === "CAT_REFERENCE_INVALID") return facets;
+  const level = settledLevel(input2.level, facets.level, input2.level);
+  if (level === null) return "CAT_VALIDATION_ERROR";
+  const refs = await references(tx, input2);
+  if (refs === null) return "CAT_REFERENCE_INVALID";
+  await tx.query(
+    "INSERT INTO products (sku, slug, category_id, brand_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      input2.sku,
+      input2.slug,
+      refs.category,
+      input2.brandId,
+      refs.level,
+      input2.nameEs,
+      input2.nameEn,
+      input2.descriptionEs,
+      input2.descriptionEn,
+      input2.priceMxnCents,
+      input2.stock,
+      input2.weightGrams,
+      input2.lengthMm,
+      input2.widthMm,
+      input2.heightMm,
+      refs.shipping
+    ]
+  );
+  const [{ id }] = await tx.query(
+    "SELECT id FROM products WHERE sku = ?",
+    [input2.sku]
+  );
+  await relinkLevel(tx, id, level);
+  await relinkFacets(tx, id, facets.ordinary);
+  const row2 = await productRow(tx, id);
+  return { before: null, after: await fullProduct(tx, row2) };
+}
+async function updateProduct(tx, id, patch) {
+  const row2 = await lockedProduct(tx, id);
+  if (!row2) return "CAT_NOT_FOUND";
+  const before = await fullProduct(tx, row2);
+  const facets = await facetChoice(tx, patch.facetValueIds ?? []);
+  if (facets === "CAT_REFERENCE_INVALID") return facets;
+  const level = settledLevel(patch.level, facets.level, before.level);
+  if (level === null) return "CAT_VALIDATION_ERROR";
+  const { facetValueIds, isActive, ...fields2 } = patch;
+  const next = {
+    ...before,
+    ...fields2,
+    level,
+    isActive: isActive ?? before.isActive
+  };
+  if (next.stock < before.reservedStock) return "CAT_STOCK_BELOW_RESERVED";
+  const refs = await references(tx, next);
+  if (refs === null) return "CAT_REFERENCE_INVALID";
+  await tx.query(
+    "UPDATE products SET category_id = ?, brand_id = ?, experience_level_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
+    [
+      refs.category,
+      next.brandId,
+      refs.level,
+      next.nameEs,
+      next.nameEn,
+      next.descriptionEs,
+      next.descriptionEn,
+      next.priceMxnCents,
+      next.stock,
+      next.weightGrams,
+      next.lengthMm,
+      next.widthMm,
+      next.heightMm,
+      refs.shipping,
+      next.isActive ? 1 : 0,
+      id
+    ]
+  );
+  if (level !== before.level) await relinkLevel(tx, id, level);
+  if (facetValueIds !== void 0) await relinkFacets(tx, id, facets.ordinary);
+  const after = await fullProduct(tx, await productRow(tx, id));
+  return { before, after };
+}
+async function placeImage(tx, productId, image, index) {
+  const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
+  const [existing] = await tx.query(
+    "SELECT id FROM product_media WHERE product_id = ? AND media_sha256 = ? ORDER BY id ASC LIMIT 1",
+    [productId, image.sha256]
+  );
+  if (existing) {
+    await tx.query(
+      "UPDATE product_media SET alt_text_es = ?, alt_text_en = ?, sort_order = ?, is_primary = ?, is_active = 1 WHERE id = ?",
+      [...values, existing.id]
+    );
+  } else {
+    await tx.query(
+      "INSERT INTO product_media (alt_text_es, alt_text_en, sort_order, is_primary, product_id, media_sha256) VALUES (?, ?, ?, ?, ?, ?)",
+      [...values, productId, image.sha256]
+    );
+  }
+}
+async function replaceGallery(tx, id, images) {
+  const row2 = await lockedProduct(tx, id);
+  if (!row2) return "CAT_NOT_FOUND";
+  const blobs = await Promise.all(
+    images.map(
+      (image) => tx.query(
+        "SELECT sha256 FROM media_blobs WHERE sha256 = ?",
+        [image.sha256]
+      )
+    )
+  );
+  if (blobs.some((rows) => rows.length === 0)) return "CAT_REFERENCE_INVALID";
+  const before = await fullProduct(tx, row2);
+  await tx.query(
+    "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
+    [id]
+  );
+  await Promise.all(
+    images.map((image, index) => placeImage(tx, id, image, index))
+  );
+  return { before, after: await fullProduct(tx, row2) };
+}
+
+// src/routes/catalogProducts.ts
+function registerCatalogProductRoutes(app, deps) {
+  app.get("/v1/admin/catalog/products", async (request, reply) => {
+    const query = productListQuery.safeParse(request.query);
+    if (!query.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid catalog data", "CAT_VALIDATION_ERROR"));
+    }
+    return { ...await listAdminProducts(deps.db, query.data), ...query.data };
+  });
+  app.get("/v1/admin/catalog/products/:id", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const product = params.success ? await readAdminProduct(deps.db, params.data.id) : null;
+    if (product === null) {
+      const status = params.success ? 404 : 400;
+      return reply.code(status).type(PROBLEM_TYPE).send(
+        problem(
+          status,
+          params.success ? "Not found" : "Invalid catalog data",
+          params.success ? "CAT_NOT_FOUND" : "CAT_VALIDATION_ERROR"
+        )
+      );
+    }
+    return product;
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/products",
+    entityType: "products",
+    body: productCreate,
+    run: (tx, { body }) => createProduct(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/products/:id",
+    entityType: "products",
+    params: idParams,
+    body: productPatch,
+    run: (tx, { params, body }) => updateProduct(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/products/:id/media",
+    entityType: "products",
+    params: idParams,
+    body: galleryPatch,
+    run: (tx, { params, body }) => replaceGallery(tx, params.id, body.images)
+  });
+}
+
+// src/services/publish.ts
+var DISPATCH_URL = "https://api.github.com/repos/felipemiramontesr/yekora.mx/actions/workflows/deploy.yml/dispatches";
+var TIMEOUT_MS = 1e4;
+async function dispatchDeploy(token, fetchImpl = fetch) {
+  try {
+    const answer = await fetchImpl(DISPATCH_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "User-Agent": "yekora-api"
+      },
+      body: JSON.stringify({ ref: "main" }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    return answer.status === 204 ? "CAT_PUBLISH_REQUESTED" : "CAT_PUBLISH_FAILED";
+  } catch {
+    return "CAT_PUBLISH_FAILED";
+  }
+}
+
+// src/routes/catalogPublish.ts
+function registerCatalogPublishRoute(app, deps) {
+  app.post(
+    "/v1/admin/catalog/publish",
+    { config: { rateLimit: { max: 3, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const token = deps.publishToken;
+      if (token === null) {
+        return refuse(
+          reply,
+          503,
+          "Publishing unavailable",
+          "CAT_PUBLISH_UNAVAILABLE"
+        );
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        const outcome = await dispatchDeploy(token);
+        if (outcome === "CAT_PUBLISH_FAILED") {
+          return {
+            status: 502,
+            body: problem(502, "GitHub did not queue the publication", outcome)
+          };
+        }
+        const published = {
+          workflow: "deploy.yml",
+          ref: "main",
+          requestedAt: deps.now().toISOString()
+        };
+        await recordAudit(tx, {
+          userId,
+          action: "POST /v1/admin/catalog/publish",
+          entityType: "publish",
+          entityId: "deploy.yml",
+          before: null,
+          after: published,
+          ip: request.ip
+        });
+        return { status: 202, body: { code: outcome, ...published } };
+      });
+    }
+  );
+}
+
+// src/routes/catalogAdmin.ts
+var UPLOAD_READ_LIMIT = 4 * 1024 * 1024;
+var MEDIA_REFUSALS = {
+  MEDIA_UNSAFE_TYPE: [415, "Unsupported image type"],
+  MEDIA_SIZE_EXCEEDED: [413, "Image too large"],
+  MEDIA_DIMENSIONS_INVALID: [422, "Image dimensions not allowed"]
+};
+function registerCatalogAdminRoutes(app, deps) {
+  app.addContentTypeParser(
+    /^image\/[a-z0-9.+-]+$/,
+    { parseAs: "buffer", bodyLimit: UPLOAD_READ_LIMIT },
+    (_request, body, done) => done(null, body)
+  );
+  app.post(
+    "/v1/admin/catalog/media",
+    {
+      bodyLimit: UPLOAD_READ_LIMIT,
+      errorHandler: (error63, _request, reply) => {
+        if (error63.code !== "FST_ERR_CTP_BODY_TOO_LARGE")
+          throw error63;
+        return refuse(reply, 413, "Image too large", "MEDIA_SIZE_EXCEEDED");
+      }
+    },
+    async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const bytes = request.body;
+      const verdict = Buffer.isBuffer(bytes) ? inspectMedia(bytes, String(request.headers["content-type"])) : { code: "MEDIA_UNSAFE_TYPE" };
+      if (verdict.code !== "MEDIA_ACCEPTED") {
+        const [status, title] = MEDIA_REFUSALS[verdict.code];
+        return refuse(reply, status, title, verdict.code);
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        const created = await storeMedia(tx, bytes, verdict);
+        const { code: code2, ...stored } = verdict;
+        await recordAudit(tx, {
+          userId,
+          action: "POST /v1/admin/catalog/media",
+          entityType: "media",
+          entityId: verdict.sha256,
+          before: created ? null : stored,
+          after: stored,
+          ip: request.ip
+        });
+        return { status: 201, body: { code: code2, created, ...stored } };
+      });
+    }
+  );
+  registerCatalogEntityRoutes(app, deps);
+  registerCatalogProductRoutes(app, deps);
+  registerCatalogPublishRoute(app, deps);
+  app.delete(
+    "/v1/admin/catalog/*",
+    (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
+  );
 }
 
 // src/routes/checkout.ts
@@ -116935,7 +116939,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "7186f321006a7ef1492bbc7beee4b1b2c85ad703" : void 0;
+var sha = true ? "2e295a85cd2d96a32393367341270a7ff4f1e945" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
