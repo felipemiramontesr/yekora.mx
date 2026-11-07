@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
@@ -78,12 +79,14 @@ export function CartDrawer({
             messages={messages}
             priceMessages={priceMessages}
           />
-          <a
+          <Link
             href={routeFor('cart', locale)}
+            // Client navigation keeps the header, and this dialog, mounted (FC 043 T2.3): close it.
+            onClick={onClose}
             className="mt-auto inline-flex min-h-11 items-center justify-center rounded-md border border-petroleo font-semibold"
           >
             {messages.viewFull}
-          </a>
+          </Link>
         </div>
       )}
     </dialog>

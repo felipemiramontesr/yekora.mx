@@ -140,6 +140,32 @@ test('legal pages are reachable from the footer in both languages', async ({
   );
 });
 
+test('internal links change page without reloading the document (FC 043 T2.3)', async ({
+  page,
+}) => {
+  await page.goto('/cuenta/');
+  // The sign-in field turns enabled at hydration (FC 043 T2.2): from here links are client-side.
+  await expect(page.getByLabel('Correo electrónico')).toBeEnabled();
+  // A full reload would build a new window and lose this mark.
+  await page.evaluate(() => {
+    (window as Window & { sameDocument?: boolean }).sameDocument = true;
+  });
+  const nav = await headerNav(page, 'Navegación principal');
+  await nav.getByRole('link', { name: 'Catálogo' }).click();
+  await expect(page).toHaveURL(/\/catalogo\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as Window & { sameDocument?: boolean }).sameDocument
+    )
+  ).toBe(true);
+  // The header stays mounted, so the phone menu must close itself after the click.
+  const menu = page.getByRole('banner').locator('details');
+  expect(await menu.evaluate((d) => (d as HTMLDetailsElement).open)).toBe(
+    false
+  );
+});
+
 test('the mobile menu opens without client JavaScript', async ({
   browser,
   baseURL,

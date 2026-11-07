@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Compass } from 'lucide-react';
 import { getMessages, type Locale, type Messages } from '@/app/i18n';
 import type { Product } from '@/lib/api/catalogClient';
@@ -42,13 +43,13 @@ function ComingSoon({
       <p className="mt-4 max-w-2xl leading-relaxed text-marfil/90">
         {messages.text}
       </p>
-      <a
+      <Link
         href={`${routeFor('home', locale)}#disciplinas`}
         className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-md bg-marfil px-6 py-3 font-semibold text-petroleo"
       >
         <Compass aria-hidden="true" size={20} />
         {messages.cta}
-      </a>
+      </Link>
     </section>
   );
 }

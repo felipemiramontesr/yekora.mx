@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getMessages, type Locale } from '@/app/i18n';
 import type { ExchangeRate, Product } from '@/lib/api/catalogClient';
@@ -31,13 +32,13 @@ export function ProductView({
   const gallery = product.images.length > 0 ? product.images : [null];
   return (
     <article className="mx-auto max-w-6xl px-4 py-12">
-      <a
+      <Link
         href={routeFor('catalog', locale)}
         className="tap-target gap-2 text-sm underline-offset-4 hover:underline"
       >
         <ArrowLeft aria-hidden="true" size={18} />
         {catalog.product.back}
-      </a>
+      </Link>
       <div className="mt-6 grid gap-10 md:grid-cols-2">
         <div className="flex flex-col gap-4">
           {gallery.map((image, index) => (

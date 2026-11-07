@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 
@@ -57,12 +58,12 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
           <ul className="mt-2 flex flex-col text-sm">
             {disciplines.map((discipline) => (
               <li key={discipline}>
-                <a
+                <Link
                   href={`${routeFor('home', locale)}#${discipline}`}
                   className="tap-target underline-offset-4 hover:underline"
                 >
                   {messages.disciplines[discipline]}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -73,12 +74,12 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
           </h2>
           <ul className="mt-2 flex flex-col text-sm">
             <li>
-              <a
+              <Link
                 href={routeFor('about', locale)}
                 className="tap-target underline-offset-4 hover:underline"
               >
                 {messages.header.about}
-              </a>
+              </Link>
             </li>
             <li className="text-marfil/90">{footer.mexicanTalent}</li>
           </ul>
@@ -90,12 +91,12 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
           <ul className="mt-2 flex flex-col text-sm">
             {legal.map((link) => (
               <li key={link.href}>
-                <a
+                <Link
                   href={link.href}
                   className="tap-target underline-offset-4 hover:underline"
                 >
                   {link.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>

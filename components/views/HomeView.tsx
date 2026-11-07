@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArrowRight, Compass } from 'lucide-react';
 import { disciplines, getMessages, type Locale } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
@@ -80,20 +81,20 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-marfil/90">{hero.lede}</p>
             <div className="mt-10 flex flex-wrap gap-4">
-              <a
+              <Link
                 href={`${routeFor('home', locale)}#disciplinas`}
                 className="inline-flex min-h-11 items-center gap-2 rounded-md bg-marfil px-6 py-3 font-semibold text-petroleo"
               >
                 <Compass aria-hidden="true" size={20} />
                 {hero.primaryCta}
-              </a>
-              <a
+              </Link>
+              <Link
                 href={routeFor('about', locale)}
                 className="inline-flex min-h-11 items-center gap-2 rounded-md border border-marfil/60 px-6 py-3 font-semibold"
               >
                 {hero.secondaryCta}
                 <ArrowRight aria-hidden="true" size={20} />
-              </a>
+              </Link>
             </div>
           </div>
           {/* Client logo, never retyped. Decorative here: the page h1 carries the message. */}

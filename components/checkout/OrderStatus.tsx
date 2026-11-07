@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { fetchOrder } from '@/lib/api/checkoutClient';
@@ -227,18 +228,18 @@ function ReturnLinks({
     <div className="flex flex-col items-start gap-4">
       {lead && <p>{lead}</p>}
       <div className="flex flex-wrap gap-4">
-        <a
+        <Link
           href={routeFor('catalog', locale)}
           className="inline-flex min-h-11 items-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
         >
           {texts.toCatalog}
-        </a>
-        <a
+        </Link>
+        <Link
           href={routeFor('cart', locale)}
           className="inline-flex min-h-11 items-center underline underline-offset-4"
         >
           {texts.toCart}
-        </a>
+        </Link>
       </div>
     </div>
   );

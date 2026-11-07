@@ -1,8 +1,10 @@
 import { Menu, UserRound } from 'lucide-react';
+import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
 import { CartButton } from './cart/CartButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { MenuDisclosure } from './MenuDisclosure';
 
 /** Props of {@link Header}. */
 interface HeaderProps {
@@ -18,29 +20,29 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
     <>
       {disciplines.map((discipline) => (
         <li key={discipline}>
-          <a
+          <Link
             href={`${routeFor('home', locale)}#${discipline}`}
             className="tap-target underline-offset-4 hover:underline"
           >
             {messages.disciplines[discipline]}
-          </a>
+          </Link>
         </li>
       ))}
       <li>
-        <a
+        <Link
           href={routeFor('about', locale)}
           className="tap-target underline-offset-4 hover:underline"
         >
           {messages.header.about}
-        </a>
+        </Link>
       </li>
       <li>
-        <a
+        <Link
           href={routeFor('catalog', locale)}
           className="tap-target underline-offset-4 hover:underline"
         >
           {messages.header.catalog}
-        </a>
+        </Link>
       </li>
     </>
   );
@@ -50,12 +52,15 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
  * Site header: brand lockup linking home, the discipline anchors, About, the catalog, the
  * language switcher, the account link (FC 028) and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
  * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
+ * Internal links use `next/link` (FC 043 T2.3): the next page is prefetched and opens without a
+ * full reload. The language switcher stays a plain link, since each language has its own root
+ * layout (another document).
  */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <header className="sticky top-0 z-40 bg-petroleo text-marfil">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-6">
-        <a
+        <Link
           href={routeFor('home', locale)}
           aria-label={messages.brand.homeLink}
           className="tap-target shrink-0 gap-3"
@@ -74,7 +79,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
             width={101}
             height={18}
           />
-        </a>
+        </Link>
         <nav
           aria-label={messages.header.navLabel}
           className="hidden flex-1 xl:block"
@@ -91,22 +96,23 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
         </div>
         {/* FC 028: the account area, always visible next to the cart. On narrow phones the bar
             tightens its gaps and the menu shows only its icon, so the three icons fit 360 px. */}
-        <a
+        <Link
           href={routeFor('account', locale)}
           aria-label={messages.header.account}
           className="tap-target shrink-0 justify-center"
         >
           <UserRound aria-hidden="true" size={24} />
-        </a>
+        </Link>
         {/* FC 009: always visible, on every screen size, outside the collapsible menu. */}
         <CartButton
           locale={locale}
           messages={messages.cart}
           priceMessages={messages.catalog.price}
         />
-        {/* Phones and tablets: menu without client JavaScript (native <details>/<summary>).
+        {/* Phones and tablets: native <details>/<summary>, so the menu opens without JavaScript;
+            MenuDisclosure only closes it after a client navigation (FC 043 T2.3).
             The full bar needs xl: below 1280 px it wraps onto two lines. */}
-        <details className="relative xl:hidden">
+        <MenuDisclosure className="relative xl:hidden">
           <summary className="tap-target cursor-pointer list-none gap-2 px-1 text-sm">
             <Menu aria-hidden="true" size={22} />
             <span className="sr-only sm:not-sr-only">
@@ -127,7 +133,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
               />
             </div>
           </nav>
-        </details>
+        </MenuDisclosure>
       </div>
     </header>
   );

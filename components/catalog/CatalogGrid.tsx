@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { fill, type PriceText } from '@/lib/catalog/format';
@@ -101,7 +102,7 @@ function ProductCard({
   messages,
 }: Readonly<{ item: GridItem; messages: Messages['catalog'] }>) {
   return (
-    <a
+    <Link
       href={item.href}
       className="group flex h-full flex-col gap-4 rounded-xl border border-petroleo/15 bg-white/60 p-4 hover:border-petroleo/40"
     >
@@ -130,7 +131,7 @@ function ProductCard({
             : messages.product.outOfStock}
         </p>
       </div>
-    </a>
+    </Link>
   );
 }
 

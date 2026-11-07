@@ -9,6 +9,9 @@ export default defineConfig({
     // Server Components run in node; Client Component tests opt into
     // jsdom per file with `// @vitest-environment jsdom`.
     environment: 'node',
+    // `next build` inlines this flag from `trailingSlash: true` (next.config.ts); without it,
+    // next/link drops the final `/` that every route of the static export ends in (FC 043 T2.3).
+    env: { __NEXT_TRAILING_SLASH: 'true' },
     include: [
       'app/**/*.{test,spec}.{ts,tsx}',
       'components/**/*.{test,spec}.{ts,tsx}',

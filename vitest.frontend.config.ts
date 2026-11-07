@@ -9,6 +9,8 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./', import.meta.url)) } },
   test: {
     environment: 'node',
+    // Same flag as vitest.config.ts: next/link keeps the trailing `/` of the static export.
+    env: { __NEXT_TRAILING_SLASH: 'true' },
     include: [
       'app/**/*.{test,spec}.{ts,tsx}',
       'components/**/*.{test,spec}.{ts,tsx}',

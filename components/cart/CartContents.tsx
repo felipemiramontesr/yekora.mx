@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Backpack } from 'lucide-react';
 import type { Locale, Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
@@ -36,12 +37,12 @@ export function CartContents({
         <Backpack aria-hidden="true" size={40} className="text-ocre" />
         <p className="text-xl font-semibold">{messages.empty.title}</p>
         <p className="text-petroleo/80">{messages.empty.text}</p>
-        <a
+        <Link
           href={routeFor('catalog', locale)}
           className="inline-flex min-h-11 items-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
         >
           {messages.empty.cta}
-        </a>
+        </Link>
       </div>
     );
   }
@@ -68,12 +69,12 @@ export function CartContents({
         priceMessages={priceMessages}
       />
       {/* FC 012: the checkout re-checks stock and shipping itself; it is always reachable. */}
-      <a
+      <Link
         href={routeFor('checkout', locale)}
         className="inline-flex min-h-12 items-center justify-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
       >
         {messages.toCheckout}
-      </a>
+      </Link>
     </div>
   );
 }

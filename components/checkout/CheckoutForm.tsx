@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { type SubmitEvent, useId, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { type CheckoutFailure, submitCheckout } from '@/lib/api/checkoutClient';
@@ -135,12 +136,12 @@ export function CheckoutForm({
       <div data-checkout-empty className="flex flex-col items-start gap-4">
         <p className="text-xl font-semibold">{messages.empty.title}</p>
         <p className="text-petroleo/80">{messages.empty.text}</p>
-        <a
+        <Link
           href={routeFor('catalog', locale)}
           className="inline-flex min-h-11 items-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
         >
           {messages.empty.cta}
-        </a>
+        </Link>
       </div>
     );
   }
@@ -334,12 +335,12 @@ export function CheckoutForm({
           {statusText(phase, ready, messages)}
         </output>
         <p className="text-xs text-petroleo/80">{messages.secure}</p>
-        <a
+        <Link
           href={routeFor('cart', locale)}
           className="text-sm underline underline-offset-4"
         >
           {messages.backToCart}
-        </a>
+        </Link>
       </aside>
     </form>
   );

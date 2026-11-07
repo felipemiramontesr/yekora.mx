@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
@@ -56,12 +57,12 @@ export function CookieBanner({
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm">
           {messages.text}{' '}
-          <a
+          <Link
             href={routeFor('cookies', locale)}
             className="tap-target underline underline-offset-4"
           >
             {messages.policy}
-          </a>
+          </Link>
         </p>
         <button
           type="button"
