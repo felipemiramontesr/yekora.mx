@@ -16,7 +16,7 @@ import {
   brandSchema,
   publishRequestedSchema,
 } from '@/lib/catalog/adminTypes';
-import { API_URL, call, json, type TransportFailure } from './http';
+import { sessionRequest, type TransportFailure } from './http';
 
 /** Hostinger may wake the API from sleep; the first request pays its start-up. */
 const TIMEOUT_MS = 25_000;
@@ -49,7 +49,7 @@ function refusal(status: number, body: unknown): CatalogFailure {
 }
 
 /** One request with the session cookie; a write carries a new Idempotency-Key. */
-async function request<T>(
+function request<T>(
   path: string,
   schema: z.ZodType<T>,
   method: 'GET' | 'POST' | 'PATCH',
@@ -59,24 +59,14 @@ async function request<T>(
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (method !== 'GET') headers['Idempotency-Key'] = crypto.randomUUID();
   if (body) headers['Content-Type'] = 'application/json';
-  const answer = await call(
+  return sessionRequest(
     fetchImpl,
-    `${API_URL}${path}`,
-    {
-      method,
-      credentials: 'include',
-      headers,
-      body: body && JSON.stringify(body),
-    },
-    TIMEOUT_MS
+    path,
+    { method, headers, body },
+    TIMEOUT_MS,
+    schema,
+    refusal
   );
-  if (typeof answer === 'string') return { ok: false, reason: answer };
-  const payload = await json(answer);
-  if (!answer.ok) return { ok: false, reason: refusal(answer.status, payload) };
-  const parsed = schema.safeParse(payload);
-  return parsed.success
-    ? { ok: true, data: parsed.data }
-    : { ok: false, reason: 'invalid' };
 }
 
 /** A brand as the console shows it. */

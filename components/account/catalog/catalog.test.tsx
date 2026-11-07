@@ -226,6 +226,24 @@ describe('brands (FC 029 F3a)', () => {
     ).toBe('');
   });
 
+  it('reads a missing field as empty, never as text of an object', async () => {
+    api.updateBrand.mockResolvedValue(ok(CUMBRE));
+    renderConsole();
+    await screen.findByText('Cumbre');
+    press(t.brands.edit);
+    const row = screen
+      .getByDisplayValue('Cumbre')
+      .closest('form') as HTMLFormElement;
+    row.querySelector('input[name="website"]')?.remove();
+    fireEvent.submit(row);
+    await waitFor(() =>
+      expect(api.updateBrand).toHaveBeenCalledWith(1, {
+        name: 'Cumbre',
+        website: null,
+      })
+    );
+  });
+
   it('retires an active brand and reactivates a retired one', async () => {
     api.updateBrand.mockResolvedValue(ok(CUMBRE));
     api.listBrands.mockResolvedValue(

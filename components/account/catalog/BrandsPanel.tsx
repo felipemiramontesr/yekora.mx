@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type SubmitEvent, useCallback, useEffect, useState } from 'react';
 import {
   type Brand,
   createBrand,
@@ -15,8 +15,14 @@ type Note = { kind: 'ok' | 'error'; text: string } | null;
 /** A text field, like the checkout's. */
 const FIELD = 'min-h-11 rounded-md border border-petroleo/30 bg-white px-3';
 
+/** A form field as trimmed text; a file or a missing field reads as empty. */
+function textOf(data: FormData, name: string): string {
+  const value = data.get(name);
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /** An empty website field is "no website". */
-const websiteOf = (value: string) => value.trim() || null;
+const websiteOf = (data: FormData) => textOf(data, 'website') || null;
 
 /**
  * Brands of the catalog (FC 029 F2b, F3): every brand, active or retired, a form to create one
@@ -67,30 +73,30 @@ export function BrandsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
     return true;
   }
 
-  async function create(event: FormEvent<HTMLFormElement>) {
+  async function create(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
     const created = await run(
       () =>
         createBrand({
-          slug: String(data.get('slug')).trim(),
-          name: String(data.get('name')).trim(),
-          website: websiteOf(String(data.get('website'))),
+          slug: textOf(data, 'slug'),
+          name: textOf(data, 'name'),
+          website: websiteOf(data),
         }),
       t.created
     );
     if (created) form.reset();
   }
 
-  async function save(event: FormEvent<HTMLFormElement>, id: number) {
+  async function save(event: SubmitEvent<HTMLFormElement>, id: number) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     await run(
       () =>
         updateBrand(id, {
-          name: String(data.get('name')).trim(),
-          website: websiteOf(String(data.get('website'))),
+          name: textOf(data, 'name'),
+          website: websiteOf(data),
         }),
       t.saved
     );
@@ -186,7 +192,7 @@ function BrandTable({
   editing: number | null;
   busy: boolean;
   onEdit: (id: number | null) => void;
-  onSave: (event: FormEvent<HTMLFormElement>, id: number) => Promise<void>;
+  onSave: (event: SubmitEvent<HTMLFormElement>, id: number) => Promise<void>;
   onToggle: (brand: Brand) => void;
 }>) {
   const t = texts.brands;

@@ -5,6 +5,7 @@
  *
  * @module
  */
+import type { z } from 'zod';
 
 /** The API. E2E tests intercept it; they never reach production. */
 export const API_URL = 'https://apiv1.yekora.mx';
@@ -48,4 +49,49 @@ export async function call(
  */
 export function json(answer: Response): Promise<unknown> {
   return answer.json().catch(() => undefined);
+}
+
+/** A JSON answer within its contract, or why there is none. */
+type ApiResult<T, R> =
+  { ok: true; data: T } | { ok: false; reason: R | TransportFailure };
+
+/**
+ * Sends one request with the session cookie (FC 028 account, FC 029 catalog console) and reads
+ * its JSON answer against its schema: a refusal becomes the reason `refusal` names, an answer
+ * outside the contract `invalid`, a missing one the transport failure.
+ *
+ * @param fetchImpl - The fetch to use (injectable for tests).
+ * @param path - Path on the API, e.g. `/v1/account/me`.
+ * @param init - Method, headers and the JSON body, if any.
+ * @param timeoutMs - Budget before aborting.
+ * @param schema - The contract of a 2xx answer.
+ * @param refusal - The reason of a non-2xx answer, from its status and body.
+ * @returns The parsed answer, or why there is none.
+ */
+export async function sessionRequest<T, R>(
+  fetchImpl: typeof fetch,
+  path: string,
+  init: { method: string; headers: Record<string, string>; body?: object },
+  timeoutMs: number,
+  schema: z.ZodType<T>,
+  refusal: (status: number, body: unknown) => R
+): Promise<ApiResult<T, R>> {
+  const answer = await call(
+    fetchImpl,
+    `${API_URL}${path}`,
+    {
+      method: init.method,
+      credentials: 'include',
+      headers: init.headers,
+      body: init.body && JSON.stringify(init.body),
+    },
+    timeoutMs
+  );
+  if (typeof answer === 'string') return { ok: false, reason: answer };
+  const payload = await json(answer);
+  if (!answer.ok) return { ok: false, reason: refusal(answer.status, payload) };
+  const parsed = schema.safeParse(payload);
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, reason: 'invalid' };
 }

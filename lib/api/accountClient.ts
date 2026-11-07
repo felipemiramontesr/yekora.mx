@@ -26,7 +26,13 @@ import {
   orderDetailSchema,
   orderPageSchema,
 } from '@/lib/account/orderTypes';
-import { API_URL, call, json, type TransportFailure } from './http';
+import {
+  API_URL,
+  call,
+  json,
+  sessionRequest,
+  type TransportFailure,
+} from './http';
 
 // FC 028 acceptance round 1 (282_AN P1): Hostinger puts the idle API to sleep, and the first request after a
 // pause pays its whole start-up before the Argon2id work; 8 s was not enough for that request.
@@ -72,32 +78,26 @@ function refusal(status: number, body: unknown): AccountFailure {
 }
 
 /** One request with the session cookie; the answer is checked against its schema. */
-async function request<T>(
+function request<T>(
   path: string,
   schema: z.ZodType<T>,
   { method = 'GET', body }: { method?: 'GET' | 'POST'; body?: object },
   { fetchImpl = fetch }: ClientOptions
 ): Promise<AccountResult<T>> {
-  const answer = await call(
+  return sessionRequest(
     fetchImpl,
-    `${API_URL}${path}`,
+    path,
     {
       method,
-      credentials: 'include',
       headers: body
         ? { Accept: 'application/json', 'Content-Type': 'application/json' }
         : { Accept: 'application/json' },
-      body: body && JSON.stringify(body),
+      body,
     },
-    TIMEOUT_MS
+    TIMEOUT_MS,
+    schema,
+    refusal
   );
-  if (typeof answer === 'string') return { ok: false, reason: answer };
-  const payload = await json(answer);
-  if (!answer.ok) return { ok: false, reason: refusal(answer.status, payload) };
-  const parsed = schema.safeParse(payload);
-  return parsed.success
-    ? { ok: true, data: parsed.data }
-    : { ok: false, reason: 'invalid' };
 }
 
 /**
