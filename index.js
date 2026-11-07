@@ -99711,12 +99711,7 @@ async function findProduct(db, slug3) {
     "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
     [slug3]
   );
-  if (!product) return null;
-  const images = await db.query(
-    "SELECT i.path, i.alt_es, i.alt_en FROM product_images i JOIN products p ON p.id = i.product_id WHERE p.slug = ? ORDER BY i.sort_order ASC",
-    [slug3]
-  );
-  return { product, images };
+  return product ?? null;
 }
 
 // src/routes/catalog.ts
@@ -99785,13 +99780,10 @@ function registerCatalogRoutes(app, deps) {
     if (!found) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Product not found"));
     }
-    const english = language.data === "en";
     return {
-      ...present(found.product, language.data, rate ? Number(rate.rate) : null),
-      images: found.images.map((image) => ({
-        path: image.path,
-        alt: english ? image.alt_en : image.alt_es
-      })),
+      ...present(found, language.data, rate ? Number(rate.rate) : null),
+      // FC 029 F0: no gallery until product_media is served in F1 (production never had images).
+      images: [],
       exchangeRate: rate
     };
   });
@@ -115593,7 +115585,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "1f11daf7f9a982fe3454879d08008dad6f8adab4" : void 0;
+var sha = true ? "ef0b01ddc6dda270c5299e3c49c2626bce7fd88a" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
