@@ -6,11 +6,16 @@ describe('ProductVisual', () => {
   it('shows the photo with its alt text, lazily by default', () => {
     const html = renderToStaticMarkup(
       <ProductVisual
-        image={{ path: '/images/products/arnes.webp', alt: 'Alpine harness' }}
+        image={{
+          path: '/v1/media/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+          alt: 'Alpine harness',
+        }}
         discipline="escalada"
       />
     );
-    expect(html).toContain('src="/images/products/arnes.webp"');
+    expect(html).toContain(
+      'src="https://apiv1.yekora.mx/v1/media/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"'
+    );
     expect(html).toContain('alt="Alpine harness"');
     expect(html).toContain('loading="lazy"');
   });
@@ -18,7 +23,10 @@ describe('ProductVisual', () => {
   it('loads the first photo of a product page eagerly', () => {
     const html = renderToStaticMarkup(
       <ProductVisual
-        image={{ path: '/images/products/arnes.webp', alt: '' }}
+        image={{
+          path: '/v1/media/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+          alt: '',
+        }}
         discipline="escalada"
         loading="eager"
       />

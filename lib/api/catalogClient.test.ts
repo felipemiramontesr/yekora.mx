@@ -68,7 +68,12 @@ describe('fetchCatalog', () => {
       '/v1/catalog/e2e-arnes-alpino?lang=en': { ...harness, exchangeRate: FIX },
       '/v1/catalog/e2e-mochila-ligera-28l?lang=en': {
         ...backpack,
-        images: [{ path: '/images/products/mochila.webp', alt: 'Backpack' }],
+        images: [
+          {
+            path: '/v1/media/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+            alt: 'Backpack',
+          },
+        ],
         exchangeRate: FIX,
       },
     });
@@ -80,7 +85,10 @@ describe('fetchCatalog', () => {
     ]);
     expect(catalog.products[0].priceUsdCents).toBe(26216);
     expect(catalog.products[1].images).toEqual([
-      { path: '/images/products/mochila.webp', alt: 'Backpack' },
+      {
+        path: '/v1/media/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        alt: 'Backpack',
+      },
     ]);
     const [, init] = api.mock.calls[0] as unknown as [URL, RequestInit];
     expect(init.headers).toEqual({ Accept: 'application/json' });
@@ -139,7 +147,7 @@ describe('fetchCatalog', () => {
     await expect(fetchCatalog(BASE, 'en', api)).rejects.toThrow();
   });
 
-  it('rejects an image outside the site (only /images/products/)', async () => {
+  it('rejects an image outside the API media route (only /v1/media/<sha256>)', async () => {
     const api = fakeApi({
       '/v1/catalog?lang=en&page=1&pageSize=48': {
         items: [listItem(harness)],

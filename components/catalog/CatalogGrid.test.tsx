@@ -36,7 +36,10 @@ const ITEMS = [
     name: 'Harness',
     priceMxnCents: 485000,
     price: { mxn: '$4,850.00 MXN', usd: '$262.16 USD' },
-    image: { path: '/images/products/harness.webp', alt: 'Harness photo' },
+    image: {
+      path: '/v1/media/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      alt: 'Harness photo',
+    },
   }),
   item({
     slug: 'backpack',

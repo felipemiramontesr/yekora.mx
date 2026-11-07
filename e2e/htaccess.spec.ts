@@ -40,12 +40,13 @@ test('the service worker and manifest are never cached by HTTP', async ({
   );
 });
 
-// FC 008 (OWASP A05): the exact policy of the FC, on pages and on the 404 alike.
-test('every answer carries the Content-Security-Policy of FC 008', async ({
+// FC 008 (OWASP A05): the exact policy of the FC, on pages and on the 404 alike. FC 029 T0.1 and
+// T2.2d: img-src admits the API origin, where product images are served by digest.
+test('every answer carries the Content-Security-Policy of FC 008 and FC 029', async ({
   request,
 }) => {
   const policy =
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
   for (const path of ['/', '/catalogo/', '/en/catalog/', '/no-existe/']) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect(response.headers()['content-security-policy']).toBe(policy);

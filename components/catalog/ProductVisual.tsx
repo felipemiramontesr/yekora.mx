@@ -1,10 +1,11 @@
 import { Mountain } from 'lucide-react';
 import { isDiscipline } from '@/app/i18n';
+import { API_URL } from '@/lib/api/http';
 import { DisciplineIcon } from '../icons/DisciplineIcon';
 
 /** Props of {@link ProductVisual}. */
 interface ProductVisualProps {
-  /** Product photo (site-local path under /images/products/), or null when it has none. */
+  /** Product photo (`/v1/media/<sha256>` on the API), or null when it has none. */
   image: { path: string; alt: string } | null;
   /** Discipline slug: picks the pictogram shown when there is no photo. */
   discipline: string;
@@ -25,7 +26,7 @@ export function ProductVisual({
   if (image) {
     return (
       <img
-        src={image.path}
+        src={`${API_URL}${image.path}`}
         alt={image.alt}
         width={800}
         height={800}

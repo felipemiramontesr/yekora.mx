@@ -75,6 +75,7 @@ export interface ContractEntry {
     rawBody?: true;
   };
   responses: Readonly<Record<number, z.ZodType>>;
+  binary?: readonly string[];
 }
 
 const PROBLEM_JSON = 'application/problem+json';
@@ -115,6 +116,31 @@ function parameters(
   }));
 }
 
+/**
+ * Content of one answer: bytes for a binary 200 (one entry per media type), RFC 7807 for a
+ * problem, JSON otherwise.
+ */
+function answerContent(
+  route: ContractEntry,
+  status: string,
+  schema: z.ZodType,
+  problem: z.ZodType
+): Record<string, { schema: JsonSchema }> {
+  if (status === '200' && route.binary) {
+    return Object.fromEntries(
+      route.binary.map((type) => [
+        type,
+        { schema: { type: 'string', contentMediaType: type } },
+      ])
+    );
+  }
+  return {
+    [schema === problem ? PROBLEM_JSON : 'application/json']: {
+      schema: jsonSchema(schema, 'output'),
+    },
+  };
+}
+
 /** OpenAPI operation of one route. */
 function operation(route: ContractEntry, problem: z.ZodType): Operation {
   const { request } = route;
@@ -137,11 +163,7 @@ function operation(route: ContractEntry, problem: z.ZodType): Operation {
         status,
         {
           description: REASONS[Number(status)] ?? 'Answer',
-          content: {
-            [schema === problem ? PROBLEM_JSON : 'application/json']: {
-              schema: jsonSchema(schema, 'output'),
-            },
-          },
+          content: answerContent(route, status, schema, problem),
         },
       ])
     ),

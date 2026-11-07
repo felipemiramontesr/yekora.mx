@@ -156,6 +156,27 @@ describe('buildOpenApi (FC 027 Q03)', () => {
     });
   });
 
+  it('describes a binary 200 by its media types, and its problems as RFC 7807 (FC 029 F1)', () => {
+    const served = doc(
+      route({
+        path: '/v1/media/:sha256',
+        responses: { 200: z.custom(), 404: problem },
+        binary: ['image/webp', 'image/png'],
+      })
+    ).paths['/v1/media/{sha256}'].get;
+    expect(served.responses['200'].content).toEqual({
+      'image/webp': {
+        schema: { type: 'string', contentMediaType: 'image/webp' },
+      },
+      'image/png': {
+        schema: { type: 'string', contentMediaType: 'image/png' },
+      },
+    });
+    expect(Object.keys(served.responses['404'].content)).toEqual([
+      'application/problem+json',
+    ]);
+  });
+
   it('matches the committed apps/api/openapi.json (the CI gate checks the same)', () => {
     const committed = JSON.parse(
       readFileSync('apps/api/openapi.json', 'utf8')

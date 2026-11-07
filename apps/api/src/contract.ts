@@ -50,6 +50,7 @@ import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
+import { MEDIA_TYPES, mediaParams } from './routes/media';
 import {
   BEARER,
   ORDER_NUMBER,
@@ -88,7 +89,12 @@ interface RouteContract {
   request: RequestContract;
   /** Schema of each answer by status; {@link problemSchema} marks an RFC 7807 error. */
   responses: Readonly<Record<number, z.ZodType>>;
+  /** Media types of a binary 200 (images), instead of JSON; its schema is {@link binarySchema}. */
+  binary?: readonly string[];
 }
+
+/** A 200 that is raw bytes, not JSON (FC 029 F1: an image served by digest). */
+const binarySchema = z.custom<Buffer>((value) => Buffer.isBuffer(value));
 
 const healthSchema = z.object({
   status: z.enum(['ok', 'degraded']),
@@ -192,6 +198,21 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       400: problemSchema,
       404: problemSchema,
     },
+  },
+  {
+    method: 'GET',
+    path: '/v1/media/:sha256',
+    summary:
+      'One product image by the SHA-256 of its bytes, cacheable as immutable',
+    permission: 'public',
+    request: { params: mediaParams },
+    responses: {
+      200: binarySchema,
+      400: problemSchema,
+      404: problemSchema,
+      500: problemSchema,
+    },
+    binary: MEDIA_TYPES,
   },
   {
     method: 'POST',

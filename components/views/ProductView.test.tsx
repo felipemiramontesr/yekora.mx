@@ -37,14 +37,28 @@ describe('ProductView', () => {
         product={{
           ...shoes,
           images: [
-            { path: '/images/products/a.webp', alt: 'Side' },
-            { path: '/images/products/b.webp', alt: 'Sole' },
+            {
+              path: '/v1/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              alt: 'Side',
+            },
+            {
+              path: '/v1/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              alt: 'Sole',
+            },
           ],
         }}
         exchangeRate={null}
       />
     );
-    expect(html.indexOf('a.webp')).toBeLessThan(html.indexOf('b.webp'));
+    expect(
+      html.indexOf(
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      )
+    ).toBeLessThan(
+      html.indexOf(
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      )
+    );
     expect(html.match(/loading="eager"/g)).toHaveLength(1);
     expect(html.match(/loading="lazy"/g)).toHaveLength(1);
     expect(html).toContain('Out of stock');

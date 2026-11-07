@@ -33,12 +33,24 @@ const tent: ProductRow = {
   level_name_es: 'Expedición',
   level_name_en: 'Expedition',
 };
-/** In-memory catalog behind the Db port: one product. */
-function catalogDb(products: ProductRow[] = [tent]): Db & Transactional {
+const SIDE = 'a'.repeat(64);
+const SOLE = 'b'.repeat(64);
+/** Gallery of the tent: one image with alt texts, one without (FC 029 F1). */
+const gallery = [
+  { sha256: SIDE, alt_text_es: 'Costado', alt_text_en: 'Side' },
+  { sha256: SOLE, alt_text_es: null, alt_text_en: null },
+];
+
+/** In-memory catalog behind the Db port: one product and its gallery. */
+function catalogDb(
+  products: ProductRow[] = [tent],
+  media: typeof gallery = []
+): Db & Transactional {
   return {
     async query<Row>(sql: string, params: readonly unknown[] = []) {
       if (sql.startsWith('SELECT COUNT'))
         return [{ total: products.length }] as Row[];
+      if (sql.startsWith('SELECT m.media_sha256')) return media as Row[];
       if (sql.includes('WHERE p.slug = ?')) {
         return products.filter((row) => row.slug === params[0]) as Row[];
       }
@@ -229,27 +241,40 @@ describe('GET /v1/catalog', () => {
 });
 
 describe('GET /v1/catalog/:slug', () => {
-  it('returns the product in Spanish, with no gallery until FC 029 F1', async () => {
-    const res = await (await makeApp()).inject('/v1/catalog/tienda-expedicion');
+  it('returns the product in Spanish with its gallery by digest (FC 029 F1)', async () => {
+    const res = await (
+      await makeApp(catalogDb([tent], gallery))
+    ).inject('/v1/catalog/tienda-expedicion');
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       name: 'Tienda de expedición',
       priceUsdCents: 26216,
-      images: [],
+      images: [
+        { path: `/v1/media/${SIDE}`, alt: 'Costado' },
+        { path: `/v1/media/${SOLE}`, alt: 'Tienda de expedición' },
+      ],
       exchangeRate: FIX,
     });
   });
 
   it('returns the product in English, in MXN only without a FIX', async () => {
     const res = await (
-      await makeApp(catalogDb(), async () => null)
+      await makeApp(catalogDb([tent], gallery), async () => null)
     ).inject('/v1/catalog/tienda-expedicion?lang=en');
     expect(res.json()).toMatchObject({
       name: 'Expedition tent',
       priceUsdCents: null,
-      images: [],
+      images: [
+        { path: `/v1/media/${SIDE}`, alt: 'Side' },
+        { path: `/v1/media/${SOLE}`, alt: 'Expedition tent' },
+      ],
       exchangeRate: null,
     });
+  });
+
+  it('returns an empty gallery when the product has no image', async () => {
+    const res = await (await makeApp()).inject('/v1/catalog/tienda-expedicion');
+    expect(res.json()).toMatchObject({ images: [] });
   });
 
   it.each([

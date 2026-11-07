@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { findProduct, listProducts, type ProductRow } from './catalog';
+import {
+  findProduct,
+  findProductMedia,
+  listProducts,
+  type ProductRow,
+} from './catalog';
 import type { Db } from './db';
 
 const tent: ProductRow = {
@@ -93,5 +98,24 @@ describe('findProduct', () => {
     const { db, calls } = scriptedDb([]);
     await expect(findProduct(db, 'no-existe')).resolves.toBeNull();
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('findProductMedia (FC 029 F1)', () => {
+  it('reads the active gallery from product_media, primary first, slug bound as a parameter', async () => {
+    const image = {
+      sha256: 'c'.repeat(64),
+      alt_text_es: 'Frente',
+      alt_text_en: 'Front',
+    };
+    const { db, calls } = scriptedDb([image]);
+    await expect(findProductMedia(db, 'tienda-expedicion')).resolves.toEqual([
+      image,
+    ]);
+    expect(calls[0].params).toEqual(['tienda-expedicion']);
+    expect(calls[0].sql).toContain('FROM product_media m');
+    expect(calls[0].sql).toContain('m.is_active = 1');
+    expect(calls[0].sql).toContain('ORDER BY m.is_primary DESC');
+    expect(calls[0].sql).not.toContain('product_images');
   });
 });

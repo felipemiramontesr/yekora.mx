@@ -28,13 +28,13 @@ const product = {
   level_name_en: 'Beginner',
 };
 
-/** One product with one image, behind the Db port. */
+/** One product with one image in its gallery, behind the Db port. */
 const db: Db & Transactional = {
   async query<Row>(sql: string) {
     if (sql.startsWith('SELECT COUNT')) return [{ total: 1 }] as Row[];
-    if (sql.startsWith('SELECT i.path')) {
+    if (sql.startsWith('SELECT m.media_sha256')) {
       return [
-        { path: '/images/products/a.webp', alt_es: 'Mochila', alt_en: 'Pack' },
+        { sha256: 'a'.repeat(64), alt_text_es: 'Mochila', alt_text_en: 'Pack' },
       ] as Row[];
     }
     return [product] as Row[];

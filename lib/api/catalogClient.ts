@@ -41,11 +41,14 @@ const itemSchema = z.object({
   inStock: z.boolean(),
 });
 
-/** A product with its gallery, as the detail route returns it. */
+/**
+ * A product with its gallery, as the detail route returns it. Each image is addressed by the
+ * SHA-256 of its bytes on the API (FC 029 F1); the page loads it from the API origin.
+ */
 export const productSchema = itemSchema.extend({
   images: z.array(
     z.object({
-      path: z.string().startsWith('/images/products/'),
+      path: z.string().regex(/^\/v1\/media\/[0-9a-f]{64}$/),
       alt: z.string(),
     })
   ),

@@ -89,11 +89,32 @@ export async function listProducts(
   return { items, total: Number(total) };
 }
 
+/** One image of a product's gallery: the digest it is served under and its alt texts. */
+interface MediaRow {
+  sha256: string;
+  alt_text_es: string | null;
+  alt_text_en: string | null;
+}
+
 /**
- * One active product by slug.
+ * The active gallery of a product (FC 029 F1): primary image first, then by sort order.
  *
- * Its gallery no longer comes from `product_images`, which migration 006 retired (FC 029 T0.2):
- * it comes back from `product_media` with `GET /v1/media/:sha256` in FC 029 F1.
+ * Images live in `product_media` and are served by digest from `GET /v1/media/:sha256`; the
+ * retired `product_images` (migration 006, T0.2) is never read.
+ *
+ * @param db - Database port.
+ * @param slug - Product slug (already validated by the route).
+ * @returns The images, possibly none.
+ */
+export function findProductMedia(db: Db, slug: string): Promise<MediaRow[]> {
+  return db.query<MediaRow>(
+    'SELECT m.media_sha256 AS sha256, m.alt_text_es, m.alt_text_en FROM product_media m JOIN products p ON p.id = m.product_id WHERE p.slug = ? AND m.is_active = 1 ORDER BY m.is_primary DESC, m.sort_order ASC, m.id ASC',
+    [slug]
+  );
+}
+
+/**
+ * One active product by slug; its gallery comes from {@link findProductMedia}.
  *
  * @param db - Database port.
  * @param slug - Product slug (already validated by the route).

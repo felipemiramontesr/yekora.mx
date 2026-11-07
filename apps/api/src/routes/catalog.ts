@@ -15,6 +15,7 @@ import { usdCents } from '../lib/money';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import {
   findProduct,
+  findProductMedia,
   listProducts,
   SORTS,
   type ProductRow,
@@ -118,8 +119,9 @@ export function registerCatalogRoutes(
         .type(PROBLEM_TYPE)
         .send(problem(400, 'Invalid request'));
     }
-    const [found, rate] = await Promise.all([
+    const [found, media, rate] = await Promise.all([
       findProduct(deps.db, params.data.slug),
+      findProductMedia(deps.db, params.data.slug),
       deps.rate(),
     ]);
     if (!found) {
@@ -128,10 +130,20 @@ export function registerCatalogRoutes(
         .type(PROBLEM_TYPE)
         .send(problem(404, 'Product not found'));
     }
+    const product = present(
+      found,
+      language.data,
+      rate ? Number(rate.rate) : null
+    );
+    const english = language.data === 'en';
     return {
-      ...present(found, language.data, rate ? Number(rate.rate) : null),
-      // FC 029 F0: no gallery until product_media is served in F1 (production never had images).
-      images: [],
+      ...product,
+      // FC 029 F1: each image by its digest; the site prefixes the API origin. An image without
+      // an alt text in this language is named after the product, never left unlabeled.
+      images: media.map((image) => ({
+        path: `/v1/media/${image.sha256}`,
+        alt: (english ? image.alt_text_en : image.alt_text_es) ?? product.name,
+      })),
       exchangeRate: rate,
     };
   });

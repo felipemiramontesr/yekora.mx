@@ -21,6 +21,8 @@ const INVENTORY = [
   '├── /v1/cart/quote (POST)',
   // FC 012: guest checkout and the buyer's order view (token-protected, no account).
   '├── /v1/checkout (POST)',
+  // FC 029 F1: product images by the SHA-256 of their bytes (public, read-only).
+  '├── /v1/media/:sha256 (GET, HEAD)',
   '├── /v1/exchange-rate (GET, HEAD)',
   // FC 028 T2.6a: every order path also declares the writes, only to refuse them with 405.
   '├── /v1/orders/:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',

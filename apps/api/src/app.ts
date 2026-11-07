@@ -27,6 +27,7 @@ import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
 import { registerCheckoutRoutes } from './routes/checkout';
 import { registerExchangeRateRoute } from './routes/exchangeRate';
+import { registerMediaRoutes } from './routes/media';
 import {
   registerOrderRoutes,
   registerOrderWriteRefusals,
@@ -151,6 +152,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
+  // FC 029 F1 (ADR 0012): product images from MariaDB, by digest.
+  registerMediaRoutes(app, { db: deps.db });
   // FC 011: shipping is priced from the rate tables of the same database (no network in v1).
   const shipping = createTableRateProvider(deps.db);
   registerCartRoutes(app, { db: deps.db, rate: deps.rate, shipping });
