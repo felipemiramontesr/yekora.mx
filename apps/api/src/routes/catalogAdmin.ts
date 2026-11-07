@@ -23,6 +23,7 @@ import { checkIdempotencyKey } from '../services/idempotency';
 import { SAFE_IMAGE_TYPES } from '../services/imageProbe';
 import { inspectMedia, SHA256_HEX, storeMedia } from '../services/media';
 import { registerCatalogEntityRoutes } from './catalogEntities';
+import { registerCatalogProductRoutes } from './catalogProducts';
 import { type CatalogAdminDeps, refuse, runOnce } from './catalogMutation';
 
 /** Answer of an accepted upload: the digest the image is served under and what was probed. */
@@ -105,6 +106,7 @@ export function registerCatalogAdminRoutes(
   );
 
   registerCatalogEntityRoutes(app, deps);
+  registerCatalogProductRoutes(app, deps);
 
   // T2.3b: nothing in the catalog is ever deleted; retiring is `is_active = 0` (T2.3c).
   app.delete('/v1/admin/catalog/*', (_request, reply) =>

@@ -63,6 +63,14 @@ import {
   facetValueSchema,
 } from './routes/catalogEntities';
 import { idParams, mutationHeaders } from './routes/catalogMutation';
+import {
+  adminProductPageSchema,
+  adminProductSchema,
+  galleryPatch,
+  productCreate,
+  productListQuery,
+  productPatch,
+} from './routes/catalogProducts';
 import { mediaParams } from './routes/media';
 import { SAFE_IMAGE_TYPES } from './services/imageProbe';
 import {
@@ -140,6 +148,11 @@ const SIGNED_IN_REFUSALS = {
   503: problemSchema,
 } as const;
 
+/** The 422 of a write that names other rows (FC 029 F2b2: an unknown or retired reference). */
+const UNPROCESSABLE: Readonly<Record<number, z.ZodType>> = {
+  422: problemSchema,
+};
+
 /** A backoffice list (FC 029 F2b): needs catalog:write, answers every row. */
 const catalogRead = (
   path: string,
@@ -162,7 +175,13 @@ const catalogWrite = (
   method: 'POST' | 'PATCH',
   path: string,
   summary: string,
-  shape: { params?: z.ZodType; body: z.ZodType; answer: z.ZodType }
+  shape: {
+    params?: z.ZodType;
+    body: z.ZodType;
+    answer: z.ZodType;
+    /** Products refer to other rows: an unknown or retired one is a 422. */
+    references?: true;
+  }
 ): RouteContract => ({
   method,
   path,
@@ -174,6 +193,7 @@ const catalogWrite = (
     400: problemSchema,
     404: problemSchema,
     409: problemSchema,
+    ...(shape.references ? UNPROCESSABLE : {}),
     ...SIGNED_IN_REFUSALS,
   },
 });
@@ -499,5 +519,58 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     '/v1/admin/catalog/facet-values/:id',
     'Relabel or reorder a facet value (not of the system group)',
     { params: idParams, body: facetValuePatch, answer: facetValueSchema }
+  ),
+  {
+    method: 'GET',
+    path: '/v1/admin/catalog/products',
+    summary: 'One page of every product, active or not, by Spanish name',
+    permission: 'catalog:write',
+    request: { query: productListQuery },
+    responses: {
+      200: adminProductPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/catalog/products/:id',
+    summary: 'One product with its facet values and gallery, active or not',
+    permission: 'catalog:write',
+    request: { params: idParams },
+    responses: {
+      200: adminProductSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  catalogWrite(
+    'POST',
+    '/v1/admin/catalog/products',
+    'Create a product; its level links the system group Nivel (T2.6)',
+    { body: productCreate, answer: adminProductSchema, references: true }
+  ),
+  catalogWrite(
+    'PATCH',
+    '/v1/admin/catalog/products/:id',
+    'Edit or retire a product; SKU and slug are fixed, level and Nivel move together',
+    {
+      params: idParams,
+      body: productPatch,
+      answer: adminProductSchema,
+      references: true,
+    }
+  ),
+  catalogWrite(
+    'PATCH',
+    '/v1/admin/catalog/products/:id/media',
+    'Replace the gallery in order (first is primary); images that leave are retired',
+    {
+      params: idParams,
+      body: galleryPatch,
+      answer: adminProductSchema,
+      references: true,
+    }
   ),
 ];

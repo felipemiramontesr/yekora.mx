@@ -27,6 +27,13 @@ import {
 } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
 import { codeHash, encryptTotpSecret, newToken } from './services/authCrypto';
+import {
+  createProduct,
+  listAdminProducts,
+  readAdminProduct,
+  replaceGallery,
+  updateProduct,
+} from './services/catalogProducts';
 import { createDb } from './services/db';
 import { runIdempotent } from './services/idempotency';
 import { inspectMedia, readMedia, storeMedia } from './services/media';
@@ -1198,5 +1205,148 @@ describe('brands and facets on real SQL (FC 029 F2b)', () => {
         updateFacetGroup(tx, nivel.id, { nameEn: 'Level' })
       )
     ).resolves.toMatchObject({ after: { nameEn: 'Level', isActive: true } });
+  });
+});
+
+describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
+  const sha = (letter: string) => letter.repeat(64);
+  const fields = {
+    nameEs: 'Arnés',
+    nameEn: 'Harness',
+    descriptionEs: 'Ligero.',
+    descriptionEn: 'Light.',
+    priceMxnCents: 210000,
+    stock: 3,
+    discipline: 'escalada',
+    level: 'principiante',
+    brandId: null,
+    shippingClass: 'estandar',
+    weightGrams: 400,
+    lengthMm: 300,
+    widthMm: 200,
+    heightMm: 100,
+  };
+  /** The Nivel value codes a product is linked to. */
+  const nivelCodes = async (productId: number) =>
+    (
+      await db.query<{ code: string }>(
+        "SELECT v.code FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.code = 'nivel'",
+        [productId]
+      )
+    ).map((row) => row.code);
+
+  it('creates a product with its Nivel link and facets, moves both with the level, and retires it (T2.6, T2.3c)', async () => {
+    const material = await db.transaction((tx) =>
+      createFacetGroup(tx, {
+        code: 'itest-tela',
+        nameEs: 'Tela',
+        nameEn: 'Fabric',
+        isRequired: false,
+        isOrdered: false,
+        isFilterable: true,
+        showOnLanding: false,
+        sortOrder: 9,
+      })
+    );
+    const nylon = await db.transaction((tx) =>
+      createFacetValue(tx, material.after.id, {
+        code: 'nylon',
+        valueEs: 'Nailon',
+        valueEn: 'Nylon',
+        sortOrder: 0,
+      })
+    );
+    if (typeof nylon === 'string') throw new Error(nylon);
+    const created = await db.transaction((tx) =>
+      createProduct(tx, {
+        ...fields,
+        sku: 'ITEST-ARNES',
+        slug: 'itest-arnes',
+        facetValueIds: [nylon.after.id],
+      })
+    );
+    if (typeof created === 'string') throw new Error(created);
+    const id = created.after.id;
+    expect(created.after).toMatchObject({
+      discipline: 'escalada',
+      level: 'principiante',
+      shippingClass: 'estandar',
+      facetValueIds: [nylon.after.id],
+    });
+    expect(await nivelCodes(id)).toEqual(['principiante']);
+
+    const moved = await db.transaction((tx) =>
+      updateProduct(tx, id, {
+        level: 'avanzado',
+        facetValueIds: [],
+        isActive: false,
+      })
+    );
+    expect(moved).toMatchObject({
+      after: { level: 'avanzado', facetValueIds: [], isActive: false },
+    });
+    expect(await nivelCodes(id)).toEqual(['avanzado']);
+    await expect(
+      db.transaction((tx) => updateProduct(tx, id, { stock: 0 }))
+    ).resolves.toMatchObject({ after: { stock: 0 } });
+    await expect(
+      db.transaction((tx) => updateProduct(tx, id, { discipline: 'buceo' }))
+    ).resolves.toBe('CAT_REFERENCE_INVALID');
+    await expect(
+      db.transaction((tx) =>
+        createProduct(tx, {
+          ...fields,
+          sku: 'ITEST-ARNES',
+          slug: 'otro',
+          facetValueIds: [],
+        })
+      )
+    ).rejects.toMatchObject({ code: 'ER_DUP_ENTRY' });
+
+    const page = await listAdminProducts(db, { page: 1, pageSize: 100 });
+    expect(page.items.find((p) => p.id === id)).toMatchObject({
+      isActive: false,
+    });
+    expect(page.total).toBeGreaterThanOrEqual(3);
+    await expect(readAdminProduct(db, id)).resolves.toMatchObject({
+      sku: 'ITEST-ARNES',
+    });
+    await expect(readAdminProduct(db, 999_999)).resolves.toBeNull();
+  });
+
+  it('replaces a gallery in order, retiring what leaves and reviving what returns', async () => {
+    const [{ id }] = await db.query<{ id: number }>(
+      "SELECT id FROM products WHERE sku = 'ITEST-LAST'"
+    );
+    const gallery = (images: string[]) =>
+      db.transaction((tx) =>
+        replaceGallery(
+          tx,
+          id,
+          images.map((letter) => ({
+            sha256: sha(letter),
+            altEs: null,
+            altEn: null,
+          }))
+        )
+      );
+    await expect(gallery(['a', 'b'])).resolves.toMatchObject({
+      after: {
+        gallery: [
+          { sha256: sha('a'), isPrimary: true, sortOrder: 0 },
+          { sha256: sha('b'), isPrimary: false, sortOrder: 1 },
+        ],
+      },
+    });
+    await gallery(['b']);
+    await expect(gallery(['a', 'b'])).resolves.toMatchObject({
+      after: { gallery: [{ sha256: sha('a') }, { sha256: sha('b') }] },
+    });
+    const [rows] = await db.query<{ n: number; active: number }>(
+      'SELECT COUNT(*) AS n, SUM(is_active) AS active FROM product_media WHERE product_id = ?',
+      [id]
+    );
+    expect([Number(rows.n), Number(rows.active)]).toEqual([2, 2]);
+    await expect(gallery(['e'])).resolves.toBe('CAT_REFERENCE_INVALID');
   });
 });

@@ -51,6 +51,9 @@ const INVENTORY = [
   '│   └── /:id (PATCH)',
   '│       └── /values (POST)',
   '├── /v1/admin/catalog/facet-values/:id (PATCH)',
+  '├── /v1/admin/catalog/products (GET, HEAD, POST)',
+  '│   └── /:id (GET, HEAD, PATCH)',
+  '│       └── /media (PATCH)',
   '├── * (OPTIONS)',
   // FC 012: payment notifications, accepted only with the processor's signature.
   '├── /v1/webhooks/stripe (POST)',
@@ -226,6 +229,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       '├── /v1/admin/catalog/facets (GET, HEAD)',
       '├── /v1/admin/catalog/facet-groups (POST)',
       '├── /v1/admin/catalog/facet-values/:id (PATCH)',
+      '├── /v1/admin/catalog/products (GET, HEAD, POST)',
     ]);
     // The one DELETE under the catalog is the wildcard refusal (FC 029 T2.3b).
     expect(app.printRoutes({ method: 'DELETE' })).toMatch(

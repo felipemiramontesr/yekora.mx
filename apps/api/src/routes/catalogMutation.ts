@@ -16,7 +16,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { recordAudit } from '../services/audit';
-import type { CatalogRefusal, Change } from '../services/catalogAdmin';
+import type { Change } from '../services/catalogAdmin';
+import type { ProductRefusal } from '../services/catalogProducts';
 import type { Db, Transactional, TxQuery } from '../services/db';
 import type { SessionUser } from '../services/identity';
 import {
@@ -44,9 +45,12 @@ export const mutationHeaders = z.object({
 export const idParams = z.object({ id: z.coerce.number().int().positive() });
 
 /** Status and title of each refusal a mutation may name. */
-const REFUSALS: Readonly<Record<CatalogRefusal, readonly [number, string]>> = {
+const REFUSALS: Readonly<Record<ProductRefusal, readonly [number, string]>> = {
   CAT_NOT_FOUND: [404, 'Not found'],
   CAT_SYSTEM_GROUP_LOCKED: [409, 'System facet group is locked'],
+  CAT_VALIDATION_ERROR: [400, 'Invalid catalog data'],
+  CAT_REFERENCE_INVALID: [422, 'Unknown or retired reference'],
+  CAT_STOCK_BELOW_RESERVED: [409, 'Stock below reserved units'],
 };
 
 /**
@@ -134,7 +138,7 @@ interface MutationRoute<Params, Body> {
   run: (
     tx: TxQuery,
     input: { params: Params; body: Body }
-  ) => Promise<Change<{ id: number }> | CatalogRefusal>;
+  ) => Promise<Change<{ id: number }> | ProductRefusal>;
 }
 
 /**
@@ -168,7 +172,7 @@ export function mutationRoute<Params, Body>(
         );
       }
       return runOnce(deps, request, reply, key.key, async (tx, userId) => {
-        let change: Change<{ id: number }> | CatalogRefusal;
+        let change: Change<{ id: number }> | ProductRefusal;
         try {
           change = await route.run(tx, {
             params: params.data as Params,
