@@ -99806,8 +99806,227 @@ function registerCatalogRoutes(app, deps) {
   });
 }
 
-// src/services/media.ts
+// src/services/imageProbe.ts
+var SAFE_IMAGE_TYPES = [
+  "image/webp",
+  "image/jpeg",
+  "image/png"
+];
+var PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+function startsWith(bytes, prefix, offset = 0) {
+  return prefix.every((byte, index) => bytes[offset + index] === byte);
+}
+function probePng(bytes) {
+  if (bytes.length < 24 || !startsWith(bytes, PNG_SIGNATURE)) return null;
+  if (bytes.toString("latin1", 12, 16) !== "IHDR") return null;
+  return {
+    type: "image/png",
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20)
+  };
+}
+function isStartOfFrame(marker) {
+  return marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
+}
+function probeJpeg(bytes) {
+  if (!startsWith(bytes, [255, 216, 255])) return null;
+  let offset = 2;
+  while (offset + 9 <= bytes.length) {
+    if (bytes[offset] !== 255) return null;
+    const marker = bytes[offset + 1];
+    if (isStartOfFrame(marker)) {
+      return {
+        type: "image/jpeg",
+        height: bytes.readUInt16BE(offset + 5),
+        width: bytes.readUInt16BE(offset + 7)
+      };
+    }
+    offset += 2 + bytes.readUInt16BE(offset + 2);
+  }
+  return null;
+}
+function probeWebp(bytes) {
+  if (bytes.length < 30) return null;
+  if (bytes.toString("latin1", 0, 4) !== "RIFF") return null;
+  if (bytes.toString("latin1", 8, 12) !== "WEBP") return null;
+  const chunk = bytes.toString("latin1", 12, 16);
+  if (chunk === "VP8 " && startsWith(bytes, [157, 1, 42], 23)) {
+    return {
+      type: "image/webp",
+      width: bytes.readUInt16LE(26) & 16383,
+      height: bytes.readUInt16LE(28) & 16383
+    };
+  }
+  if (chunk === "VP8L" && bytes[20] === 47) {
+    const bits = bytes.readUInt32LE(21);
+    return {
+      type: "image/webp",
+      width: (bits & 16383) + 1,
+      height: (bits >>> 14 & 16383) + 1
+    };
+  }
+  if (chunk === "VP8X") {
+    return {
+      type: "image/webp",
+      width: bytes.readUIntLE(24, 3) + 1,
+      height: bytes.readUIntLE(27, 3) + 1
+    };
+  }
+  return null;
+}
+function probeImage(bytes) {
+  return probePng(bytes) ?? probeJpeg(bytes) ?? probeWebp(bytes);
+}
+
+// src/services/audit.ts
+var REDACTED = "[redacted]";
+var PII_KEY = /pass|secret|token|otp|backup|hash|code|name|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
+function redactPii(value) {
+  if (typeof value === "string") return value.includes("@") ? REDACTED : value;
+  if (Array.isArray(value)) return value.map(redactPii);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        PII_KEY.test(key) ? REDACTED : redactPii(item)
+      ])
+    );
+  }
+  return value;
+}
+async function recordAudit(db, entry) {
+  const json2 = (state) => state === null ? null : JSON.stringify(redactPii(state));
+  await db.query(
+    "INSERT INTO audit_log (user_id, action, entity_type, entity_id, before_state, after_state, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      entry.userId,
+      entry.action.slice(0, 100),
+      entry.entityType.slice(0, 50),
+      entry.entityId.slice(0, 100),
+      json2(entry.before),
+      json2(entry.after),
+      entry.ip
+    ]
+  );
+}
+function auditTrail(db) {
+  return async (request, reply) => {
+    const route = request.routeOptions.url;
+    if (request.user === null || !route?.startsWith("/v1/admin/")) return;
+    const params = Object.values(request.params);
+    try {
+      await recordAudit(db, {
+        userId: request.user.userId,
+        action: `${request.method} ${route}`,
+        entityType: route.split("/")[3],
+        entityId: params[0] ?? "*",
+        before: null,
+        after: { query: request.query, status: reply.statusCode },
+        ip: request.ip
+      });
+    } catch (error63) {
+      request.log.error({ err: error63 }, "audit_log write failed");
+    }
+  };
+}
+
+// src/services/idempotency.ts
 var import_node_crypto = require("node:crypto");
+var IDEMPOTENCY_KEY_SYNTAX = /^[A-Za-z0-9_.:-]{1,128}$/;
+var TTL_MS = 24 * 60 * 60 * 1e3;
+function checkIdempotencyKey(header3) {
+  if (header3 === void 0) return { code: "IDEMP_KEY_MISSING" };
+  if (typeof header3 !== "string" || !IDEMPOTENCY_KEY_SYNTAX.test(header3))
+    return { code: "IDEMP_KEY_INVALID" };
+  return { code: "IDEMP_KEY_ACCEPTED", key: header3 };
+}
+function requestHash(contentType, body) {
+  return (0, import_node_crypto.createHash)("sha256").update(`${contentType}
+`).update(Buffer.isBuffer(body) ? body : JSON.stringify(body ?? null)).digest("hex");
+}
+var keyHash = (userId, key) => (0, import_node_crypto.createHash)("sha256").update(`${userId}
+${key}`).digest("hex");
+function runIdempotent(db, request, work) {
+  const hash2 = keyHash(request.userId, request.key);
+  return db.transaction(async (tx) => {
+    const [row2] = await tx.query(
+      "SELECT route, request_hash, response_status, response_body, expires_at FROM idempotency_keys WHERE key_hash = ? FOR UPDATE",
+      [hash2]
+    );
+    if (row2 && new Date(row2.expires_at) > request.now) {
+      if (row2.route !== request.route || row2.request_hash !== request.requestHash)
+        return { code: "IDEMP_PAYLOAD_MISMATCH" };
+      return {
+        code: "IDEMP_REPLAY_SUCCESS",
+        answer: {
+          status: Number(row2.response_status),
+          body: JSON.parse(row2.response_body)
+        }
+      };
+    }
+    if (row2) {
+      await tx.query("DELETE FROM idempotency_keys WHERE key_hash = ?", [hash2]);
+    }
+    const answer = await work(tx);
+    if (Math.floor(answer.status / 100) === 2) {
+      await tx.query(
+        "INSERT INTO idempotency_keys (key_hash, user_id, route, request_hash, response_status, response_headers, response_body, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          hash2,
+          request.userId,
+          request.route,
+          request.requestHash,
+          answer.status,
+          "{}",
+          JSON.stringify(answer.body),
+          new Date(request.now.getTime() + TTL_MS)
+        ]
+      );
+    }
+    return { code: "IDEMP_FIRST_EXECUTION", answer };
+  });
+}
+
+// src/services/media.ts
+var import_node_crypto2 = require("node:crypto");
+var MAX_MEDIA_BYTES = 2097152;
+var CANONICAL_WIDTHS = /* @__PURE__ */ new Set([1200, 600, 300]);
+var MAX_HEIGHT = 1200;
+function inspectMedia(bytes, declaredType) {
+  const probe = probeImage(bytes);
+  if (probe?.type !== declaredType) return { code: "MEDIA_UNSAFE_TYPE" };
+  if (bytes.length > MAX_MEDIA_BYTES) return { code: "MEDIA_SIZE_EXCEEDED" };
+  if (!CANONICAL_WIDTHS.has(probe.width) || probe.height < 1 || probe.height > MAX_HEIGHT) {
+    return { code: "MEDIA_DIMENSIONS_INVALID" };
+  }
+  return {
+    code: "MEDIA_ACCEPTED",
+    sha256: (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex"),
+    mimeType: probe.type,
+    width: probe.width,
+    height: probe.height,
+    sizeBytes: bytes.length
+  };
+}
+async function storeMedia(tx, bytes, verdict) {
+  const [existing] = await tx.query(
+    "SELECT sha256 FROM media_blobs WHERE sha256 = ? FOR UPDATE",
+    [verdict.sha256]
+  );
+  if (existing) return false;
+  await tx.query(
+    "INSERT INTO media_blobs (sha256, mime_type, width, height, size_bytes, media_data) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      verdict.sha256,
+      verdict.mimeType,
+      verdict.width,
+      verdict.height,
+      verdict.sizeBytes,
+      bytes
+    ]
+  );
+  return true;
+}
 var SHA256_HEX = /^[0-9a-f]{64}$/;
 async function readMedia(db, sha2562) {
   const [row2] = await db.query(
@@ -99817,12 +100036,106 @@ async function readMedia(db, sha2562) {
   return row2 ? { mimeType: row2.mime_type, data: row2.media_data } : null;
 }
 function matchesDigest(data, sha2562) {
-  return (0, import_node_crypto.createHash)("sha256").update(data).digest("hex") === sha2562;
+  return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
+}
+
+// src/routes/catalogAdmin.ts
+var mutationHeaders = external_exports.object({
+  "idempotency-key": external_exports.string().regex(IDEMPOTENCY_KEY_SYNTAX)
+});
+var mediaUploadedSchema = external_exports.object({
+  code: external_exports.literal("MEDIA_ACCEPTED"),
+  created: external_exports.boolean(),
+  sha256: external_exports.string().regex(SHA256_HEX),
+  mimeType: external_exports.enum(SAFE_IMAGE_TYPES),
+  width: external_exports.number().int().positive(),
+  height: external_exports.number().int().positive(),
+  sizeBytes: external_exports.number().int().positive()
+});
+var UPLOAD_READ_LIMIT = 4 * 1024 * 1024;
+var MEDIA_REFUSALS = {
+  MEDIA_UNSAFE_TYPE: [415, "Unsupported image type"],
+  MEDIA_SIZE_EXCEEDED: [413, "Image too large"],
+  MEDIA_DIMENSIONS_INVALID: [422, "Image dimensions not allowed"]
+};
+function refuse(reply, status, title, code) {
+  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, title, code));
+}
+function actorOf(request) {
+  return request.user.userId;
+}
+async function runOnce(deps, request, reply, key, mutation) {
+  const userId = actorOf(request);
+  const outcome = await runIdempotent(
+    deps.db,
+    {
+      userId,
+      key,
+      route: `${request.method} ${request.routeOptions.url}`,
+      requestHash: requestHash(
+        String(request.headers["content-type"]),
+        request.body
+      ),
+      now: deps.now()
+    },
+    (tx) => mutation(tx, userId)
+  );
+  if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
+    return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
+  }
+  return reply.code(outcome.answer.status).header("idempotency-status", outcome.code).send(outcome.answer.body);
+}
+function registerCatalogAdminRoutes(app, deps) {
+  app.addContentTypeParser(
+    /^image\/[a-z0-9.+-]+$/,
+    { parseAs: "buffer", bodyLimit: UPLOAD_READ_LIMIT },
+    (_request, body, done) => done(null, body)
+  );
+  app.post(
+    "/v1/admin/catalog/media",
+    {
+      bodyLimit: UPLOAD_READ_LIMIT,
+      errorHandler: (error63, _request, reply) => {
+        if (error63.code !== "FST_ERR_CTP_BODY_TOO_LARGE")
+          throw error63;
+        return refuse(reply, 413, "Image too large", "MEDIA_SIZE_EXCEEDED");
+      }
+    },
+    async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const bytes = request.body;
+      const verdict = Buffer.isBuffer(bytes) ? inspectMedia(bytes, String(request.headers["content-type"])) : { code: "MEDIA_UNSAFE_TYPE" };
+      if (verdict.code !== "MEDIA_ACCEPTED") {
+        const [status, title] = MEDIA_REFUSALS[verdict.code];
+        return refuse(reply, status, title, verdict.code);
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        const created = await storeMedia(tx, bytes, verdict);
+        const { code, ...stored } = verdict;
+        await recordAudit(tx, {
+          userId,
+          action: "POST /v1/admin/catalog/media",
+          entityType: "media",
+          entityId: verdict.sha256,
+          before: created ? null : stored,
+          after: stored,
+          ip: request.ip
+        });
+        return { status: 201, body: { code, created, ...stored } };
+      });
+    }
+  );
+  app.delete(
+    "/v1/admin/catalog/*",
+    (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
+  );
 }
 
 // src/routes/media.ts
 var mediaParams = external_exports.object({ sha256: external_exports.string().regex(SHA256_HEX) });
-var MEDIA_TYPES = ["image/webp", "image/jpeg", "image/png"];
 var IMMUTABLE = "public, max-age=31536000, immutable";
 function registerMediaRoutes(app, deps) {
   app.get("/v1/media/:sha256", async (request, reply) => {
@@ -99844,10 +100157,10 @@ function registerMediaRoutes(app, deps) {
 }
 
 // src/routes/orders.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 
 // src/services/checkoutCrypto.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 var FORMAT_V1 = 1;
 var IV_BYTES = 12;
 var TAG_BYTES = 16;
@@ -99864,8 +100177,8 @@ function additionalData(orderNumber, field) {
   return Buffer.from(`${orderNumber}|${field}`, "utf8");
 }
 function encryptPii(key, orderNumber, field, value) {
-  const iv = (0, import_node_crypto2.randomBytes)(IV_BYTES);
-  const cipher = (0, import_node_crypto2.createCipheriv)("aes-256-gcm", key, iv, {
+  const iv = (0, import_node_crypto3.randomBytes)(IV_BYTES);
+  const cipher = (0, import_node_crypto3.createCipheriv)("aes-256-gcm", key, iv, {
     authTagLength: TAG_BYTES
   });
   cipher.setAAD(additionalData(orderNumber, field));
@@ -99878,18 +100191,18 @@ function encryptPii(key, orderNumber, field, value) {
   ]);
 }
 function emailHmac(pepper, email3) {
-  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
+  return (0, import_node_crypto3.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
 }
 function tokenHash(pepper, token) {
-  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(token, "utf8").digest();
+  return (0, import_node_crypto3.createHmac)("sha256", pepper).update(token, "utf8").digest();
 }
 function newAccessToken() {
-  return (0, import_node_crypto2.randomBytes)(32).toString("base64url");
+  return (0, import_node_crypto3.randomBytes)(32).toString("base64url");
 }
 function newOrderNumber(now) {
   let tail = "";
   for (let i = 0; i < 8; i += 1)
-    tail += ORDER_ALPHABET[(0, import_node_crypto2.randomInt)(ORDER_ALPHABET.length)];
+    tail += ORDER_ALPHABET[(0, import_node_crypto3.randomInt)(ORDER_ALPHABET.length)];
   return `YEK-${now.getUTCFullYear()}-${tail}`;
 }
 
@@ -99900,7 +100213,7 @@ var PROCESSOR_OF = {
   SPEI: "MERCADO_PAGO",
   MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
 };
-var refuse = (status, code) => ({ ok: false, status, code });
+var refuse2 = (status, code) => ({ ok: false, status, code });
 function affected(result) {
   return result.affectedRows;
 }
@@ -99962,25 +100275,25 @@ function methodOf(body) {
 }
 function admit(deps, body) {
   const method = methodOf(body);
-  if (method === null) return refuse(400, "INVALID_REQUEST");
+  if (method === null) return refuse2(400, "INVALID_REQUEST");
   const processorCode = PROCESSOR_OF[method];
   const processor = deps.processors[processorCode];
   const secrets = deps.payments.checkout;
   if (processor === void 0 || secrets === null) {
-    return refuse(503, "SERVICE_UNAVAILABLE");
+    return refuse2(503, "SERVICE_UNAVAILABLE");
   }
   const parsed = checkoutRequestSchema.safeParse(body);
   if (!parsed.success) {
     const buyerData = parsed.error.issues.some(
       (issue2) => ["customer", "address"].includes(String(issue2.path[0]))
     );
-    return refuse(
+    return refuse2(
       400,
       buyerData ? "INVALID_SHIPPING_ADDRESS" : "INVALID_REQUEST"
     );
   }
   if (!parsed.data.privacyConsent) {
-    return refuse(400, "PRIVACY_CONSENT_REQUIRED");
+    return refuse2(400, "PRIVACY_CONSENT_REQUIRED");
   }
   return { request: parsed.data, method, processorCode, processor, secrets };
 }
@@ -99997,17 +100310,17 @@ async function price(deps, request, lang) {
     deps.shipping
   );
   if (!quoted.ok) {
-    return refuse(
+    return refuse2(
       400,
       quoted.code === "EMPTY_OR_UNAVAILABLE_CART" ? "EMPTY_OR_UNAVAILABLE_CART" : "INVALID_SHIPPING_ADDRESS"
     );
   }
   const { shippingCode, totalMxnCents } = quoted.quote.summary;
   if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
-    return refuse(400, "UNSERVICEABLE_DESTINATION");
+    return refuse2(400, "UNSERVICEABLE_DESTINATION");
   }
   if (totalMxnCents !== request.expectedTotalMxnCents) {
-    return refuse(409, "PRICE_CHANGED");
+    return refuse2(409, "PRICE_CHANGED");
   }
   return quoted.quote;
 }
@@ -100064,7 +100377,7 @@ async function persist(deps, admitted, quote, order) {
     });
   } catch (error63) {
     if (error63 instanceof InsufficientStock) {
-      return refuse(409, "INSUFFICIENT_STOCK");
+      return refuse2(409, "INSUFFICIENT_STOCK");
     }
     throw error63;
   }
@@ -100080,7 +100393,7 @@ async function createCheckout(deps, body, lang, userId = null) {
     "SELECT id, hold_minutes FROM payment_methods WHERE code = ? AND is_active = 1",
     [admitted.method]
   );
-  if (methodRow === void 0) return refuse(503, "SERVICE_UNAVAILABLE");
+  if (methodRow === void 0) return refuse2(503, "SERVICE_UNAVAILABLE");
   const order = {
     orderNumber: newOrderNumber(now),
     accessToken: newAccessToken(),
@@ -100124,7 +100437,7 @@ async function createCheckout(deps, body, lang, userId = null) {
     };
   } catch {
     await cancelOrder(deps.db, orderId);
-    return refuse(503, "SERVICE_UNAVAILABLE");
+    return refuse2(503, "SERVICE_UNAVAILABLE");
   }
 }
 
@@ -100251,7 +100564,7 @@ function registerOrderRoutes(app, deps) {
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row2 === void 0 || !(0, import_node_crypto3.timingSafeEqual)(
+      if (row2 === void 0 || !(0, import_node_crypto4.timingSafeEqual)(
         Buffer.from(row2.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
@@ -100367,7 +100680,7 @@ var ROUTE_CONTRACTS = [
       404: problemSchema,
       500: problemSchema
     },
-    binary: MEDIA_TYPES
+    binary: SAFE_IMAGE_TYPES
   },
   {
     method: "POST",
@@ -100526,11 +100839,36 @@ var ROUTE_CONTRACTS = [
       ...SIGNED_IN_REFUSALS
     }
   },
-  ...ORDER_PATHS.flatMap(readOnly)
+  ...ORDER_PATHS.flatMap(readOnly),
+  // FC 029 F2: the catalog backoffice. Every write needs catalog:write and an Idempotency-Key.
+  {
+    method: "POST",
+    path: "/v1/admin/catalog/media",
+    summary: "Upload one cropped image (raw WebP, JPEG or PNG bytes), stored once per SHA-256",
+    permission: "catalog:write",
+    request: { headers: mutationHeaders, rawBody: true },
+    responses: {
+      201: mediaUploadedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      413: problemSchema,
+      415: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/admin/catalog/*",
+    summary: "Refused: nothing in the catalog is deleted; retiring is is_active = 0",
+    permission: "catalog:write",
+    request: {},
+    responses: { 405: problemSchema, ...SIGNED_IN_REFUSALS }
+  }
 ];
 
 // src/services/identity.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 
 // src/lib/permissions.ts
 var PERMISSIONS = [
@@ -100545,7 +100883,7 @@ function isPrivileged(roles) {
 }
 
 // src/services/authCrypto.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 var KEY_BYTES2 = 32;
 var TOTP_STEP_SECONDS = 30;
 var TOTP_DIGITS = 6;
@@ -100558,30 +100896,30 @@ function parseAuthKey(name2, base643) {
   return key;
 }
 function newToken() {
-  return (0, import_node_crypto4.randomBytes)(32).toString("base64url");
+  return (0, import_node_crypto5.randomBytes)(32).toString("base64url");
 }
 function tokenHash2(token) {
-  return (0, import_node_crypto4.createHash)("sha256").update(token, "utf8").digest("hex");
+  return (0, import_node_crypto5.createHash)("sha256").update(token, "utf8").digest("hex");
 }
 function codeHash(secret, code) {
-  return (0, import_node_crypto4.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
+  return (0, import_node_crypto5.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
 }
 function newEmailCode() {
-  return String((0, import_node_crypto4.randomInt)(0, 1e6)).padStart(6, "0");
+  return String((0, import_node_crypto5.randomInt)(0, 1e6)).padStart(6, "0");
 }
 function sameHash(a, b) {
   const left = Buffer.from(a, "hex");
   const right = Buffer.from(b, "hex");
-  return left.length === right.length && (0, import_node_crypto4.timingSafeEqual)(left, right);
+  return left.length === right.length && (0, import_node_crypto5.timingSafeEqual)(left, right);
 }
 function newBackupCodes() {
   const codes = /* @__PURE__ */ new Set();
   while (codes.size < 8)
-    codes.add(String((0, import_node_crypto4.randomInt)(0, 1e8)).padStart(8, "0"));
+    codes.add(String((0, import_node_crypto5.randomInt)(0, 1e8)).padStart(8, "0"));
   return [...codes];
 }
 function newTotpSecret() {
-  return (0, import_node_crypto4.randomBytes)(20);
+  return (0, import_node_crypto5.randomBytes)(20);
 }
 function base32(bytes) {
   let bits = "";
@@ -100599,7 +100937,7 @@ function otpauthUri(email3, secret) {
 function totpCode(secret, step) {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(step));
-  const mac3 = (0, import_node_crypto4.createHmac)("sha1", secret).update(counter).digest();
+  const mac3 = (0, import_node_crypto5.createHmac)("sha1", secret).update(counter).digest();
   const offset = mac3.readUInt8(mac3.length - 1) & 15;
   const value = mac3.readUInt32BE(offset) & 2147483647;
   return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
@@ -100608,12 +100946,12 @@ function verifyTotp(secret, code, now) {
   if (!/^\d{6}$/.test(code)) return false;
   const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
   return [step - 1, step, step + 1].some(
-    (candidate) => (0, import_node_crypto4.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
+    (candidate) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
   );
 }
 function encryptTotpSecret(key, userId, secret) {
-  const iv = (0, import_node_crypto4.randomBytes)(12);
-  const cipher = (0, import_node_crypto4.createCipheriv)("aes-256-gcm", key, iv);
+  const iv = (0, import_node_crypto5.randomBytes)(12);
+  const cipher = (0, import_node_crypto5.createCipheriv)("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from(userId, "utf8"));
   const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
   const parts = [iv, cipher.getAuthTag(), ciphertext].map(
@@ -100626,7 +100964,7 @@ function decryptTotpSecret(key, userId, stored) {
   if (version3 !== "v1" || ciphertext === void 0) {
     throw new Error("Unknown TOTP secret format");
   }
-  const decipher = (0, import_node_crypto4.createDecipheriv)(
+  const decipher = (0, import_node_crypto5.createDecipheriv)(
     "aes-256-gcm",
     key,
     Buffer.from(iv, "base64url")
@@ -100671,7 +101009,7 @@ function createCustomer(db, user) {
       [user.email]
     );
     if (taken) return false;
-    const id = (0, import_node_crypto5.randomUUID)();
+    const id = (0, import_node_crypto6.randomUUID)();
     await tx.query(
       "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
       [id, user.email, user.passwordHash, user.fullName]
@@ -100703,7 +101041,7 @@ async function capabilitiesOf(db, userId) {
   };
 }
 async function openChallenge(db, secret, userId, now, emailCode) {
-  const id = (0, import_node_crypto5.randomUUID)();
+  const id = (0, import_node_crypto6.randomUUID)();
   await db.query(
     "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
     [
@@ -100901,19 +101239,23 @@ var TITLES = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
   SESSION_INVALID_OR_EXPIRED: "Sign in first",
   SECOND_FACTOR_REQUIRED: "Two-step verification required",
-  PERMISSION_DENIED: "Not allowed"
+  PERMISSION_DENIED: "Not allowed",
+  CAT_FORBIDDEN: "Not allowed"
 };
 function permissionGuard(deps) {
   return (permission) => async (request, reply) => {
-    const refuse3 = (status, code) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
-    if (deps.auth === null) return refuse3(503, "AUTH_UNAVAILABLE");
+    const refuse4 = (status, code) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
+    if (deps.auth === null) return refuse4(503, "AUTH_UNAVAILABLE");
     const token = readSessionToken(request.headers.cookie);
     const user = token ? await sessionUser(deps.db, token, deps.now()) : null;
-    if (user === null) return refuse3(401, "SESSION_INVALID_OR_EXPIRED");
+    if (user === null) return refuse4(401, "SESSION_INVALID_OR_EXPIRED");
     if (!secondFactorSatisfied(user))
-      return refuse3(403, "SECOND_FACTOR_REQUIRED");
+      return refuse4(403, "SECOND_FACTOR_REQUIRED");
     if (!user.permissions.includes(permission))
-      return refuse3(403, "PERMISSION_DENIED");
+      return refuse4(
+        403,
+        permission === "catalog:write" ? "CAT_FORBIDDEN" : "PERMISSION_DENIED"
+      );
     request.user = user;
   };
 }
@@ -100996,7 +101338,7 @@ function registerAdminRoutes(app, deps) {
 }
 
 // src/services/botChallenge.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -101007,16 +101349,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto6.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto7.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto6.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto7.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto6.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto6.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto7.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto7.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto6.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto6.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto7.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto7.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -101064,7 +101406,7 @@ async function enqueueMail(tx, event) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -101076,7 +101418,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto7.randomBytes)(16),
+    salt: (0, import_node_crypto8.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -101089,7 +101431,7 @@ async function verifyPassword(hash2, password) {
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto7.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto8.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -101106,7 +101448,7 @@ var TITLES2 = {
   BOT_CHALLENGE_REQUIRED: "Anti-bot check required",
   BOT_CHALLENGE_FAILED: "Anti-bot check failed"
 };
-function refuse2(reply, status, code) {
+function refuse3(reply, status, code) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code], code));
 }
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
@@ -101116,12 +101458,12 @@ var CHALLENGE_LIMIT = {
 function registerAuthRoutes(app, deps) {
   function parse4(schema2, request, reply) {
     if (deps.auth === null) {
-      void refuse2(reply, 503, "AUTH_UNAVAILABLE");
+      void refuse3(reply, 503, "AUTH_UNAVAILABLE");
       return null;
     }
     const body = schema2.safeParse(request.body);
     if (!body.success) {
-      void refuse2(reply, 400, "INVALID_REQUEST");
+      void refuse3(reply, 400, "INVALID_REQUEST");
       return null;
     }
     return { auth: deps.auth, body: body.data };
@@ -101129,19 +101471,19 @@ function registerAuthRoutes(app, deps) {
   async function challengeOf(challengeId, types, reply) {
     const challenge = await liveChallenge(deps.db, challengeId, deps.now());
     if (challenge && types.includes(challenge.type)) return challenge;
-    void refuse2(reply, 401, "INVALID_CHALLENGE");
+    void refuse3(reply, 401, "INVALID_CHALLENGE");
     return null;
   }
   async function passMailedCode(request, reply, auth2, challenge, code, remember) {
     if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code))) {
       await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
+      return refuse3(reply, 401, "INVALID_CODE");
     }
     await markEmailVerified(deps.db, challenge.userId, deps.now());
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
     if (isPrivileged(roles)) {
       await passEmailChallenge(deps.db, auth2.secret, challenge.id);
-      return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+      return refuse3(reply, 409, "TOTP_NOT_ENROLLED");
     }
     await signIn(request, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
@@ -101176,14 +101518,14 @@ function registerAuthRoutes(app, deps) {
       deps.now()
     );
     if (outcome === "passed") return true;
-    void refuse2(reply, 400, outcome);
+    void refuse3(reply, 400, outcome);
     return false;
   }
   app.get(
     "/v1/auth/bot-challenge",
     CHALLENGE_LIMIT,
     async (_request, reply) => {
-      if (deps.auth === null) return refuse2(reply, 503, "AUTH_UNAVAILABLE");
+      if (deps.auth === null) return refuse3(reply, 503, "AUTH_UNAVAILABLE");
       reply.header("Cache-Control", "no-store");
       return issueChallenge(deps.auth.secret, deps.now());
     }
@@ -101211,7 +101553,7 @@ function registerAuthRoutes(app, deps) {
       body.password
     );
     if (user === null || !valid) {
-      return refuse2(reply, 401, "INVALID_CREDENTIALS");
+      return refuse3(reply, 401, "INVALID_CREDENTIALS");
     }
     const device = readDeviceToken(request.headers.cookie);
     if (device !== null) {
@@ -101235,7 +101577,7 @@ function registerAuthRoutes(app, deps) {
         channel: "authenticator"
       });
     }
-    if (!deps.mailReady) return refuse2(reply, 503, "MAIL_UNAVAILABLE");
+    if (!deps.mailReady) return refuse3(reply, 503, "MAIL_UNAVAILABLE");
     const code = newEmailCode();
     const challengeId = await deps.db.transaction(async (tx) => {
       const id = await openChallenge(
@@ -101267,7 +101609,7 @@ function registerAuthRoutes(app, deps) {
     const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
     if (challenge === null) return reply;
     if ((await totpOf(deps.db, challenge.userId))?.enabled) {
-      return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
+      return refuse3(reply, 409, "TOTP_ALREADY_ENABLED");
     }
     const email3 = await emailOf(deps.db, challenge.userId);
     const secret = newTotpSecret();
@@ -101288,8 +101630,8 @@ function registerAuthRoutes(app, deps) {
     const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
     if (challenge === null) return reply;
     const totp = await totpOf(deps.db, challenge.userId);
-    if (totp === null) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
-    if (totp.enabled) return refuse2(reply, 409, "TOTP_ALREADY_ENABLED");
+    if (totp === null) return refuse3(reply, 409, "TOTP_NOT_ENROLLED");
+    if (totp.enabled) return refuse3(reply, 409, "TOTP_ALREADY_ENABLED");
     const secret = decryptTotpSecret(
       auth2.totpKey,
       challenge.userId,
@@ -101297,7 +101639,7 @@ function registerAuthRoutes(app, deps) {
     );
     if (!verifyTotp(secret, body.code, deps.now())) {
       await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
+      return refuse3(reply, 401, "INVALID_CODE");
     }
     const backupCodes = newBackupCodes();
     await deps.db.transaction(async (tx) => {
@@ -101335,7 +101677,7 @@ function registerAuthRoutes(app, deps) {
       );
     }
     const totp = await totpOf(deps.db, challenge.userId);
-    if (!totp?.enabled) return refuse2(reply, 409, "TOTP_NOT_ENROLLED");
+    if (!totp?.enabled) return refuse3(reply, 409, "TOTP_NOT_ENROLLED");
     const passed = await (body.code.length === 6 ? Promise.resolve(
       verifyTotp(
         decryptTotpSecret(auth2.totpKey, challenge.userId, totp.encrypted),
@@ -101350,7 +101692,7 @@ function registerAuthRoutes(app, deps) {
     ));
     if (!passed) {
       await failChallenge(deps.db, challenge.id);
-      return refuse2(reply, 401, "INVALID_CODE");
+      return refuse3(reply, 401, "INVALID_CODE");
     }
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
     await signIn(request, reply, challenge, roles, remember);
@@ -101411,58 +101753,6 @@ function registerExchangeRateRoute(app, rate) {
     }
     return current;
   });
-}
-
-// src/services/audit.ts
-var REDACTED = "[redacted]";
-var PII_KEY = /pass|secret|token|otp|backup|hash|code|name|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
-function redactPii(value) {
-  if (typeof value === "string") return value.includes("@") ? REDACTED : value;
-  if (Array.isArray(value)) return value.map(redactPii);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        PII_KEY.test(key) ? REDACTED : redactPii(item)
-      ])
-    );
-  }
-  return value;
-}
-async function recordAudit(db, entry) {
-  const json2 = (state) => state === null ? null : JSON.stringify(redactPii(state));
-  await db.query(
-    "INSERT INTO audit_log (user_id, action, entity_type, entity_id, before_state, after_state, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [
-      entry.userId,
-      entry.action.slice(0, 100),
-      entry.entityType.slice(0, 50),
-      entry.entityId.slice(0, 100),
-      json2(entry.before),
-      json2(entry.after),
-      entry.ip
-    ]
-  );
-}
-function auditTrail(db) {
-  return async (request, reply) => {
-    const route = request.routeOptions.url;
-    if (request.user === null || !route?.startsWith("/v1/admin/")) return;
-    const params = Object.values(request.params);
-    try {
-      await recordAudit(db, {
-        userId: request.user.userId,
-        action: `${request.method} ${route}`,
-        entityType: route.split("/")[3],
-        entityId: params[0] ?? "*",
-        before: null,
-        after: { query: request.query, status: reply.statusCode },
-        ip: request.ip
-      });
-    } catch (error63) {
-      request.log.error({ err: error63 }, "audit_log write failed");
-    }
-  };
 }
 
 // src/services/settlement.ts
@@ -101644,7 +101934,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -101789,9 +102079,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto8.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto9.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto8.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto9.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -105409,7 +105699,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto9 = __toESM(require("node:crypto"), 1);
+var import_node_crypto10 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -107142,7 +107432,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto9.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto10.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -108319,8 +108609,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto9.default.randomBytes(len).toString("hex"),
-      import_node_crypto9.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto10.default.randomBytes(len).toString("hex"),
+      import_node_crypto10.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -109008,7 +109298,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto10 = __toESM(require("node:crypto"), 1);
+var import_node_crypto11 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -109019,7 +109309,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto10.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto11.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -109129,7 +109419,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto11 = __toESM(require("node:crypto"), 1);
+var import_node_crypto12 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -109144,7 +109434,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto11.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto12.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -109211,7 +109501,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto12 = __toESM(require("node:crypto"), 1);
+var import_node_crypto13 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -109224,7 +109514,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto12.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto13.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -109834,7 +110124,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -110152,7 +110442,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto13.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto14.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -110187,7 +110477,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -110352,7 +110642,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto14.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto15.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -111700,7 +111990,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto14.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto15.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -112034,7 +112324,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -112357,7 +112647,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto15.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto16.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -114880,7 +115170,7 @@ function createOutboxDispatcher(deps) {
       deps.log.error({ outboxId: row2.id, attempts }, "outbox send failed");
     }
   }
-  async function runOnce() {
+  async function runOnce2() {
     const now = deps.now();
     await db.query("DELETE FROM auth_challenge_nonces WHERE expires_at < ?", [
       now
@@ -114904,7 +115194,7 @@ function createOutboxDispatcher(deps) {
       again = true;
       return;
     }
-    running = runOnce().catch((error63) => {
+    running = runOnce2().catch((error63) => {
       deps.log.error({ err: error63 }, "outbox run failed");
       return 0;
     }).then((sent) => {
@@ -115077,7 +115367,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto17 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS2 = 1e4;
@@ -115140,7 +115430,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto16.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto17.timingSafeEqual)(a, b);
 }
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   async function call(path3, init) {
@@ -115191,7 +115481,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto16.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto17.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -115344,6 +115634,7 @@ async function buildApp(deps) {
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
+  registerCatalogAdminRoutes(app, { db: deps.db, now });
   registerOrderWriteRefusals(app);
   app.addHook("onResponse", auditTrail(deps.db));
   await registerWebhookRoutes(app, {
@@ -115655,7 +115946,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "60e7e83e451c06c7a5f1679bb9008b2d7725af56" : void 0;
+var sha = true ? "035e7d7f36532ecc82da03a09d0720f95ccd31d6" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
