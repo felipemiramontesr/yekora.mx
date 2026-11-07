@@ -5000,21 +5000,21 @@ var require_error = __commonJS({
       return `${this.name} [${this.code}]: ${this.message}`;
     }
     var FastifyGenericErrorSymbol = /* @__PURE__ */ Symbol.for("fastify-error-generic");
-    function createError(code, message, statusCode = 500, Base = Error, captureStackTrace2 = createError.captureStackTrace) {
-      const shouldCreateFastifyGenericError = code === FastifyGenericErrorSymbol;
+    function createError(code2, message, statusCode = 500, Base = Error, captureStackTrace2 = createError.captureStackTrace) {
+      const shouldCreateFastifyGenericError = code2 === FastifyGenericErrorSymbol;
       if (shouldCreateFastifyGenericError) {
-        code = "FST_ERR";
+        code2 = "FST_ERR";
       }
-      if (!code) throw new Error("Fastify error code must not be empty");
+      if (!code2) throw new Error("Fastify error code must not be empty");
       if (!message) throw new Error("Fastify error message must not be empty");
-      code = code.toUpperCase();
+      code2 = code2.toUpperCase();
       !statusCode && (statusCode = void 0);
-      const FastifySpecificErrorSymbol = /* @__PURE__ */ Symbol.for(`fastify-error ${code}`);
+      const FastifySpecificErrorSymbol = /* @__PURE__ */ Symbol.for(`fastify-error ${code2}`);
       function FastifyError(...args) {
         if (!new.target) {
           return new FastifyError(...args);
         }
-        this.code = code;
+        this.code = code2;
         this.name = "FastifyError";
         this.statusCode = statusCode;
         const lastElement = args.length - 1;
@@ -5212,14 +5212,14 @@ var require_time_tree = __commonJS({
        * @param {number} start
        * @returns {TimeTreeNode["id"]}
        */
-      [kAddNode](parent, label, start2) {
+      [kAddNode](parent, label2, start2) {
         const parentNode = this[kGetParent](parent);
         const isRoot = parentNode === null;
         if (isRoot) {
           this.root = {
             parent: null,
             id: "root",
-            label,
+            label: label2,
             nodes: [],
             start: start2,
             stop: null,
@@ -5228,11 +5228,11 @@ var require_time_tree = __commonJS({
           this[kTrackNode](this.root);
           return this.root.id;
         }
-        const nodeId = `${label}-${Math.random()}`;
+        const nodeId = `${label2}-${Math.random()}`;
         const childNode = {
           parent,
           id: nodeId,
-          label,
+          label: label2,
           nodes: [],
           start: start2,
           stop: null,
@@ -5248,8 +5248,8 @@ var require_time_tree = __commonJS({
        * @param {number|undefined} start
        * @returns {TimeTreeNode["id"]}
        */
-      start(parent, label, start2 = Date.now()) {
-        return this[kAddNode](parent, label, start2);
+      start(parent, label2, start2 = Date.now()) {
+        return this[kAddNode](parent, label2, start2);
       }
       /**
        * @param {string} nodeId
@@ -6259,12 +6259,12 @@ var require_process_warning = __commonJS({
     function createDeprecation(params) {
       return createWarning({ ...params, name: "DeprecationWarning" });
     }
-    function createWarning({ name: name2, code, message, unlimited = false } = {}) {
+    function createWarning({ name: name2, code: code2, message, unlimited = false } = {}) {
       if (!name2) throw new Error("Warning name must not be empty");
-      if (!code) throw new Error("Warning code must not be empty");
+      if (!code2) throw new Error("Warning code must not be empty");
       if (!message) throw new Error("Warning message must not be empty");
       if (typeof unlimited !== "boolean") throw new Error("Warning opts.unlimited must be a boolean");
-      code = code.toUpperCase();
+      code2 = code2.toUpperCase();
       const warningFn = unlimited === true ? function(a, b, c) {
         warning.emitted = true;
         process.emitWarning(warning.format(a, b, c), warning.name, warning.code);
@@ -6286,7 +6286,7 @@ var require_process_warning = __commonJS({
       warning.emitted = false;
       warning.message = message;
       warning.unlimited = unlimited;
-      warning.code = code;
+      warning.code = code2;
       warning[kWarningFn] = warningFn;
       warning[kWarningSpyData] = null;
       warning.format = function(a, b, c) {
@@ -7640,7 +7640,7 @@ var require_server = __commonJS({
         session.once("close", function() {
           http2Server[kHttp2ServerSessions].delete(session);
         });
-        session.once("frameError", function(type, code, streamId) {
+        session.once("frameError", function(type, code2, streamId) {
           if (streamId === 0) {
             http2Server[kHttp2ServerSessions].delete(session);
           }
@@ -12184,7 +12184,7 @@ var require_thread_stream = __commonJS({
           destroy(stream, new Error("this should not happen: " + msg.code));
       }
     }
-    function onWorkerExit(code) {
+    function onWorkerExit(code2) {
       const stream = this.stream.deref();
       if (stream === void 0) {
         return;
@@ -12192,7 +12192,7 @@ var require_thread_stream = __commonJS({
       registry2.unregister(stream);
       stream.worker.exited = true;
       stream.worker.off("exit", onWorkerExit);
-      destroy(stream, code !== 0 ? new Error("the worker thread exited") : null);
+      destroy(stream, code2 !== 0 ? new Error("the worker thread exited") : null);
     }
     var ThreadStream = class extends EventEmitter7 {
       constructor(opts = {}) {
@@ -13164,9 +13164,9 @@ var require_levels = __commonJS({
       const formatter = instance[formattersSym].level;
       const { labels } = instance.levels;
       const cache = {};
-      for (const label in labels) {
-        const level = formatter(labels[label], Number(label));
-        cache[label] = JSON.stringify(level).slice(0, -1);
+      for (const label2 in labels) {
+        const level = formatter(labels[label2], Number(label2));
+        cache[label2] = JSON.stringify(level).slice(0, -1);
       }
       instance[lsCacheSym] = cache;
       return instance;
@@ -14384,7 +14384,7 @@ var require_pino = __commonJS({
         bindings(bindings) {
           return bindings;
         },
-        level(label, number4) {
+        level(label2, number4) {
           return { level: number4 };
         }
       }),
@@ -14779,11 +14779,11 @@ var require_schemas = __commonJS({
       }
       if (routeSchemas.response) {
         const httpCodes = Object.keys(routeSchemas.response);
-        for (const code of httpCodes) {
-          if (isCustomSchemaPrototype(routeSchemas.response[code])) {
+        for (const code2 of httpCodes) {
+          if (isCustomSchemaPrototype(routeSchemas.response[code2])) {
             continue;
           }
-          const contentProperty = routeSchemas.response[code].content;
+          const contentProperty = routeSchemas.response[code2].content;
           if (contentProperty) {
             const keys = Object.keys(contentProperty);
             for (let i = 0; i < keys.length; i++) {
@@ -14806,9 +14806,9 @@ var require_schemas = __commonJS({
       }
       if (schema2.response) {
         const httpCodes = Object.keys(schema2.response);
-        for (const code of httpCodes) {
-          if (schema2.response[code].isFluentSchema || schema2.response[code][kFluentSchema]) {
-            schema2.response[code] = schema2.response[code].valueOf();
+        for (const code2 of httpCodes) {
+          if (schema2.response[code2].isFluentSchema || schema2.response[code2][kFluentSchema]) {
+            schema2.response[code2] = schema2.response[code2].valueOf();
           }
         }
       }
@@ -15667,10 +15667,10 @@ var require_reply = __commonJS({
       this[kReplyTrailers][key.toLowerCase()] = void 0;
       return this;
     };
-    Reply.prototype.code = function(code) {
-      const statusCode = +code;
+    Reply.prototype.code = function(code2) {
+      const statusCode = +code2;
       if (!(statusCode >= 100 && statusCode <= 599)) {
-        throw new FST_ERR_BAD_STATUS_CODE(code || String(code));
+        throw new FST_ERR_BAD_STATUS_CODE(code2 || String(code2));
       }
       this.raw.statusCode = statusCode;
       this[kReplyHasStatusCode] = true;
@@ -15755,11 +15755,11 @@ var require_reply = __commonJS({
       this[kReplyHeaders]["content-type"] = type;
       return this;
     };
-    Reply.prototype.redirect = function(url2, code) {
-      if (!code) {
-        code = this[kReplyHasStatusCode] ? this.raw.statusCode : 302;
+    Reply.prototype.redirect = function(url2, code2) {
+      if (!code2) {
+        code2 = this[kReplyHasStatusCode] ? this.raw.statusCode : 302;
       }
-      return this.header("location", url2).code(code).send();
+      return this.header("location", url2).code(code2).send();
     };
     Reply.prototype.callNotFound = function() {
       notFound(this);
@@ -18181,9 +18181,9 @@ var require_code = __commonJS({
     };
     exports2.Name = Name;
     var _Code = class extends _CodeOrName {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this._items = typeof code === "string" ? [code] : code;
+        this._items = typeof code2 === "string" ? [code2] : code2;
       }
       toString() {
         return this.str;
@@ -18210,13 +18210,13 @@ var require_code = __commonJS({
     exports2._Code = _Code;
     exports2.nil = new _Code("");
     function _(strs, ...args) {
-      const code = [strs[0]];
+      const code2 = [strs[0]];
       let i = 0;
       while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+        addCodeArg(code2, args[i]);
+        code2.push(strs[++i]);
       }
-      return new _Code(code);
+      return new _Code(code2);
     }
     exports2._ = _;
     var plus = new _Code("+");
@@ -18232,13 +18232,13 @@ var require_code = __commonJS({
       return new _Code(expr);
     }
     exports2.str = str;
-    function addCodeArg(code, arg) {
+    function addCodeArg(code2, arg) {
       if (arg instanceof _Code)
-        code.push(...arg._items);
+        code2.push(...arg._items);
       else if (arg instanceof Name)
-        code.push(arg);
+        code2.push(arg);
       else
-        code.push(interpolate(arg));
+        code2.push(interpolate(arg));
     }
     exports2.addCodeArg = addCodeArg;
     function optimize(expr) {
@@ -18422,7 +18422,7 @@ var require_scope = __commonJS({
         }, usedValues, getCode);
       }
       _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
+        let code2 = code_1.nil;
         for (const prefix in values) {
           const vs = values[prefix];
           if (!vs)
@@ -18435,16 +18435,16 @@ var require_scope = __commonJS({
             let c = valueCode(name2);
             if (c) {
               const def = this.opts.es5 ? exports2.varKinds.var : exports2.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name2} = ${c};${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${def} ${name2} = ${c};${this.opts._n}`;
             } else if (c = getCode === null || getCode === void 0 ? void 0 : getCode(name2)) {
-              code = (0, code_1._)`${code}${c}${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${c}${this.opts._n}`;
             } else {
               throw new ValueError(name2);
             }
             nameSet.set(name2, UsedValueState.Completed);
           });
         }
-        return code;
+        return code2;
       }
     };
     exports2.ValueScope = ValueScope;
@@ -18571,9 +18571,9 @@ var require_codegen = __commonJS({
       }
     };
     var Label = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
@@ -18581,14 +18581,14 @@ var require_codegen = __commonJS({
       }
     };
     var Break = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
+        const label2 = this.label ? ` ${this.label}` : "";
+        return `break${label2};` + _n;
       }
     };
     var Throw = class extends Node {
@@ -18604,9 +18604,9 @@ var require_codegen = __commonJS({
       }
     };
     var AnyCode = class extends Node {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this.code = code;
+        this.code = code2;
       }
       render({ _n }) {
         return `${this.code};` + _n;
@@ -18628,7 +18628,7 @@ var require_codegen = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code2, n) => code2 + n.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
@@ -18676,10 +18676,10 @@ var require_codegen = __commonJS({
         this.condition = condition;
       }
       render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
+        let code2 = `if(${this.condition})` + super.render(opts);
         if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
+          code2 += "else " + this.else.render(opts);
+        return code2;
       }
       optimizeNodes() {
         super.optimizeNodes();
@@ -18800,12 +18800,12 @@ var require_codegen = __commonJS({
     Return.kind = "return";
     var Try = class extends BlockNode {
       render(opts) {
-        let code = "try" + super.render(opts);
+        let code2 = "try" + super.render(opts);
         if (this.catch)
-          code += this.catch.render(opts);
+          code2 += this.catch.render(opts);
         if (this.finally)
-          code += this.finally.render(opts);
-        return code;
+          code2 += this.finally.render(opts);
+        return code2;
       }
       optimizeNodes() {
         var _a3, _b;
@@ -18922,18 +18922,18 @@ var require_codegen = __commonJS({
       }
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
-        const code = ["{"];
+        const code2 = ["{"];
         for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
+          if (code2.length > 1)
+            code2.push(",");
+          code2.push(key);
           if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
+            code2.push(":");
+            (0, code_1.addCodeArg)(code2, value);
           }
         }
-        code.push("}");
-        return new code_1._Code(code);
+        code2.push("}");
+        return new code_1._Code(code2);
       }
       // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
       if(condition, thenBody, elseBody) {
@@ -19000,12 +19000,12 @@ var require_codegen = __commonJS({
         return this._endBlockNode(For);
       }
       // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
+      label(label2) {
+        return this._leafNode(new Label(label2));
       }
       // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
+      break(label2) {
+        return this._leafNode(new Break(label2));
       }
       // `return` statement
       return(value) {
@@ -21252,22 +21252,22 @@ var require_utils = __commonJS({
     }
     function stringArrayToHexStripped(input2) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input2[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
         break;
       }
       for (i += 1; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input2[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
@@ -21540,15 +21540,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -21579,15 +21579,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -21614,15 +21614,15 @@ var require_utils = __commonJS({
         if (isAllowed(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -21667,15 +21667,15 @@ var require_utils = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -24633,8 +24633,8 @@ var require_format = __commonJS({
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code });
+            const code2 = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code: code2 });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -26261,9 +26261,9 @@ var require_parseJson = __commonJS({
           } else if (c === "u") {
             pos++;
             let count = 4;
-            let code = 0;
+            let code2 = 0;
             while (count--) {
-              code <<= 4;
+              code2 <<= 4;
               c = s[pos];
               if (c === void 0) {
                 errorMessage("unexpected end");
@@ -26271,16 +26271,16 @@ var require_parseJson = __commonJS({
               }
               c = c.toLowerCase();
               if (c >= "a" && c <= "f") {
-                code += c.charCodeAt(0) - CODE_A + 10;
+                code2 += c.charCodeAt(0) - CODE_A + 10;
               } else if (c >= "0" && c <= "9") {
-                code += c.charCodeAt(0) - CODE_0;
+                code2 += c.charCodeAt(0) - CODE_0;
               } else {
                 errorMessage(`unexpected token ${c}`);
                 return void 0;
               }
               pos++;
             }
-            str += String.fromCharCode(code);
+            str += String.fromCharCode(code2);
           } else {
             errorMessage(`unexpected token ${c}`);
             return void 0;
@@ -26768,22 +26768,22 @@ var require_utils2 = __commonJS({
     var isLiteralRegName = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=]*$/u);
     function stringArrayToHexStripped(input2) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input2[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
         break;
       }
       for (i += 1; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input2[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
@@ -27082,15 +27082,15 @@ var require_utils2 = __commonJS({
         if (isPathCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -27121,15 +27121,15 @@ var require_utils2 = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -27162,15 +27162,15 @@ var require_utils2 = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -27197,15 +27197,15 @@ var require_utils2 = __commonJS({
         if (isAllowed(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += allowNonAscii ? ch : percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += allowNonAscii ? ch : percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += allowNonAscii ? ch + input2[i + 1] : percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += allowNonAscii ? ch + input2[i + 1] : percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += allowNonAscii ? "\uFFFD" : percentEncodeNonAscii(65533);
@@ -27238,15 +27238,15 @@ var require_utils2 = __commonJS({
             continue;
           }
         }
-        const code = input2.charCodeAt(i);
-        if (code < 128) {
-          output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-        } else if (code < 55296 || code > 57343) {
-          output2 += percentEncodeNonAscii(code);
-        } else if (code <= 56319 && i + 1 < input2.length) {
+        const code2 = input2.charCodeAt(i);
+        if (code2 < 128) {
+          output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+        } else if (code2 < 55296 || code2 > 57343) {
+          output2 += percentEncodeNonAscii(code2);
+        } else if (code2 <= 56319 && i + 1 < input2.length) {
           const low = input2.charCodeAt(i + 1);
           if (low >= 56320 && low <= 57343) {
-            output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+            output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
             i++;
           } else {
             output2 += percentEncodeNonAscii(65533);
@@ -27552,8 +27552,8 @@ var require_schemes2 = __commonJS({
     function replaceLoneSurrogates(input2) {
       let result = "";
       for (let i = 0; i < input2.length; i++) {
-        const code = input2.charCodeAt(i);
-        if (code >= 55296 && code <= 56319 && i + 1 < input2.length) {
+        const code2 = input2.charCodeAt(i);
+        if (code2 >= 55296 && code2 <= 56319 && i + 1 < input2.length) {
           const low = input2.charCodeAt(i + 1);
           if (low >= 56320 && low <= 57343) {
             result += input2[i] + input2[i + 1];
@@ -27561,7 +27561,7 @@ var require_schemes2 = __commonJS({
             continue;
           }
         }
-        result += code >= 55296 && code <= 57343 ? "\uFFFD" : input2[i];
+        result += code2 >= 55296 && code2 <= 57343 ? "\uFFFD" : input2[i];
       }
       return result;
     }
@@ -27572,26 +27572,26 @@ var require_schemes2 = __commonJS({
       const table = set2.table;
       let result = "";
       for (let i = 0; i < input2.length; i++) {
-        const code = input2.charCodeAt(i);
-        if (code < 128) {
-          if (table[code] === 1) {
+        const code2 = input2.charCodeAt(i);
+        if (code2 < 128) {
+          if (table[code2] === 1) {
             result += input2[i];
-          } else if (code === 37 && i + 2 < input2.length && HEX_PAIR.test(input2.slice(i + 1, i + 3))) {
+          } else if (code2 === 37 && i + 2 < input2.length && HEX_PAIR.test(input2.slice(i + 1, i + 3))) {
             result += "%" + input2.slice(i + 1, i + 3).toUpperCase();
             i += 2;
           } else {
-            result += BYTE_HEX[code];
+            result += BYTE_HEX[code2];
           }
           continue;
         }
-        if (code < 55296 || code > 57343) {
-          result += set2.allowNonAscii ? input2[i] : percentEncodeNonAscii(code);
+        if (code2 < 55296 || code2 > 57343) {
+          result += set2.allowNonAscii ? input2[i] : percentEncodeNonAscii(code2);
           continue;
         }
-        if (code <= 56319 && i + 1 < input2.length) {
+        if (code2 <= 56319 && i + 1 < input2.length) {
           const low = input2.charCodeAt(i + 1);
           if (low >= 56320 && low <= 57343) {
-            result += set2.allowNonAscii ? input2[i] + input2[i + 1] : percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+            result += set2.allowNonAscii ? input2[i] + input2[i + 1] : percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
             i++;
             continue;
           }
@@ -28511,9 +28511,9 @@ var require_code3 = __commonJS({
     };
     exports2.Name = Name;
     var _Code = class extends _CodeOrName {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this._items = typeof code === "string" ? [code] : code;
+        this._items = typeof code2 === "string" ? [code2] : code2;
       }
       toString() {
         return this.str;
@@ -28540,13 +28540,13 @@ var require_code3 = __commonJS({
     exports2._Code = _Code;
     exports2.nil = new _Code("");
     function _(strs, ...args) {
-      const code = [strs[0]];
+      const code2 = [strs[0]];
       let i = 0;
       while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+        addCodeArg(code2, args[i]);
+        code2.push(strs[++i]);
       }
-      return new _Code(code);
+      return new _Code(code2);
     }
     exports2._ = _;
     var plus = new _Code("+");
@@ -28562,13 +28562,13 @@ var require_code3 = __commonJS({
       return new _Code(expr);
     }
     exports2.str = str;
-    function addCodeArg(code, arg) {
+    function addCodeArg(code2, arg) {
       if (arg instanceof _Code)
-        code.push(...arg._items);
+        code2.push(...arg._items);
       else if (arg instanceof Name)
-        code.push(arg);
+        code2.push(arg);
       else
-        code.push(interpolate(arg));
+        code2.push(interpolate(arg));
     }
     exports2.addCodeArg = addCodeArg;
     function optimize(expr) {
@@ -28752,7 +28752,7 @@ var require_scope2 = __commonJS({
         }, usedValues, getCode);
       }
       _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
+        let code2 = code_1.nil;
         for (const prefix in values) {
           const vs = values[prefix];
           if (!vs)
@@ -28765,16 +28765,16 @@ var require_scope2 = __commonJS({
             let c = valueCode(name2);
             if (c) {
               const def = this.opts.es5 ? exports2.varKinds.var : exports2.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name2} = ${c};${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${def} ${name2} = ${c};${this.opts._n}`;
             } else if (c = getCode === null || getCode === void 0 ? void 0 : getCode(name2)) {
-              code = (0, code_1._)`${code}${c}${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${c}${this.opts._n}`;
             } else {
               throw new ValueError(name2);
             }
             nameSet.set(name2, UsedValueState.Completed);
           });
         }
-        return code;
+        return code2;
       }
     };
     exports2.ValueScope = ValueScope;
@@ -28901,9 +28901,9 @@ var require_codegen2 = __commonJS({
       }
     };
     var Label = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
@@ -28911,14 +28911,14 @@ var require_codegen2 = __commonJS({
       }
     };
     var Break = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
+        const label2 = this.label ? ` ${this.label}` : "";
+        return `break${label2};` + _n;
       }
     };
     var Throw = class extends Node {
@@ -28934,9 +28934,9 @@ var require_codegen2 = __commonJS({
       }
     };
     var AnyCode = class extends Node {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this.code = code;
+        this.code = code2;
       }
       render({ _n }) {
         return `${this.code};` + _n;
@@ -28958,7 +28958,7 @@ var require_codegen2 = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code2, n) => code2 + n.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
@@ -29006,10 +29006,10 @@ var require_codegen2 = __commonJS({
         this.condition = condition;
       }
       render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
+        let code2 = `if(${this.condition})` + super.render(opts);
         if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
+          code2 += "else " + this.else.render(opts);
+        return code2;
       }
       optimizeNodes() {
         super.optimizeNodes();
@@ -29130,12 +29130,12 @@ var require_codegen2 = __commonJS({
     Return.kind = "return";
     var Try = class extends BlockNode {
       render(opts) {
-        let code = "try" + super.render(opts);
+        let code2 = "try" + super.render(opts);
         if (this.catch)
-          code += this.catch.render(opts);
+          code2 += this.catch.render(opts);
         if (this.finally)
-          code += this.finally.render(opts);
-        return code;
+          code2 += this.finally.render(opts);
+        return code2;
       }
       optimizeNodes() {
         var _a3, _b;
@@ -29252,18 +29252,18 @@ var require_codegen2 = __commonJS({
       }
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
-        const code = ["{"];
+        const code2 = ["{"];
         for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
+          if (code2.length > 1)
+            code2.push(",");
+          code2.push(key);
           if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
+            code2.push(":");
+            (0, code_1.addCodeArg)(code2, value);
           }
         }
-        code.push("}");
-        return new code_1._Code(code);
+        code2.push("}");
+        return new code_1._Code(code2);
       }
       // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
       if(condition, thenBody, elseBody) {
@@ -29330,12 +29330,12 @@ var require_codegen2 = __commonJS({
         return this._endBlockNode(For);
       }
       // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
+      label(label2) {
+        return this._leafNode(new Label(label2));
       }
       // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
+      break(label2) {
+        return this._leafNode(new Break(label2));
       }
       // `return` statement
       return(value) {
@@ -31547,22 +31547,22 @@ var require_utils3 = __commonJS({
     }
     function stringArrayToHexStripped(input2) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input2[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
         break;
       }
       for (i += 1; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input2[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
@@ -31835,15 +31835,15 @@ var require_utils3 = __commonJS({
         if (isPathCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -31874,15 +31874,15 @@ var require_utils3 = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -31909,15 +31909,15 @@ var require_utils3 = __commonJS({
         if (isAllowed(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -31962,15 +31962,15 @@ var require_utils3 = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -34928,8 +34928,8 @@ var require_format3 = __commonJS({
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code });
+            const code2 = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code: code2 });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -35570,16 +35570,16 @@ var require_standalone = __commonJS({
       function multiExportsCode(schemas, getValidateFunc) {
         var _a3;
         const usedValues = {};
-        let code = (0, code_1._)`"use strict";`;
+        let code2 = (0, code_1._)`"use strict";`;
         for (const name2 in schemas) {
           const v = getValidateFunc(schemas[name2]);
           if (v) {
             const vCode = validateCode(usedValues, v.source);
             const exportSyntax = ajv.opts.code.esm ? (0, code_1._)`export const ${(0, code_1.getEsmExportName)(name2)}` : (0, code_1._)`exports${(0, code_1.getProperty)(name2)}`;
-            code = (0, code_1._)`${code}${_n}${exportSyntax} = ${(_a3 = v.source) === null || _a3 === void 0 ? void 0 : _a3.validateName};${_n}${vCode}`;
+            code2 = (0, code_1._)`${code2}${_n}${exportSyntax} = ${(_a3 = v.source) === null || _a3 === void 0 ? void 0 : _a3.validateName};${_n}${vCode}`;
           }
         }
-        return `${code}`;
+        return `${code2}`;
       }
       function validateCode(usedValues, s) {
         if (!s)
@@ -35588,8 +35588,8 @@ var require_standalone = __commonJS({
           return code_1.nil;
         setUsedState(s.validateName, scope_1.UsedValueState.Started);
         const scopeCode = ajv.scope.scopeCode(s.scopeValues, usedValues, refValidateCode);
-        const code = new code_1._Code(`${scopeCode}${_n}${s.validateCode}`);
-        return s.evaluated ? (0, code_1._)`${code}${s.validateName}.evaluated = ${s.evaluated};${_n}` : code;
+        const code2 = new code_1._Code(`${scopeCode}${_n}${s.validateCode}`);
+        return s.evaluated ? (0, code_1._)`${code2}${s.validateName}.evaluated = ${s.evaluated};${_n}` : code2;
         function refValidateCode(n) {
           var _a3;
           const vRef = (_a3 = n.value) === null || _a3 === void 0 ? void 0 : _a3.ref;
@@ -36063,9 +36063,9 @@ var require_code5 = __commonJS({
     };
     exports2.Name = Name;
     var _Code = class extends _CodeOrName {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this._items = typeof code === "string" ? [code] : code;
+        this._items = typeof code2 === "string" ? [code2] : code2;
       }
       toString() {
         return this.str;
@@ -36092,13 +36092,13 @@ var require_code5 = __commonJS({
     exports2._Code = _Code;
     exports2.nil = new _Code("");
     function _(strs, ...args) {
-      const code = [strs[0]];
+      const code2 = [strs[0]];
       let i = 0;
       while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+        addCodeArg(code2, args[i]);
+        code2.push(strs[++i]);
       }
-      return new _Code(code);
+      return new _Code(code2);
     }
     exports2._ = _;
     var plus = new _Code("+");
@@ -36114,13 +36114,13 @@ var require_code5 = __commonJS({
       return new _Code(expr);
     }
     exports2.str = str;
-    function addCodeArg(code, arg) {
+    function addCodeArg(code2, arg) {
       if (arg instanceof _Code)
-        code.push(...arg._items);
+        code2.push(...arg._items);
       else if (arg instanceof Name)
-        code.push(arg);
+        code2.push(arg);
       else
-        code.push(interpolate(arg));
+        code2.push(interpolate(arg));
     }
     exports2.addCodeArg = addCodeArg;
     function optimize(expr) {
@@ -36304,7 +36304,7 @@ var require_scope3 = __commonJS({
         }, usedValues, getCode);
       }
       _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
+        let code2 = code_1.nil;
         for (const prefix in values) {
           const vs = values[prefix];
           if (!vs)
@@ -36317,16 +36317,16 @@ var require_scope3 = __commonJS({
             let c = valueCode(name2);
             if (c) {
               const def = this.opts.es5 ? exports2.varKinds.var : exports2.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name2} = ${c};${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${def} ${name2} = ${c};${this.opts._n}`;
             } else if (c = getCode === null || getCode === void 0 ? void 0 : getCode(name2)) {
-              code = (0, code_1._)`${code}${c}${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${c}${this.opts._n}`;
             } else {
               throw new ValueError(name2);
             }
             nameSet.set(name2, UsedValueState.Completed);
           });
         }
-        return code;
+        return code2;
       }
     };
     exports2.ValueScope = ValueScope;
@@ -36453,9 +36453,9 @@ var require_codegen3 = __commonJS({
       }
     };
     var Label = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
@@ -36463,14 +36463,14 @@ var require_codegen3 = __commonJS({
       }
     };
     var Break = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
+        const label2 = this.label ? ` ${this.label}` : "";
+        return `break${label2};` + _n;
       }
     };
     var Throw = class extends Node {
@@ -36486,9 +36486,9 @@ var require_codegen3 = __commonJS({
       }
     };
     var AnyCode = class extends Node {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this.code = code;
+        this.code = code2;
       }
       render({ _n }) {
         return `${this.code};` + _n;
@@ -36510,7 +36510,7 @@ var require_codegen3 = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code2, n) => code2 + n.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
@@ -36558,10 +36558,10 @@ var require_codegen3 = __commonJS({
         this.condition = condition;
       }
       render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
+        let code2 = `if(${this.condition})` + super.render(opts);
         if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
+          code2 += "else " + this.else.render(opts);
+        return code2;
       }
       optimizeNodes() {
         super.optimizeNodes();
@@ -36682,12 +36682,12 @@ var require_codegen3 = __commonJS({
     Return.kind = "return";
     var Try = class extends BlockNode {
       render(opts) {
-        let code = "try" + super.render(opts);
+        let code2 = "try" + super.render(opts);
         if (this.catch)
-          code += this.catch.render(opts);
+          code2 += this.catch.render(opts);
         if (this.finally)
-          code += this.finally.render(opts);
-        return code;
+          code2 += this.finally.render(opts);
+        return code2;
       }
       optimizeNodes() {
         var _a3, _b;
@@ -36804,18 +36804,18 @@ var require_codegen3 = __commonJS({
       }
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
-        const code = ["{"];
+        const code2 = ["{"];
         for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
+          if (code2.length > 1)
+            code2.push(",");
+          code2.push(key);
           if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
+            code2.push(":");
+            (0, code_1.addCodeArg)(code2, value);
           }
         }
-        code.push("}");
-        return new code_1._Code(code);
+        code2.push("}");
+        return new code_1._Code(code2);
       }
       // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
       if(condition, thenBody, elseBody) {
@@ -36882,12 +36882,12 @@ var require_codegen3 = __commonJS({
         return this._endBlockNode(For);
       }
       // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
+      label(label2) {
+        return this._leafNode(new Label(label2));
       }
       // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
+      break(label2) {
+        return this._leafNode(new Break(label2));
       }
       // `return` statement
       return(value) {
@@ -39099,22 +39099,22 @@ var require_utils4 = __commonJS({
     }
     function stringArrayToHexStripped(input2) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input2[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
         break;
       }
       for (i += 1; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input2[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
@@ -39387,15 +39387,15 @@ var require_utils4 = __commonJS({
         if (isPathCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -39426,15 +39426,15 @@ var require_utils4 = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -39461,15 +39461,15 @@ var require_utils4 = __commonJS({
         if (isAllowed(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -39514,15 +39514,15 @@ var require_utils4 = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -42480,8 +42480,8 @@ var require_format5 = __commonJS({
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code });
+            const code2 = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code: code2 });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -44578,16 +44578,16 @@ var require_standalone3 = __commonJS({
       function multiExportsCode(schemas, getValidateFunc) {
         var _a3;
         const usedValues = {};
-        let code = (0, code_1._)`"use strict";`;
+        let code2 = (0, code_1._)`"use strict";`;
         for (const name2 in schemas) {
           const v = getValidateFunc(schemas[name2]);
           if (v) {
             const vCode = validateCode(usedValues, v.source);
             const exportSyntax = ajv.opts.code.esm ? (0, code_1._)`export const ${(0, code_1.getEsmExportName)(name2)}` : (0, code_1._)`exports${(0, code_1.getProperty)(name2)}`;
-            code = (0, code_1._)`${code}${_n}${exportSyntax} = ${(_a3 = v.source) === null || _a3 === void 0 ? void 0 : _a3.validateName};${_n}${vCode}`;
+            code2 = (0, code_1._)`${code2}${_n}${exportSyntax} = ${(_a3 = v.source) === null || _a3 === void 0 ? void 0 : _a3.validateName};${_n}${vCode}`;
           }
         }
-        return `${code}`;
+        return `${code2}`;
       }
       function validateCode(usedValues, s) {
         if (!s)
@@ -44596,8 +44596,8 @@ var require_standalone3 = __commonJS({
           return code_1.nil;
         setUsedState(s.validateName, scope_1.UsedValueState.Started);
         const scopeCode = ajv.scope.scopeCode(s.scopeValues, usedValues, refValidateCode);
-        const code = new code_1._Code(`${scopeCode}${_n}${s.validateCode}`);
-        return s.evaluated ? (0, code_1._)`${code}${s.validateName}.evaluated = ${s.evaluated};${_n}` : code;
+        const code2 = new code_1._Code(`${scopeCode}${_n}${s.validateCode}`);
+        return s.evaluated ? (0, code_1._)`${code2}${s.validateName}.evaluated = ${s.evaluated};${_n}` : code2;
         function refValidateCode(n) {
           var _a3;
           const vRef = (_a3 = n.value) === null || _a3 === void 0 ? void 0 : _a3.ref;
@@ -44997,7 +44997,7 @@ const asInteger = serializer.asInteger.bind(serializer)
       }
       const location = new Location(schema2, context.rootSchemaId);
       detectRecursiveSchemas(context, location);
-      const code = buildValue(context, location, "input");
+      const code2 = buildValue(context, location, "input");
       let contextFunctionCode = `
     ${serializerFns}
     const JSON_STR_BEGIN_OBJECT = '{'
@@ -45012,7 +45012,7 @@ const asInteger = serializer.asInteger.bind(serializer)
     const JSON_STR_EMPTY_STRING = JSON_STR_QUOTE + JSON_STR_QUOTE
     const JSON_STR_NULL = 'null'
   `;
-      if (code === "json += anonymous0(input)") {
+      if (code2 === "json += anonymous0(input)") {
         contextFunctionCode += `
     ${context.functions.join("\n")}
     const main = anonymous0
@@ -45022,7 +45022,7 @@ const asInteger = serializer.asInteger.bind(serializer)
         contextFunctionCode += `
     function main (input) {
       let json = ''
-      ${code}
+      ${code2}
       return json
     }
     ${context.functions.join("\n")}
@@ -45109,7 +45109,7 @@ ${contextFunctionCode}`,
     function buildExtraObjectPropertiesSerializer(context, location, addComma, objVar) {
       const schema2 = location.schema;
       const propertiesKeys = Object.keys(schema2.properties || {});
-      let code = `
+      let code2 = `
     for (const key of Object.keys(${objVar})) {
       if (
         ${propertiesKeys.length > 0 ? propertiesKeys.map((k) => `key === ${JSON.stringify(k)}`).join(" || ") + " ||" : ""}
@@ -45124,7 +45124,7 @@ ${contextFunctionCode}`,
       if (patternPropertiesSchema !== void 0) {
         for (const propertyKey in patternPropertiesSchema) {
           const propertyLocation = patternPropertiesLocation.getPropertyLocation(propertyKey);
-          code += `
+          code2 += `
         if (/${propertyKey.replace(/\\*\//g, "\\/")}/.test(key)) {
           ${addComma}
           json += asString(key) + JSON_STR_COLONS
@@ -45138,23 +45138,23 @@ ${contextFunctionCode}`,
       const additionalPropertiesSchema = additionalPropertiesLocation.schema;
       if (additionalPropertiesSchema !== void 0 && additionalPropertiesSchema !== false) {
         if (additionalPropertiesSchema === true) {
-          code += `
+          code2 += `
         ${addComma}
         json += asString(key) + JSON_STR_COLONS + JSON.stringify(value)
       `;
         } else {
           const propertyLocation = location.getPropertyLocation("additionalProperties");
-          code += `
+          code2 += `
         ${addComma}
         json += asString(key) + JSON_STR_COLONS
         ${buildValue(context, propertyLocation, "value")}
       `;
         }
       }
-      code += `
+      code2 += `
     }
   `;
-      return code;
+      return code2;
     }
     function buildInnerObject(context, location, objVar) {
       const schema2 = location.schema;
@@ -45167,15 +45167,15 @@ ${contextFunctionCode}`,
           return required1 === required2 ? 0 : required1 ? -1 : 1;
         }
       );
-      let code = "";
+      let code2 = "";
       for (const key of requiredProperties) {
         if (!propertiesKeys.includes(key)) {
           const sanitizedKey = JSON.stringify(key);
-          code += `if (${objVar}[${sanitizedKey}] === undefined) throw new Error('${sanitizedKey.replace(/'/g, "\\'")} is required!')
+          code2 += `if (${objVar}[${sanitizedKey}] === undefined) throw new Error('${sanitizedKey.replace(/'/g, "\\'")} is required!')
 `;
         }
       }
-      code += "json += JSON_STR_BEGIN_OBJECT\n";
+      code2 += "json += JSON_STR_BEGIN_OBJECT\n";
       const localUid = context.uid++;
       let addComma = "";
       if (propertiesKeys.length > 0 && requiredProperties.includes(propertiesKeys[0])) {
@@ -45191,7 +45191,7 @@ ${contextFunctionCode}`,
           const defaultValue = resolvedLocation.schema.default;
           const isRequired = requiredProperties.includes(key);
           const currentAddComma = i === 0 ? "" : "json += JSON_STR_COMMA";
-          code += `
+          code2 += `
       const ${value} = ${objVar}[${sanitizedKey}]
       if (${value} !== undefined) {
         ${currentAddComma}
@@ -45199,25 +45199,25 @@ ${contextFunctionCode}`,
         ${buildValue(context, resolvedLocation, `${value}`)}
       }`;
           if (defaultValue !== void 0) {
-            code += ` else {
+            code2 += ` else {
         ${currentAddComma}
         json += ${JSON.stringify(sanitizedKey + ":" + JSON.stringify(defaultValue))}
       }
       `;
           } else if (isRequired) {
-            code += ` else {
+            code2 += ` else {
         throw new Error('${sanitizedKey.replace(/'/g, "\\'")} is required!')
       }
       `;
           } else {
-            code += "\n";
+            code2 += "\n";
           }
         }
         addComma = "json += JSON_STR_COMMA";
       } else {
         const needsRuntimeComma = propertiesKeys.length > 1 || schema2.patternProperties || schema2.additionalProperties !== void 0 && schema2.additionalProperties !== false;
         if (needsRuntimeComma) {
-          code += `let addComma_${localUid} = false
+          code2 += `let addComma_${localUid} = false
 `;
           addComma = `!addComma_${localUid} && (addComma_${localUid} = true) || (json += JSON_STR_COMMA)`;
         }
@@ -45233,35 +45233,35 @@ ${contextFunctionCode}`,
           const propertyPrefix = sanitizedKey + ":";
           const addProperty = needsRuntimeComma ? `json += addComma_${localUid} ? ${JSON.stringify("," + propertyPrefix)} : ${JSON.stringify(propertyPrefix)}
            addComma_${localUid} = true` : `json += ${JSON.stringify(propertyPrefix)}`;
-          code += `
+          code2 += `
           const ${value} = ${objVar}[${sanitizedKey}]
           if (${value} !== undefined) {
             ${addProperty}
             ${buildValue(context, propertyLocation, `${value}`)}
           }`;
           if (defaultValue !== void 0) {
-            code += ` else {
+            code2 += ` else {
             ${addComma}
             json += ${JSON.stringify(sanitizedKey + ":" + JSON.stringify(defaultValue))}
           }
           `;
           } else if (isRequired) {
-            code += ` else {
+            code2 += ` else {
             throw new Error('${sanitizedKey.replace(/'/g, "\\'")} is required!')
           }
           `;
           } else {
-            code += "\n";
+            code2 += "\n";
           }
         }
       }
       if (schema2.patternProperties || schema2.additionalProperties) {
-        code += buildExtraObjectPropertiesSerializer(context, location, addComma, objVar);
+        code2 += buildExtraObjectPropertiesSerializer(context, location, addComma, objVar);
       }
-      code += `
+      code2 += `
     json += JSON_STR_END_OBJECT
   `;
-      return code;
+      return code2;
     }
     function mergeLocations(context, mergedSchemaId, mergedLocations) {
       for (let i = 0, mergedLocationsLength = mergedLocations.length; i < mergedLocationsLength; i++) {
@@ -45339,7 +45339,7 @@ ${contextFunctionCode}`,
       }
       context.buildingSet.add(schema2);
       const objVar = `obj_${context.uid++}`;
-      const code = `
+      const code2 = `
     const ${objVar} = ${toJSON(input2)}
     if (${objVar} === null) {
       json += ${nullable2 ? "JSON_STR_NULL" : "JSON_STR_EMPTY_OBJECT"}
@@ -45348,7 +45348,7 @@ ${contextFunctionCode}`,
     }
   `;
       context.buildingSet.delete(schema2);
-      return code;
+      return code2;
     }
     function buildArray(context, location, input2) {
       const schema2 = location.schema;
@@ -45430,15 +45430,15 @@ ${contextFunctionCode}`,
         }`;
           }
         } else {
-          const code = buildValue(context, itemsLocation, "value");
+          const code2 = buildValue(context, itemsLocation, "value");
           functionCode += `
       if (arrayLength > 0) {
         const value = obj[0]
-        ${code}
+        ${code2}
         for (let i = 1; i < arrayLength; i++) {
           json += JSON_STR_COMMA
           const value = obj[i]
-          ${code}
+          ${code2}
         }
       }`;
         }
@@ -45507,15 +45507,15 @@ ${contextFunctionCode}`,
         }`;
         }
       } else {
-        const code = buildValue(context, itemsLocation, "value");
+        const code2 = buildValue(context, itemsLocation, "value");
         inlinedCode += `
       if (arrayLength_${objVar} > 0) {
         const value = ${objVar}[0]
-        ${code}
+        ${code2}
         for (let i = 1; i < arrayLength_${objVar}; i++) {
           json += JSON_STR_COMMA
           const value = ${objVar}[i]
-          ${code}
+          ${code2}
         }
       }`;
       }
@@ -45577,21 +45577,21 @@ ${contextFunctionCode}`,
     function buildMultiTypeSerializer(context, location, input2) {
       const schema2 = location.schema;
       const types = schema2.type.sort((t1) => t1 === "null" ? -1 : 1);
-      let code = "";
+      let code2 = "";
       types.forEach((type, index) => {
         location.schema = { ...location.schema, type };
         const nestedResult = buildSingleTypeSerializer(context, location, input2);
         const statement = index === 0 ? "if" : "else if";
         switch (type) {
           case "null":
-            code += `
+            code2 += `
           ${statement} (${input2} === null) {
             ${nestedResult}
           }
           `;
             break;
           case "string": {
-            code += `
+            code2 += `
           ${statement}(
             typeof ${input2} === "string" ||
             ${input2} === null ||
@@ -45609,7 +45609,7 @@ ${contextFunctionCode}`,
             break;
           }
           case "array": {
-            code += `
+            code2 += `
           ${statement}(Array.isArray(${input2})) {
             ${nestedResult}
           }
@@ -45617,7 +45617,7 @@ ${contextFunctionCode}`,
             break;
           }
           case "integer": {
-            code += `
+            code2 += `
           ${statement}(Number.isInteger(${input2}) || ${input2} === null) {
             ${nestedResult}
           }
@@ -45625,7 +45625,7 @@ ${contextFunctionCode}`,
             break;
           }
           case "object": {
-            code += `
+            code2 += `
           ${statement}((typeof ${input2} === "object" && !Array.isArray(${input2})) || ${input2} === null) {
             ${nestedResult}
           }
@@ -45633,7 +45633,7 @@ ${contextFunctionCode}`,
             break;
           }
           default: {
-            code += `
+            code2 += `
           ${statement}(typeof ${input2} === "${type}" || ${input2} === null) {
             ${nestedResult}
           }
@@ -45642,10 +45642,10 @@ ${contextFunctionCode}`,
           }
         }
       });
-      code += `
+      code2 += `
     else throw new TypeError(${JSON.stringify(`The value of '${getSafeSchemaRef(context, location)}' does not match schema definition.`)})
   `;
-      return code;
+      return code2;
     }
     function buildSingleTypeSerializer(context, location, input2) {
       const schema2 = location.schema;
@@ -45778,21 +45778,21 @@ ${contextFunctionCode}`,
       const schema2 = location.schema;
       const type = schema2.type;
       const hasNullType = Array.isArray(type) && type.includes("null");
-      let code = "";
+      let code2 = "";
       if (hasNullType) {
-        code += `
+        code2 += `
       if (${input2} === null) {
         json += JSON_STR_NULL
       } else {
     `;
       }
-      code += `json += ${JSON.stringify(JSON.stringify(schema2.const))}`;
+      code2 += `json += ${JSON.stringify(JSON.stringify(schema2.const))}`;
       if (hasNullType) {
-        code += `
+        code2 += `
       }
     `;
       }
-      return code;
+      return code2;
     }
     function buildAllOf(context, location, input2) {
       const schema2 = location.schema;
@@ -45829,7 +45829,7 @@ ${contextFunctionCode}`,
         location.jsonPointer
       );
       const oneOfsLocation = location.getPropertyLocation(type);
-      let code = "";
+      let code2 = "";
       for (let index = 0, oneOfsLength = oneOfs.length; index < oneOfsLength; index++) {
         const optionLocation = oneOfsLocation.getPropertyLocation(index);
         const optionSchema = optionLocation.schema;
@@ -45848,16 +45848,16 @@ ${contextFunctionCode}`,
         const nestedResult = buildValue(context, mergedLocation, input2);
         const schemaRef = getValidatorSchemaRef(context, optionLocation);
         context.validatorSchemaRefs.add(schemaRef);
-        code += `
+        code2 += `
       ${index === 0 ? "if" : "else if"}(validator.validate(${JSON.stringify(schemaRef)}, ${input2})) {
         ${nestedResult}
       }
     `;
       }
-      code += `
+      code2 += `
     else throw new TypeError(${JSON.stringify(`The value of '${getSafeSchemaRef(context, location)}' does not match schema definition.`)})
   `;
-      return code;
+      return code2;
     }
     function buildIfThenElse(context, location, input2) {
       context.validatorSchemasIds.add(location.schemaId);
@@ -45944,36 +45944,36 @@ ${contextFunctionCode}`,
           schema2.type = inferredType;
         }
       }
-      let code = "";
+      let code2 = "";
       const type = schema2.type;
       const nullable2 = schema2.nullable === true;
       if (nullable2) {
-        code += `
+        code2 += `
       if (${input2} === null) {
         json += JSON_STR_NULL
       } else {
     `;
       }
       if (schema2.const !== void 0) {
-        code += buildConstSerializer(location, input2);
+        code2 += buildConstSerializer(location, input2);
       } else if (Array.isArray(type)) {
-        code += buildMultiTypeSerializer(context, location, input2);
+        code2 += buildMultiTypeSerializer(context, location, input2);
       } else {
-        code += buildSingleTypeSerializer(context, location, input2);
+        code2 += buildSingleTypeSerializer(context, location, input2);
       }
       if (nullable2) {
-        code += `
+        code2 += `
       }
     `;
       }
-      return code;
+      return code2;
     }
     module2.exports = build;
     module2.exports.default = build;
     module2.exports.build = build;
     module2.exports.validLargeArrayMechanisms = validLargeArrayMechanisms;
-    module2.exports.restore = function({ code, validator, serializer }) {
-      return Function.apply(null, ["validator", "serializer", code]).apply(null, [validator, serializer]);
+    module2.exports.restore = function({ code: code2, validator, serializer }) {
+      return Function.apply(null, ["validator", "serializer", code2]).apply(null, [validator, serializer]);
     };
   }
 });
@@ -49302,7 +49302,7 @@ var require_util4 = __commonJS({
         if (lbs) {
           return s;
         }
-        let code = b ? 8 : a16 ? parseInt(a16, 16) : b16 ? parseInt(b16, 16) : dctrl ? CTRL.indexOf(dctrl) : {
+        let code2 = b ? 8 : a16 ? parseInt(a16, 16) : b16 ? parseInt(b16, 16) : dctrl ? CTRL.indexOf(dctrl) : {
           0: 0,
           t: 9,
           n: 10,
@@ -49310,7 +49310,7 @@ var require_util4 = __commonJS({
           f: 12,
           r: 13
         }[eslsh];
-        let c = String.fromCharCode(code);
+        let c = String.fromCharCode(code2);
         return /[[\]{}^$.|?*+()]/.test(c) ? `\\${c}` : c;
       });
     };
@@ -50362,8 +50362,8 @@ return ${lines.join(" && ")}`);
         this.routes.push(route);
         this.handlerStorage.addHandler(constrainer, route);
       }
-      setStaticChild(label, node2) {
-        const charCode = label.charCodeAt(0);
+      setStaticChild(label2, node2) {
+        const charCode = label2.charCodeAt(0);
         const index = this.staticChildrenCharCodes.indexOf(charCode);
         if (index === -1) {
           this.staticChildrenCharCodes.push(charCode);
@@ -50765,10 +50765,10 @@ var require_compiler = __commonJS({
           }
           source.push(...this.lines, "}");
         }
-        const code = source.join("\n");
-        const factory = new Function("NullObject", "decodeParam", "slow", "FLAG", "NO_MATCH", ...this.constNames, code);
+        const code2 = source.join("\n");
+        const factory = new Function("NullObject", "decodeParam", "slow", "FLAG", "NO_MATCH", ...this.constNames, code2);
         const fn = factory(NullObject2, safeDecodeURIComponent, slow, FLAG, NO_MATCH, ...this.constValues);
-        fn.source = code;
+        fn.source = code2;
         return fn;
       }
       // Locals for the parameter values collected from slot `from` on. Four are
@@ -50802,8 +50802,8 @@ var require_compiler = __commonJS({
       // consumes the rest of the path, so its scanner knows the length up front
       // and can pick the strategy before looping.
       scanFunction(name2, stops, knowsLength) {
-        const checks = stops.concat(37).map((code) => `c === ${code}`).join(" || ");
-        const charClass = stops.concat(37).map((code) => "\\x" + code.toString(16).padStart(2, "0")).join("");
+        const checks = stops.concat(37).map((code2) => `c === ${code2}`).join(" || ");
+        const charClass = stops.concat(37).map((code2) => "\\x" + code2.toString(16).padStart(2, "0")).join("");
         const lines = [
           // A global regex with lastIndex finds the first stop char in one
           // native call, without allocating a match result.
@@ -53445,13 +53445,13 @@ function valueSlice(str, min, max) {
   let start2 = min;
   let end = max;
   do {
-    const code = str.charCodeAt(start2);
-    if (code !== 32 && code !== 9)
+    const code2 = str.charCodeAt(start2);
+    if (code2 !== 32 && code2 !== 9)
       break;
   } while (++start2 < end);
   while (end > start2) {
-    const code = str.charCodeAt(end - 1);
-    if (code !== 32 && code !== 9)
+    const code2 = str.charCodeAt(end - 1);
+    if (code2 !== 32 && code2 !== 9)
       break;
     end--;
   }
@@ -53959,8 +53959,8 @@ var require_set_cookie = __commonJS({
       }
       return str.substring(start2, end);
     }
-    function isWsp(code) {
-      return code === 32 || code === 9;
+    function isWsp(code2) {
+      return code2 === 32 || code2 === 9;
     }
     function parseSetCookie2(input2, options) {
       options = options ? Object.assign({}, defaultParseOptions, options) : defaultParseOptions;
@@ -58661,9 +58661,9 @@ var require_lib2 = __commonJS({
     }
     var hasOwnProperty = Object.prototype.hasOwnProperty;
     var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Set) && !(value instanceof Map);
-    var isWordChar = (code) => code >= 65 && code <= 90 || code >= 97 && code <= 122 || code >= 48 && code <= 57 || code === 95;
-    var isWhitespace2 = (code) => code === charCode.space || code === charCode.tab || code === charCode.newline || code === charCode.carriageReturn;
-    var toLower = (code) => code | 32;
+    var isWordChar = (code2) => code2 >= 65 && code2 <= 90 || code2 >= 97 && code2 <= 122 || code2 >= 48 && code2 <= 57 || code2 === 95;
+    var isWhitespace2 = (code2) => code2 === charCode.space || code2 === charCode.tab || code2 === charCode.newline || code2 === charCode.carriageReturn;
+    var toLower = (code2) => code2 | 32;
     var matchesWord = (sql, position, word, length) => {
       const wordLength = word.length;
       for (let offset = 0; offset < wordLength; offset++)
@@ -58716,10 +58716,10 @@ var require_lib2 = __commonJS({
     var findNextPlaceholder = (sql, start2) => {
       const sqlLength = sql.length;
       for (let position = start2; position < sqlLength; position++) {
-        const code = sql.charCodeAt(position);
-        if (code === charCode.questionMark)
+        const code2 = sql.charCodeAt(position);
+        if (code2 === charCode.questionMark)
           return position;
-        if (code < 128 && CONTEXT_TRIGGER[code]) {
+        if (code2 < 128 && CONTEXT_TRIGGER[code2]) {
           const contextEnd = skipSqlContext(sql, position);
           if (contextEnd !== -1)
             position = contextEnd - 1;
@@ -58733,8 +58733,8 @@ var require_lib2 = __commonJS({
       let sawContent = false;
       let lastWasComma = false;
       for (let i = setEnd; i < placeholderPosition; ) {
-        const code = sql.charCodeAt(i);
-        if (code < 128 && CONTEXT_TRIGGER[code]) {
+        const code2 = sql.charCodeAt(i);
+        if (code2 < 128 && CONTEXT_TRIGGER[code2]) {
           const contextEnd = skipSqlContext(sql, i);
           if (contextEnd !== -1) {
             i = contextEnd;
@@ -58743,18 +58743,18 @@ var require_lib2 = __commonJS({
             continue;
           }
         }
-        if (isWhitespace2(code)) {
+        if (isWhitespace2(code2)) {
           i++;
           continue;
         }
-        if (code === charCode.openParen) {
+        if (code2 === charCode.openParen) {
           depth++;
           sawContent = true;
           lastWasComma = false;
           i++;
           continue;
         }
-        if (code === charCode.closeParen) {
+        if (code2 === charCode.closeParen) {
           if (--depth < 0)
             return false;
           sawContent = true;
@@ -58762,9 +58762,9 @@ var require_lib2 = __commonJS({
           i++;
           continue;
         }
-        if (isWordChar(code)) {
-          if (depth === 0 && !(code >= 48 && code <= 57)) {
-            const bucket = SET_CLAUSE_TERMINATORS_BY_FIRST[code | 32];
+        if (isWordChar(code2)) {
+          if (depth === 0 && !(code2 >= 48 && code2 <= 57)) {
+            const bucket = SET_CLAUSE_TERMINATORS_BY_FIRST[code2 | 32];
             if (bucket) {
               for (let t = 0; t < bucket.length; t++)
                 if (matchesWord(sql, i, bucket[t], length))
@@ -58779,9 +58779,9 @@ var require_lib2 = __commonJS({
           continue;
         }
         if (depth === 0) {
-          if (code === charCode.semicolon)
+          if (code2 === charCode.semicolon)
             return false;
-          if (code === charCode.comma) {
+          if (code2 === charCode.comma) {
             lastWasComma = true;
             sawContent = true;
             i++;
@@ -58797,15 +58797,15 @@ var require_lib2 = __commonJS({
     var findSetKeyword = (sql, startFrom = 0) => {
       const length = sql.length;
       for (let position = startFrom; position < length; position++) {
-        const code = sql.charCodeAt(position);
-        if (code < 128 && CONTEXT_TRIGGER[code]) {
+        const code2 = sql.charCodeAt(position);
+        if (code2 < 128 && CONTEXT_TRIGGER[code2]) {
           const contextEnd = skipSqlContext(sql, position);
           if (contextEnd !== -1) {
             position = contextEnd - 1;
             continue;
           }
         }
-        const lower = code | 32;
+        const lower = code2 | 32;
         if (lower === 115 && matchesWord(sql, position, "set", length))
           return position + 3;
         if (lower === 107 && matchesWord(sql, position, "key", length)) {
@@ -65079,15 +65079,15 @@ var require_utf32 = __commonJS({
       var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
       var offset = 0;
       for (var i = 0; i < src.length; i += 2) {
-        var code = src.readUInt16LE(i);
-        var isHighSurrogate = code >= 55296 && code < 56320;
-        var isLowSurrogate = code >= 56320 && code < 57344;
+        var code2 = src.readUInt16LE(i);
+        var isHighSurrogate = code2 >= 55296 && code2 < 56320;
+        var isLowSurrogate = code2 >= 56320 && code2 < 57344;
         if (this.highSurrogate) {
           if (isHighSurrogate || !isLowSurrogate) {
             write32.call(dst, this.highSurrogate, offset);
             offset += 4;
           } else {
-            var codepoint = (this.highSurrogate - 55296 << 10 | code - 56320) + 65536;
+            var codepoint = (this.highSurrogate - 55296 << 10 | code2 - 56320) + 65536;
             write32.call(dst, codepoint, offset);
             offset += 4;
             this.highSurrogate = 0;
@@ -65095,9 +65095,9 @@ var require_utf32 = __commonJS({
           }
         }
         if (isHighSurrogate) {
-          this.highSurrogate = code;
+          this.highSurrogate = code2;
         } else {
-          write32.call(dst, code, offset);
+          write32.call(dst, code2, offset);
           offset += 4;
           this.highSurrogate = 0;
         }
@@ -66445,16 +66445,16 @@ var require_dbcs_codec = __commonJS({
         var part = chunk[k];
         if (typeof part === "string") {
           for (var l = 0; l < part.length; ) {
-            var code = part.charCodeAt(l++);
-            if (code >= 55296 && code < 56320) {
+            var code2 = part.charCodeAt(l++);
+            if (code2 >= 55296 && code2 < 56320) {
               var codeTrail = part.charCodeAt(l++);
               if (codeTrail >= 56320 && codeTrail < 57344) {
-                writeTable[curAddr++] = 65536 + (code - 55296) * 1024 + (codeTrail - 56320);
+                writeTable[curAddr++] = 65536 + (code2 - 55296) * 1024 + (codeTrail - 56320);
               } else {
                 throw new Error("Incorrect surrogate pair in " + this.encodingName + " at chunk " + chunk[0]);
               }
-            } else if (code > 4080 && code <= 4095) {
-              var len = 4095 - code + 2;
+            } else if (code2 > 4080 && code2 <= 4095) {
+              var len = 4095 - code2 + 2;
               var seq = [];
               for (var m = 0; m < len; m++) {
                 seq.push(part.charCodeAt(l++));
@@ -66462,7 +66462,7 @@ var require_dbcs_codec = __commonJS({
               writeTable[curAddr++] = SEQ_START - this.decodeTableSeq.length;
               this.decodeTableSeq.push(seq);
             } else {
-              writeTable[curAddr++] = code;
+              writeTable[curAddr++] = code2;
             }
           }
         } else if (typeof part === "number") {
@@ -68817,12 +68817,12 @@ var require_helpers2 = __commonJS({
         return text2;
       };
     }
-    function printDebugWithCode(msg, code) {
+    function printDebugWithCode(msg, code2) {
       console.log(`
 
 ${msg}:
 `);
-      console.log(`${highlightFn(code)}
+      console.log(`${highlightFn(code2)}
 `);
     }
     exports2.printDebugWithCode = printDebugWithCode;
@@ -70875,7 +70875,7 @@ var require_change_user = __commonJS({
       // ChangeUser.fromPacket = function(packet)
       // };
       serializeToBuffer(buffer) {
-        const isSet = (flag) => this.flags & ClientConstants[flag];
+        const isSet = (flag2) => this.flags & ClientConstants[flag2];
         const packet = new Packet(0, buffer, 0, buffer.length);
         packet.offset = 4;
         const encoding = CharsetToEncoding[this.charsetNumber];
@@ -72046,7 +72046,7 @@ var require_handshake_response = __commonJS({
         this.connectAttributes = handshake.connectAttributes;
       }
       serializeResponse(buffer) {
-        const isSet = (flag) => this.clientFlags & ClientConstants[flag];
+        const isSet = (flag2) => this.clientFlags & ClientConstants[flag2];
         const packet = new Packet(0, buffer, 0, buffer.length);
         packet.offset = 4;
         packet.writeInt32(this.clientFlags);
@@ -72111,8 +72111,8 @@ var require_handshake_response = __commonJS({
       static fromPacket(packet, serverFlags = 4294967295) {
         const args = {};
         args.clientFlags = packet.readInt32();
-        function isSet(flag) {
-          return args.clientFlags & serverFlags & ClientConstants[flag];
+        function isSet(flag2) {
+          return args.clientFlags & serverFlags & ClientConstants[flag2];
         }
         args.maxPacketSize = packet.readInt32();
         args.charsetNumber = packet.readInt8();
@@ -72490,8 +72490,8 @@ var require_resultset_header = __commonJS({
         const bigNumberStrings = connection.config.bigNumberStrings;
         const encoding = connection.serverEncoding;
         const flags = connection._handshakePacket.capabilityFlags;
-        const isSet = function(flag) {
-          return flags & ClientConstants[flag];
+        const isSet = function(flag2) {
+          return flags & ClientConstants[flag2];
         };
         if (packet.buffer[packet.offset] !== 0) {
           this.fieldCount = packet.readLengthCodedNumber();
@@ -72781,13 +72781,13 @@ var require_packets = __commonJS({
       }
       static fromPacket(packet) {
         packet.readInt8();
-        const code = packet.readInt16();
+        const code2 = packet.readInt16();
         packet.readString(1, "ascii");
         packet.readString(5, "ascii");
         const message = packet.readNullTerminatedString("utf8");
         const error63 = new _Error();
         error63.message = message;
-        error63.code = code;
+        error63.code = code2;
         return error63;
       }
     };
@@ -77342,13 +77342,13 @@ var require_connection = __commonJS({
         });
         this.stream = secureSocket;
       }
-      protocolError(message, code) {
+      protocolError(message, code2) {
         if (this._closing) {
           return;
         }
         const err = new Error(message);
         err.fatal = true;
-        err.code = code || "PROTOCOL_ERROR";
+        err.code = code2 || "PROTOCOL_ERROR";
         this.emit("error", err);
       }
       get state() {
@@ -82522,12 +82522,12 @@ function isIso7064Mod97(iban3) {
   let remainder = 0;
   const len = iban3.length;
   for (let i = 4; i < len; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   for (let i = 0; i < 4; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   return remainder === 1;
 }
@@ -92473,12 +92473,12 @@ function compileFn(schema2, options) {
   doc.write(outputAccessor === null ? `return true;` : `return ${outputAccessor};`);
   const constantNames = ["INVALID", ...ctx.constants.keys()];
   const constantValues = [INVALID, ...ctx.constants.values()];
-  const code = doc.content.join("\n");
+  const code2 = doc.content.join("\n");
   const fullCode = options?.debug ? constantNames.length > 0 ? `// Constants: ${constantNames.join(", ")}
-${code}` : code : "";
+${code2}` : code2 : "";
   const F = Function;
   const factoryCode = `return (input) => {
-${code}
+${code2}
 }`;
   let fn;
   try {
@@ -92642,9 +92642,9 @@ function codePointLengthVar(doc, ctx, accessor, inDoubt) {
   doc.write(`const ${v} = typeof ${accessor} === "string" && ${inDoubt} ? ${cpLen}(${accessor}) : ${accessor}.length;`);
   return v;
 }
-function numericOperand(value, label) {
+function numericOperand(value, label2) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new ZodCompileUnsupportedError(`${label} bound of type ${typeof value}`);
+    throw new ZodCompileUnsupportedError(`${label2} bound of type ${typeof value}`);
   }
   return `${value}`;
 }
@@ -99294,7 +99294,7 @@ var shippingAddressSchema = external_exports.strictObject({
   interiorNumber: external_exports.string().trim().max(20).optional(),
   neighborhood: text(120),
   municipality: text(120),
-  stateCode: external_exports.string().refine((code) => STATE_CODES.has(code), "Unknown Mexican state"),
+  stateCode: external_exports.string().refine((code2) => STATE_CODES.has(code2), "Unknown Mexican state"),
   postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits"),
   references: external_exports.string().trim().max(200).optional()
 });
@@ -99706,16 +99706,16 @@ async function listProducts(db, query) {
   );
   return { items, total: Number(total) };
 }
-function findProductMedia(db, slug3) {
+function findProductMedia(db, slug4) {
   return db.query(
     "SELECT m.media_sha256 AS sha256, m.alt_text_es, m.alt_text_en FROM product_media m JOIN products p ON p.id = m.product_id WHERE p.slug = ? AND m.is_active = 1 ORDER BY m.is_primary DESC, m.sort_order ASC, m.id ASC",
-    [slug3]
+    [slug4]
   );
 }
-async function findProduct(db, slug3) {
+async function findProduct(db, slug4) {
   const [product] = await db.query(
     "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [slug3]
+    [slug4]
   );
   return product ?? null;
 }
@@ -99806,96 +99806,33 @@ function registerCatalogRoutes(app, deps) {
   });
 }
 
-// src/services/imageProbe.ts
-var SAFE_IMAGE_TYPES = [
-  "image/webp",
-  "image/jpeg",
-  "image/png"
-];
-var PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
-function startsWith(bytes, prefix, offset = 0) {
-  return prefix.every((byte, index) => bytes[offset + index] === byte);
-}
-function probePng(bytes) {
-  if (bytes.length < 24 || !startsWith(bytes, PNG_SIGNATURE)) return null;
-  if (bytes.toString("latin1", 12, 16) !== "IHDR") return null;
-  return {
-    type: "image/png",
-    width: bytes.readUInt32BE(16),
-    height: bytes.readUInt32BE(20)
-  };
-}
-function isStartOfFrame(marker) {
-  return marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
-}
-function probeJpeg(bytes) {
-  if (!startsWith(bytes, [255, 216, 255])) return null;
-  let offset = 2;
-  while (offset + 9 <= bytes.length) {
-    if (bytes[offset] !== 255) return null;
-    const marker = bytes[offset + 1];
-    if (isStartOfFrame(marker)) {
-      return {
-        type: "image/jpeg",
-        height: bytes.readUInt16BE(offset + 5),
-        width: bytes.readUInt16BE(offset + 7)
-      };
-    }
-    offset += 2 + bytes.readUInt16BE(offset + 2);
-  }
-  return null;
-}
-function probeWebp(bytes) {
-  if (bytes.length < 30) return null;
-  if (bytes.toString("latin1", 0, 4) !== "RIFF") return null;
-  if (bytes.toString("latin1", 8, 12) !== "WEBP") return null;
-  const chunk = bytes.toString("latin1", 12, 16);
-  if (chunk === "VP8 " && startsWith(bytes, [157, 1, 42], 23)) {
-    return {
-      type: "image/webp",
-      width: bytes.readUInt16LE(26) & 16383,
-      height: bytes.readUInt16LE(28) & 16383
-    };
-  }
-  if (chunk === "VP8L" && bytes[20] === 47) {
-    const bits = bytes.readUInt32LE(21);
-    return {
-      type: "image/webp",
-      width: (bits & 16383) + 1,
-      height: (bits >>> 14 & 16383) + 1
-    };
-  }
-  if (chunk === "VP8X") {
-    return {
-      type: "image/webp",
-      width: bytes.readUIntLE(24, 3) + 1,
-      height: bytes.readUIntLE(27, 3) + 1
-    };
-  }
-  return null;
-}
-function probeImage(bytes) {
-  return probePng(bytes) ?? probeJpeg(bytes) ?? probeWebp(bytes);
-}
-
 // src/services/audit.ts
 var REDACTED = "[redacted]";
 var PII_KEY = /pass|secret|token|otp|backup|hash|code|name|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
-function redactPii(value) {
+var CATALOG_PII_KEY = /pass|secret|token|otp|backup|hash|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
+var CATALOG_ENTITIES = /* @__PURE__ */ new Set([
+  "media",
+  "brands",
+  "facet_groups",
+  "facet_values",
+  "products"
+]);
+function redactPii(value, rule) {
   if (typeof value === "string") return value.includes("@") ? REDACTED : value;
-  if (Array.isArray(value)) return value.map(redactPii);
+  if (Array.isArray(value)) return value.map((item) => redactPii(item, rule));
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        PII_KEY.test(key) ? REDACTED : redactPii(item)
+        rule.test(key) ? REDACTED : redactPii(item, rule)
       ])
     );
   }
   return value;
 }
 async function recordAudit(db, entry) {
-  const json2 = (state) => state === null ? null : JSON.stringify(redactPii(state));
+  const rule = CATALOG_ENTITIES.has(entry.entityType) ? CATALOG_PII_KEY : PII_KEY;
+  const json2 = (state) => state === null ? null : JSON.stringify(redactPii(state, rule));
   await db.query(
     "INSERT INTO audit_log (user_id, action, entity_type, entity_id, before_state, after_state, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [
@@ -99987,6 +99924,78 @@ function runIdempotent(db, request, work) {
   });
 }
 
+// src/services/imageProbe.ts
+var SAFE_IMAGE_TYPES = [
+  "image/webp",
+  "image/jpeg",
+  "image/png"
+];
+var PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+function startsWith(bytes, prefix, offset = 0) {
+  return prefix.every((byte, index) => bytes[offset + index] === byte);
+}
+function probePng(bytes) {
+  if (bytes.length < 24 || !startsWith(bytes, PNG_SIGNATURE)) return null;
+  if (bytes.toString("latin1", 12, 16) !== "IHDR") return null;
+  return {
+    type: "image/png",
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20)
+  };
+}
+function isStartOfFrame(marker) {
+  return marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
+}
+function probeJpeg(bytes) {
+  if (!startsWith(bytes, [255, 216, 255])) return null;
+  let offset = 2;
+  while (offset + 9 <= bytes.length) {
+    if (bytes[offset] !== 255) return null;
+    const marker = bytes[offset + 1];
+    if (isStartOfFrame(marker)) {
+      return {
+        type: "image/jpeg",
+        height: bytes.readUInt16BE(offset + 5),
+        width: bytes.readUInt16BE(offset + 7)
+      };
+    }
+    offset += 2 + bytes.readUInt16BE(offset + 2);
+  }
+  return null;
+}
+function probeWebp(bytes) {
+  if (bytes.length < 30) return null;
+  if (bytes.toString("latin1", 0, 4) !== "RIFF") return null;
+  if (bytes.toString("latin1", 8, 12) !== "WEBP") return null;
+  const chunk = bytes.toString("latin1", 12, 16);
+  if (chunk === "VP8 " && startsWith(bytes, [157, 1, 42], 23)) {
+    return {
+      type: "image/webp",
+      width: bytes.readUInt16LE(26) & 16383,
+      height: bytes.readUInt16LE(28) & 16383
+    };
+  }
+  if (chunk === "VP8L" && bytes[20] === 47) {
+    const bits = bytes.readUInt32LE(21);
+    return {
+      type: "image/webp",
+      width: (bits & 16383) + 1,
+      height: (bits >>> 14 & 16383) + 1
+    };
+  }
+  if (chunk === "VP8X") {
+    return {
+      type: "image/webp",
+      width: bytes.readUIntLE(24, 3) + 1,
+      height: bytes.readUIntLE(27, 3) + 1
+    };
+  }
+  return null;
+}
+function probeImage(bytes) {
+  return probePng(bytes) ?? probeJpeg(bytes) ?? probeWebp(bytes);
+}
+
 // src/services/media.ts
 var import_node_crypto2 = require("node:crypto");
 var MAX_MEDIA_BYTES = 2097152;
@@ -100039,33 +100048,178 @@ function matchesDigest(data, sha2562) {
   return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
 }
 
-// src/routes/catalogAdmin.ts
+// src/services/catalogAdmin.ts
+var brandOf = (row2) => ({
+  id: Number(row2.id),
+  slug: row2.slug,
+  name: row2.name,
+  website: row2.website,
+  isActive: Number(row2.is_active) === 1
+});
+async function listBrands(db) {
+  const rows = await db.query(
+    "SELECT id, slug, name, website, is_active FROM brands ORDER BY name ASC, id ASC"
+  );
+  return rows.map(brandOf);
+}
+async function lockBrand(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT id, slug, name, website, is_active FROM brands WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return row2 ? brandOf(row2) : null;
+}
+async function createBrand(tx, input2) {
+  await tx.query("INSERT INTO brands (slug, name, website) VALUES (?, ?, ?)", [
+    input2.slug,
+    input2.name,
+    input2.website
+  ]);
+  const [row2] = await tx.query(
+    "SELECT id, slug, name, website, is_active FROM brands WHERE slug = ?",
+    [input2.slug]
+  );
+  return { before: null, after: brandOf(row2) };
+}
+async function updateBrand(tx, id, patch) {
+  const before = await lockBrand(tx, id);
+  if (before === null) return "CAT_NOT_FOUND";
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE brands SET name = ?, website = ?, is_active = ? WHERE id = ?",
+    [after.name, after.website, after.isActive ? 1 : 0, id]
+  );
+  return { before, after };
+}
+var flag = (value) => Number(value) === 1;
+var groupOf = (row2, values = []) => ({
+  id: Number(row2.id),
+  code: row2.code,
+  nameEs: row2.name_es,
+  nameEn: row2.name_en,
+  isRequired: flag(row2.is_required),
+  isOrdered: flag(row2.is_ordered),
+  isFilterable: flag(row2.is_filterable),
+  showOnLanding: flag(row2.show_on_landing),
+  isSystem: flag(row2.is_system),
+  isActive: flag(row2.is_active),
+  sortOrder: Number(row2.sort_order),
+  values
+});
+var valueOf = (row2) => ({
+  id: Number(row2.id),
+  code: row2.code,
+  valueEs: row2.value_es,
+  valueEn: row2.value_en,
+  sortOrder: Number(row2.sort_order)
+});
+async function listFacets(db) {
+  const groups = await db.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC"
+  );
+  const values = await db.query(
+    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values ORDER BY sort_order ASC, id ASC"
+  );
+  return groups.map(
+    (group) => groupOf(
+      group,
+      values.filter((value) => Number(value.group_id) === Number(group.id)).map(valueOf)
+    )
+  );
+}
+async function lockGroup(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return row2 ? groupOf(row2) : null;
+}
+async function createFacetGroup(tx, input2) {
+  await tx.query(
+    "INSERT INTO product_facet_groups (code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      input2.code,
+      input2.nameEs,
+      input2.nameEn,
+      input2.isRequired ? 1 : 0,
+      input2.isOrdered ? 1 : 0,
+      input2.isFilterable ? 1 : 0,
+      input2.showOnLanding ? 1 : 0,
+      input2.sortOrder
+    ]
+  );
+  const [row2] = await tx.query(
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code = ?",
+    [input2.code]
+  );
+  return { before: null, after: groupOf(row2) };
+}
+async function updateFacetGroup(tx, id, patch) {
+  const before = await lockGroup(tx, id);
+  if (before === null) return "CAT_NOT_FOUND";
+  if (before.isSystem && patch.isActive === false)
+    return "CAT_SYSTEM_GROUP_LOCKED";
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE product_facet_groups SET name_es = ?, name_en = ?, is_required = ?, is_ordered = ?, is_filterable = ?, show_on_landing = ?, is_active = ?, sort_order = ? WHERE id = ?",
+    [
+      after.nameEs,
+      after.nameEn,
+      after.isRequired ? 1 : 0,
+      after.isOrdered ? 1 : 0,
+      after.isFilterable ? 1 : 0,
+      after.showOnLanding ? 1 : 0,
+      after.isActive ? 1 : 0,
+      after.sortOrder,
+      id
+    ]
+  );
+  return { before, after };
+}
+async function createFacetValue(tx, groupId, input2) {
+  const group = await lockGroup(tx, groupId);
+  if (group === null) return "CAT_NOT_FOUND";
+  if (group.isSystem) return "CAT_SYSTEM_GROUP_LOCKED";
+  await tx.query(
+    "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
+    [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
+  );
+  const [row2] = await tx.query(
+    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id = ? AND code = ?",
+    [groupId, input2.code]
+  );
+  return { before: null, after: valueOf(row2) };
+}
+async function updateFacetValue(tx, id, patch) {
+  const [row2] = await tx.query(
+    "SELECT v.id, v.group_id, v.code, v.value_es, v.value_en, v.sort_order, g.is_system FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ? FOR UPDATE",
+    [id]
+  );
+  if (!row2) return "CAT_NOT_FOUND";
+  if (flag(row2.is_system)) return "CAT_SYSTEM_GROUP_LOCKED";
+  const before = valueOf(row2);
+  const after = { ...before, ...patch };
+  await tx.query(
+    "UPDATE product_facet_values SET value_es = ?, value_en = ?, sort_order = ? WHERE id = ?",
+    [after.valueEs, after.valueEn, after.sortOrder, id]
+  );
+  return { before, after };
+}
+
+// src/routes/catalogMutation.ts
 var mutationHeaders = external_exports.object({
   "idempotency-key": external_exports.string().regex(IDEMPOTENCY_KEY_SYNTAX)
 });
-var mediaUploadedSchema = external_exports.object({
-  code: external_exports.literal("MEDIA_ACCEPTED"),
-  created: external_exports.boolean(),
-  sha256: external_exports.string().regex(SHA256_HEX),
-  mimeType: external_exports.enum(SAFE_IMAGE_TYPES),
-  width: external_exports.number().int().positive(),
-  height: external_exports.number().int().positive(),
-  sizeBytes: external_exports.number().int().positive()
-});
-var UPLOAD_READ_LIMIT = 4 * 1024 * 1024;
-var MEDIA_REFUSALS = {
-  MEDIA_UNSAFE_TYPE: [415, "Unsupported image type"],
-  MEDIA_SIZE_EXCEEDED: [413, "Image too large"],
-  MEDIA_DIMENSIONS_INVALID: [422, "Image dimensions not allowed"]
+var idParams = external_exports.object({ id: external_exports.coerce.number().int().positive() });
+var REFUSALS = {
+  CAT_NOT_FOUND: [404, "Not found"],
+  CAT_SYSTEM_GROUP_LOCKED: [409, "System facet group is locked"]
 };
-function refuse(reply, status, title, code) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, title, code));
-}
-function actorOf(request) {
-  return request.user.userId;
+function refuse(reply, status, title, code2) {
+  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, title, code2));
 }
 async function runOnce(deps, request, reply, key, mutation) {
-  const userId = actorOf(request);
+  const userId = request.user.userId;
   const outcome = await runIdempotent(
     deps.db,
     {
@@ -100083,8 +100237,214 @@ async function runOnce(deps, request, reply, key, mutation) {
   if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
     return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
   }
-  return reply.code(outcome.answer.status).header("idempotency-status", outcome.code).send(outcome.answer.body);
+  const { status, body } = outcome.answer;
+  if (status >= 400) reply.type(PROBLEM_TYPE);
+  return reply.code(status).header("idempotency-status", outcome.code).send(body);
 }
+var isDuplicate = (error63) => error63?.code === "ER_DUP_ENTRY";
+function mutationRoute(app, deps, route) {
+  app.route({
+    method: route.method,
+    url: route.url,
+    handler: async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const params = (route.params ?? external_exports.object({})).safeParse(request.params);
+      const body = route.body.safeParse(request.body);
+      if (!params.success || !body.success) {
+        return refuse(
+          reply,
+          400,
+          "Invalid catalog data",
+          "CAT_VALIDATION_ERROR"
+        );
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        let change;
+        try {
+          change = await route.run(tx, {
+            params: params.data,
+            body: body.data
+          });
+        } catch (error63) {
+          if (!isDuplicate(error63)) throw error63;
+          return {
+            status: 409,
+            body: problem(409, "Already exists", "CAT_CONFLICT")
+          };
+        }
+        if (typeof change === "string") {
+          const [status, title] = REFUSALS[change];
+          return { status, body: problem(status, title, change) };
+        }
+        await recordAudit(tx, {
+          userId,
+          action: `${route.method} ${route.url}`,
+          entityType: route.entityType,
+          entityId: String(change.after.id),
+          before: change.before,
+          after: change.after,
+          ip: request.ip
+        });
+        return { status: change.before ? 200 : 201, body: change.after };
+      });
+    }
+  });
+}
+
+// src/routes/catalogEntities.ts
+var slug3 = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100);
+var code = external_exports.string().regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/).max(50);
+var label = (max) => external_exports.string().trim().min(1).max(max);
+var website = external_exports.url({ protocol: /^https$/ }).max(255).nullable();
+var order = external_exports.number().int().min(-1e3).max(1e3);
+var brandCreate = external_exports.strictObject({
+  slug: slug3,
+  name: label(150),
+  website: website.default(null)
+});
+var brandPatch = external_exports.strictObject({
+  name: label(150).optional(),
+  website: website.optional(),
+  isActive: external_exports.boolean().optional()
+});
+var groupFields = {
+  nameEs: label(100),
+  nameEn: label(100),
+  isRequired: external_exports.boolean(),
+  isOrdered: external_exports.boolean(),
+  isFilterable: external_exports.boolean(),
+  showOnLanding: external_exports.boolean(),
+  sortOrder: order
+};
+var facetGroupCreate = external_exports.strictObject({
+  code,
+  nameEs: groupFields.nameEs,
+  nameEn: groupFields.nameEn,
+  isRequired: groupFields.isRequired.default(false),
+  isOrdered: groupFields.isOrdered.default(false),
+  isFilterable: groupFields.isFilterable.default(true),
+  showOnLanding: groupFields.showOnLanding.default(false),
+  sortOrder: groupFields.sortOrder.default(0)
+});
+var facetGroupPatch = external_exports.strictObject({
+  nameEs: groupFields.nameEs.optional(),
+  nameEn: groupFields.nameEn.optional(),
+  isRequired: groupFields.isRequired.optional(),
+  isOrdered: groupFields.isOrdered.optional(),
+  isFilterable: groupFields.isFilterable.optional(),
+  showOnLanding: groupFields.showOnLanding.optional(),
+  isActive: external_exports.boolean().optional(),
+  sortOrder: groupFields.sortOrder.optional()
+});
+var facetValueCreate = external_exports.strictObject({
+  code,
+  valueEs: label(100),
+  valueEn: label(100),
+  sortOrder: order.default(0)
+});
+var facetValuePatch = external_exports.strictObject({
+  valueEs: label(100).optional(),
+  valueEn: label(100).optional(),
+  sortOrder: order.optional()
+});
+var brandSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  slug: external_exports.string(),
+  name: external_exports.string(),
+  website: external_exports.string().nullable(),
+  isActive: external_exports.boolean()
+});
+var facetValueSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  code: external_exports.string(),
+  valueEs: external_exports.string(),
+  valueEn: external_exports.string(),
+  sortOrder: external_exports.number().int()
+});
+var facetGroupSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  code: external_exports.string(),
+  nameEs: external_exports.string(),
+  nameEn: external_exports.string(),
+  isRequired: external_exports.boolean(),
+  isOrdered: external_exports.boolean(),
+  isFilterable: external_exports.boolean(),
+  showOnLanding: external_exports.boolean(),
+  isSystem: external_exports.boolean(),
+  isActive: external_exports.boolean(),
+  sortOrder: external_exports.number().int(),
+  values: external_exports.array(facetValueSchema)
+});
+function registerCatalogEntityRoutes(app, deps) {
+  app.get("/v1/admin/catalog/brands", async () => listBrands(deps.db));
+  app.get("/v1/admin/catalog/facets", async () => listFacets(deps.db));
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/brands",
+    entityType: "brands",
+    body: brandCreate,
+    run: (tx, { body }) => createBrand(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/brands/:id",
+    entityType: "brands",
+    params: idParams,
+    body: brandPatch,
+    run: (tx, { params, body }) => updateBrand(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/facet-groups",
+    entityType: "facet_groups",
+    body: facetGroupCreate,
+    run: (tx, { body }) => createFacetGroup(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/facet-groups/:id",
+    entityType: "facet_groups",
+    params: idParams,
+    body: facetGroupPatch,
+    run: (tx, { params, body }) => updateFacetGroup(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/facet-groups/:id/values",
+    entityType: "facet_values",
+    params: idParams,
+    body: facetValueCreate,
+    run: (tx, { params, body }) => createFacetValue(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/facet-values/:id",
+    entityType: "facet_values",
+    params: idParams,
+    body: facetValuePatch,
+    run: (tx, { params, body }) => updateFacetValue(tx, params.id, body)
+  });
+}
+
+// src/routes/catalogAdmin.ts
+var mediaUploadedSchema = external_exports.object({
+  code: external_exports.literal("MEDIA_ACCEPTED"),
+  created: external_exports.boolean(),
+  sha256: external_exports.string().regex(SHA256_HEX),
+  mimeType: external_exports.enum(SAFE_IMAGE_TYPES),
+  width: external_exports.number().int().positive(),
+  height: external_exports.number().int().positive(),
+  sizeBytes: external_exports.number().int().positive()
+});
+var UPLOAD_READ_LIMIT = 4 * 1024 * 1024;
+var MEDIA_REFUSALS = {
+  MEDIA_UNSAFE_TYPE: [415, "Unsupported image type"],
+  MEDIA_SIZE_EXCEEDED: [413, "Image too large"],
+  MEDIA_DIMENSIONS_INVALID: [422, "Image dimensions not allowed"]
+};
 function registerCatalogAdminRoutes(app, deps) {
   app.addContentTypeParser(
     /^image\/[a-z0-9.+-]+$/,
@@ -100114,7 +100474,7 @@ function registerCatalogAdminRoutes(app, deps) {
       }
       return runOnce(deps, request, reply, key.key, async (tx, userId) => {
         const created = await storeMedia(tx, bytes, verdict);
-        const { code, ...stored } = verdict;
+        const { code: code2, ...stored } = verdict;
         await recordAudit(tx, {
           userId,
           action: "POST /v1/admin/catalog/media",
@@ -100124,10 +100484,11 @@ function registerCatalogAdminRoutes(app, deps) {
           after: stored,
           ip: request.ip
         });
-        return { status: 201, body: { code, created, ...stored } };
+        return { status: 201, body: { code: code2, created, ...stored } };
       });
     }
   );
+  registerCatalogEntityRoutes(app, deps);
   app.delete(
     "/v1/admin/catalog/*",
     (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
@@ -100213,7 +100574,7 @@ var PROCESSOR_OF = {
   SPEI: "MERCADO_PAGO",
   MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
 };
-var refuse2 = (status, code) => ({ ok: false, status, code });
+var refuse2 = (status, code2) => ({ ok: false, status, code: code2 });
 function affected(result) {
   return result.affectedRows;
 }
@@ -100271,7 +100632,7 @@ async function cancelOrder(db, orderId) {
 }
 function methodOf(body) {
   const method = body?.method;
-  return PAYMENT_METHOD_CODES.find((code) => code === method) ?? null;
+  return PAYMENT_METHOD_CODES.find((code2) => code2 === method) ?? null;
 }
 function admit(deps, body) {
   const method = methodOf(body);
@@ -100324,20 +100685,20 @@ async function price(deps, request, lang) {
   }
   return quoted.quote;
 }
-async function persist(deps, admitted, quote, order) {
+async function persist(deps, admitted, quote, order2) {
   const { request, secrets } = admitted;
   const { customer, address } = request;
   const summary2 = quote.summary;
-  const seal = (field, value) => encryptPii(secrets.piiKey, order.orderNumber, field, value);
+  const seal = (field, value) => encryptPii(secrets.piiKey, order2.orderNumber, field, value);
   try {
     return await deps.db.transaction(async (tx) => {
       const productIds = await reserveLines(tx, request.items);
       const inserted = await tx.query(
         "INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
         [
-          order.orderNumber,
-          order.userId,
-          order.methodId,
+          order2.orderNumber,
+          order2.userId,
+          order2.methodId,
           summary2.itemsBaseMxnCents,
           summary2.itemsTaxMxnCents,
           summary2.itemsTotalMxnCents,
@@ -100350,9 +100711,9 @@ async function persist(deps, admitted, quote, order) {
           seal("customer_phone", customer.phone),
           seal("shipping_address", JSON.stringify(address)),
           emailHmac(secrets.emailPepper, customer.email),
-          tokenHash(secrets.tokenPepper, order.accessToken),
-          order.now,
-          order.expiresAt,
+          tokenHash(secrets.tokenPepper, order2.accessToken),
+          order2.now,
+          order2.expiresAt,
           deps.payments.mode === "sandbox" ? 1 : 0,
           address.stateCode
         ]
@@ -100394,7 +100755,7 @@ async function createCheckout(deps, body, lang, userId = null) {
     [admitted.method]
   );
   if (methodRow === void 0) return refuse2(503, "SERVICE_UNAVAILABLE");
-  const order = {
+  const order2 = {
     orderNumber: newOrderNumber(now),
     accessToken: newAccessToken(),
     methodId: methodRow.id,
@@ -100404,18 +100765,18 @@ async function createCheckout(deps, body, lang, userId = null) {
     ),
     userId
   };
-  const orderId = await persist(deps, admitted, quote, order);
+  const orderId = await persist(deps, admitted, quote, order2);
   if (typeof orderId !== "number") return orderId;
   const paths = CHECKOUT_RETURN_PATHS[lang];
   const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
   const total = quote.summary.totalMxnCents;
   try {
     const session = await admitted.processor.createSession({
-      orderNumber: order.orderNumber,
+      orderNumber: order2.orderNumber,
       method: admitted.method,
       totalMxnCents: total,
-      description: `Y\u0113kora \xB7 ${order.orderNumber}`,
-      expiresAt: order.expiresAt,
+      description: `Y\u0113kora \xB7 ${order2.orderNumber}`,
+      expiresAt: order2.expiresAt,
       now,
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
@@ -100428,10 +100789,10 @@ async function createCheckout(deps, body, lang, userId = null) {
     return {
       ok: true,
       session: {
-        orderNumber: order.orderNumber,
-        accessToken: order.accessToken,
+        orderNumber: order2.orderNumber,
+        accessToken: order2.accessToken,
         redirectUrl: session.redirectUrl,
-        expiresAt: order.expiresAt.toISOString(),
+        expiresAt: order2.expiresAt.toISOString(),
         totalMxnCents: total
       }
     };
@@ -100609,6 +100970,28 @@ var SIGNED_IN_REFUSALS = {
   403: problemSchema,
   503: problemSchema
 };
+var catalogRead = (path3, summary2, item) => ({
+  method: "GET",
+  path: path3,
+  summary: summary2,
+  permission: "catalog:write",
+  request: {},
+  responses: { 200: external_exports.array(item), ...SIGNED_IN_REFUSALS }
+});
+var catalogWrite = (method, path3, summary2, shape) => ({
+  method,
+  path: path3,
+  summary: summary2,
+  permission: "catalog:write",
+  request: { params: shape.params, headers: mutationHeaders, body: shape.body },
+  responses: {
+    [method === "POST" ? 201 : 200]: shape.answer,
+    400: problemSchema,
+    404: problemSchema,
+    409: problemSchema,
+    ...SIGNED_IN_REFUSALS
+  }
+});
 var auth = (path3, summary2, body, responses) => ({
   method: "POST",
   path: path3,
@@ -100864,7 +101247,54 @@ var ROUTE_CONTRACTS = [
     permission: "catalog:write",
     request: {},
     responses: { 405: problemSchema, ...SIGNED_IN_REFUSALS }
-  }
+  },
+  catalogRead(
+    "/v1/admin/catalog/brands",
+    "Every brand, active or not",
+    brandSchema
+  ),
+  catalogRead(
+    "/v1/admin/catalog/facets",
+    "Every facet group with its values, active or not",
+    facetGroupSchema
+  ),
+  catalogWrite("POST", "/v1/admin/catalog/brands", "Create a brand", {
+    body: brandCreate,
+    answer: brandSchema
+  }),
+  catalogWrite(
+    "PATCH",
+    "/v1/admin/catalog/brands/:id",
+    "Edit or retire a brand (isActive: false)",
+    { params: idParams, body: brandPatch, answer: brandSchema }
+  ),
+  catalogWrite(
+    "POST",
+    "/v1/admin/catalog/facet-groups",
+    "Create a facet group",
+    {
+      body: facetGroupCreate,
+      answer: facetGroupSchema
+    }
+  ),
+  catalogWrite(
+    "PATCH",
+    "/v1/admin/catalog/facet-groups/:id",
+    "Edit or retire a facet group; the system group Nivel is never retired",
+    { params: idParams, body: facetGroupPatch, answer: facetGroupSchema }
+  ),
+  catalogWrite(
+    "POST",
+    "/v1/admin/catalog/facet-groups/:id/values",
+    "Add a value to a facet group (not to the system group)",
+    { params: idParams, body: facetValueCreate, answer: facetValueSchema }
+  ),
+  catalogWrite(
+    "PATCH",
+    "/v1/admin/catalog/facet-values/:id",
+    "Relabel or reorder a facet value (not of the system group)",
+    { params: idParams, body: facetValuePatch, answer: facetValueSchema }
+  )
 ];
 
 // src/services/identity.ts
@@ -100901,8 +101331,8 @@ function newToken() {
 function tokenHash2(token) {
   return (0, import_node_crypto5.createHash)("sha256").update(token, "utf8").digest("hex");
 }
-function codeHash(secret, code) {
-  return (0, import_node_crypto5.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
+function codeHash(secret, code2) {
+  return (0, import_node_crypto5.createHmac)("sha256", secret).update(code2, "utf8").digest("hex");
 }
 function newEmailCode() {
   return String((0, import_node_crypto5.randomInt)(0, 1e6)).padStart(6, "0");
@@ -100931,8 +101361,8 @@ function base32(bytes) {
   return out;
 }
 function otpauthUri(email3, secret) {
-  const label = encodeURIComponent(`Y\u0112KORA:${email3}`);
-  return `otpauth://totp/${label}?secret=${base32(secret)}&issuer=${encodeURIComponent("Y\u0112KORA")}&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_STEP_SECONDS}`;
+  const label2 = encodeURIComponent(`Y\u0112KORA:${email3}`);
+  return `otpauth://totp/${label2}?secret=${base32(secret)}&issuer=${encodeURIComponent("Y\u0112KORA")}&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_STEP_SECONDS}`;
 }
 function totpCode(secret, step) {
   const counter = Buffer.alloc(8);
@@ -100942,11 +101372,11 @@ function totpCode(secret, step) {
   const value = mac3.readUInt32BE(offset) & 2147483647;
   return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
 }
-function verifyTotp(secret, code, now) {
-  if (!/^\d{6}$/.test(code)) return false;
+function verifyTotp(secret, code2, now) {
+  if (!/^\d{6}$/.test(code2)) return false;
   const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
   return [step - 1, step, step + 1].some(
-    (candidate) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
+    (candidate) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code2))
   );
 }
 function encryptTotpSecret(key, userId, secret) {
@@ -101244,7 +101674,7 @@ var TITLES = {
 };
 function permissionGuard(deps) {
   return (permission) => async (request, reply) => {
-    const refuse4 = (status, code) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code], code));
+    const refuse4 = (status, code2) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code2], code2));
     if (deps.auth === null) return refuse4(503, "AUTH_UNAVAILABLE");
     const token = readSessionToken(request.headers.cookie);
     const user = token ? await sessionUser(deps.db, token, deps.now()) : null;
@@ -101448,8 +101878,8 @@ var TITLES2 = {
   BOT_CHALLENGE_REQUIRED: "Anti-bot check required",
   BOT_CHALLENGE_FAILED: "Anti-bot check failed"
 };
-function refuse3(reply, status, code) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code], code));
+function refuse3(reply, status, code2) {
+  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code2], code2));
 }
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
 var CHALLENGE_LIMIT = {
@@ -101474,8 +101904,8 @@ function registerAuthRoutes(app, deps) {
     void refuse3(reply, 401, "INVALID_CHALLENGE");
     return null;
   }
-  async function passMailedCode(request, reply, auth2, challenge, code, remember) {
-    if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code))) {
+  async function passMailedCode(request, reply, auth2, challenge, code2, remember) {
+    if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code2))) {
       await failChallenge(deps.db, challenge.id);
       return refuse3(reply, 401, "INVALID_CODE");
     }
@@ -101578,20 +102008,20 @@ function registerAuthRoutes(app, deps) {
       });
     }
     if (!deps.mailReady) return refuse3(reply, 503, "MAIL_UNAVAILABLE");
-    const code = newEmailCode();
+    const code2 = newEmailCode();
     const challengeId = await deps.db.transaction(async (tx) => {
       const id = await openChallenge(
         tx,
         auth2.secret,
         user.id,
         deps.now(),
-        code
+        code2
       );
       await enqueueMail(tx, {
         type: "SIGN_IN_CODE",
         userId: user.id,
         challengeId: id,
-        code: encryptTotpSecret(auth2.totpKey, id, Buffer.from(code, "utf8"))
+        code: encryptTotpSecret(auth2.totpKey, id, Buffer.from(code2, "utf8"))
       });
       return id;
     });
@@ -101646,7 +102076,7 @@ function registerAuthRoutes(app, deps) {
       await enableTotp(
         tx,
         challenge.userId,
-        backupCodes.map((code) => codeHash(auth2.secret, code))
+        backupCodes.map((code2) => codeHash(auth2.secret, code2))
       );
       await enqueueMail(tx, { type: "TOTP_ENABLED", userId: challenge.userId });
     });
@@ -101756,9 +102186,9 @@ function registerExchangeRateRoute(app, rate) {
 }
 
 // src/services/settlement.ts
-var row = (code, nextStatusId, alert, sellsStock = false) => ({
-  code,
-  httpStatus: code === "STATE_CONFLICT_ANOMALY" ? 500 : 200,
+var row = (code2, nextStatusId, alert, sellsStock = false) => ({
+  code: code2,
+  httpStatus: code2 === "STATE_CONFLICT_ANOMALY" ? 500 : 200,
   nextStatusId,
   alert,
   sellsStock
@@ -101792,7 +102222,7 @@ var SETTLING_TYPES = {
 };
 var STATUS = { PENDING: 1, PAID: 2, EXPIRED: 3, CANCELLED: 4 };
 async function recordEvent(tx, record2) {
-  const { payment, order } = record2.reconciliation;
+  const { payment, order: order2 } = record2.reconciliation;
   try {
     await tx.query(
       "INSERT INTO payment_events (processor_id, event_id, event_type, order_id, processor_status, amount_mxn_cents, currency, resulting_status_id, is_alert, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -101800,7 +102230,7 @@ async function recordEvent(tx, record2) {
         record2.processorId,
         record2.event.eventId,
         record2.event.type,
-        order?.id ?? null,
+        order2?.id ?? null,
         payment?.processorStatus ?? null,
         payment?.amountMxnCents ?? null,
         payment?.currency ?? null,
@@ -101815,24 +102245,24 @@ async function recordEvent(tx, record2) {
   }
   return true;
 }
-async function reconcile(deps, code, processor, event) {
-  if (event.resourceId === null || !SETTLING_TYPES[code].includes(event.type)) {
+async function reconcile(deps, code2, processor, event) {
+  if (event.resourceId === null || !SETTLING_TYPES[code2].includes(event.type)) {
     return { payment: null, order: null, confirmed: false };
   }
   const payment = await processor.fetchPayment(event.resourceId);
-  const [order] = await deps.db.query(
+  const [order2] = await deps.db.query(
     "SELECT o.id, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ?",
-    [payment.orderNumber, PROCESSOR_ID[code]]
+    [payment.orderNumber, PROCESSOR_ID[code2]]
   );
-  const confirmed = payment.paid && order !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order.total_mxn_cents);
-  return { payment, order: order ?? null, confirmed };
+  const confirmed = payment.paid && order2 !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order2.total_mxn_cents);
+  return { payment, order: order2 ?? null, confirmed };
 }
-function settleOrder(deps, base2, order) {
+function settleOrder(deps, base2, order2) {
   const resourceId = base2.event.resourceId;
   return deps.db.transaction(async (tx) => {
     const [current] = await tx.query(
       "SELECT status_id, payment_resource_id FROM orders WHERE id = ? FOR UPDATE",
-      [order.id]
+      [order2.id]
     );
     const status = Number(current.status_id);
     const row2 = settle2(
@@ -101849,26 +102279,26 @@ function settleOrder(deps, base2, order) {
     if (row2.nextStatusId !== null) {
       await tx.query(
         "UPDATE orders SET status_id = ?, paid_at = ?, payment_resource_id = ? WHERE id = ?",
-        [row2.nextStatusId, deps.now(), resourceId, order.id]
+        [row2.nextStatusId, deps.now(), resourceId, order2.id]
       );
     }
     if (row2.sellsStock) {
       await tx.query(
         "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity, p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
-        [order.id]
+        [order2.id]
       );
     }
     return { status: row2.httpStatus, code: row2.code };
   });
 }
-async function receiveWebhook(deps, code, input2) {
-  const processor = deps.processors[code];
+async function receiveWebhook(deps, code2, input2) {
+  const processor = deps.processors[code2];
   if (processor === void 0) {
     return { status: 503, code: "SERVICE_UNAVAILABLE" };
   }
   const event = processor.verifyWebhook({ ...input2, now: deps.now() });
   if (event === null) return { status: 401, code: "INVALID_SIGNATURE" };
-  const processorId = PROCESSOR_ID[code];
+  const processorId = PROCESSOR_ID[code2];
   const [seen] = await deps.db.query(
     "SELECT id FROM payment_events WHERE processor_id = ? AND event_id = ?",
     [processorId, event.eventId]
@@ -101876,7 +102306,7 @@ async function receiveWebhook(deps, code, input2) {
   if (seen !== void 0) return { status: 200, code: "IDEMPOTENT_IGNORED" };
   let reconciliation;
   try {
-    reconciliation = await reconcile(deps, code, processor, event);
+    reconciliation = await reconcile(deps, code2, processor, event);
   } catch {
     return { status: 503, code: "SERVICE_UNAVAILABLE" };
   }
@@ -101918,9 +102348,9 @@ async function registerWebhookRoutes(app, deps) {
       { parseAs: "buffer", bodyLimit: 64 * 1024 },
       (_request, body, done2) => done2(null, body)
     );
-    for (const [path3, code] of ROUTES) {
+    for (const [path3, code2] of ROUTES) {
       scope.post(`/v1/webhooks/${path3}`, async (request, reply) => {
-        const outcome = await receiveWebhook(deps, code, {
+        const outcome = await receiveWebhook(deps, code2, {
           rawBody: request.body ?? Buffer.alloc(0),
           headers: request.headers,
           query: request.query
@@ -102199,8 +102629,8 @@ var basicToDigit = function(codePoint) {
   }
   return base;
 };
-var digitToBasic = function(digit, flag) {
-  return digit + 22 + 75 * Number(digit < 26) - (Number(flag != 0) << 5);
+var digitToBasic = function(digit, flag2) {
+  return digit + 22 + 75 * Number(digit < 26) - (Number(flag2 != 0) << 5);
 };
 var adapt = function(delta, numPoints, firstTime) {
   let k = 0;
@@ -105850,7 +106280,7 @@ function wrap(str, lineLength) {
   }
   let pos = 0;
   const len = str.length;
-  let match, code, line;
+  let match, code2, line;
   const lineMargin = Math.floor(lineLength / 3);
   let result = "";
   while (pos < len) {
@@ -105879,12 +106309,12 @@ function wrap(str, lineLength) {
         line = line.substr(0, line.length - match[0].length);
       }
       while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match = line.match(/[=][\da-f]{2}$/gi))) {
-        code = parseInt(match[0].substr(1, 2), 16);
-        if (code < 128) {
+        code2 = parseInt(match[0].substr(1, 2), 16);
+        if (code2 < 128) {
           break;
         }
         line = line.substr(0, line.length - 3);
-        if (code >= 192) {
+        if (code2 >= 192) {
           break;
         }
       }
@@ -106078,8 +106508,8 @@ function encodeWords(value, mimeWordEncoding, maxLength, encodeAll) {
   let firstSpecial = -1;
   let lastSpecial = -1;
   for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code === 34 || code >= 128) {
+    const code2 = value.charCodeAt(i);
+    if (code2 === 34 || code2 >= 128) {
       if (firstSpecial < 0) {
         firstSpecial = i;
       }
@@ -106574,11 +107004,11 @@ function _isAddrSpec(value) {
 }
 var LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
 var LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
-function _isSpaceCode(code) {
-  return code === 32 || code >= 9 && code <= 13 || code === 160 || code === 5760 || code >= 8192 && code <= 8202 || code === 8232 || code === 8233 || code === 8239 || code === 8287 || code === 12288 || code === 65279;
+function _isSpaceCode(code2) {
+  return code2 === 32 || code2 >= 9 && code2 <= 13 || code2 === 160 || code2 === 5760 || code2 >= 8192 && code2 <= 8202 || code2 === 8232 || code2 === 8233 || code2 === 8239 || code2 === 8287 || code2 === 12288 || code2 === 65279;
 }
-function _isWordCode(code) {
-  return code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122 || code === 95;
+function _isWordCode(code2) {
+  return code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 90 || code2 >= 97 && code2 <= 122 || code2 === 95;
 }
 function _isBoundary(text2, at) {
   return _isWordCode(text2.charCodeAt(at - 1)) !== _isWordCode(text2.charCodeAt(at));
@@ -107401,12 +107831,12 @@ function abortedError() {
 }
 function exceedsDomainLimits(domain2) {
   let total = 0;
-  let label = 0;
+  let label2 = 0;
   for (const char of domain2) {
     total++;
     if (char === "." || char === "\u3002" || char === "\uFF0E" || char === "\uFF61") {
-      label = 0;
-    } else if (++label > MAX_LABEL_LENGTH) {
+      label2 = 0;
+    } else if (++label2 > MAX_LABEL_LENGTH) {
       return true;
     }
   }
@@ -108134,10 +108564,10 @@ var MimeNode = class _MimeNode {
    * @return true if this node or an ancestor closed that access
    * @internal
    */
-  _accessDisabled(flag) {
+  _accessDisabled(flag2) {
     let node2 = this;
     while (node2) {
-      if (node2[flag]) {
+      if (node2[flag2]) {
         return true;
       }
       node2 = node2.parentNode;
@@ -108591,10 +109021,10 @@ var MimeNode = class _MimeNode {
     let nonLatinLen = 0;
     let latinLen = 0;
     for (let i = 0, len = value.length; i < len; i++) {
-      const code = value.charCodeAt(i);
-      if (code >= 0 && code <= 8 || code === 11 || code === 12 || code >= 14 && code <= 31 || code >= 128) {
+      const code2 = value.charCodeAt(i);
+      if (code2 >= 0 && code2 <= 8 || code2 === 11 || code2 === 12 || code2 >= 14 && code2 <= 31 || code2 >= 128) {
         nonLatinLen++;
-      } else if (code >= 65 && code <= 90 || code >= 97 && code <= 122) {
+      } else if (code2 >= 65 && code2 <= 90 || code2 >= 97 && code2 <= 122) {
         latinLen++;
       }
     }
@@ -110578,7 +111008,7 @@ function sesRegion(host) {
   if (domain2 !== "amazonaws.com" && domain2 !== "awsapps.com") {
     return void 0;
   }
-  return labels.slice(0, -2).find((label) => AWS_REGION.test(label));
+  return labels.slice(0, -2).find((label2) => AWS_REGION.test(label2));
 }
 function parseServerMessageId(response2, host) {
   const reply = (response2 || "").toString().trim();
@@ -114565,10 +114995,10 @@ var SendmailTransport = class {
         }, "Error occurred when sending message %s. %s", messageId, err.message);
         fail(err);
       });
-      const onExit = (code, signal) => {
+      const onExit = (code2, signal) => {
         let err = null;
-        if (code) {
-          err = new Error(code === 127 ? "Sendmail command not found, process exited with code " + code : "Sendmail exited with code " + code);
+        if (code2) {
+          err = new Error(code2 === 127 ? "Sendmail command not found, process exited with code " + code2 : "Sendmail exited with code " + code2);
         } else if (signal) {
           err = new Error("Sendmail was terminated by " + signal);
         } else if (!messageWritten()) {
@@ -115118,15 +115548,15 @@ async function render(db, totpKey, row2) {
   };
   const to = await emailOf(db, event.userId);
   if (event.type === "SIGN_IN_CODE") {
-    const code = decryptTotpSecret(totpKey, event.challengeId, event.code);
+    const code2 = decryptTotpSecret(totpKey, event.challengeId, event.code);
     return {
       to,
       subject: "Tu c\xF3digo de acceso a Y\u0112KORA",
-      text: `Tu c\xF3digo de acceso es ${code.toString("utf8")}. Vence en 5 minutos.
+      text: `Tu c\xF3digo de acceso es ${code2.toString("utf8")}. Vence en 5 minutos.
 
 Si no intentaste entrar, cambia tu contrase\xF1a: alguien la conoce.
 
-Your Y\u0112KORA sign-in code is ${code.toString("utf8")}. It expires in 5 minutes.`
+Your Y\u0112KORA sign-in code is ${code2.toString("utf8")}. It expires in 5 minutes.`
     };
   }
   return {
@@ -115269,8 +115699,8 @@ var MATCHERS = {
     rule.maxItemsTotalMxnCents
   )
 };
-function isStrategyCode(code) {
-  return Object.hasOwn(MATCHERS, code);
+function isStrategyCode(code2) {
+  return Object.hasOwn(MATCHERS, code2);
 }
 function coveringRule(strategy, rules, facts) {
   if (!isStrategyCode(strategy)) return null;
@@ -115946,7 +116376,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "035e7d7f36532ecc82da03a09d0720f95ccd31d6" : void 0;
+var sha = true ? "fc4458440671fc0567464ff3ef6392397eb31722" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
