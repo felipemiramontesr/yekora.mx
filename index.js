@@ -99161,7 +99161,7 @@ var itemSchema = external_exports.object({
 var productSchema = itemSchema.extend({
   images: external_exports.array(
     external_exports.object({
-      path: external_exports.string().startsWith("/images/products/"),
+      path: external_exports.string().regex(/^\/v1\/media\/[0-9a-f]{64}$/),
       alt: external_exports.string()
     })
   )
@@ -99706,6 +99706,12 @@ async function listProducts(db, query) {
   );
   return { items, total: Number(total) };
 }
+function findProductMedia(db, slug3) {
+  return db.query(
+    "SELECT m.media_sha256 AS sha256, m.alt_text_es, m.alt_text_en FROM product_media m JOIN products p ON p.id = m.product_id WHERE p.slug = ? AND m.is_active = 1 ORDER BY m.is_primary DESC, m.sort_order ASC, m.id ASC",
+    [slug3]
+  );
+}
 async function findProduct(db, slug3) {
   const [product] = await db.query(
     "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
@@ -99773,27 +99779,75 @@ function registerCatalogRoutes(app, deps) {
     if (!params.success || !language.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
     }
-    const [found, rate] = await Promise.all([
+    const [found, media, rate] = await Promise.all([
       findProduct(deps.db, params.data.slug),
+      findProductMedia(deps.db, params.data.slug),
       deps.rate()
     ]);
     if (!found) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Product not found"));
     }
+    const product = present(
+      found,
+      language.data,
+      rate ? Number(rate.rate) : null
+    );
+    const english = language.data === "en";
     return {
-      ...present(found, language.data, rate ? Number(rate.rate) : null),
-      // FC 029 F0: no gallery until product_media is served in F1 (production never had images).
-      images: [],
+      ...product,
+      // FC 029 F1: each image by its digest; the site prefixes the API origin. An image without
+      // an alt text in this language is named after the product, never left unlabeled.
+      images: media.map((image) => ({
+        path: `/v1/media/${image.sha256}`,
+        alt: (english ? image.alt_text_en : image.alt_text_es) ?? product.name
+      })),
       exchangeRate: rate
     };
   });
 }
 
+// src/services/media.ts
+var import_node_crypto = require("node:crypto");
+var SHA256_HEX = /^[0-9a-f]{64}$/;
+async function readMedia(db, sha2562) {
+  const [row2] = await db.query(
+    "SELECT mime_type, media_data FROM media_blobs WHERE sha256 = ?",
+    [sha2562]
+  );
+  return row2 ? { mimeType: row2.mime_type, data: row2.media_data } : null;
+}
+function matchesDigest(data, sha2562) {
+  return (0, import_node_crypto.createHash)("sha256").update(data).digest("hex") === sha2562;
+}
+
+// src/routes/media.ts
+var mediaParams = external_exports.object({ sha256: external_exports.string().regex(SHA256_HEX) });
+var MEDIA_TYPES = ["image/webp", "image/jpeg", "image/png"];
+var IMMUTABLE = "public, max-age=31536000, immutable";
+function registerMediaRoutes(app, deps) {
+  app.get("/v1/media/:sha256", async (request, reply) => {
+    const params = mediaParams.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid media digest"));
+    }
+    const { sha256: sha2562 } = params.data;
+    const media = await readMedia(deps.db, sha2562);
+    if (!media) {
+      return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Media not found"));
+    }
+    if (!matchesDigest(media.data, sha2562)) {
+      request.log.error({ sha256: sha2562 }, "media blob does not match its digest");
+      return reply.code(500).type(PROBLEM_TYPE).send(problem(500, "Internal error"));
+    }
+    return reply.type(media.mimeType).header("cache-control", IMMUTABLE).header("cross-origin-resource-policy", "same-site").header("x-content-type-options", "nosniff").send(media.data);
+  });
+}
+
 // src/routes/orders.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 
 // src/services/checkoutCrypto.ts
-var import_node_crypto = require("node:crypto");
+var import_node_crypto2 = require("node:crypto");
 var FORMAT_V1 = 1;
 var IV_BYTES = 12;
 var TAG_BYTES = 16;
@@ -99810,8 +99864,8 @@ function additionalData(orderNumber, field) {
   return Buffer.from(`${orderNumber}|${field}`, "utf8");
 }
 function encryptPii(key, orderNumber, field, value) {
-  const iv = (0, import_node_crypto.randomBytes)(IV_BYTES);
-  const cipher = (0, import_node_crypto.createCipheriv)("aes-256-gcm", key, iv, {
+  const iv = (0, import_node_crypto2.randomBytes)(IV_BYTES);
+  const cipher = (0, import_node_crypto2.createCipheriv)("aes-256-gcm", key, iv, {
     authTagLength: TAG_BYTES
   });
   cipher.setAAD(additionalData(orderNumber, field));
@@ -99824,18 +99878,18 @@ function encryptPii(key, orderNumber, field, value) {
   ]);
 }
 function emailHmac(pepper, email3) {
-  return (0, import_node_crypto.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
+  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
 }
 function tokenHash(pepper, token) {
-  return (0, import_node_crypto.createHmac)("sha256", pepper).update(token, "utf8").digest();
+  return (0, import_node_crypto2.createHmac)("sha256", pepper).update(token, "utf8").digest();
 }
 function newAccessToken() {
-  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
+  return (0, import_node_crypto2.randomBytes)(32).toString("base64url");
 }
 function newOrderNumber(now) {
   let tail = "";
   for (let i = 0; i < 8; i += 1)
-    tail += ORDER_ALPHABET[(0, import_node_crypto.randomInt)(ORDER_ALPHABET.length)];
+    tail += ORDER_ALPHABET[(0, import_node_crypto2.randomInt)(ORDER_ALPHABET.length)];
   return `YEK-${now.getUTCFullYear()}-${tail}`;
 }
 
@@ -100197,7 +100251,7 @@ function registerOrderRoutes(app, deps) {
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row2 === void 0 || !(0, import_node_crypto2.timingSafeEqual)(
+      if (row2 === void 0 || !(0, import_node_crypto3.timingSafeEqual)(
         Buffer.from(row2.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
@@ -100218,6 +100272,7 @@ function registerOrderRoutes(app, deps) {
 }
 
 // src/contract.ts
+var binarySchema = external_exports.custom((value) => Buffer.isBuffer(value));
 var healthSchema = external_exports.object({
   status: external_exports.enum(["ok", "degraded"]),
   version: external_exports.string(),
@@ -100299,6 +100354,20 @@ var ROUTE_CONTRACTS = [
       400: problemSchema,
       404: problemSchema
     }
+  },
+  {
+    method: "GET",
+    path: "/v1/media/:sha256",
+    summary: "One product image by the SHA-256 of its bytes, cacheable as immutable",
+    permission: "public",
+    request: { params: mediaParams },
+    responses: {
+      200: binarySchema,
+      400: problemSchema,
+      404: problemSchema,
+      500: problemSchema
+    },
+    binary: MEDIA_TYPES
   },
   {
     method: "POST",
@@ -100461,7 +100530,7 @@ var ROUTE_CONTRACTS = [
 ];
 
 // src/services/identity.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 
 // src/lib/permissions.ts
 var PERMISSIONS = [
@@ -100476,7 +100545,7 @@ function isPrivileged(roles) {
 }
 
 // src/services/authCrypto.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 var KEY_BYTES2 = 32;
 var TOTP_STEP_SECONDS = 30;
 var TOTP_DIGITS = 6;
@@ -100489,30 +100558,30 @@ function parseAuthKey(name2, base643) {
   return key;
 }
 function newToken() {
-  return (0, import_node_crypto3.randomBytes)(32).toString("base64url");
+  return (0, import_node_crypto4.randomBytes)(32).toString("base64url");
 }
 function tokenHash2(token) {
-  return (0, import_node_crypto3.createHash)("sha256").update(token, "utf8").digest("hex");
+  return (0, import_node_crypto4.createHash)("sha256").update(token, "utf8").digest("hex");
 }
 function codeHash(secret, code) {
-  return (0, import_node_crypto3.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
+  return (0, import_node_crypto4.createHmac)("sha256", secret).update(code, "utf8").digest("hex");
 }
 function newEmailCode() {
-  return String((0, import_node_crypto3.randomInt)(0, 1e6)).padStart(6, "0");
+  return String((0, import_node_crypto4.randomInt)(0, 1e6)).padStart(6, "0");
 }
 function sameHash(a, b) {
   const left = Buffer.from(a, "hex");
   const right = Buffer.from(b, "hex");
-  return left.length === right.length && (0, import_node_crypto3.timingSafeEqual)(left, right);
+  return left.length === right.length && (0, import_node_crypto4.timingSafeEqual)(left, right);
 }
 function newBackupCodes() {
   const codes = /* @__PURE__ */ new Set();
   while (codes.size < 8)
-    codes.add(String((0, import_node_crypto3.randomInt)(0, 1e8)).padStart(8, "0"));
+    codes.add(String((0, import_node_crypto4.randomInt)(0, 1e8)).padStart(8, "0"));
   return [...codes];
 }
 function newTotpSecret() {
-  return (0, import_node_crypto3.randomBytes)(20);
+  return (0, import_node_crypto4.randomBytes)(20);
 }
 function base32(bytes) {
   let bits = "";
@@ -100530,7 +100599,7 @@ function otpauthUri(email3, secret) {
 function totpCode(secret, step) {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(step));
-  const mac3 = (0, import_node_crypto3.createHmac)("sha1", secret).update(counter).digest();
+  const mac3 = (0, import_node_crypto4.createHmac)("sha1", secret).update(counter).digest();
   const offset = mac3.readUInt8(mac3.length - 1) & 15;
   const value = mac3.readUInt32BE(offset) & 2147483647;
   return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
@@ -100539,12 +100608,12 @@ function verifyTotp(secret, code, now) {
   if (!/^\d{6}$/.test(code)) return false;
   const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
   return [step - 1, step, step + 1].some(
-    (candidate) => (0, import_node_crypto3.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
+    (candidate) => (0, import_node_crypto4.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code))
   );
 }
 function encryptTotpSecret(key, userId, secret) {
-  const iv = (0, import_node_crypto3.randomBytes)(12);
-  const cipher = (0, import_node_crypto3.createCipheriv)("aes-256-gcm", key, iv);
+  const iv = (0, import_node_crypto4.randomBytes)(12);
+  const cipher = (0, import_node_crypto4.createCipheriv)("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from(userId, "utf8"));
   const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
   const parts = [iv, cipher.getAuthTag(), ciphertext].map(
@@ -100557,7 +100626,7 @@ function decryptTotpSecret(key, userId, stored) {
   if (version3 !== "v1" || ciphertext === void 0) {
     throw new Error("Unknown TOTP secret format");
   }
-  const decipher = (0, import_node_crypto3.createDecipheriv)(
+  const decipher = (0, import_node_crypto4.createDecipheriv)(
     "aes-256-gcm",
     key,
     Buffer.from(iv, "base64url")
@@ -100602,7 +100671,7 @@ function createCustomer(db, user) {
       [user.email]
     );
     if (taken) return false;
-    const id = (0, import_node_crypto4.randomUUID)();
+    const id = (0, import_node_crypto5.randomUUID)();
     await tx.query(
       "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
       [id, user.email, user.passwordHash, user.fullName]
@@ -100634,7 +100703,7 @@ async function capabilitiesOf(db, userId) {
   };
 }
 async function openChallenge(db, secret, userId, now, emailCode) {
-  const id = (0, import_node_crypto4.randomUUID)();
+  const id = (0, import_node_crypto5.randomUUID)();
   await db.query(
     "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
     [
@@ -100927,7 +100996,7 @@ function registerAdminRoutes(app, deps) {
 }
 
 // src/services/botChallenge.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -100938,16 +101007,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto5.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto6.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto5.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto6.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto5.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto6.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto6.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto5.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto5.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto6.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto6.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -100995,7 +101064,7 @@ async function enqueueMail(tx, event) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -101007,7 +101076,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto6.randomBytes)(16),
+    salt: (0, import_node_crypto7.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -101020,7 +101089,7 @@ async function verifyPassword(hash2, password) {
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto6.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto7.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -101575,7 +101644,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -101720,9 +101789,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto7.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto8.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto7.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto8.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -105340,7 +105409,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto8 = __toESM(require("node:crypto"), 1);
+var import_node_crypto9 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -107073,7 +107142,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto8.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto9.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -108250,8 +108319,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto8.default.randomBytes(len).toString("hex"),
-      import_node_crypto8.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto9.default.randomBytes(len).toString("hex"),
+      import_node_crypto9.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -108939,7 +109008,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto9 = __toESM(require("node:crypto"), 1);
+var import_node_crypto10 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -108950,7 +109019,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto9.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto10.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -109060,7 +109129,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto10 = __toESM(require("node:crypto"), 1);
+var import_node_crypto11 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -109075,7 +109144,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto10.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto11.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -109142,7 +109211,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto11 = __toESM(require("node:crypto"), 1);
+var import_node_crypto12 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -109155,7 +109224,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto11.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto12.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -109765,7 +109834,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto12 = __toESM(require("node:crypto"), 1);
+var import_node_crypto13 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -110083,7 +110152,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto12.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto13.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -110118,7 +110187,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -110283,7 +110352,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto13.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto14.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -111631,7 +111700,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto13.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto14.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -111965,7 +112034,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -112288,7 +112357,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto14.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto15.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -115008,7 +115077,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS2 = 1e4;
@@ -115071,7 +115140,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto15.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto16.timingSafeEqual)(a, b);
 }
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   async function call(path3, init) {
@@ -115122,7 +115191,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto15.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto16.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -115226,6 +115295,7 @@ async function buildApp(deps) {
     }
   });
   registerCatalogRoutes(app, { db: deps.db, rate: deps.rate });
+  registerMediaRoutes(app, { db: deps.db });
   const shipping = createTableRateProvider(deps.db);
   registerCartRoutes(app, { db: deps.db, rate: deps.rate, shipping });
   registerExchangeRateRoute(app, deps.rate);
@@ -115585,7 +115655,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "d4846c456900a550ffc02fb161bd9e8546f4ab4f" : void 0;
+var sha = true ? "60e7e83e451c06c7a5f1679bb9008b2d7725af56" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
