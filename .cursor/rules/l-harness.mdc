@@ -20,5 +20,5 @@ alwaysApply: true
 - Token diet: no full L re-dump while L_pin holds; FC slice + code + H delta
 - Phase DAG: respect needs[]; FC FSM: no code in PROPUESTO
 - After L upgrades: run `l sync-hosts` (R-HOST-SYNC)
-- Ω: GrayMan · Raptors: Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+- Ω: GrayMan · Raptors: Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O · Belle (Grok) seat Belle
 <!-- L-HARNESS:END -->

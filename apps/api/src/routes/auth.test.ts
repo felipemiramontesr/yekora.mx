@@ -519,7 +519,7 @@ afterEach(async () => {
 // Each test chains several Argon2id hashes (sign-up and sign-ins), slow on purpose (OWASP
 // profile); on a busy machine a few of them pass 5 s, so the block has its own budget.
 describe('A07 identification and authentication', { timeout: 20_000 }, () => {
-  it('registers a buyer with an Argon2id hash and never says whether the e-mail existed', async () => {
+  it('OWASP-A07 · registers a buyer with an Argon2id hash and never says whether the e-mail existed', async () => {
     await start();
     const first = await register(' Ana@Example.test ', 'Ana');
     const again = await register('ana@example.test', 'Ana');
@@ -532,7 +532,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.userRoles).toEqual([[user.id, 'customer']]);
   });
 
-  it('refuses short passwords and unknown fields (400), before any work', async () => {
+  it('OWASP-A07 · refuses short passwords and unknown fields (400), before any work', async () => {
     await start();
     for (const payload of [
       { email: 'a@example.test', password: 'short', fullName: 'Ana' },
@@ -550,7 +550,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.users.size).toBe(0);
   });
 
-  it('answers the same 401 to a wrong password and to an unknown e-mail', async () => {
+  it('OWASP-A07 · answers the same 401 to a wrong password and to an unknown e-mail', async () => {
     await start();
     await register('ana@example.test');
     const wrong = await loginAs('ana@example.test', 'wrong password!');
@@ -559,7 +559,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(unknown.json()).toEqual(wrong.json());
   });
 
-  it('opens only a challenge after the password, and queues its code in the same transaction (T2.1a, T2.4b)', async () => {
+  it('OWASP-A07 · opens only a challenge after the password, and queues its code in the same transaction (T2.1a, T2.4b)', async () => {
     await start();
     await register('ana@example.test');
     const response = await loginAs('ana@example.test');
@@ -583,7 +583,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(queued.payload).not.toContain('@');
   });
 
-  it('mails the code after the answer, through the dispatcher (T1.3, T2.4a)', async () => {
+  it('OWASP-A07 · mails the code after the answer, through the dispatcher (T1.3, T2.4a)', async () => {
     await start();
     await register('ana@example.test');
     const { challengeId } = await login('ana@example.test');
@@ -596,7 +596,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.outbox[0].status).toBe('SENT');
   });
 
-  it('signs a buyer in with the mailed code: hardened 8 h cookie, e-mail verified', async () => {
+  it('OWASP-A07 · signs a buyer in with the mailed code: hardened 8 h cookie, e-mail verified', async () => {
     await start();
     const { cookie, verify } = await signedInBuyer();
     expect(verify.json()).toEqual({ status: 'signed_in' });
@@ -611,7 +611,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(user.email_verified_at).toEqual(NOW);
   });
 
-  it('counts a wrong mailed code against the challenge, and spends it after 5 (T1.1 T)', async () => {
+  it('OWASP-A07 · counts a wrong mailed code against the challenge, and spends it after 5 (T1.1 T)', async () => {
     await start();
     await register('ana@example.test');
     const { challengeId } = await login('ana@example.test');
@@ -626,7 +626,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.sessions.size).toBe(0);
   });
 
-  it('makes staff prove the mailbox before enrolling the authenticator, then signs in for 2 h (T2.1a)', async () => {
+  it('OWASP-A07 · makes staff prove the mailbox before enrolling the authenticator, then signs in for 2 h (T2.1a)', async () => {
     await start();
     await register('staff@example.test', 'Staff');
     makeOnly('staff_orders');
@@ -672,7 +672,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(String(store.totp.get(String(user.id))?.secret)).toMatch(/^v1:/);
   });
 
-  it('queues the security alert with the authenticator, and mails it', async () => {
+  it('OWASP-A07 · queues the security alert with the authenticator, and mails it', async () => {
     await start();
     await signedInStaff();
     expect(store.outbox.map((r) => r.type)).toEqual([
@@ -686,7 +686,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     });
   });
 
-  it('signs staff in again with the authenticator, or once with each backup code', async () => {
+  it('OWASP-A07 · signs staff in again with the authenticator, or once with each backup code', async () => {
     await start();
     const { backupCodes, secret } = await signedInStaff();
     const again = await login('staff@example.test');
@@ -716,7 +716,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     ).toBe(401);
   });
 
-  it('spends an authenticator challenge after 5 wrong codes, and refuses an unknown one', async () => {
+  it('OWASP-A07 · spends an authenticator challenge after 5 wrong codes, and refuses an unknown one', async () => {
     await start();
     await signedInStaff();
     const { challengeId } = await login('staff@example.test');
@@ -742,7 +742,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     }
   });
 
-  it('refuses a second enrolment once the authenticator is on', async () => {
+  it('OWASP-A07 · refuses a second enrolment once the authenticator is on', async () => {
     await start();
     await signedInStaff();
     const { challengeId } = await login('staff@example.test');
@@ -756,7 +756,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     ).toMatchObject({ detail: 'TOTP_ALREADY_ENABLED' });
   });
 
-  it('answers who is signed in, and ends the session on logout', async () => {
+  it('OWASP-A07 · answers who is signed in, and ends the session on logout', async () => {
     await start();
     const { cookie } = await signedInBuyer();
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
@@ -775,7 +775,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     ).toBe(401);
   });
 
-  it('refuses staff whose authenticator is off (403, T2.1a)', async () => {
+  it('OWASP-A07 · refuses staff whose authenticator is off (403, T2.1a)', async () => {
     await start();
     const { cookie } = await signedInStaff();
     const [user] = [...store.users.values()];
@@ -785,7 +785,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(me.json()).toMatchObject({ detail: 'SECOND_FACTOR_REQUIRED' });
   });
 
-  it('refuses a session without the route’s permission (403)', async () => {
+  it('OWASP-A07 · refuses a session without the route’s permission (403)', async () => {
     await start();
     const { cookie } = await signedInBuyer();
     store.userRoles.splice(0, store.userRoles.length);
@@ -793,7 +793,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(me.json()).toMatchObject({ detail: 'PERMISSION_DENIED' });
   });
 
-  it('refuses a missing, malformed or expired session (401)', async () => {
+  it('OWASP-A07 · refuses a missing, malformed or expired session (401)', async () => {
     await start();
     for (const cookie of [
       undefined,
@@ -809,7 +809,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     }
   });
 
-  it('stays closed (503) on every auth and account route without the identity secrets', async () => {
+  it('OWASP-A07 · stays closed (503) on every auth and account route without the identity secrets', async () => {
     await start({});
     expect(
       (
@@ -824,7 +824,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     });
   });
 
-  it('answers 503 MAIL_UNAVAILABLE without the SMTP account, but lets the authenticator in', async () => {
+  it('OWASP-A07 · answers 503 MAIL_UNAVAILABLE without the SMTP account, but lets the authenticator in', async () => {
     await start(KEYS);
     await register('ana@example.test');
     const byMail = await loginAs('ana@example.test');
@@ -835,7 +835,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect((await login('ana@example.test')).channel).toBe('authenticator');
   });
 
-  it('keeps the security alert queued while the SMTP account is missing', async () => {
+  it('OWASP-A07 · keeps the security alert queued while the SMTP account is missing', async () => {
     await start(KEYS);
     await register('staff@example.test', 'Staff');
     const userId = makeOnly('staff_orders');
@@ -862,7 +862,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(sent).toEqual([]);
   });
 
-  it('carries the session only from the site, with credentials', async () => {
+  it('OWASP-A07 · carries the session only from the site, with credentials', async () => {
     await start();
     const preflight = await app.inject({
       method: 'OPTIONS',
@@ -878,7 +878,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     );
   });
 
-  it('shows the authenticator secret in base32 and as a scannable URI', async () => {
+  it('OWASP-A07 · shows the authenticator secret in base32 and as a scannable URI', async () => {
     await start();
     await register('staff@example.test', 'Staff');
     makeOnly('admin');
@@ -892,7 +892,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(enrol.otpauthUri).toContain(`secret=${enrol.secret}`);
   });
 
-  it('refuses a malformed body on every second-factor route (400)', async () => {
+  it('OWASP-A07 · refuses a malformed body on every second-factor route (400)', async () => {
     await start();
     for (const url of [
       '/v1/auth/totp/enroll',
@@ -907,7 +907,7 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     }
   });
 
-  it('reads a role without permissions and a user without a 2FA row as having none', async () => {
+  it('OWASP-A07 · reads a role without permissions and a user without a 2FA row as having none', async () => {
     await start();
     const { cookie } = await signedInBuyer();
     expect(

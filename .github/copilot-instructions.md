@@ -14,5 +14,5 @@ SSOT: `protocols/north-star/001_NS_ProtocolL.md` (Protocol L V.1.9.16-core). If 
 - Official harness: https://github.com/GrayMan/l-harness · GrayMan identity reserved
 - Sync host boots: `l sync-hosts`
 
-Ω: GrayMan · Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+Ω: GrayMan · Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O · Belle (Grok) seat Belle
 <!-- L-HARNESS:END -->

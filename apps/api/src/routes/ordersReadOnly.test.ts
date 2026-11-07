@@ -256,7 +256,7 @@ describe('T2.6a orders are read-only: every write is refused with 405', () => {
   );
 
   it.each(writes)(
-    '%s %s answers 405 and touches nothing',
+    'OWASP-A01 · %s %s answers 405 and touches nothing',
     async (method, url) => {
       for (const headers of [{}, cookie('b'), cookie('s')]) {
         const response = await app.inject({ method, url, headers });
@@ -270,7 +270,7 @@ describe('T2.6a orders are read-only: every write is refused with 405', () => {
 });
 
 describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
-  it('lists with the session user as the filter, newest first, 20 per page', async () => {
+  it('OWASP-A01 · lists with the session user as the filter, newest first, 20 per page', async () => {
     const response = await app.inject({
       url: '/v1/account/orders',
       headers: cookie('b'),
@@ -302,7 +302,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
     expect(list?.params).toEqual([BUYER.id, 20, 0]);
   });
 
-  it('refuses a malformed page with 400', async () => {
+  it('OWASP-A01 · refuses a malformed page with 400', async () => {
     const response = await app.inject({
       url: '/v1/account/orders?page=0',
       headers: cookie('b'),
@@ -310,7 +310,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it('shows the own order with its lines and payment events', async () => {
+  it('OWASP-A01 · shows the own order with its lines and payment events', async () => {
     const response = await app.inject({
       url: `/v1/account/orders/${OWN}`,
       headers: cookie('b'),
@@ -341,7 +341,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
   });
 
   it.each([OTHER, GUEST])(
-    'refuses %s, not the buyer’s, with 403 DATA_DOMAIN_FORBIDDEN',
+    'OWASP-A01 · refuses %s, not the buyer’s, with 403 DATA_DOMAIN_FORBIDDEN',
     async (orderNumber) => {
       const response = await app.inject({
         url: `/v1/account/orders/${orderNumber}`,
@@ -355,7 +355,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
   );
 
   it.each(['YEK-2026-NOPE0000', 'not-an-order'])(
-    'answers 404 to %s',
+    'OWASP-A01 · answers 404 to %s',
     async (orderNumber) => {
       const response = await app.inject({
         url: `/v1/account/orders/${orderNumber}`,
@@ -365,7 +365,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
     }
   );
 
-  it('answers 401 SESSION_INVALID_OR_EXPIRED without a session', async () => {
+  it('OWASP-A01 · answers 401 SESSION_INVALID_OR_EXPIRED without a session', async () => {
     const response = await app.inject({ url: '/v1/account/orders' });
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({
@@ -373,7 +373,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
     });
   });
 
-  it('leaves no audit entry: only the panel is audited', async () => {
+  it('OWASP-A01 · leaves no audit entry: only the panel is audited', async () => {
     await app.inject({ url: '/v1/account/orders', headers: cookie('b') });
     await settle();
     expect(seen.audit).toEqual([]);
@@ -381,7 +381,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
 });
 
 describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a)', () => {
-  it('refuses a buyer with 403 PERMISSION_DENIED', async () => {
+  it('OWASP-A01 · refuses a buyer with 403 PERMISSION_DENIED', async () => {
     const response = await app.inject({
       url: '/v1/admin/orders',
       headers: cookie('b'),
@@ -390,7 +390,7 @@ describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a
     expect(response.json()).toMatchObject({ detail: 'PERMISSION_DENIED' });
   });
 
-  it('refuses staff without the authenticator with 403 SECOND_FACTOR_REQUIRED', async () => {
+  it('OWASP-A01 · refuses staff without the authenticator with 403 SECOND_FACTOR_REQUIRED', async () => {
     const response = await app.inject({
       url: '/v1/admin/orders',
       headers: cookie('n'),
@@ -399,7 +399,7 @@ describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a
     expect(response.json()).toMatchObject({ detail: 'SECOND_FACTOR_REQUIRED' });
   });
 
-  it('lists every order for staff, or those of one status', async () => {
+  it('OWASP-A01 · lists every order for staff, or those of one status', async () => {
     const all = await app.inject({
       url: '/v1/admin/orders',
       headers: cookie('s'),
@@ -424,7 +424,7 @@ describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a
     ]);
   });
 
-  it('shows any order to staff, a guest purchase included', async () => {
+  it('OWASP-A01 · shows any order to staff, a guest purchase included', async () => {
     const response = await app.inject({
       url: `/v1/admin/orders/${GUEST}`,
       headers: cookie('s'),
@@ -447,7 +447,7 @@ describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a
     });
   });
 
-  it('answers 404 to an unknown order and 400 to an unknown status', async () => {
+  it('OWASP-A01 · answers 404 to an unknown order and 400 to an unknown status', async () => {
     const unknown = await app.inject({
       url: '/v1/admin/orders/YEK-2026-NOPE0000',
       headers: cookie('s'),

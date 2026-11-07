@@ -18,14 +18,15 @@
 
 ## Default roster (Ω base)
 
-| Who         | Identity    | Seat  | Craft                                 |
-| ----------- | ----------- | ----- | ------------------------------------- |
-| **GrayMan** | human Ω     | **L** | owner (omnipotent / omnipresent · A0) |
-| Alfa        | Antigravity | **O** | architect                             |
-| Bravo       | Grok        | **R** | auditor, security, formal             |
-| Charlie     | Claude Code | **O** | fullstack                             |
+| Who         | Identity    | Seat      | Craft                                 |
+| ----------- | ----------- | --------- | ------------------------------------- |
+| **GrayMan** | human Ω     | **L**     | owner (omnipotent / omnipresent · A0) |
+| Alfa        | Antigravity | **O**     | architect                             |
+| Bravo       | Grok        | **R**     | auditor, security, formal             |
+| Charlie     | Claude Code | **O**     | fullstack                             |
+| Belle       | Grok        | **Belle** | docs                                  |
 
-OLR: **O** = Alfa \| Charlie · **R** = Bravo · **L** = GrayMan
+OLR: **O** = Alfa \| Charlie · **R** = Bravo · **L** = GrayMan. Belle no firma.
 
 ## Quality gate (Yekora)
 
@@ -92,7 +93,7 @@ If this file disagrees with L → **L wins**. Do not re-state the full rule cata
 
 ## Roster (from install)
 
-Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O · Belle (Grok) seat Belle
 
 ## Precedence
 

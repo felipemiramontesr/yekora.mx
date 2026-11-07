@@ -90,11 +90,11 @@ afterAll(async () => {
 });
 
 describe('A01 closed route inventory', () => {
-  it('exposes exactly the public routes, the sign-in routes, the account, the panel and the payment webhooks', () => {
+  it('OWASP-A01 · exposes exactly the public routes, the sign-in routes, the account, the panel and the payment webhooks', () => {
     expect(app.printRoutes({ commonPrefix: false })).toBe(INVENTORY);
   });
 
-  it('answers 404 problem+json to unknown and privileged-looking paths', async () => {
+  it('OWASP-A01 · answers 404 problem+json to unknown and privileged-looking paths', async () => {
     for (const url of [
       '/admin',
       '/v1/login',
@@ -114,7 +114,7 @@ describe('A01 closed route inventory', () => {
     }
   });
 
-  it('answers 404 problem+json to a method the route does not declare', async () => {
+  it('OWASP-A01 · answers 404 problem+json to a method the route does not declare', async () => {
     const attempts = [
       { method: 'PUT', url: '/v1/catalog' },
       { method: 'DELETE', url: '/v1/catalog/tienda-expedicion' },
@@ -132,7 +132,7 @@ describe('A01 closed route inventory', () => {
     }
   });
 
-  it('grants cross-origin reads to the site only', async () => {
+  it('OWASP-A01 · grants cross-origin reads to the site only', async () => {
     const site = await app.inject({
       url: '/health',
       headers: { origin: 'https://yekora.mx' },
@@ -151,7 +151,7 @@ describe('A01 closed route inventory', () => {
     expect(preflight.headers['access-control-allow-origin']).toBeUndefined();
   });
 
-  it('answers no local server in production, credentials or not (T2.2d2, 295_AN)', async () => {
+  it('OWASP-A01 · answers no local server in production, credentials or not (T2.2d2, 295_AN)', async () => {
     const production = await buildApp({
       config: loadConfig({
         DB_HOST: '127.0.0.1',
@@ -188,7 +188,7 @@ describe('A01 closed route inventory', () => {
 });
 
 describe('A01 signed-in surface behind the guard (FC 028)', () => {
-  it('answers no /v1/account or /v1/admin route without the identity secrets (503), never its data', async () => {
+  it('OWASP-A01 · answers no /v1/account or /v1/admin route without the identity secrets (503), never its data', async () => {
     for (const request of [
       { method: 'GET', url: '/v1/account/me' },
       { method: 'POST', url: '/v1/account/logout' },
@@ -202,7 +202,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     }
   });
 
-  it('keeps the panel to its read-only orders: no other /admin or /v1/admin route exists', () => {
+  it('OWASP-A01 · keeps the panel to its read-only orders: no other /admin or /v1/admin route exists', () => {
     const panel = app
       .printRoutes({ commonPrefix: false })
       .split('\n')
@@ -212,7 +212,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     ]);
   });
 
-  it('reads its one cookie by hand: no cookie, session or credential plugin', () => {
+  it('OWASP-A01 · reads its one cookie by hand: no cookie, session or credential plugin', () => {
     const manifest = JSON.parse(
       readFileSync(
         fileURLToPath(new URL('../../package.json', import.meta.url)),

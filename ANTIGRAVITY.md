@@ -37,5 +37,5 @@ NO SIGNED FC = NO PRODUCT CODE.
 
 ## Ω / roster
 
-Ω: GrayMan · Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+Ω: GrayMan · Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O · Belle (Grok) seat Belle
 <!-- L-HARNESS:END -->

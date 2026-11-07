@@ -67,7 +67,7 @@ Annexes under `protocols/annex/security/`. Honesty > theater (`CI_TRUTH` / `R-OW
 ## Ω
 
 Project Ω alias: **GrayMan** (GrayMan brand verified=true)  
-Raptors: Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O
+Raptors: Alfa (Antigravity) seat O · Bravo (Grok) seat R · Charlie (Claude Code) seat O · Belle (Grok) seat Belle
 
 ## GrayMan L-Harness
 
