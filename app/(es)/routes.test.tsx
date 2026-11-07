@@ -100,7 +100,7 @@ describe('es-MX routes', () => {
     expect(html).toContain('Tu mochila está vacía');
   });
 
-  it('account area is at /cuenta/, never indexed, and prerenders its loading line (FC 028)', () => {
+  it('account area is at /cuenta/, never indexed, and prerenders the sign-in form, no loading line (FC 028)', () => {
     expect(AccountMeta.alternates?.canonical).toBe('/cuenta/');
     expect(AccountMeta.alternates?.languages).toMatchObject({
       en: '/en/account/',
@@ -109,7 +109,9 @@ describe('es-MX routes', () => {
     expect(AccountMeta.robots).toEqual({ index: false, follow: false });
     const html = renderToStaticMarkup(<Account />);
     expect(html).toContain('<h1');
-    expect(html).toContain('Cargando tu cuenta');
+    // The form is in the static page, so it shows before any script or API answer (no jump).
+    expect(html).toContain('type="password"');
+    expect(html).not.toContain('Cargando tu cuenta');
   });
 
   it('checkout is at /checkout/, never indexed, and prerenders the empty state', () => {

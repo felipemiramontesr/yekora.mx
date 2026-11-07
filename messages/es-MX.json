@@ -650,7 +650,6 @@
   "account": {
     "metaTitle": "Mi cuenta | YĒKORA",
     "title": "Mi cuenta",
-    "loading": "Cargando tu cuenta…",
     "signIn": {
       "title": "Entrar",
       "intro": "Entra con tu correo y tu contraseña. Te pediremos un código para confirmar que eres tú.",

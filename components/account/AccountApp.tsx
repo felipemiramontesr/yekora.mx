@@ -35,7 +35,6 @@ interface AccountAppProps {
 
 /** Where the person stands in the area. */
 type Stage =
-  | { kind: 'loading' }
   | { kind: 'signIn'; email: string; notice: string | null }
   | { kind: 'register' }
   | { kind: 'code'; challengeId: string; channel: Channel; email: string }
@@ -68,28 +67,45 @@ export function AccountApp({
   methods,
 }: Readonly<AccountAppProps>) {
   const area = routeFor('account', locale);
-  const [stage, setStage] = useState<Stage>({ kind: 'loading' });
+  // The sign-in form is what almost every visitor needs, so it is in the prerendered page and
+  // shows at once; the session is checked behind it and replaces it only when there is one.
+  // Waiting for the API first made the page jump from a loading line to the form, seconds
+  // later when Hostinger had put the API to sleep.
+  const [stage, setStage] = useState<Stage>(() => signedOut());
   const [view, setView] = useState<AccountView>({
     tab: 'orders',
     orderNumber: null,
   });
 
-  const loadSession = useCallback(async () => {
-    const result = await me();
-    if (result.ok) {
-      setStage({ kind: 'signedIn', user: result.data });
-      return;
-    }
-    // Signed out is the usual answer; anything else is worth saying.
-    const quiet = result.reason === 'SESSION_INVALID_OR_EXPIRED';
-    setStage(signedOut(quiet ? null : failureText(messages, result.reason)));
-  }, [messages]);
+  /**
+   * Asks the API who is signed in. The first check runs behind the form: when it finds no
+   * session, it only touches a sign-in form still waiting, never someone who has meanwhile moved
+   * on to the code or to sign-up (the API may answer seconds later, after a cold start).
+   */
+  const loadSession = useCallback(
+    async (behindForm = false) => {
+      const result = await me();
+      if (result.ok) {
+        setStage({ kind: 'signedIn', user: result.data });
+        return;
+      }
+      // Signed out is the usual answer; anything else is worth saying.
+      const quiet = result.reason === 'SESSION_INVALID_OR_EXPIRED';
+      const next = signedOut(
+        quiet ? null : failureText(messages, result.reason)
+      );
+      setStage((current) =>
+        behindForm && current.kind !== 'signIn' ? current : next
+      );
+    },
+    [messages]
+  );
 
   useEffect(() => {
     const read = () =>
       setView(parseAccountPath(globalThis.location.pathname, area));
     read();
-    void loadSession();
+    void loadSession(true);
     globalThis.addEventListener('popstate', read);
     return () => globalThis.removeEventListener('popstate', read);
   }, [area, loadSession]);
@@ -107,9 +123,6 @@ export function AccountApp({
 
   return (
     <div className="flex flex-col gap-6">
-      {stage.kind === 'loading' && (
-        <output className="block">{messages.loading}</output>
-      )}
       {stage.kind === 'signIn' && (
         <SignInForm
           messages={messages}

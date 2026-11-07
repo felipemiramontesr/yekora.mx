@@ -82,11 +82,13 @@ describe('en routes', () => {
     expect(renderToStaticMarkup(<Cart />)).toContain('Your pack is empty');
   });
 
-  it('account area is at /en/account/, never indexed, and prerenders its loading line (FC 028)', () => {
+  it('account area is at /en/account/, never indexed, and prerenders the sign-in form, no loading line (FC 028)', () => {
     expect(AccountMeta.alternates?.canonical).toBe('/en/account/');
     expect(AccountMeta.title).toBe('My account | YĒKORA');
     expect(AccountMeta.robots).toEqual({ index: false, follow: false });
-    expect(renderToStaticMarkup(<Account />)).toContain('Loading your account');
+    const html = renderToStaticMarkup(<Account />);
+    expect(html).toContain('type="password"');
+    expect(html).not.toContain('Loading your account');
   });
 
   it('checkout is at /en/checkout/, never indexed, and prerenders the empty state', () => {

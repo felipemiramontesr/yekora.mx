@@ -148,10 +148,31 @@ afterEach(() => {
 });
 
 describe('account area · signing in (FC 028 F2)', () => {
+  it('lets a late "no session" answer leave someone who moved on alone (cold start)', async () => {
+    let answer!: (value: never) => void;
+    api.me.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+    );
+    renderApp();
+    press(account.signIn.toRegister);
+    expect(
+      screen.getByRole('heading', { name: account.register.title })
+    ).toBeTruthy();
+    await act(async () => answer(no('SESSION_INVALID_OR_EXPIRED')));
+    expect(
+      screen.getByRole('heading', { name: account.register.title })
+    ).toBeTruthy();
+  });
+
   it('signs a buyer in with the mailed code and shows their orders', async () => {
     renderApp();
-    expect(screen.getByText(account.loading)).toBeTruthy();
-    await screen.findByRole('heading', { name: account.signIn.title });
+    // The form is there at once, before the session check answers: no jump.
+    expect(
+      screen.getByRole('heading', { name: account.signIn.title })
+    ).toBeTruthy();
+    await waitFor(() => expect(api.me).toHaveBeenCalled());
     press(account.signIn.submit);
     expect(screen.getByRole('alert').textContent).toBe(account.errors.required);
     api.login.mockResolvedValueOnce(no('INVALID_CREDENTIALS'));
