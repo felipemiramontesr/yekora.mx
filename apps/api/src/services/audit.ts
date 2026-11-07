@@ -7,6 +7,8 @@
  * any string with an `@`, wherever it appears (an e-mail under an innocent key). The client
  * address is technical
  * telemetry the FC allows (278_AN §2.4). Rows are never deleted by the API.
+ * FC 029 T2.4 (319_AN, 320_AN): a catalog entry keeps `name` and `code` keys, which are public
+ * catalog data; everything else stays redacted.
  *
  * @module
  */
@@ -21,19 +23,37 @@ const PII_KEY =
   /pass|secret|token|otp|backup|hash|code|name|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
 
 /**
+ * The same rule without `code` and `name` (FC 029 T2.4, 320_AN): a catalog diff keeps the public
+ * names of products, brands and facets and their codes; secrets, e-mail, phone and address keys
+ * and any string with an `@` stay redacted, as T2.5b demands.
+ */
+const CATALOG_PII_KEY =
+  /pass|secret|token|otp|backup|hash|mail|phone|address|street|exterior|interior|neighborhood|municipality|postal|zip/i;
+
+/** Entity types written by the catalog backoffice (routes/catalogMutation.ts and media). */
+const CATALOG_ENTITIES = new Set([
+  'media',
+  'brands',
+  'facet_groups',
+  'facet_values',
+  'products',
+]);
+
+/**
  * A copy of a value with every personal or secret part replaced by {@link REDACTED}.
  *
  * @param value - Any JSON-like value.
+ * @param rule - Which keys are personal or secret.
  * @returns The same shape, safe for `audit_log`.
  */
-function redactPii(value: unknown): unknown {
+function redactPii(value: unknown, rule: RegExp): unknown {
   if (typeof value === 'string') return value.includes('@') ? REDACTED : value;
-  if (Array.isArray(value)) return value.map(redactPii);
+  if (Array.isArray(value)) return value.map((item) => redactPii(item, rule));
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        PII_KEY.test(key) ? REDACTED : redactPii(item),
+        rule.test(key) ? REDACTED : redactPii(item, rule),
       ])
     );
   }
@@ -69,8 +89,11 @@ export async function recordAudit(
   db: TxQuery,
   entry: AuditEntry
 ): Promise<void> {
+  const rule = CATALOG_ENTITIES.has(entry.entityType)
+    ? CATALOG_PII_KEY
+    : PII_KEY;
   const json = (state: unknown) =>
-    state === null ? null : JSON.stringify(redactPii(state));
+    state === null ? null : JSON.stringify(redactPii(state, rule));
   await db.query(
     'INSERT INTO audit_log (user_id, action, entity_type, entity_id, before_state, after_state, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [

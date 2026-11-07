@@ -11,6 +11,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
 import { auditTrail, recordAudit } from './services/audit';
 import {
+  createBrand,
+  createFacetGroup,
+  createFacetValue,
+  listBrands,
+  listFacets,
+  updateBrand,
+  updateFacetGroup,
+  updateFacetValue,
+} from './services/catalogAdmin';
+import {
   findProduct,
   findProductMedia,
   listProducts,
@@ -1085,5 +1095,108 @@ describe('catalog backoffice on real SQL (FC 029 F1 and F2a)', () => {
       [sha('7'), userId, request.route, sha('3')]
     );
     expect(Number(left.n)).toBe(0);
+  });
+});
+
+describe('brands and facets on real SQL (FC 029 F2b)', () => {
+  it('creates, edits and retires a brand; a taken slug is a duplicate key', async () => {
+    const created = await db.transaction((tx) =>
+      createBrand(tx, {
+        slug: 'itest-cumbre',
+        name: 'Cumbre',
+        website: 'https://cumbre.example',
+      })
+    );
+    expect(created.after).toMatchObject({
+      slug: 'itest-cumbre',
+      isActive: true,
+    });
+    const id = created.after.id;
+    await expect(
+      db.transaction((tx) =>
+        updateBrand(tx, id, { name: 'Cumbre MX', isActive: false })
+      )
+    ).resolves.toMatchObject({
+      before: { name: 'Cumbre' },
+      after: { name: 'Cumbre MX', isActive: false },
+    });
+    expect((await listBrands(db)).find((b) => b.id === id)).toMatchObject({
+      isActive: false,
+      website: 'https://cumbre.example',
+    });
+    await expect(
+      db.transaction((tx) =>
+        createBrand(tx, { slug: 'itest-cumbre', name: 'Otra', website: null })
+      )
+    ).rejects.toMatchObject({ code: 'ER_DUP_ENTRY' });
+    await expect(
+      db.transaction((tx) => updateBrand(tx, 999_999, { name: 'X' }))
+    ).resolves.toBe('CAT_NOT_FOUND');
+  });
+
+  it('creates a group with values, retires it, and keeps Nivel and its values locked', async () => {
+    const group = await db.transaction((tx) =>
+      createFacetGroup(tx, {
+        code: 'itest-material',
+        nameEs: 'Material',
+        nameEn: 'Material',
+        isRequired: false,
+        isOrdered: true,
+        isFilterable: true,
+        showOnLanding: false,
+        sortOrder: 7,
+      })
+    );
+    const groupId = group.after.id;
+    const added = await db.transaction((tx) =>
+      createFacetValue(tx, groupId, {
+        code: 'nylon',
+        valueEs: 'Nailon',
+        valueEn: 'Nylon',
+        sortOrder: 1,
+      })
+    );
+    if (typeof added === 'string') throw new Error(added);
+    await expect(
+      db.transaction((tx) =>
+        updateFacetValue(tx, added.after.id, { valueEn: 'Nylon 6' })
+      )
+    ).resolves.toMatchObject({ after: { valueEn: 'Nylon 6' } });
+    await expect(
+      db.transaction((tx) => updateFacetGroup(tx, groupId, { isActive: false }))
+    ).resolves.toMatchObject({ after: { isActive: false, isOrdered: true } });
+    const listed = (await listFacets(db)).find((g) => g.id === groupId);
+    expect(listed).toMatchObject({
+      isActive: false,
+      values: [{ code: 'nylon' }],
+    });
+
+    const nivel = (await listFacets(db)).find((g) => g.code === 'nivel');
+    if (!nivel) throw new Error('Nivel missing');
+    await expect(
+      db.transaction((tx) =>
+        updateFacetGroup(tx, nivel.id, { isActive: false })
+      )
+    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
+    await expect(
+      db.transaction((tx) =>
+        createFacetValue(tx, nivel.id, {
+          code: 'x',
+          valueEs: 'X',
+          valueEn: 'X',
+          sortOrder: 0,
+        })
+      )
+    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
+    await expect(
+      db.transaction((tx) =>
+        updateFacetValue(tx, nivel.values[0].id, { sortOrder: 9 })
+      )
+    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
+    await expect(
+      db.transaction((tx) =>
+        updateFacetGroup(tx, nivel.id, { nameEn: 'Level' })
+      )
+    ).resolves.toMatchObject({ after: { nameEn: 'Level', isActive: true } });
   });
 });

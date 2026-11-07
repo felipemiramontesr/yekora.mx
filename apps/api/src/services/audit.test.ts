@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
-import { auditTrail } from './audit';
+import { auditTrail, recordAudit } from './audit';
 import type { Db } from './db';
 
 /** A request as the hook reads it, after the guard set its user. */
@@ -70,5 +70,63 @@ describe('audit trail (FC 028 T2.5)', () => {
       reply
     );
     expect(rows).toEqual([]);
+  });
+});
+
+describe('catalog diffs (FC 029 T2.4, 320_AN)', () => {
+  /** Records one entry and answers the before and after JSON written. */
+  async function written(entityType: string, state: unknown) {
+    const params: unknown[][] = [];
+    const db = {
+      query: async (_sql: string, values: readonly unknown[] = []) => {
+        params.push([...values]);
+        return [];
+      },
+    };
+    await recordAudit(db, {
+      userId: 'u1',
+      action: 'PATCH /v1/admin/catalog/brands/:id',
+      entityType,
+      entityId: '1',
+      before: null,
+      after: state,
+      ip: null,
+    });
+    return JSON.parse(params[0][5] as string) as Record<string, unknown>;
+  }
+
+  const state = {
+    name: 'Cumbre',
+    nameEs: 'Mochila',
+    code: 'material',
+    contactEmail: 'ventas@cumbre.mx',
+    phone: '5512345678',
+    address: 'Calle 1',
+    token: 'secret',
+    note: 'escribe a ventas@cumbre.mx',
+  };
+
+  it.each(['brands', 'facet_groups', 'facet_values', 'products', 'media'])(
+    'keeps the public name and code of %s, and still redacts e-mail, phone, address, secrets and any @',
+    async (entityType) => {
+      expect(await written(entityType, state)).toEqual({
+        name: 'Cumbre',
+        nameEs: 'Mochila',
+        code: 'material',
+        contactEmail: '[redacted]',
+        phone: '[redacted]',
+        address: '[redacted]',
+        token: '[redacted]',
+        note: '[redacted]',
+      });
+    }
+  );
+
+  it('keeps redacting name and code outside the catalog (T2.5b)', async () => {
+    expect(await written('orders', state)).toMatchObject({
+      name: '[redacted]',
+      nameEs: '[redacted]',
+      code: '[redacted]',
+    });
   });
 });

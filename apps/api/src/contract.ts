@@ -50,7 +50,19 @@ import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
-import { mediaUploadedSchema, mutationHeaders } from './routes/catalogAdmin';
+import { mediaUploadedSchema } from './routes/catalogAdmin';
+import {
+  brandCreate,
+  brandPatch,
+  brandSchema,
+  facetGroupCreate,
+  facetGroupPatch,
+  facetGroupSchema,
+  facetValueCreate,
+  facetValuePatch,
+  facetValueSchema,
+} from './routes/catalogEntities';
+import { idParams, mutationHeaders } from './routes/catalogMutation';
 import { mediaParams } from './routes/media';
 import { SAFE_IMAGE_TYPES } from './services/imageProbe';
 import {
@@ -127,6 +139,44 @@ const SIGNED_IN_REFUSALS = {
   403: problemSchema,
   503: problemSchema,
 } as const;
+
+/** A backoffice list (FC 029 F2b): needs catalog:write, answers every row. */
+const catalogRead = (
+  path: string,
+  summary: string,
+  item: z.ZodType
+): RouteContract => ({
+  method: 'GET',
+  path,
+  summary,
+  permission: 'catalog:write',
+  request: {},
+  responses: { 200: z.array(item), ...SIGNED_IN_REFUSALS },
+});
+
+/**
+ * A backoffice write (FC 029 F2b, routes/catalogMutation.ts): Idempotency-Key, JSON body, 201
+ * when it creates and 200 when it edits, and every refusal of the mutation pipeline.
+ */
+const catalogWrite = (
+  method: 'POST' | 'PATCH',
+  path: string,
+  summary: string,
+  shape: { params?: z.ZodType; body: z.ZodType; answer: z.ZodType }
+): RouteContract => ({
+  method,
+  path,
+  summary,
+  permission: 'catalog:write',
+  request: { params: shape.params, headers: mutationHeaders, body: shape.body },
+  responses: {
+    [method === 'POST' ? 201 : 200]: shape.answer,
+    400: problemSchema,
+    404: problemSchema,
+    409: problemSchema,
+    ...SIGNED_IN_REFUSALS,
+  },
+});
 
 /** A public sign-in route: JSON body, its answers, 400 and 503 like every auth route. */
 const auth = (
@@ -403,4 +453,51 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     request: {},
     responses: { 405: problemSchema, ...SIGNED_IN_REFUSALS },
   },
+  catalogRead(
+    '/v1/admin/catalog/brands',
+    'Every brand, active or not',
+    brandSchema
+  ),
+  catalogRead(
+    '/v1/admin/catalog/facets',
+    'Every facet group with its values, active or not',
+    facetGroupSchema
+  ),
+  catalogWrite('POST', '/v1/admin/catalog/brands', 'Create a brand', {
+    body: brandCreate,
+    answer: brandSchema,
+  }),
+  catalogWrite(
+    'PATCH',
+    '/v1/admin/catalog/brands/:id',
+    'Edit or retire a brand (isActive: false)',
+    { params: idParams, body: brandPatch, answer: brandSchema }
+  ),
+  catalogWrite(
+    'POST',
+    '/v1/admin/catalog/facet-groups',
+    'Create a facet group',
+    {
+      body: facetGroupCreate,
+      answer: facetGroupSchema,
+    }
+  ),
+  catalogWrite(
+    'PATCH',
+    '/v1/admin/catalog/facet-groups/:id',
+    'Edit or retire a facet group; the system group Nivel is never retired',
+    { params: idParams, body: facetGroupPatch, answer: facetGroupSchema }
+  ),
+  catalogWrite(
+    'POST',
+    '/v1/admin/catalog/facet-groups/:id/values',
+    'Add a value to a facet group (not to the system group)',
+    { params: idParams, body: facetValueCreate, answer: facetValueSchema }
+  ),
+  catalogWrite(
+    'PATCH',
+    '/v1/admin/catalog/facet-values/:id',
+    'Relabel or reorder a facet value (not of the system group)',
+    { params: idParams, body: facetValuePatch, answer: facetValueSchema }
+  ),
 ];
