@@ -63,6 +63,7 @@ import {
   facetValueSchema,
 } from './routes/catalogEntities';
 import { idParams, mutationHeaders } from './routes/catalogMutation';
+import { publishRequestedSchema } from './routes/catalogPublish';
 import {
   adminProductPageSchema,
   adminProductSchema,
@@ -573,4 +574,19 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       references: true,
     }
   ),
+  {
+    method: 'POST',
+    path: '/v1/admin/catalog/publish',
+    summary:
+      'Rebuild the store: dispatch deploy.yml on main, through every gate (FC 029 T2.5)',
+    permission: 'catalog:write',
+    request: { headers: mutationHeaders },
+    responses: {
+      202: publishRequestedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
 ];

@@ -34,6 +34,8 @@ export interface CatalogAdminDeps {
   db: Db & Transactional;
   /** Clock. */
   now: () => Date;
+  /** GitHub token that dispatches deploy.yml (FC 029 T2.5); null keeps publishing closed. */
+  publishToken: string | null;
 }
 
 /** Headers every catalog mutation reads (T1.3); the contract documents them. */

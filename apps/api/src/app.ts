@@ -215,7 +215,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
   // FC 029 F2: the catalog backoffice, idempotent and audited, with DELETE refused.
-  registerCatalogAdminRoutes(app, { db: deps.db, now });
+  registerCatalogAdminRoutes(app, {
+    db: deps.db,
+    now,
+    publishToken: deps.config.publishToken,
+  });
   registerOrderWriteRefusals(app);
   app.addHook('onResponse', auditTrail(deps.db));
   await registerWebhookRoutes(app, {

@@ -63,6 +63,7 @@ const schema = z.object({
       'must be a Yekora database'
     ),
   BANXICO_TOKEN: z.string().optional(),
+  GITHUB_PUBLISH_TOKEN: z.string().optional(),
   API_VERSION: z.string().default('0.8.6'),
   GIT_SHA: z.string().default('dev'),
   PAYMENTS_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
@@ -173,6 +174,12 @@ export interface ApiConfig {
   db: DbConfig;
   /** Banxico SIE token; without it the API serves the last stored FIX only. */
   banxicoToken: string | undefined;
+  /**
+   * Fine-grained GitHub token (Actions: write on yekora.mx only) that lets
+   * `POST /v1/admin/catalog/publish` dispatch deploy.yml (FC 029 T2.5); without it the route is
+   * closed (503).
+   */
+  publishToken: string | null;
   /** Released version, reported by /health. */
   version: string;
   /** Deployed commit, reported by /health and checked by the deploy smoke test. */
@@ -289,6 +296,7 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
       database: parsed.DB_NAME,
     },
     banxicoToken: parsed.BANXICO_TOKEN || undefined,
+    publishToken: parsed.GITHUB_PUBLISH_TOKEN || null,
     version: parsed.API_VERSION,
     sha: parsed.GIT_SHA,
     payments: loadPayments(parsed),

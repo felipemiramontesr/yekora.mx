@@ -11,7 +11,8 @@
  *
  * F2a: images. `POST /v1/admin/catalog/media` takes the raw bytes of the Canvas crop with their
  * type as Content-Type and stores them once per digest (T1.2, T2.2a, T2.2b).
- * F2b: brands and facets (routes/catalogEntities.ts), through routes/catalogMutation.ts.
+ * F2b: brands, facets and products (routes/catalogEntities.ts, routes/catalogProducts.ts),
+ * through routes/catalogMutation.ts. F2c: «Publicar cambios» (routes/catalogPublish.ts).
  *
  * @module
  */
@@ -24,6 +25,7 @@ import { SAFE_IMAGE_TYPES } from '../services/imageProbe';
 import { inspectMedia, SHA256_HEX, storeMedia } from '../services/media';
 import { registerCatalogEntityRoutes } from './catalogEntities';
 import { registerCatalogProductRoutes } from './catalogProducts';
+import { registerCatalogPublishRoute } from './catalogPublish';
 import { type CatalogAdminDeps, refuse, runOnce } from './catalogMutation';
 
 /** Answer of an accepted upload: the digest the image is served under and what was probed. */
@@ -107,6 +109,7 @@ export function registerCatalogAdminRoutes(
 
   registerCatalogEntityRoutes(app, deps);
   registerCatalogProductRoutes(app, deps);
+  registerCatalogPublishRoute(app, deps);
 
   // T2.3b: nothing in the catalog is ever deleted; retiring is `is_active = 0` (T2.3c).
   app.delete('/v1/admin/catalog/*', (_request, reply) =>

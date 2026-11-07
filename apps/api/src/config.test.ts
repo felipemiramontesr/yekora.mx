@@ -22,6 +22,8 @@ describe('loadConfig', () => {
         database: 'yekora_dev',
       },
       banxicoToken: undefined,
+      // FC 029 T2.5: no GitHub token, so publishing the catalog stays closed (503).
+      publishToken: null,
       version: '0.8.6',
       sha: 'dev',
       // FC 012: sandbox by default and nothing configured, so the checkout stays closed (503).
@@ -47,12 +49,14 @@ describe('loadConfig', () => {
       PORT: '8080',
       DB_PASSWORD: 's3cret',
       BANXICO_TOKEN: 'token',
+      GITHUB_PUBLISH_TOKEN: 'github_pat_x',
       GIT_SHA: 'abc123',
     });
     expect(config).toMatchObject({
       isProduction: true,
       port: 8080,
       banxicoToken: 'token',
+      publishToken: 'github_pat_x',
       sha: 'abc123',
     });
     expect(config.db.password).toBe('s3cret');

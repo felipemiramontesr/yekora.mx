@@ -13,6 +13,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # FC 029 T2.5 (321_AN, option A): «Publicar cambios» of the catalog backoffice dispatches the
+  # whole pipeline on main, so a publication passes every gate before the store is rebuilt.
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -341,7 +344,7 @@ jobs:
     name: 🏗️ Production Site Build
     # FC 026 Enmienda 10: the production site is built at t = 0, from the live API, and handed to
     # the deploy as an artifact; the deploy only waits for the released API and syncs.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -693,7 +696,7 @@ jobs:
     # the api-release branch, which Hostinger's Node.js app tracks; Hostinger never installs or
     # builds anything. /health reports the stamped commit, so the smoke test proves what runs.
     needs: [global-certification]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -791,7 +794,7 @@ jobs:
     # built from site-build; this job waits for apiv1.yekora.mx to serve this commit before the
     # rsync, so the order API → site holds without paying the two in series.
     needs: [global-certification, site-build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # One deploy at a time; a newer push waits instead of cutting an rsync in half.
