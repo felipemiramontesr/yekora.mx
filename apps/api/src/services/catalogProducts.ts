@@ -117,33 +117,31 @@ interface ProductRow {
   is_test: number;
 }
 
-const num = (value: unknown) => Number(value);
-
 const productOf = (
   row: ProductRow,
   facetValueIds: number[] = [],
   gallery: GalleryImage[] = []
 ): AdminProduct => ({
-  id: num(row.id),
+  id: Number(row.id),
   sku: row.sku,
   slug: row.slug,
   nameEs: row.name_es,
   nameEn: row.name_en,
   descriptionEs: row.description_es,
   descriptionEn: row.description_en,
-  priceMxnCents: num(row.price_mxn_cents),
-  stock: num(row.stock),
-  reservedStock: num(row.reserved_stock),
+  priceMxnCents: Number(row.price_mxn_cents),
+  stock: Number(row.stock),
+  reservedStock: Number(row.reserved_stock),
   discipline: row.discipline,
   level: row.level,
-  brandId: row.brand_id === null ? null : num(row.brand_id),
+  brandId: row.brand_id === null ? null : Number(row.brand_id),
   shippingClass: row.shipping_class,
-  weightGrams: num(row.weight_grams),
-  lengthMm: num(row.length_mm),
-  widthMm: num(row.width_mm),
-  heightMm: num(row.height_mm),
-  isActive: num(row.is_active) === 1,
-  isTest: num(row.is_test) === 1,
+  weightGrams: Number(row.weight_grams),
+  lengthMm: Number(row.length_mm),
+  widthMm: Number(row.width_mm),
+  heightMm: Number(row.height_mm),
+  isActive: Number(row.is_active) === 1,
+  isTest: Number(row.is_test) === 1,
   facetValueIds,
   gallery,
 });
@@ -166,7 +164,7 @@ export async function listAdminProducts(
     'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
     [paging.pageSize, (paging.page - 1) * paging.pageSize]
   );
-  return { items: rows.map((row) => productOf(row)), total: num(total) };
+  return { items: rows.map((row) => productOf(row)), total: Number(total) };
 }
 
 /** The product row, with its references by slug. */
@@ -214,13 +212,13 @@ async function fullProduct(
   );
   return productOf(
     row,
-    values.map((value) => num(value.value_id)),
+    values.map((value) => Number(value.value_id)),
     images.map((image) => ({
       sha256: image.media_sha256,
       altEs: image.alt_text_es,
       altEn: image.alt_text_en,
-      sortOrder: num(image.sort_order),
-      isPrimary: num(image.is_primary) === 1,
+      sortOrder: Number(image.sort_order),
+      isPrimary: Number(image.is_primary) === 1,
     }))
   );
 }
@@ -279,21 +277,28 @@ async function facetChoice(
 ): Promise<
   { ordinary: number[]; level: string | null } | 'CAT_REFERENCE_INVALID'
 > {
-  const ordinary: number[] = [];
-  let level: string | null = null;
-  for (const id of new Set(ids)) {
-    const [value] = await tx.query<{
-      code: string;
-      is_system: number;
-      is_active: number;
-    }>(
-      'SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?',
-      [id]
-    );
-    if (!value || num(value.is_active) !== 1) return 'CAT_REFERENCE_INVALID';
-    if (num(value.is_system) === 1) level = value.code;
-    else ordinary.push(id);
-  }
+  const unique = [...new Set(ids)];
+  const found = await Promise.all(
+    unique.map(async (id) => {
+      const [value] = await tx.query<{
+        code: string;
+        is_system: number;
+        is_active: number;
+      }>(
+        'SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?',
+        [id]
+      );
+      return { id, value };
+    })
+  );
+  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
+    return 'CAT_REFERENCE_INVALID';
+  const ordinary = found
+    .filter(({ value }) => Number(value.is_system) !== 1)
+    .map(({ id }) => id);
+  const level =
+    found.find(({ value }) => Number(value.is_system) === 1)?.value.code ??
+    null;
   return { ordinary, level };
 }
 
@@ -323,12 +328,15 @@ async function relinkFacets(
     'DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0',
     [productId]
   );
-  for (const id of ids) {
-    await tx.query(
-      'INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
-      [productId, id]
-    );
-  }
+  // One connection runs these in order; Promise.all only stops waiting between them.
+  await Promise.all(
+    ids.map((id) =>
+      tx.query(
+        'INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
+        [productId, id]
+      )
+    )
+  );
 }
 
 /**
@@ -453,6 +461,34 @@ export async function updateProduct(
 }
 
 /**
+ * Puts one image at its place in a product's gallery: its retired row comes back when the
+ * product had it before, else a new row (rows are never deleted, T2.3c).
+ */
+async function placeImage(
+  tx: TxQuery,
+  productId: number,
+  image: { sha256: string; altEs: string | null; altEn: string | null },
+  index: number
+): Promise<void> {
+  const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
+  const [existing] = await tx.query<{ id: number }>(
+    'SELECT id FROM product_media WHERE product_id = ? AND media_sha256 = ? ORDER BY id ASC LIMIT 1',
+    [productId, image.sha256]
+  );
+  if (existing) {
+    await tx.query(
+      'UPDATE product_media SET alt_text_es = ?, alt_text_en = ?, sort_order = ?, is_primary = ?, is_active = 1 WHERE id = ?',
+      [...values, existing.id]
+    );
+  } else {
+    await tx.query(
+      'INSERT INTO product_media (alt_text_es, alt_text_en, sort_order, is_primary, product_id, media_sha256) VALUES (?, ?, ?, ?, ?, ?)',
+      [...values, productId, image.sha256]
+    );
+  }
+}
+
+/**
  * Replaces a product's gallery, in order; the first image is the primary one. An image that
  * leaves is retired (`is_active = 0`), never deleted, and comes back with its row if re-added.
  *
@@ -472,35 +508,22 @@ export async function replaceGallery(
 ): Promise<Change<AdminProduct> | ProductRefusal> {
   const row = await lockedProduct(tx, id);
   if (!row) return 'CAT_NOT_FOUND';
-  for (const image of images) {
-    const [blob] = await tx.query<{ sha256: string }>(
-      'SELECT sha256 FROM media_blobs WHERE sha256 = ?',
-      [image.sha256]
-    );
-    if (!blob) return 'CAT_REFERENCE_INVALID';
-  }
+  const blobs = await Promise.all(
+    images.map((image) =>
+      tx.query<{ sha256: string }>(
+        'SELECT sha256 FROM media_blobs WHERE sha256 = ?',
+        [image.sha256]
+      )
+    )
+  );
+  if (blobs.some((rows) => rows.length === 0)) return 'CAT_REFERENCE_INVALID';
   const before = await fullProduct(tx, row);
   await tx.query(
     'UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?',
     [id]
   );
-  for (const [index, image] of images.entries()) {
-    const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
-    const [existing] = await tx.query<{ id: number }>(
-      'SELECT id FROM product_media WHERE product_id = ? AND media_sha256 = ? ORDER BY id ASC LIMIT 1',
-      [id, image.sha256]
-    );
-    if (existing) {
-      await tx.query(
-        'UPDATE product_media SET alt_text_es = ?, alt_text_en = ?, sort_order = ?, is_primary = ?, is_active = 1 WHERE id = ?',
-        [...values, existing.id]
-      );
-    } else {
-      await tx.query(
-        'INSERT INTO product_media (alt_text_es, alt_text_en, sort_order, is_primary, product_id, media_sha256) VALUES (?, ?, ?, ?, ?, ?)',
-        [...values, id, image.sha256]
-      );
-    }
-  }
+  await Promise.all(
+    images.map((image, index) => placeImage(tx, id, image, index))
+  );
   return { before, after: await fullProduct(tx, row) };
 }
