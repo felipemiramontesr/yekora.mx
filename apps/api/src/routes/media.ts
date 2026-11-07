@@ -18,9 +18,6 @@ import { matchesDigest, readMedia, SHA256_HEX } from '../services/media';
 /** Path parameters of `GET /v1/media/:sha256`; also the request of the API contract. */
 export const mediaParams = z.object({ sha256: z.string().regex(SHA256_HEX) });
 
-/** Types an image may have (CHECK of migration 006); the contract lists them as the answer. */
-export const MEDIA_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
-
 /** Cache policy of an image: the digest never points to other bytes (T2.2c). */
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 

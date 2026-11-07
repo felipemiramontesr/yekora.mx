@@ -25,6 +25,7 @@ import { registerAdminRoutes } from './routes/admin';
 import { registerAuthRoutes } from './routes/auth';
 import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
+import { registerCatalogAdminRoutes } from './routes/catalogAdmin';
 import { registerCheckoutRoutes } from './routes/checkout';
 import { registerExchangeRateRoute } from './routes/exchangeRate';
 import { registerMediaRoutes } from './routes/media';
@@ -213,6 +214,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
+  // FC 029 F2: the catalog backoffice, idempotent and audited, with DELETE refused.
+  registerCatalogAdminRoutes(app, { db: deps.db, now });
   registerOrderWriteRefusals(app);
   app.addHook('onResponse', auditTrail(deps.db));
   await registerWebhookRoutes(app, {

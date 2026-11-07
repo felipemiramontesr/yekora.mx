@@ -6,7 +6,8 @@
  * - No identity secrets configured → 503 AUTH_UNAVAILABLE (closed, never half-open).
  * - No live session (absent, revoked or expired) → 401 SESSION_INVALID_OR_EXPIRED (T1.2 S).
  * - Staff or admin without TOTP → 403 SECOND_FACTOR_REQUIRED.
- * - Missing the route's permission → 403 PERMISSION_DENIED (T1.2 P).
+ * - Missing the route's permission → 403 PERMISSION_DENIED (T1.2 P); CAT_FORBIDDEN for
+ *   `catalog:write` (FC 029 T1.1).
  * Otherwise the user is set on `request.user` for the handler.
  *
  * @module
@@ -23,6 +24,7 @@ const TITLES = {
   SESSION_INVALID_OR_EXPIRED: 'Sign in first',
   SECOND_FACTOR_REQUIRED: 'Two-step verification required',
   PERMISSION_DENIED: 'Not allowed',
+  CAT_FORBIDDEN: 'Not allowed',
 } as const;
 
 /**
@@ -48,8 +50,12 @@ export function permissionGuard(deps: {
     if (user === null) return refuse(401, 'SESSION_INVALID_OR_EXPIRED');
     if (!secondFactorSatisfied(user))
       return refuse(403, 'SECOND_FACTOR_REQUIRED');
+    // FC 029 T1.1: the catalog names its refusal CAT_FORBIDDEN; the rest keep PERMISSION_DENIED.
     if (!user.permissions.includes(permission))
-      return refuse(403, 'PERMISSION_DENIED');
+      return refuse(
+        403,
+        permission === 'catalog:write' ? 'CAT_FORBIDDEN' : 'PERMISSION_DENIED'
+      );
     request.user = user;
   };
 }

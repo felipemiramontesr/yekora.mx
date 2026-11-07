@@ -67,6 +67,7 @@ beforeAll(async () => {
 function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (Object.keys(route.responses).join() === '405') return 'public';
   if (route.path.startsWith('/v1/account/')) return 'account:self';
+  if (route.path.startsWith('/v1/admin/catalog')) return 'catalog:write';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';
   return 'public';
 }

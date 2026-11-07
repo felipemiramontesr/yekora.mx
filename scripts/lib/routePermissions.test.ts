@@ -122,6 +122,42 @@ describe('routePermissionViolations (FC 027 T2.6, S02)', () => {
     ).toEqual(['DELETE /v1/admin/users/:id: DELETE must only refuse (405)']);
   });
 
+  it('lets a guarded DELETE carry the guard refusals before its 405, never anything else (FC 029 T1.1)', () => {
+    const guarded = (responses: Record<number, unknown>) => ({
+      method: 'DELETE',
+      path: '/v1/admin/catalog/*',
+      permission: 'catalog:write',
+      responses,
+    });
+    expect(
+      routePermissionViolations(
+        [guarded({ 405: {}, 401: {}, 403: {}, 503: {} })],
+        ['catalog:write']
+      )
+    ).toEqual([]);
+    expect(
+      routePermissionViolations(
+        [guarded({ 401: {}, 403: {} })],
+        ['catalog:write']
+      )
+    ).toEqual(['DELETE /v1/admin/catalog/*: DELETE must only refuse (405)']);
+    expect(
+      routePermissionViolations(
+        [guarded({ 405: {}, 200: {} })],
+        ['catalog:write']
+      )
+    ).toEqual(['DELETE /v1/admin/catalog/*: DELETE must only refuse (405)']);
+  });
+
+  it('treats a DELETE without declared answers as one that may do anything', () => {
+    expect(
+      routePermissionViolations(
+        [{ method: 'DELETE', path: '/v1/things', permission: 'public' }],
+        []
+      )
+    ).toEqual(['DELETE /v1/things: DELETE must only refuse (405)']);
+  });
+
   it('does not mistake a public path that only starts like a private prefix', () => {
     expect(
       routePermissionViolations(

@@ -44,7 +44,9 @@ const doc = (...routes: ContractEntry[]): OpenApiDocument =>
 /**
  * `METHOD path` of every route Fastify serves, without the HEAD and OPTIONS it adds itself.
  * `printRoutes` nests a route under the one whose path it extends, four columns deeper, so the
- * full path is the parent's plus the segment on the line.
+ * full path is the parent's plus the segment on the line. It reads the compressed tree: the
+ * flat view (`commonPrefix: false`) drops the prefix of a wildcard such as
+ * `DELETE /v1/admin/catalog/*` (FC 029 T2.3b).
  */
 function servedRoutes(tree: string): string[] {
   const routes: string[] = [];
@@ -53,7 +55,9 @@ function servedRoutes(tree: string): string[] {
     const start = line.search(/[^│├└─\s]/);
     if (start < 0) continue;
     // "segment (GET, HEAD)": the methods sit in the last parentheses, when the node has any.
-    const [segment, list = ''] = line.slice(start).split(' (');
+    const [label, list = ''] = line.slice(start).split(' (');
+    // The compressed tree's root is "(empty root node)": no path of its own.
+    const segment = label.startsWith('(') ? '' : label;
     const depth = start / 4;
     // Top-level routes already sit one level in ("└── /health"), with no parent above them.
     const path = (parents[depth - 1] ?? '') + segment;
@@ -85,7 +89,7 @@ describe('route registry ↔ Fastify (ADR 0014: 1:1 in both directions)', () => 
       logger: false,
     });
     await app.ready();
-    const served = servedRoutes(app.printRoutes({ commonPrefix: false }));
+    const served = servedRoutes(app.printRoutes());
     await app.close();
     const declared = ROUTE_CONTRACTS.map(
       ({ method, path }) => `${method} ${path}`

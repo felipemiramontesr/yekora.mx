@@ -5,7 +5,8 @@
  *
  * FC 028 adds three letters:
  * - T2.3a: a `/v1/admin` route needs a granular permission, never the buyer's `account:self`.
- * - T2.3c: a `DELETE` route may only refuse (405); no master entity is ever deleted.
+ * - T2.3c: a `DELETE` route may only refuse (405); no master entity is ever deleted. FC 029
+ *   T1.1: a guarded DELETE may also carry the guard's 401, 403 and 503, which come first.
  * - T2.6a: the one public route a private prefix may hold is a 405 refusal, which answers
  *   nothing else and reveals nothing.
  *
@@ -37,6 +38,21 @@ const under = (path: string, prefix: string) =>
 const onlyRefuses = (route: PermissionedRoute) =>
   Object.keys(route.responses ?? {}).join() === '405';
 
+/** What the session guard may answer before a guarded route runs (lib/guard.ts). */
+const GUARD_REFUSALS = new Set(['401', '403', '503']);
+
+/**
+ * Whether a route answers 405 and nothing else of its own: the guard's refusals may come first
+ * (FC 029 T1.1: a catalog DELETE without `catalog:write` is CAT_FORBIDDEN before the 405).
+ */
+const refusesBehindGuard = (route: PermissionedRoute) => {
+  const statuses = Object.keys(route.responses ?? {});
+  return (
+    statuses.includes('405') &&
+    statuses.every((status) => status === '405' || GUARD_REFUSALS.has(status))
+  );
+};
+
 /**
  * Finds every route that breaks the route ↔ permission rule.
  *
@@ -63,7 +79,7 @@ export function routePermissionViolations(
       violations.push(`${at}: private route declared public`);
     if (under(path, '/v1/admin') && permission === SELF_PERMISSION)
       violations.push(`${at}: panel route without a granular permission`);
-    if (method === 'DELETE' && !onlyRefuses(route))
+    if (method === 'DELETE' && !refusesBehindGuard(route))
       violations.push(`${at}: DELETE must only refuse (405)`);
   }
   return violations;

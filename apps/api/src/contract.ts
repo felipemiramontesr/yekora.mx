@@ -50,7 +50,9 @@ import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
-import { MEDIA_TYPES, mediaParams } from './routes/media';
+import { mediaUploadedSchema, mutationHeaders } from './routes/catalogAdmin';
+import { mediaParams } from './routes/media';
+import { SAFE_IMAGE_TYPES } from './services/imageProbe';
 import {
   BEARER,
   ORDER_NUMBER,
@@ -212,7 +214,7 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       404: problemSchema,
       500: problemSchema,
     },
-    binary: MEDIA_TYPES,
+    binary: SAFE_IMAGE_TYPES,
   },
   {
     method: 'POST',
@@ -374,4 +376,31 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     },
   },
   ...ORDER_PATHS.flatMap(readOnly),
+  // FC 029 F2: the catalog backoffice. Every write needs catalog:write and an Idempotency-Key.
+  {
+    method: 'POST',
+    path: '/v1/admin/catalog/media',
+    summary:
+      'Upload one cropped image (raw WebP, JPEG or PNG bytes), stored once per SHA-256',
+    permission: 'catalog:write',
+    request: { headers: mutationHeaders, rawBody: true },
+    responses: {
+      201: mediaUploadedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      413: problemSchema,
+      415: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/admin/catalog/*',
+    summary:
+      'Refused: nothing in the catalog is deleted; retiring is is_active = 0',
+    permission: 'catalog:write',
+    request: {},
+    responses: { 405: problemSchema, ...SIGNED_IN_REFUSALS },
+  },
 ];

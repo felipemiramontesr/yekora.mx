@@ -11,7 +11,7 @@
  * @module
  */
 import type { onResponseAsyncHookHandler } from 'fastify';
-import type { Db } from './db';
+import type { Db, TxQuery } from './db';
 
 /** What replaces a personal or secret value. */
 const REDACTED = '[redacted]';
@@ -59,12 +59,16 @@ interface AuditEntry {
 }
 
 /**
- * Writes one entry, redacted.
+ * Writes one entry, redacted. FC 029 T2.4: a catalog mutation writes its entry inside its own
+ * transaction, so the change and its trace commit or roll back together.
  *
- * @param db - Database port.
+ * @param db - Database port, or the transaction of the mutation.
  * @param entry - What happened.
  */
-async function recordAudit(db: Db, entry: AuditEntry): Promise<void> {
+export async function recordAudit(
+  db: TxQuery,
+  entry: AuditEntry
+): Promise<void> {
   const json = (state: unknown) =>
     state === null ? null : JSON.stringify(redactPii(state));
   await db.query(

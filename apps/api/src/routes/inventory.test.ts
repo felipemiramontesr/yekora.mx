@@ -41,10 +41,13 @@ const INVENTORY = [
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  // FC 029 F2: the catalog backoffice (catalog:write). Its DELETE /v1/admin/catalog/* refusal
+  // is a wildcard this view does not print; routes/catalogAdmin.test.ts proves its 405.
+  '├── /v1/admin/catalog/media (POST)',
+  '├── * (OPTIONS)',
   // FC 012: payment notifications, accepted only with the processor's signature.
   '├── /v1/webhooks/stripe (POST)',
-  '├── /v1/webhooks/mercadopago (POST)',
-  '└── * (OPTIONS)',
+  '└── /v1/webhooks/mercadopago (POST)',
   '',
 ].join('\n');
 
@@ -204,14 +207,19 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     }
   });
 
-  it('OWASP-A01 · keeps the panel to its read-only orders: no other /admin or /v1/admin route exists', () => {
+  it('OWASP-A01 · keeps the panel to read-only orders and the catalog: no other /admin or /v1/admin route exists', () => {
     const panel = app
       .printRoutes({ commonPrefix: false })
       .split('\n')
       .filter((line) => /\/admin\b/.test(line));
     expect(panel).toEqual([
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
+      '├── /v1/admin/catalog/media (POST)',
     ]);
+    // The one DELETE under the catalog is the wildcard refusal (FC 029 T2.3b).
+    expect(app.printRoutes({ method: 'DELETE' })).toMatch(
+      /catalog\/\n.*└── \* \(DELETE\)/
+    );
   });
 
   it('OWASP-A01 · reads its one cookie by hand: no cookie, session or credential plugin', () => {

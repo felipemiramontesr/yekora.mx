@@ -9,11 +9,17 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
-import { auditTrail } from './services/audit';
-import { findProduct, listProducts } from './services/catalog';
+import { auditTrail, recordAudit } from './services/audit';
+import {
+  findProduct,
+  findProductMedia,
+  listProducts,
+} from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
 import { codeHash, encryptTotpSecret, newToken } from './services/authCrypto';
 import { createDb } from './services/db';
+import { runIdempotent } from './services/idempotency';
+import { inspectMedia, readMedia, storeMedia } from './services/media';
 import {
   capabilitiesOf,
   closeSession,
@@ -959,5 +965,125 @@ describe('unified catalog, media and idempotency of migration 006 (FC 029 F0)', 
         [sha('d'), sha('e')]
       )
     ).rejects.toThrow('fk_idemp_user');
+  });
+});
+
+describe('catalog backoffice on real SQL (FC 029 F1 and F2a)', () => {
+  const sha = (letter: string) => letter.repeat(64);
+
+  /** A PNG header of a canonical size, enough for the probe and the CHECKs of migration 006. */
+  function png(width: number, height: number): Buffer {
+    const bytes = Buffer.alloc(64);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(bytes);
+    bytes.writeUInt32BE(13, 8);
+    bytes.write('IHDR', 12, 'latin1');
+    bytes.writeUInt32BE(width, 16);
+    bytes.writeUInt32BE(height, 20);
+    return bytes;
+  }
+
+  it('reads the active gallery of a product, primary first, and a blob by its digest (F1)', async () => {
+    const [{ id: productId }] = await db.query<{ id: number }>(
+      "SELECT id FROM products WHERE sku = 'ITEST-PACK'"
+    );
+    for (const letter of ['b', 'c']) {
+      await db.query(
+        'INSERT INTO media_blobs (sha256, mime_type, width, height, size_bytes, media_data) VALUES (?, ?, 300, 300, 4, ?)',
+        [sha(letter), 'image/png', Buffer.from(letter.repeat(4))]
+      );
+    }
+    await db.query(
+      "INSERT INTO product_media (product_id, media_sha256, alt_text_es, sort_order, is_primary, is_active) VALUES (?, ?, 'Lado', 1, 0, 1), (?, ?, NULL, 2, 0, 0)",
+      [productId, sha('b'), productId, sha('c')]
+    );
+    const gallery = await findProductMedia(db, 'itest-pack');
+    expect(gallery.map((image) => image.sha256)).toEqual([sha('a'), sha('b')]);
+    expect(gallery[1]).toMatchObject({
+      alt_text_es: 'Lado',
+      alt_text_en: null,
+    });
+    await expect(readMedia(db, sha('b'))).resolves.toEqual({
+      mimeType: 'image/png',
+      data: Buffer.from('bbbb'),
+    });
+    await expect(readMedia(db, sha('9'))).resolves.toBeNull();
+  });
+
+  it('uploads once per key: stores the blob, its idempotency row and its audit entry together (F2a)', async () => {
+    const passwordHash = await hashPassword('catalog suite passphrase');
+    await createCustomer(db, {
+      email: 'catalog@example.test',
+      passwordHash,
+      fullName: 'Catalog',
+    });
+    const userId = String(
+      (await findUserByEmail(db, 'catalog@example.test'))?.id
+    );
+    const image = png(600, 400);
+    const verdict = inspectMedia(image, 'image/png');
+    if (verdict.code !== 'MEDIA_ACCEPTED') throw new Error(verdict.code);
+    const request = {
+      userId,
+      key: 'itest-upload-1',
+      route: 'POST /v1/admin/catalog/media',
+      requestHash: sha('1'),
+      now: NOW,
+    };
+    const upload = () =>
+      runIdempotent(db, request, async (tx) => {
+        const created = await storeMedia(tx, image, verdict);
+        await recordAudit(tx, {
+          userId,
+          action: 'POST /v1/admin/catalog/media',
+          entityType: 'media',
+          entityId: verdict.sha256,
+          before: null,
+          after: { created },
+          ip: '127.0.0.1',
+        });
+        return { status: 201, body: { sha256: verdict.sha256, created } };
+      });
+    await expect(upload()).resolves.toMatchObject({
+      code: 'IDEMP_FIRST_EXECUTION',
+      answer: { status: 201, body: { created: true } },
+    });
+    await expect(upload()).resolves.toMatchObject({
+      code: 'IDEMP_REPLAY_SUCCESS',
+      answer: { status: 201, body: { sha256: verdict.sha256, created: true } },
+    });
+    await expect(
+      runIdempotent(db, { ...request, requestHash: sha('2') }, async () => ({
+        status: 201,
+        body: {},
+      }))
+    ).resolves.toEqual({ code: 'IDEMP_PAYLOAD_MISMATCH' });
+    const counts = await db.query<{
+      blobs: number;
+      idem: number;
+      audit: number;
+    }>(
+      "SELECT (SELECT COUNT(*) FROM media_blobs WHERE sha256 = ?) AS blobs, (SELECT COUNT(*) FROM idempotency_keys WHERE user_id = ?) AS idem, (SELECT COUNT(*) FROM audit_log WHERE entity_type = 'media' AND entity_id = ?) AS audit",
+      [verdict.sha256, userId, verdict.sha256]
+    );
+    expect(Object.values(counts[0]).map(Number)).toEqual([1, 1, 1]);
+    // A crashed mutation leaves neither its blob nor its key (one transaction, T2.3a).
+    await expect(
+      runIdempotent(
+        db,
+        { ...request, key: 'itest-upload-2', requestHash: sha('3') },
+        async (tx) => {
+          await storeMedia(tx, png(300, 300), {
+            ...verdict,
+            sha256: sha('7'),
+          });
+          throw new Error('crash after the insert');
+        }
+      )
+    ).rejects.toThrow('crash after the insert');
+    const [left] = await db.query<{ n: number }>(
+      'SELECT (SELECT COUNT(*) FROM media_blobs WHERE sha256 = ?) + (SELECT COUNT(*) FROM idempotency_keys WHERE user_id = ? AND route = ? AND request_hash = ?) AS n',
+      [sha('7'), userId, request.route, sha('3')]
+    );
+    expect(Number(left.n)).toBe(0);
   });
 });
