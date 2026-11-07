@@ -100833,6 +100833,82 @@ function registerCatalogProductRoutes(app, deps) {
   });
 }
 
+// src/services/publish.ts
+var DISPATCH_URL = "https://api.github.com/repos/felipemiramontesr/yekora.mx/actions/workflows/deploy.yml/dispatches";
+var TIMEOUT_MS = 1e4;
+async function dispatchDeploy(token, fetchImpl = fetch) {
+  try {
+    const answer = await fetchImpl(DISPATCH_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "User-Agent": "yekora-api"
+      },
+      body: JSON.stringify({ ref: "main" }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    return answer.status === 204 ? "CAT_PUBLISH_REQUESTED" : "CAT_PUBLISH_FAILED";
+  } catch {
+    return "CAT_PUBLISH_FAILED";
+  }
+}
+
+// src/routes/catalogPublish.ts
+var publishRequestedSchema = external_exports.object({
+  code: external_exports.literal("CAT_PUBLISH_REQUESTED"),
+  workflow: external_exports.literal("deploy.yml"),
+  ref: external_exports.literal("main"),
+  requestedAt: external_exports.iso.datetime()
+});
+function registerCatalogPublishRoute(app, deps) {
+  app.post(
+    "/v1/admin/catalog/publish",
+    { config: { rateLimit: { max: 3, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const token = deps.publishToken;
+      if (token === null) {
+        return refuse(
+          reply,
+          503,
+          "Publishing unavailable",
+          "CAT_PUBLISH_UNAVAILABLE"
+        );
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        const outcome = await dispatchDeploy(token);
+        if (outcome === "CAT_PUBLISH_FAILED") {
+          return {
+            status: 502,
+            body: problem(502, "GitHub did not queue the publication", outcome)
+          };
+        }
+        const published = {
+          workflow: "deploy.yml",
+          ref: "main",
+          requestedAt: deps.now().toISOString()
+        };
+        await recordAudit(tx, {
+          userId,
+          action: "POST /v1/admin/catalog/publish",
+          entityType: "publish",
+          entityId: "deploy.yml",
+          before: null,
+          after: published,
+          ip: request.ip
+        });
+        return { status: 202, body: { code: outcome, ...published } };
+      });
+    }
+  );
+}
+
 // src/routes/catalogAdmin.ts
 var mediaUploadedSchema = external_exports.object({
   code: external_exports.literal("MEDIA_ACCEPTED"),
@@ -100894,6 +100970,7 @@ function registerCatalogAdminRoutes(app, deps) {
   );
   registerCatalogEntityRoutes(app, deps);
   registerCatalogProductRoutes(app, deps);
+  registerCatalogPublishRoute(app, deps);
   app.delete(
     "/v1/admin/catalog/*",
     (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
@@ -101756,7 +101833,21 @@ var ROUTE_CONTRACTS = [
       answer: adminProductSchema,
       references: true
     }
-  )
+  ),
+  {
+    method: "POST",
+    path: "/v1/admin/catalog/publish",
+    summary: "Rebuild the store: dispatch deploy.yml on main, through every gate (FC 029 T2.5)",
+    permission: "catalog:write",
+    request: { headers: mutationHeaders },
+    responses: {
+      202: publishRequestedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  }
 ];
 
 // src/services/identity.ts
@@ -102845,7 +102936,7 @@ function remoteDeadline(expiresAt) {
 
 // src/services/mercadoPagoAdapter.ts
 var MP_API = "https://api.mercadopago.com";
-var TIMEOUT_MS = 1e4;
+var TIMEOUT_MS2 = 1e4;
 var PAYMENT_TYPES = [
   "credit_card",
   "debit_card",
@@ -102864,7 +102955,7 @@ async function isTestAccount(accessToken, fetchImpl) {
   try {
     const answer = await fetchImpl(`${MP_API}/users/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      signal: AbortSignal.timeout(TIMEOUT_MS2)
     });
     if (!answer.ok) return null;
     const { tags } = await answer.json();
@@ -102899,7 +102990,7 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
         Authorization: `Bearer ${secrets.accessToken}`,
         "Content-Type": "application/json"
       },
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      signal: AbortSignal.timeout(TIMEOUT_MS2)
     });
     if (!answer.ok) {
       throw new PaymentProcessorError(`Mercado Pago: HTTP ${answer.status}`);
@@ -116262,7 +116353,7 @@ function createTableRateProvider(db) {
 var import_node_crypto17 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
-var TIMEOUT_MS2 = 1e4;
+var TIMEOUT_MS3 = 1e4;
 var MIN_SESSION_MS = 30 * 60 * 1e3;
 var MAX_SESSION_MS = 24 * 60 * 60 * 1e3;
 var SIGNATURE_TOLERANCE_S = 300;
@@ -116333,7 +116424,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         "Stripe-Version": STRIPE_VERSION,
         ...init.headers
       },
-      signal: AbortSignal.timeout(TIMEOUT_MS2)
+      signal: AbortSignal.timeout(TIMEOUT_MS3)
     });
     if (!answer.ok) {
       throw new PaymentProcessorError(`Stripe: HTTP ${answer.status}`);
@@ -116526,7 +116617,11 @@ async function buildApp(deps) {
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
-  registerCatalogAdminRoutes(app, { db: deps.db, now });
+  registerCatalogAdminRoutes(app, {
+    db: deps.db,
+    now,
+    publishToken: deps.config.publishToken
+  });
   registerOrderWriteRefusals(app);
   app.addHook("onResponse", auditTrail(deps.db));
   await registerWebhookRoutes(app, {
@@ -116560,6 +116655,7 @@ var schema = external_exports.object({
     "must be a Yekora database"
   ),
   BANXICO_TOKEN: external_exports.string().optional(),
+  GITHUB_PUBLISH_TOKEN: external_exports.string().optional(),
   API_VERSION: external_exports.string().default("0.8.6"),
   GIT_SHA: external_exports.string().default("dev"),
   PAYMENTS_MODE: external_exports.enum(["sandbox", "live"]).default("sandbox"),
@@ -116667,6 +116763,7 @@ function loadConfig(env2) {
       database: parsed.DB_NAME
     },
     banxicoToken: parsed.BANXICO_TOKEN || void 0,
+    publishToken: parsed.GITHUB_PUBLISH_TOKEN || null,
     version: parsed.API_VERSION,
     sha: parsed.GIT_SHA,
     payments: loadPayments(parsed),
@@ -116838,7 +116935,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "57220b1d152aa9f2199c800e75d2797ba8a7f5dd" : void 0;
+var sha = true ? "7186f321006a7ef1492bbc7beee4b1b2c85ad703" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
