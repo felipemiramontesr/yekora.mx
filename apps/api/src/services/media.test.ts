@@ -1,13 +1,8 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Db } from './db';
-import {
-  inspectMedia,
-  matchesDigest,
-  readMedia,
-  SHA256_HEX,
-  storeMedia,
-} from './media';
+import { inspectMedia, matchesDigest, readMedia, storeMedia } from './media';
+import { SHA256_HEX } from '../../../../lib/catalog/adminTypes';
 
 const bytes = Buffer.from('RIFF\x00\x00\x00\x00WEBPVP8 ', 'latin1');
 const digest = createHash('sha256').update(bytes).digest('hex');

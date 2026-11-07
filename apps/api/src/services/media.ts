@@ -11,7 +11,8 @@
  */
 import { createHash } from 'node:crypto';
 import type { Db, TxQuery } from './db';
-import { probeImage, type SafeImageType } from './imageProbe';
+import type { SafeImageType } from '../../../../lib/catalog/adminTypes';
+import { probeImage } from './imageProbe';
 
 /** Largest image the store accepts: 2 MB (T1.2 S, CHECK `ck_media_blobs_size`). */
 const MAX_MEDIA_BYTES = 2_097_152;
@@ -103,9 +104,6 @@ export async function storeMedia(
   );
   return true;
 }
-
-/** A SHA-256 digest as `media_blobs` stores it: 64 lowercase hex characters. */
-export const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 /** One stored image: its type and its bytes. */
 interface StoredMedia {

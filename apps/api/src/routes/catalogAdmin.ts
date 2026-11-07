@@ -17,27 +17,14 @@
  * @module
  */
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { recordAudit } from '../services/audit';
 import { checkIdempotencyKey } from '../services/idempotency';
-import { SAFE_IMAGE_TYPES } from '../services/imageProbe';
-import { inspectMedia, SHA256_HEX, storeMedia } from '../services/media';
+import { inspectMedia, storeMedia } from '../services/media';
 import { registerCatalogEntityRoutes } from './catalogEntities';
 import { registerCatalogProductRoutes } from './catalogProducts';
 import { registerCatalogPublishRoute } from './catalogPublish';
 import { type CatalogAdminDeps, refuse, runOnce } from './catalogMutation';
-
-/** Answer of an accepted upload: the digest the image is served under and what was probed. */
-export const mediaUploadedSchema = z.object({
-  code: z.literal('MEDIA_ACCEPTED'),
-  created: z.boolean(),
-  sha256: z.string().regex(SHA256_HEX),
-  mimeType: z.enum(SAFE_IMAGE_TYPES),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  sizeBytes: z.number().int().positive(),
-});
 
 /** Largest body read from an upload: twice the 2 MB limit, so the service names the refusal. */
 const UPLOAD_READ_LIMIT = 4 * 1024 * 1024;

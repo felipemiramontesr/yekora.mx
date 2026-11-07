@@ -21,6 +21,7 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
+import { CatalogConsole } from './catalog/CatalogConsole';
 
 /** Props of {@link AccountApp}. */
 interface AccountAppProps {
@@ -44,6 +45,9 @@ type Stage =
 
 /** The permission that opens the panel's orders. */
 const PANEL_PERMISSION = 'orders:read';
+
+/** The permission that opens the catalog console (FC 029 F3). */
+const CATALOG_PERMISSION = 'catalog:write';
 
 const signedOut = (notice: string | null = null): Stage => ({
   kind: 'signIn',
@@ -192,11 +196,16 @@ function Dashboard({
   const [leaving, setLeaving] = useState(false);
   const [forgetting, setForgetting] = useState(false);
   const [deviceNote, setDeviceNote] = useState<string | null>(null);
-  const panel = user.permissions.includes(PANEL_PERMISSION);
-  // Without the permission the panel is not offered; the API would refuse it anyway.
-  const tab = panel ? view.tab : 'orders';
+  // A tab is offered only with its permission; the API would refuse it anyway.
+  const tabs = (['orders', 'panel', 'catalog'] as const).filter(
+    (name) =>
+      name === 'orders' ||
+      user.permissions.includes(
+        name === 'panel' ? PANEL_PERMISSION : CATALOG_PERMISSION
+      )
+  );
+  const tab = tabs.includes(view.tab) ? view.tab : 'orders';
   const scope = tab === 'panel' ? 'admin' : 'account';
-  const tabs = panel ? (['orders', 'panel'] as const) : (['orders'] as const);
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
 
   return (
@@ -257,7 +266,8 @@ function Dashboard({
           ))}
         </ul>
       </nav>
-      {view.orderNumber ? (
+      {tab === 'catalog' && <CatalogConsole texts={texts.account.catalog} />}
+      {tab !== 'catalog' && view.orderNumber && (
         <OrderDetailView
           scope={scope}
           orderNumber={view.orderNumber}
@@ -266,7 +276,8 @@ function Dashboard({
           backHref={accountPath(area, { tab, orderNumber: null })}
           onBack={() => open(null)}
         />
-      ) : (
+      )}
+      {tab !== 'catalog' && !view.orderNumber && (
         <OrderList
           key={scope}
           scope={scope}

@@ -16,6 +16,26 @@
  */
 import { z } from 'zod';
 import {
+  adminProductPageSchema,
+  adminProductSchema,
+  brandCreate,
+  brandPatch,
+  brandSchema,
+  facetGroupCreate,
+  facetGroupPatch,
+  facetGroupSchema,
+  facetValueCreate,
+  facetValuePatch,
+  facetValueSchema,
+  galleryPatch,
+  mediaUploadedSchema,
+  productCreate,
+  productListQuery,
+  productPatch,
+  publishRequestedSchema,
+  SAFE_IMAGE_TYPES,
+} from '../../../lib/catalog/adminTypes';
+import {
   exchangeRateSchema,
   productSchema,
 } from '../../../lib/api/catalogClient';
@@ -50,30 +70,8 @@ import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
 import { cartQuoteRequestSchema } from './routes/cart';
 import { catalogItemParams, catalogListQuery } from './routes/catalog';
-import { mediaUploadedSchema } from './routes/catalogAdmin';
-import {
-  brandCreate,
-  brandPatch,
-  brandSchema,
-  facetGroupCreate,
-  facetGroupPatch,
-  facetGroupSchema,
-  facetValueCreate,
-  facetValuePatch,
-  facetValueSchema,
-} from './routes/catalogEntities';
 import { idParams, mutationHeaders } from './routes/catalogMutation';
-import { publishRequestedSchema } from './routes/catalogPublish';
-import {
-  adminProductPageSchema,
-  adminProductSchema,
-  galleryPatch,
-  productCreate,
-  productListQuery,
-  productPatch,
-} from './routes/catalogProducts';
 import { mediaParams } from './routes/media';
-import { SAFE_IMAGE_TYPES } from './services/imageProbe';
 import {
   BEARER,
   ORDER_NUMBER,

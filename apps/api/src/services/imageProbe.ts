@@ -8,15 +8,7 @@
  * @module
  */
 
-/** The types the store accepts (CHECK `ck_media_blobs_mime` of migration 006). */
-export const SAFE_IMAGE_TYPES = [
-  'image/webp',
-  'image/jpeg',
-  'image/png',
-] as const;
-
-/** One of {@link SAFE_IMAGE_TYPES}. */
-export type SafeImageType = (typeof SAFE_IMAGE_TYPES)[number];
+import type { SafeImageType } from '../../../../lib/catalog/adminTypes';
 
 /** What the header says: the real type and the pixel size. */
 interface ImageProbe {

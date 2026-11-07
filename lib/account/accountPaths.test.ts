@@ -31,3 +31,20 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
     );
   });
 });
+
+describe('catalog console path (FC 029 F3)', () => {
+  it('reads and writes /catalogo/ in both languages, whatever follows it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}catalogo/`, area)).toEqual({
+        tab: 'catalog',
+        orderNumber: null,
+      });
+      expect(parseAccountPath(`${area}catalogo/marcas/`, area).tab).toBe(
+        'catalog'
+      );
+      expect(accountPath(area, { tab: 'catalog', orderNumber: null })).toBe(
+        `${area}catalogo/`
+      );
+    }
+  });
+});

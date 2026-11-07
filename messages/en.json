@@ -711,7 +711,8 @@
       "panel": "Panel: orders",
       "forgetDevice": "Forget this device",
       "forgettingDevice": "Forgetting…",
-      "deviceForgotten": "Done. Next time you sign in from here we will ask for the code."
+      "deviceForgotten": "Done. Next time you sign in from here we will ask for the code.",
+      "catalog": "Catalog"
     },
     "orders": {
       "loading": "Loading orders…",
@@ -784,6 +785,59 @@
       "passwordLength": "The password needs at least 12 characters.",
       "BOT_CHALLENGE_REQUIRED": "We could not confirm you are a person. Reload the page and try again.",
       "BOT_CHALLENGE_FAILED": "The security check expired. Try again."
+    },
+    "catalog": {
+      "sectionsLabel": "Catalog sections",
+      "sections": {
+        "brands": "Brands",
+        "publish": "Publish"
+      },
+      "loading": "Loading…",
+      "brands": {
+        "caption": "Brands, active and retired",
+        "name": "Name",
+        "slug": "Identifier",
+        "website": "Website",
+        "status": "Status",
+        "actions": "Actions",
+        "active": "Active",
+        "retired": "Retired",
+        "empty": "No brands yet.",
+        "new": "New brand",
+        "slugHint": "Lowercase letters, numbers and hyphens, e.g. \"cumbre-mx\". It does not change later.",
+        "websiteHint": "Optional. Must start with https://",
+        "create": "Create brand",
+        "creating": "Creating…",
+        "created": "Brand created.",
+        "edit": "Edit",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Changes saved.",
+        "cancel": "Cancel",
+        "retire": "Retire",
+        "reactivate": "Reactivate"
+      },
+      "publish": {
+        "title": "Publish changes",
+        "explain": "Catalog changes are saved right away, but the store shows them only after you publish. Publishing checks everything and rebuilds the store; it takes 15 to 20 minutes.",
+        "button": "Publish changes",
+        "publishing": "Sending…",
+        "requested": "Done. We requested the publication at {time}. The store will update in 15 to 20 minutes."
+      },
+      "errors": {
+        "CAT_VALIDATION_ERROR": "Check the data: a field is empty or has an invalid format.",
+        "CAT_CONFLICT": "That identifier already exists. Choose another.",
+        "CAT_NOT_FOUND": "That record no longer exists. Reload the page.",
+        "CAT_FORBIDDEN": "Your account has no permission for the catalog.",
+        "CAT_SYSTEM_GROUP_LOCKED": "The Level group belongs to the system: it cannot be retired nor its values changed.",
+        "CAT_PUBLISH_UNAVAILABLE": "Publishing is not configured on the server yet.",
+        "CAT_PUBLISH_FAILED": "GitHub did not accept the publication. Try again in a few minutes.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Try again.",
+        "unknown": "Something went wrong. Try again."
+      }
     }
   }
 }

@@ -711,7 +711,8 @@
       "panel": "Panel: pedidos",
       "forgetDevice": "Olvidar este dispositivo",
       "forgettingDevice": "Olvidando…",
-      "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código."
+      "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código.",
+      "catalog": "Catálogo"
     },
     "orders": {
       "loading": "Cargando pedidos…",
@@ -784,6 +785,59 @@
       "passwordLength": "La contraseña necesita al menos 12 caracteres.",
       "BOT_CHALLENGE_REQUIRED": "No pudimos confirmar que eres una persona. Recarga la página e intenta de nuevo.",
       "BOT_CHALLENGE_FAILED": "La verificación de seguridad venció. Intenta de nuevo."
+    },
+    "catalog": {
+      "sectionsLabel": "Secciones del catálogo",
+      "sections": {
+        "brands": "Marcas",
+        "publish": "Publicar"
+      },
+      "loading": "Cargando…",
+      "brands": {
+        "caption": "Marcas, activas y retiradas",
+        "name": "Nombre",
+        "slug": "Identificador",
+        "website": "Sitio web",
+        "status": "Estado",
+        "actions": "Acciones",
+        "active": "Activa",
+        "retired": "Retirada",
+        "empty": "Aún no hay marcas.",
+        "new": "Nueva marca",
+        "slugHint": "Minúsculas, números y guiones, por ejemplo «cumbre-mx». No cambia después.",
+        "websiteHint": "Opcional. Debe empezar con https://",
+        "create": "Crear marca",
+        "creating": "Creando…",
+        "created": "Marca creada.",
+        "edit": "Editar",
+        "save": "Guardar",
+        "saving": "Guardando…",
+        "saved": "Cambios guardados.",
+        "cancel": "Cancelar",
+        "retire": "Retirar",
+        "reactivate": "Reactivar"
+      },
+      "publish": {
+        "title": "Publicar cambios",
+        "explain": "Los cambios del catálogo se guardan al momento, pero la tienda los muestra hasta que publicas. Al publicar, el sistema revisa todo y vuelve a armar la tienda; tarda de 15 a 20 minutos.",
+        "button": "Publicar cambios",
+        "publishing": "Enviando…",
+        "requested": "Listo. Pedimos la publicación a las {time}. La tienda se actualizará en 15 a 20 minutos."
+      },
+      "errors": {
+        "CAT_VALIDATION_ERROR": "Revisa los datos: hay un campo vacío o con un formato no válido.",
+        "CAT_CONFLICT": "Ese identificador ya existe. Elige otro.",
+        "CAT_NOT_FOUND": "Ese registro ya no existe. Recarga la página.",
+        "CAT_FORBIDDEN": "Tu cuenta no tiene permiso para el catálogo.",
+        "CAT_SYSTEM_GROUP_LOCKED": "El grupo Nivel es del sistema: no se puede retirar ni cambiar sus valores.",
+        "CAT_PUBLISH_UNAVAILABLE": "La publicación todavía no está configurada en el servidor.",
+        "CAT_PUBLISH_FAILED": "GitHub no aceptó la publicación. Inténtalo de nuevo en unos minutos.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
+      }
     }
   }
 }

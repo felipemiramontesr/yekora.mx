@@ -5,15 +5,16 @@
  * the same in both languages, so the language switcher keeps the open order:
  *
  * - `{area}` my orders · `{area}{order}/` one of them;
- * - `{area}panel/` every order (staff) · `{area}panel/{order}/` one of them.
+ * - `{area}panel/` every order (staff) · `{area}panel/{order}/` one of them;
+ * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`).
  *
  * @module
  */
 
 /** Which list, and which order of it, the area shows. */
 export interface AccountView {
-  /** The buyer's own orders, or the panel's. */
-  tab: 'orders' | 'panel';
+  /** The buyer's own orders, the panel's, or the catalog console. */
+  tab: 'orders' | 'panel' | 'catalog';
   /** The open order, or null for the list. */
   orderNumber: string | null;
 }
@@ -31,6 +32,7 @@ const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
 export function parseAccountPath(pathname: string, area: string): AccountView {
   const rest = pathname.startsWith(area) ? pathname.slice(area.length) : '';
   const [first = '', second = ''] = rest.split('/');
+  if (first === 'catalogo') return { tab: 'catalog', orderNumber: null };
   if (first === 'panel') {
     return {
       tab: 'panel',
@@ -51,6 +53,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
  * @returns e.g. `/cuenta/panel/YEK-2026-AB12CD34/`.
  */
 export function accountPath(area: string, view: AccountView): string {
+  if (view.tab === 'catalog') return `${area}catalogo/`;
   const tab = view.tab === 'panel' ? 'panel/' : '';
   const order = view.orderNumber ? `${view.orderNumber}/` : '';
   return `${area}${tab}${order}`;

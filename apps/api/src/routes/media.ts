@@ -13,7 +13,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import type { Db } from '../services/db';
-import { matchesDigest, readMedia, SHA256_HEX } from '../services/media';
+import { SHA256_HEX } from '../../../../lib/catalog/adminTypes';
+import { matchesDigest, readMedia } from '../services/media';
 
 /** Path parameters of `GET /v1/media/:sha256`; also the request of the API contract. */
 export const mediaParams = z.object({ sha256: z.string().regex(SHA256_HEX) });

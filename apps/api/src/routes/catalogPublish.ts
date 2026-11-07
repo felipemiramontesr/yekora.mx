@@ -12,20 +12,11 @@
  * @module
  */
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import { problem } from '../lib/problem';
 import { recordAudit } from '../services/audit';
 import { checkIdempotencyKey } from '../services/idempotency';
 import { dispatchDeploy } from '../services/publish';
 import { type CatalogAdminDeps, refuse, runOnce } from './catalogMutation';
-
-/** Answer of an accepted publication: what GitHub was asked to run, and when. */
-export const publishRequestedSchema = z.object({
-  code: z.literal('CAT_PUBLISH_REQUESTED'),
-  workflow: z.literal('deploy.yml'),
-  ref: z.literal('main'),
-  requestedAt: z.iso.datetime(),
-});
 
 /**
  * Registers the publish route.
