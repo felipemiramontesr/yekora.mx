@@ -82,25 +82,14 @@ describe('listProducts', () => {
 });
 
 describe('findProduct', () => {
-  it('returns the product with its images in display order', async () => {
-    const image = {
-      path: '/images/products/tent.webp',
-      alt_es: 'Tienda',
-      alt_en: 'Tent',
-    };
-    const { db, calls } = scriptedDb([tent], [image]);
-    await expect(findProduct(db, 'tienda-expedicion')).resolves.toEqual({
-      product: tent,
-      images: [image],
-    });
-    expect(calls.map((call) => call.params)).toEqual([
-      ['tienda-expedicion'],
-      ['tienda-expedicion'],
-    ]);
-    expect(calls[1].sql).toContain('ORDER BY i.sort_order ASC');
+  it('returns the product in one query, never reading the retired product_images (FC 029 T0.2)', async () => {
+    const { db, calls } = scriptedDb([tent]);
+    await expect(findProduct(db, 'tienda-expedicion')).resolves.toEqual(tent);
+    expect(calls.map((call) => call.params)).toEqual([['tienda-expedicion']]);
+    expect(calls[0].sql).not.toContain('product_images');
   });
 
-  it('returns null for an unknown or inactive product, without loading images', async () => {
+  it('returns null for an unknown or inactive product', async () => {
     const { db, calls } = scriptedDb([]);
     await expect(findProduct(db, 'no-existe')).resolves.toBeNull();
     expect(calls).toHaveLength(1);

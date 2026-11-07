@@ -1,7 +1,7 @@
 /**
  * Real-SQL suite (FC 025 T1.2 S): the API's own services against a migrated MariaDB, with the
  * real pool and no fake `Db`. Only the Database (SQL) job runs it (vitest.db.config.ts), after
- * it has applied migrations 001–005 to its `yekora_ci` service.
+ * it has applied migrations 001–006 to its `yekora_ci` service.
  *
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
@@ -200,7 +200,7 @@ describe('catalog (catalog.ts)', () => {
     );
     expect(page.total).toBeGreaterThanOrEqual(2);
     const found = await findProduct(db, 'itest-pack');
-    expect(found?.product).toMatchObject({
+    expect(found).toMatchObject({
       sku: 'ITEST-PACK',
       level: 'principiante',
     });
@@ -828,5 +828,136 @@ describe('anti-bot nonces and trusted devices of migration 005 (FC 028 Enmienda 
       [userId]
     );
     expect(Number(left.n)).toBe(0);
+  });
+});
+
+describe('unified catalog, media and idempotency of migration 006 (FC 029 F0)', () => {
+  /** How many rows a query counts. */
+  const count = async (sql: string, params: unknown[] = []) =>
+    Number((await db.query<{ n: number }>(sql, params))[0].n);
+  const sha = (letter: string) => letter.repeat(64);
+
+  it('retires product_images (T0.2, T2.1d)', async () => {
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_images'"
+      )
+    ).toBe(0);
+  });
+
+  it('keys every catalog relation with INT UNSIGNED, like products.id (T2.1a)', async () => {
+    const columns = await db.query<{ column_type: string }>(
+      "SELECT COLUMN_TYPE AS column_type FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA = k.TABLE_SCHEMA AND c.TABLE_NAME = k.TABLE_NAME AND c.COLUMN_NAME = k.COLUMN_NAME WHERE k.TABLE_SCHEMA = DATABASE() AND k.REFERENCED_TABLE_NAME IN ('products', 'brands', 'product_facet_groups', 'product_facet_values')"
+    );
+    // product_facet_links (2), product_facet_values, product_media and products.brand_id.
+    expect(columns.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(columns.map((c) => c.column_type))).toEqual(
+      new Set(['int(10) unsigned'])
+    );
+  });
+
+  it('seeds the system group Nivel with one value per experience level, and never lets it be retired (T2.1b)', async () => {
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id JOIN experience_levels l ON l.slug = v.code WHERE g.code = 'nivel' AND g.is_system = 1"
+      )
+    ).toBe(await count('SELECT COUNT(*) AS n FROM experience_levels'));
+    await expect(
+      db.query(
+        "UPDATE product_facet_groups SET is_active = 0 WHERE code = 'nivel'"
+      )
+    ).rejects.toThrow('ck_product_facet_groups_system_active');
+  });
+
+  it('links a facet only to an existing product and value, and drops the link with either (T2.1c)', async () => {
+    const [{ id: productId }] = await db.query<{ id: number }>(
+      "SELECT id FROM products WHERE sku = 'ITEST-PACK'"
+    );
+    const [{ id: valueId }] = await db.query<{ id: number }>(
+      "SELECT v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.code = 'nivel' AND v.code = 'principiante'"
+    );
+    await db.query(
+      'INSERT IGNORE INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
+      [productId, valueId]
+    );
+    await expect(
+      db.query(
+        'INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
+        [999_999, valueId]
+      )
+    ).rejects.toThrow('fk_facet_link_prod');
+    await expect(
+      db.query(
+        'INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
+        [productId, 999_999]
+      )
+    ).rejects.toThrow('fk_facet_link_val');
+    // Read the ids back by code instead of INSERT … RETURNING, which needs MariaDB 10.5+
+    // (the local XAMPP engine is 10.4; CI and production run 11.8).
+    await db.query(
+      "INSERT INTO product_facet_groups (code, name_es, name_en) VALUES ('itest', 'Prueba', 'Test')"
+    );
+    const [{ id: groupId }] = await db.query<{ id: number }>(
+      "SELECT id FROM product_facet_groups WHERE code = 'itest'"
+    );
+    await db.query(
+      "INSERT INTO product_facet_values (group_id, code, value_es, value_en) VALUES (?, 'uno', 'Uno', 'One')",
+      [groupId]
+    );
+    const [{ id: tempValue }] = await db.query<{ id: number }>(
+      "SELECT id FROM product_facet_values WHERE group_id = ? AND code = 'uno'",
+      [groupId]
+    );
+    await db.query(
+      'INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
+      [productId, tempValue]
+    );
+    await db.query('DELETE FROM product_facet_groups WHERE id = ?', [groupId]);
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM product_facet_links WHERE value_id = ?',
+        [tempValue]
+      )
+    ).toBe(0);
+  });
+
+  it('stores each blob once by its SHA-256, only WebP, JPEG or PNG up to 2 MB, and keeps a blob in use (T2.2a, T2.2b)', async () => {
+    const insert = (hash: string, mime: string, bytes: Buffer) =>
+      db.query(
+        'INSERT INTO media_blobs (sha256, mime_type, width, height, size_bytes, media_data) VALUES (?, ?, 300, 300, ?, ?)',
+        [hash, mime, bytes.length, bytes]
+      );
+    await insert(sha('a'), 'image/webp', Buffer.from('webp'));
+    await expect(
+      insert(sha('a'), 'image/webp', Buffer.from('webp'))
+    ).rejects.toThrow('Duplicate entry');
+    await expect(
+      insert(sha('b'), 'image/svg+xml', Buffer.from('<svg/>'))
+    ).rejects.toThrow('ck_media_blobs_mime');
+    await expect(
+      insert(sha('c'), 'image/png', Buffer.alloc(2_097_153))
+    ).rejects.toThrow('ck_media_blobs_size');
+    await expect(
+      insert('NOT-A-DIGEST'.padEnd(64, 'x'), 'image/png', Buffer.from('png'))
+    ).rejects.toThrow('ck_media_blobs_sha256');
+    const [{ id: productId }] = await db.query<{ id: number }>(
+      "SELECT id FROM products WHERE sku = 'ITEST-PACK'"
+    );
+    await db.query(
+      'INSERT INTO product_media (product_id, media_sha256, is_primary) VALUES (?, ?, 1)',
+      [productId, sha('a')]
+    );
+    await expect(
+      db.query('DELETE FROM media_blobs WHERE sha256 = ?', [sha('a')])
+    ).rejects.toThrow('fk_media_blob');
+  });
+
+  it('keeps one idempotency row per key, for an existing user', async () => {
+    await expect(
+      db.query(
+        "INSERT INTO idempotency_keys (key_hash, user_id, route, request_hash, response_status, response_headers, response_body, expires_at) VALUES (?, 'u-nobody', '/v1/admin/catalog/products', ?, 201, '{}', '{}', NOW())",
+        [sha('d'), sha('e')]
+      )
+    ).rejects.toThrow('fk_idemp_user');
   });
 });

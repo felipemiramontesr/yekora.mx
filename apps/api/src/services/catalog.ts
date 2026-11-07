@@ -54,13 +54,6 @@ export interface ProductRow {
   level_name_en: string;
 }
 
-/** An image row of a product. */
-interface ImageRow {
-  path: string;
-  alt_es: string;
-  alt_en: string;
-}
-
 /**
  * One page of active products and the total matching the filters.
  *
@@ -97,24 +90,22 @@ export async function listProducts(
 }
 
 /**
- * One active product by slug, with its images in display order.
+ * One active product by slug.
+ *
+ * Its gallery no longer comes from `product_images`, which migration 006 retired (FC 029 T0.2):
+ * it comes back from `product_media` with `GET /v1/media/:sha256` in FC 029 F1.
  *
  * @param db - Database port.
  * @param slug - Product slug (already validated by the route).
- * @returns The product and its images, or null when it does not exist or is inactive.
+ * @returns The product, or null when it does not exist or is inactive.
  */
 export async function findProduct(
   db: Db,
   slug: string
-): Promise<{ product: ProductRow; images: ImageRow[] } | null> {
+): Promise<ProductRow | null> {
   const [product] = await db.query<ProductRow>(
     'SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
     [slug]
   );
-  if (!product) return null;
-  const images = await db.query<ImageRow>(
-    'SELECT i.path, i.alt_es, i.alt_en FROM product_images i JOIN products p ON p.id = i.product_id WHERE p.slug = ? ORDER BY i.sort_order ASC',
-    [slug]
-  );
-  return { product, images };
+  return product ?? null;
 }

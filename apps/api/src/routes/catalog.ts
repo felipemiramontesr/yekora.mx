@@ -128,13 +128,10 @@ export function registerCatalogRoutes(
         .type(PROBLEM_TYPE)
         .send(problem(404, 'Product not found'));
     }
-    const english = language.data === 'en';
     return {
-      ...present(found.product, language.data, rate ? Number(rate.rate) : null),
-      images: found.images.map((image) => ({
-        path: image.path,
-        alt: english ? image.alt_en : image.alt_es,
-      })),
+      ...present(found, language.data, rate ? Number(rate.rate) : null),
+      // FC 029 F0: no gallery until product_media is served in F1 (production never had images).
+      images: [],
       exchangeRate: rate,
     };
   });

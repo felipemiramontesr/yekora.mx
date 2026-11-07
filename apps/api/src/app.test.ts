@@ -33,19 +33,12 @@ const tent: ProductRow = {
   level_name_es: 'Expedición',
   level_name_en: 'Expedition',
 };
-const image = {
-  path: '/images/products/tent.webp',
-  alt_es: 'Tienda',
-  alt_en: 'Tent',
-};
-
-/** In-memory catalog behind the Db port: one product with one image. */
+/** In-memory catalog behind the Db port: one product. */
 function catalogDb(products: ProductRow[] = [tent]): Db & Transactional {
   return {
     async query<Row>(sql: string, params: readonly unknown[] = []) {
       if (sql.startsWith('SELECT COUNT'))
         return [{ total: products.length }] as Row[];
-      if (sql.startsWith('SELECT i.path')) return [image] as Row[];
       if (sql.includes('WHERE p.slug = ?')) {
         return products.filter((row) => row.slug === params[0]) as Row[];
       }
@@ -236,13 +229,13 @@ describe('GET /v1/catalog', () => {
 });
 
 describe('GET /v1/catalog/:slug', () => {
-  it('returns the product with its images in Spanish', async () => {
+  it('returns the product in Spanish, with no gallery until FC 029 F1', async () => {
     const res = await (await makeApp()).inject('/v1/catalog/tienda-expedicion');
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       name: 'Tienda de expedición',
       priceUsdCents: 26216,
-      images: [{ path: '/images/products/tent.webp', alt: 'Tienda' }],
+      images: [],
       exchangeRate: FIX,
     });
   });
@@ -254,7 +247,7 @@ describe('GET /v1/catalog/:slug', () => {
     expect(res.json()).toMatchObject({
       name: 'Expedition tent',
       priceUsdCents: null,
-      images: [{ alt: 'Tent' }],
+      images: [],
       exchangeRate: null,
     });
   });
