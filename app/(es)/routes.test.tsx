@@ -111,6 +111,9 @@ describe('es-MX routes', () => {
     expect(html).toContain('<h1');
     // The form is in the static page, so it shows before any script or API answer (no jump).
     expect(html).toContain('type="password"');
+    // …disabled until React hydrates, so nothing typed before is lost (FC 035 T1.1).
+    expect(html).toContain('<fieldset disabled=""');
+    expect(html).toContain('method="post"');
     expect(html).not.toContain('Cargando tu cuenta');
   });
 

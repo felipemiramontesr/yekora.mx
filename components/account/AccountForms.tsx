@@ -85,6 +85,11 @@ export function SignInForm({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The form is prerendered so it shows at once (322_AN), but React only owns it once it has
+  // hydrated: until then its fields stay disabled, so nothing typed is lost and nothing is sent
+  // natively (FC 035 T1.1, the same guard as the catalog filters).
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,35 +115,43 @@ export function SignInForm({
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex max-w-md flex-col gap-4">
+    // method="post": even a native submission could never put the password in the URL.
+    <form
+      noValidate
+      method="post"
+      onSubmit={submit}
+      className="flex max-w-md flex-col gap-4"
+    >
       <h2 className="text-2xl font-semibold">{messages.signIn.title}</h2>
       {notice && <output className="block text-sm">{notice}</output>}
       <p className="text-petroleo/80">{messages.signIn.intro}</p>
       <FormAlert text={error} />
-      <Field
-        id={`${base}-email`}
-        label={messages.signIn.email}
-        value={email}
-        onChange={setEmail}
-        input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
-      />
-      <Field
-        id={`${base}-password`}
-        label={messages.signIn.password}
-        value={password}
-        onChange={setPassword}
-        input={{
-          type: 'password',
-          autoComplete: 'current-password',
-          maxLength: 128,
-        }}
-      />
-      <button type="submit" disabled={busy} className={BUTTON}>
-        {busy ? messages.signIn.submitting : messages.signIn.submit}
-      </button>
-      <button type="button" onClick={onRegister} className={LINK_BUTTON}>
-        {messages.signIn.toRegister}
-      </button>
+      <fieldset disabled={!hydrated} className="contents">
+        <Field
+          id={`${base}-email`}
+          label={messages.signIn.email}
+          value={email}
+          onChange={setEmail}
+          input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
+        />
+        <Field
+          id={`${base}-password`}
+          label={messages.signIn.password}
+          value={password}
+          onChange={setPassword}
+          input={{
+            type: 'password',
+            autoComplete: 'current-password',
+            maxLength: 128,
+          }}
+        />
+        <button type="submit" disabled={busy} className={BUTTON}>
+          {busy ? messages.signIn.submitting : messages.signIn.submit}
+        </button>
+        <button type="button" onClick={onRegister} className={LINK_BUTTON}>
+          {messages.signIn.toRegister}
+        </button>
+      </fieldset>
     </form>
   );
 }

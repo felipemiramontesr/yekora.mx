@@ -88,6 +88,9 @@ describe('en routes', () => {
     expect(AccountMeta.robots).toEqual({ index: false, follow: false });
     const html = renderToStaticMarkup(<Account />);
     expect(html).toContain('type="password"');
+    // …disabled until React hydrates, so nothing typed before is lost (FC 035 T1.1).
+    expect(html).toContain('<fieldset disabled=""');
+    expect(html).toContain('method="post"');
     expect(html).not.toContain('Loading your account');
   });
 
