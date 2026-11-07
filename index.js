@@ -17683,13 +17683,13 @@ var require_context = __commonJS({
       this.server = server;
     }
     function defaultSchemaErrorFormatter(errors2, dataVar) {
-      let text2 = "";
+      let text3 = "";
       const separator = ", ";
       for (let i = 0; i !== errors2.length; ++i) {
         const e = errors2[i];
-        text2 += dataVar + (e.instancePath || "") + " " + e.message + separator;
+        text3 += dataVar + (e.instancePath || "") + " " + e.message + separator;
       }
-      return new Error(text2.slice(0, -separator.length));
+      return new Error(text3.slice(0, -separator.length));
     }
     module2.exports = Context;
   }
@@ -17702,20 +17702,20 @@ var require_secure_json_parse = __commonJS({
     var hasBuffer = typeof Buffer !== "undefined";
     var suspectProtoRx = /"(?:_|\\u005[Ff])(?:_|\\u005[Ff])(?:p|\\u0070)(?:r|\\u0072)(?:o|\\u006[Ff])(?:t|\\u0074)(?:o|\\u006[Ff])(?:_|\\u005[Ff])(?:_|\\u005[Ff])"\s*:/;
     var suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/;
-    function _parse3(text2, reviver, options) {
+    function _parse3(text3, reviver, options) {
       if (options == null) {
         if (reviver !== null && typeof reviver === "object") {
           options = reviver;
           reviver = void 0;
         }
       }
-      if (hasBuffer && Buffer.isBuffer(text2)) {
-        text2 = text2.toString();
+      if (hasBuffer && Buffer.isBuffer(text3)) {
+        text3 = text3.toString();
       }
-      if (text2 && text2.charCodeAt(0) === 65279) {
-        text2 = text2.slice(1);
+      if (text3 && text3.charCodeAt(0) === 65279) {
+        text3 = text3.slice(1);
       }
-      const obj = JSON.parse(text2, reviver);
+      const obj = JSON.parse(text3, reviver);
       if (obj === null || typeof obj !== "object") {
         return obj;
       }
@@ -17725,15 +17725,15 @@ var require_secure_json_parse = __commonJS({
         return obj;
       }
       if (protoAction !== "ignore" && constructorAction !== "ignore") {
-        if (suspectProtoRx.test(text2) === false && suspectConstructorRx.test(text2) === false) {
+        if (suspectProtoRx.test(text3) === false && suspectConstructorRx.test(text3) === false) {
           return obj;
         }
       } else if (protoAction !== "ignore" && constructorAction === "ignore") {
-        if (suspectProtoRx.test(text2) === false) {
+        if (suspectProtoRx.test(text3) === false) {
           return obj;
         }
       } else {
-        if (suspectConstructorRx.test(text2) === false) {
+        if (suspectConstructorRx.test(text3) === false) {
           return obj;
         }
       }
@@ -17771,21 +17771,21 @@ var require_secure_json_parse = __commonJS({
       }
       return obj;
     }
-    function parse4(text2, reviver, options) {
+    function parse4(text3, reviver, options) {
       const { stackTraceLimit } = Error;
       Error.stackTraceLimit = 0;
       try {
-        return _parse3(text2, reviver, options);
+        return _parse3(text3, reviver, options);
       } finally {
         Error.stackTraceLimit = stackTraceLimit;
       }
     }
-    function safeParse3(text2, reviver) {
+    function safeParse3(text3, reviver) {
       const { stackTraceLimit } = Error;
       Error.stackTraceLimit = 0;
       let result;
       try {
-        result = _parse3(text2, reviver, { safe: true });
+        result = _parse3(text3, reviver, { safe: true });
       } catch {
         result = void 0;
       } finally {
@@ -22800,7 +22800,7 @@ var require_core = __commonJS({
       errorsText(errors2 = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors2 || errors2.length === 0)
           return "No errors";
-        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -33095,7 +33095,7 @@ var require_core3 = __commonJS({
       errorsText(errors2 = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors2 || errors2.length === 0)
           return "No errors";
-        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -40647,7 +40647,7 @@ var require_core5 = __commonJS({
       errorsText(errors2 = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors2 || errors2.length === 0)
           return "No errors";
-        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors2.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -59410,7 +59410,7 @@ var require_parser_cache = __commonJS({
       }
       return hash2;
     }
-    function hashKey(type, fields, options, config2) {
+    function hashKey(type, fields2, options, config2) {
       const nestTables = nestTablesKey(options.nestTables);
       const dateStrings = dateStringsKey(options.dateStrings || config2.dateStrings);
       const includeTable = nestTables !== false;
@@ -59427,9 +59427,9 @@ var require_parser_cache = __commonJS({
           hash2 = mixString(hash2, dateStrings[i]);
         }
       }
-      hash2 = mixNumber(hash2, fields.length);
-      for (let i = 0; i < fields.length; ++i) {
-        const field = fields[i];
+      hash2 = mixNumber(hash2, fields2.length);
+      for (let i = 0; i < fields2.length; ++i) {
+        const field = fields2[i];
         hash2 = mixNumber(
           hash2,
           field.columnType | field.characterSet << 8 | field.decimals << 24
@@ -59460,7 +59460,7 @@ var require_parser_cache = __commonJS({
       return true;
     }
     var Entry = class {
-      constructor(parser, type, fields, options, config2) {
+      constructor(parser, type, fields2, options, config2) {
         this.parser = parser;
         this.nestTables = nestTablesKey(options.nestTables);
         this.dateStrings = dateStringsKey(
@@ -59474,7 +59474,7 @@ var require_parser_cache = __commonJS({
           this.dateStrings
         );
         this.timezone = String(options.timezone || config2.timezone);
-        const count = fields.length;
+        const count = fields2.length;
         this.columnTypes = new Array(count);
         this.characterSets = new Array(count);
         this.flags = new Array(count);
@@ -59484,7 +59484,7 @@ var require_parser_cache = __commonJS({
         this.extendedFormats = new Array(count);
         this.tables = this.nestTables === false ? null : new Array(count);
         for (let i = 0; i < count; ++i) {
-          const field = fields[i];
+          const field = fields2[i];
           this.columnTypes[i] = field.columnType;
           this.characterSets[i] = field.characterSet;
           this.flags[i] = field.flags;
@@ -59497,19 +59497,19 @@ var require_parser_cache = __commonJS({
           }
         }
       }
-      matches(type, fields, options, config2) {
+      matches(type, fields2, options, config2) {
         const nestTables = nestTablesKey(options.nestTables);
         const dateStrings = dateStringsKey(
           options.dateStrings || config2.dateStrings
         );
-        if (this.optionBits !== optionBits(type, options, config2, nestTables, dateStrings) || this.nestTables !== nestTables || this.timezone !== String(options.timezone || config2.timezone) || this.names.length !== fields.length) {
+        if (this.optionBits !== optionBits(type, options, config2, nestTables, dateStrings) || this.nestTables !== nestTables || this.timezone !== String(options.timezone || config2.timezone) || this.names.length !== fields2.length) {
           return false;
         }
         if (Array.isArray(dateStrings) && !sameList(this.dateStrings, dateStrings)) {
           return false;
         }
-        for (let i = 0; i < fields.length; ++i) {
-          const field = fields[i];
+        for (let i = 0; i < fields2.length; ++i) {
+          const field = fields2[i];
           if (this.columnTypes[i] !== field.columnType || this.characterSets[i] !== field.characterSet || this.flags[i] !== field.flags || this.decimals[i] !== field.decimals || this.names[i] !== field.name || this.extendedTypeNames[i] !== field.extendedTypeName || this.extendedFormats[i] !== field.extendedFormat || this.tables !== null && this.tables[i] !== field.table) {
             return false;
           }
@@ -59517,22 +59517,22 @@ var require_parser_cache = __commonJS({
         return true;
       }
     };
-    function getParser(type, fields, options, config2, compiler) {
-      const hash2 = hashKey(type, fields, options, config2);
+    function getParser(type, fields2, options, config2, compiler) {
+      const hash2 = hashKey(type, fields2, options, config2);
       let entries = parserCache.get(hash2);
       if (entries !== void 0) {
         for (let i = 0; i < entries.length; ++i) {
-          if (entries[i].matches(type, fields, options, config2)) {
+          if (entries[i].matches(type, fields2, options, config2)) {
             return entries[i].parser;
           }
         }
       }
-      const parser = compiler(fields, options, config2);
+      const parser = compiler(fields2, options, config2);
       if (entries === void 0) {
         entries = [];
         parserCache.set(hash2, entries);
       }
-      entries.push(new Entry(parser, type, fields, options, config2));
+      entries.push(new Entry(parser, type, fields2, options, config2));
       return parser;
     }
     function setMaxCache(max) {
@@ -68809,12 +68809,12 @@ var require_helpers2 = __commonJS({
       const REQUIRE_TERMINATOR = "";
       highlightFn = require(`cardinal${REQUIRE_TERMINATOR}`).highlight;
     } catch {
-      highlightFn = (text2) => {
+      highlightFn = (text3) => {
         if (!cardinalRecommended) {
           console.log("For nicer debug output consider install cardinal@^2.0.0");
           cardinalRecommended = true;
         }
-        return text2;
+        return text3;
       };
     }
     function printDebugWithCode(msg, code2) {
@@ -70290,13 +70290,13 @@ var require_binary_row = __commonJS({
         return packet;
       }
       // TODO: complete list of types...
-      static fromPacket(fields, packet) {
-        const columns = new Array(fields.length);
+      static fromPacket(fields2, packet) {
+        const columns = new Array(fields2.length);
         packet.readInt8();
-        const nullBitmapLength = Math.floor((fields.length + 7 + 2) / 8);
+        const nullBitmapLength = Math.floor((fields2.length + 7 + 2) / 8);
         packet.skip(nullBitmapLength);
         for (let i = 0; i < columns.length; ++i) {
-          columns[i] = binaryReader[fields[i].columnType].apply(packet);
+          columns[i] = binaryReader[fields2[i].columnType].apply(packet);
         }
         return new _BinaryRow(columns);
       }
@@ -70982,7 +70982,7 @@ var require_column_definition = __commonJS({
     var Packet = require_packet();
     var StringParser = require_string();
     var CharsetToEncoding = require_charset_encodings();
-    var fields = ["catalog", "schema", "table", "orgTable", "name", "orgName"];
+    var fields2 = ["catalog", "schema", "table", "orgTable", "name", "orgName"];
     var ColumnDefinition = class {
       constructor(packet, clientEncoding, mariadbExtendedMetadata) {
         this._buf = packet.buffer;
@@ -71177,7 +71177,7 @@ var require_column_definition = __commonJS({
       }
       static toPacket(column, sequenceId) {
         let length = 17;
-        fields.forEach((field) => {
+        fields2.forEach((field) => {
           length += Packet.lengthCodedStringLength(
             column[field],
             CharsetToEncoding[column.characterSet]
@@ -71192,7 +71192,7 @@ var require_column_definition = __commonJS({
           );
         }
         packet.offset = 4;
-        fields.forEach(writeField);
+        fields2.forEach(writeField);
         packet.writeInt8(12);
         packet.writeInt16(column.characterSet);
         packet.writeInt32(column.columnLength);
@@ -73755,8 +73755,8 @@ var require_server_handshake = __commonJS({
           case CommandCode.FIELD_LIST:
             if (connection.listeners("field_list").length) {
               const table = packet.readNullTerminatedString(encoding);
-              const fields = packet.readString(void 0, encoding);
-              connection.emit("field_list", table, fields);
+              const fields2 = packet.readString(void 0, encoding);
+              connection.emit("field_list", table, fields2);
             } else {
               connection.writeError({
                 code: Errors.ER_WARN_DEPRECATED_SYNTAX,
@@ -74353,7 +74353,7 @@ var require_text_parser = __commonJS({
           return `packet.readLengthCodedString(${encodingExpr})`;
       }
     }
-    function compile2(fields, options, config2) {
+    function compile2(fields2, options, config2) {
       if (typeof config2.typeCast === "function" && typeof options.typeCast !== "function") {
         options.typeCast = config2.typeCast;
       }
@@ -74391,22 +74391,22 @@ var require_text_parser = __commonJS({
         parserFn("this[`wrap${i}`] = wrap(fields[i], _this);");
         parserFn("}");
       }
-      if (fields.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
+      if (fields2.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
         parserFn("LocalDate.checkTimezone();");
       }
       parserFn("}");
       parserFn("next(packet, fields, options) {");
       parserFn("this.packet = packet;");
       if (options.rowsAsArray) {
-        parserFn(`const result = new Array(${fields.length});`);
+        parserFn(`const result = new Array(${fields2.length});`);
       } else {
         parserFn("const result = {};");
       }
       const resultTables = {};
       let resultTablesArray = [];
       if (options.nestTables === true) {
-        for (let i = 0; i < fields.length; i++) {
-          resultTables[fields[i].table] = 1;
+        for (let i = 0; i < fields2.length; i++) {
+          resultTables[fields2[i].table] = 1;
         }
         resultTablesArray = Object.keys(resultTables);
         for (let i = 0; i < resultTablesArray.length; i++) {
@@ -74416,12 +74416,12 @@ var require_text_parser = __commonJS({
       let lvalue = "";
       let fieldName = "";
       let tableName = "";
-      for (let i = 0; i < fields.length; i++) {
-        fieldName = helpers.fieldEscape(fields[i].name);
+      for (let i = 0; i < fields2.length; i++) {
+        fieldName = helpers.fieldEscape(fields2[i].name);
         if (typeof options.nestTables === "string") {
-          lvalue = `result[${helpers.fieldEscape(fields[i].table + options.nestTables + fields[i].name)}]`;
+          lvalue = `result[${helpers.fieldEscape(fields2[i].table + options.nestTables + fields2[i].name)}]`;
         } else if (options.nestTables === true) {
-          tableName = helpers.fieldEscape(fields[i].table);
+          tableName = helpers.fieldEscape(fields2[i].table);
           parserFn(`if (!result[${tableName}]) result[${tableName}] = {};`);
           lvalue = `result[${tableName}][${fieldName}]`;
         } else if (options.rowsAsArray) {
@@ -74433,7 +74433,7 @@ var require_text_parser = __commonJS({
           parserFn(`${lvalue} = packet.readLengthCodedBuffer();`);
         } else {
           const encodingExpr = `fields[${i}].encoding`;
-          const readCode = readCodeFor(fields[i], encodingExpr, config2, options);
+          const readCode = readCodeFor(fields2[i], encodingExpr, config2, options);
           if (typeof options.typeCast === "function") {
             parserFn(
               `${lvalue} = options.typeCast(this.wrap${i}, function() { return ${readCode} });`
@@ -74454,8 +74454,8 @@ var require_text_parser = __commonJS({
       }
       return parserFn.toFunction({ wrap: wrap2, LocalDate });
     }
-    function getTextParser(fields, options, config2) {
-      return parserCache.getParser("text", fields, options, config2, compile2);
+    function getTextParser(fields2, options, config2) {
+      return parserCache.getParser("text", fields2, options, config2, compile2);
     }
     module2.exports = getTextParser;
   }
@@ -74566,15 +74566,15 @@ var require_static_text_parser = __commonJS({
         }
       };
     }
-    function getTextParser(fields, options, config2) {
-      if (fields.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
+    function getTextParser(fields2, options, config2) {
+      if (fields2.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
         LocalDate.checkTimezone();
       }
       return {
-        next(packet, fields2, options2) {
+        next(packet, fields3, options2) {
           const result = options2.rowsAsArray ? [] : {};
-          for (let i = 0; i < fields2.length; i++) {
-            const field = fields2[i];
+          for (let i = 0; i < fields3.length; i++) {
+            const field = fields3[i];
             const typeCast = options2.typeCast ? options2.typeCast : config2.typeCast;
             const next = () => readField({
               packet,
@@ -75275,17 +75275,17 @@ var require_query2 = __commonJS({
           this.queryTimeout = null;
         }
         if (this.onResult) {
-          let rows, fields;
+          let rows, fields2;
           if (this._resultIndex === 0) {
             rows = this._rows[0];
-            fields = this._fields[0];
+            fields2 = this._fields[0];
           } else {
             rows = this._rows;
-            fields = this._fields;
+            fields2 = this._fields;
           }
-          if (fields) {
+          if (fields2) {
             process2.nextTick(() => {
-              this.onResult(null, rows, fields);
+              this.onResult(null, rows, fields2);
             });
           } else {
             process2.nextTick(() => {
@@ -75402,16 +75402,16 @@ var require_query2 = __commonJS({
           }
         }
         if (this._receivedFieldsCount === this._fieldCount) {
-          const fields = this._fields[this._resultIndex];
-          this.emit("fields", fields);
+          const fields2 = this._fields[this._resultIndex];
+          this.emit("fields", fields2);
           if (this.options.disableEval) {
-            this._rowParser = staticParser(fields, this.options, connection.config);
+            this._rowParser = staticParser(fields2, this.options, connection.config);
           } else {
             this._rowParser = new (getTextParser(
-              fields,
+              fields2,
               this.options,
               connection.config
-            ))(fields);
+            ))(fields2);
           }
           return _Query.prototype.fieldsEOF;
         }
@@ -75474,9 +75474,9 @@ var require_query2 = __commonJS({
           }
           stream.emit("result", row2, index);
         };
-        const onFields = (fields) => {
+        const onFields = (fields2) => {
           if (stream.destroyed) return;
-          stream.emit("fields", fields);
+          stream.emit("fields", fields2);
         };
         const onEnd = () => {
           if (stream.destroyed) return;
@@ -75627,9 +75627,9 @@ var require_binary_parser = __commonJS({
           return `packet.readLengthCodedString(fields[${fieldNum}].encoding)`;
       }
     }
-    function compile2(fields, options, config2) {
+    function compile2(fields2, options, config2) {
       const parserFn = genFunc();
-      const nullBitmapLength = Math.floor((fields.length + 7 + 2) / 8);
+      const nullBitmapLength = Math.floor((fields2.length + 7 + 2) / 8);
       function fieldMetadata(field) {
         return {
           type: typeNames[field.columnType],
@@ -75693,13 +75693,13 @@ var require_binary_parser = __commonJS({
       parserFn("(function(){");
       parserFn("return class BinaryRow {");
       parserFn("constructor() {");
-      if (fields.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
+      if (fields2.some((field) => LocalDate.usesLocalDate(field, options, config2))) {
         parserFn("LocalDate.checkTimezone();");
       }
       parserFn("}");
       parserFn("next(packet, fields, options) {");
       if (options.rowsAsArray) {
-        parserFn(`const result = new Array(${fields.length});`);
+        parserFn(`const result = new Array(${fields2.length});`);
       } else {
         parserFn("const result = {};");
       }
@@ -75715,12 +75715,12 @@ var require_binary_parser = __commonJS({
       let nullByteIndex = 0;
       let fieldName = "";
       let tableName = "";
-      for (let i = 0; i < fields.length; i++) {
-        fieldName = helpers.fieldEscape(fields[i].name);
+      for (let i = 0; i < fields2.length; i++) {
+        fieldName = helpers.fieldEscape(fields2[i].name);
         if (typeof options.nestTables === "string") {
-          lvalue = `result[${helpers.fieldEscape(fields[i].table + options.nestTables + fields[i].name)}]`;
+          lvalue = `result[${helpers.fieldEscape(fields2[i].table + options.nestTables + fields2[i].name)}]`;
         } else if (options.nestTables === true) {
-          tableName = helpers.fieldEscape(fields[i].table);
+          tableName = helpers.fieldEscape(fields2[i].table);
           parserFn(`if (!result[${tableName}]) result[${tableName}] = {};`);
           lvalue = `result[${tableName}][${fieldName}]`;
         } else if (options.rowsAsArray) {
@@ -75742,7 +75742,7 @@ var require_binary_parser = __commonJS({
         if (options.typeCast === false) {
           parserFn(`${lvalue} = packet.readLengthCodedBuffer();`);
         } else {
-          const readCode = readCodeFor(fields[i], config2, options, i);
+          const readCode = readCodeFor(fields2[i], config2, options, i);
           if (typeof options.typeCast === "function") {
             const fieldWrapperVar = `fieldWrapper${i}`;
             parserFn(`const ${fieldWrapperVar} = wrap(fields[${i}], packet);`);
@@ -75771,8 +75771,8 @@ var require_binary_parser = __commonJS({
       }
       return parserFn.toFunction({ wrap: wrap2, wrapNull, LocalDate });
     }
-    function getBinaryParser(fields, options, config2) {
-      return parserCache.getParser("binary", fields, options, config2, compile2);
+    function getBinaryParser(fields2, options, config2) {
+      return parserCache.getParser("binary", fields2, options, config2, compile2);
     }
     module2.exports = getBinaryParser;
   }
@@ -75791,8 +75791,8 @@ var require_static_binary_parser = __commonJS({
     for (const t in Types) {
       typeNames[Types[t]] = t;
     }
-    function getBinaryParser(fields, queryOptions, config2) {
-      if (fields.some((field) => LocalDate.usesLocalDate(field, queryOptions, config2))) {
+    function getBinaryParser(fields2, queryOptions, config2) {
+      if (fields2.some((field) => LocalDate.usesLocalDate(field, queryOptions, config2))) {
         LocalDate.checkTimezone();
       }
       function readCode(field, config3, options, fieldNum, packet) {
@@ -75849,7 +75849,7 @@ var require_static_binary_parser = __commonJS({
               return unsigned ? packet.readInt64JSNumber() : packet.readSInt64JSNumber();
             return bigNumberStrings ? unsigned ? packet.readInt64String() : packet.readSInt64String() : unsigned ? packet.readInt64() : packet.readSInt64();
           default:
-            return field.characterSet === Charsets.BINARY ? packet.readLengthCodedBuffer() : packet.readLengthCodedString(fields[fieldNum].encoding);
+            return field.characterSet === Charsets.BINARY ? packet.readLengthCodedBuffer() : packet.readLengthCodedString(fields2[fieldNum].encoding);
         }
       }
       function wrapNull(field) {
@@ -75875,18 +75875,18 @@ var require_static_binary_parser = __commonJS({
       return class BinaryRow {
         constructor() {
         }
-        next(packet, fields2, options) {
+        next(packet, fields3, options) {
           packet.readInt8();
-          const nullBitmapLength = Math.floor((fields2.length + 7 + 2) / 8);
+          const nullBitmapLength = Math.floor((fields3.length + 7 + 2) / 8);
           const nullBitmaskBytes = new Array(nullBitmapLength);
           for (let i = 0; i < nullBitmapLength; i++) {
             nullBitmaskBytes[i] = packet.readInt8();
           }
-          const result = options.rowsAsArray ? new Array(fields2.length) : {};
+          const result = options.rowsAsArray ? new Array(fields3.length) : {};
           let currentFieldNullBit = 4;
           let nullByteIndex = 0;
-          for (let i = 0; i < fields2.length; i++) {
-            const field = fields2[i];
+          for (let i = 0; i < fields3.length; i++) {
+            const field = fields3[i];
             const typeCast = options.typeCast !== void 0 ? options.typeCast : config2.typeCast;
             let value;
             if (nullBitmaskBytes[nullByteIndex] & currentFieldNullBit) {
@@ -76013,11 +76013,11 @@ var require_execute2 = __commonJS({
         this._streamFactory = options.infileStreamFactory;
         this._connection = null;
       }
-      buildParserFromFields(fields, connection) {
+      buildParserFromFields(fields2, connection) {
         if (this.options.disableEval) {
-          return getStaticBinaryParser(fields, this.options, connection.config);
+          return getStaticBinaryParser(fields2, this.options, connection.config);
         }
-        return getBinaryParser(fields, this.options, connection.config);
+        return getBinaryParser(fields2, this.options, connection.config);
       }
       start(packet, connection) {
         this._connection = connection;
@@ -76054,7 +76054,7 @@ var require_execute2 = __commonJS({
         return _Execute.prototype.resultsetHeader;
       }
       readField(packet, connection) {
-        let fields;
+        let fields2;
         const field = new Packets.ColumnDefinition(
           packet,
           connection.clientEncoding,
@@ -76063,8 +76063,8 @@ var require_execute2 = __commonJS({
         this._receivedFieldsCount++;
         this._fields[this._resultIndex].push(field);
         if (this._receivedFieldsCount === this._fieldCount) {
-          fields = this._fields[this._resultIndex];
-          this.emit("fields", fields, this._resultIndex);
+          fields2 = this._fields[this._resultIndex];
+          this.emit("fields", fields2, this._resultIndex);
           return _Execute.prototype.fieldsEOF;
         }
         return _Execute.prototype.readField;
@@ -77958,12 +77958,12 @@ var require_make_done_cb = __commonJS({
     "use strict";
     var { applyCapturedStack } = require_capture_local_err();
     function makeDoneCb(resolve3, reject, stackHolder) {
-      return function(err, rows, fields) {
+      return function(err, rows, fields2) {
         if (err) {
           applyCapturedStack(err, stackHolder);
           reject(err);
         } else {
-          resolve3([rows, fields]);
+          resolve3([rows, fields2]);
         }
       };
     }
@@ -78571,9 +78571,9 @@ var require_pool = __commonJS({
             let queryError = null;
             const origOnResult = cmdQuery.onResult;
             if (origOnResult) {
-              cmdQuery.onResult = function(err2, rows, fields) {
+              cmdQuery.onResult = function(err2, rows, fields2) {
                 queryError = err2 || null;
-                origOnResult(err2, rows, fields);
+                origOnResult(err2, rows, fields2);
               };
             } else {
               cmdQuery.once("error", (err2) => {
@@ -78608,11 +78608,11 @@ var require_pool = __commonJS({
             return cb(err);
           }
           try {
-            conn.execute(sql, values, (err2, rows, fields) => {
+            conn.execute(sql, values, (err2, rows, fields2) => {
               if (isReadOnlyError(err2)) {
                 conn.destroy();
               }
-              cb(err2, rows, fields);
+              cb(err2, rows, fields2);
             }).once("end", () => {
               conn.release();
             });
@@ -88771,8 +88771,8 @@ function ko_default() {
 }
 
 // ../../node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text2) => {
-  return text2.charAt(0).toUpperCase() + text2.slice(1);
+var capitalizeFirstCharacter = (text3) => {
+  return text3.charAt(0).toUpperCase() + text3.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -99706,16 +99706,16 @@ async function listProducts(db, query) {
   );
   return { items, total: Number(total) };
 }
-function findProductMedia(db, slug4) {
+function findProductMedia(db, slug5) {
   return db.query(
     "SELECT m.media_sha256 AS sha256, m.alt_text_es, m.alt_text_en FROM product_media m JOIN products p ON p.id = m.product_id WHERE p.slug = ? AND m.is_active = 1 ORDER BY m.is_primary DESC, m.sort_order ASC, m.id ASC",
-    [slug4]
+    [slug5]
   );
 }
-async function findProduct(db, slug4) {
+async function findProduct(db, slug5) {
   const [product] = await db.query(
     "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
-    [slug4]
+    [slug5]
   );
   return product ?? null;
 }
@@ -100213,7 +100213,10 @@ var mutationHeaders = external_exports.object({
 var idParams = external_exports.object({ id: external_exports.coerce.number().int().positive() });
 var REFUSALS = {
   CAT_NOT_FOUND: [404, "Not found"],
-  CAT_SYSTEM_GROUP_LOCKED: [409, "System facet group is locked"]
+  CAT_SYSTEM_GROUP_LOCKED: [409, "System facet group is locked"],
+  CAT_VALIDATION_ERROR: [400, "Invalid catalog data"],
+  CAT_REFERENCE_INVALID: [422, "Unknown or retired reference"],
+  CAT_STOCK_BELOW_RESERVED: [409, "Stock below reserved units"]
 };
 function refuse(reply, status, title, code2) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, title, code2));
@@ -100429,6 +100432,407 @@ function registerCatalogEntityRoutes(app, deps) {
   });
 }
 
+// src/services/catalogProducts.ts
+var productOf = (row2, facetValueIds = [], gallery = []) => ({
+  id: Number(row2.id),
+  sku: row2.sku,
+  slug: row2.slug,
+  nameEs: row2.name_es,
+  nameEn: row2.name_en,
+  descriptionEs: row2.description_es,
+  descriptionEn: row2.description_en,
+  priceMxnCents: Number(row2.price_mxn_cents),
+  stock: Number(row2.stock),
+  reservedStock: Number(row2.reserved_stock),
+  discipline: row2.discipline,
+  level: row2.level,
+  brandId: row2.brand_id === null ? null : Number(row2.brand_id),
+  shippingClass: row2.shipping_class,
+  weightGrams: Number(row2.weight_grams),
+  lengthMm: Number(row2.length_mm),
+  widthMm: Number(row2.width_mm),
+  heightMm: Number(row2.height_mm),
+  isActive: Number(row2.is_active) === 1,
+  isTest: Number(row2.is_test) === 1,
+  facetValueIds,
+  gallery
+});
+async function listAdminProducts(db, paging2) {
+  const [{ total }] = await db.query(
+    "SELECT COUNT(*) AS total FROM products"
+  );
+  const rows = await db.query(
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
+    [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
+  );
+  return { items: rows.map((row2) => productOf(row2)), total: Number(total) };
+}
+async function productRow(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
+    [id]
+  );
+  return row2;
+}
+async function lockedProduct(tx, id) {
+  const [found] = await tx.query(
+    "SELECT id FROM products WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return found ? productRow(tx, id) : void 0;
+}
+async function fullProduct(tx, row2) {
+  const values = await tx.query(
+    "SELECT k.value_id FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0 ORDER BY k.value_id ASC",
+    [row2.id]
+  );
+  const images = await tx.query(
+    "SELECT media_sha256, alt_text_es, alt_text_en, sort_order, is_primary FROM product_media WHERE product_id = ? AND is_active = 1 ORDER BY is_primary DESC, sort_order ASC, id ASC",
+    [row2.id]
+  );
+  return productOf(
+    row2,
+    values.map((value) => Number(value.value_id)),
+    images.map((image) => ({
+      sha256: image.media_sha256,
+      altEs: image.alt_text_es,
+      altEn: image.alt_text_en,
+      sortOrder: Number(image.sort_order),
+      isPrimary: Number(image.is_primary) === 1
+    }))
+  );
+}
+async function readAdminProduct(db, id) {
+  const row2 = await productRow(db, id);
+  return row2 ? fullProduct(db, row2) : null;
+}
+async function references(tx, fields2) {
+  const [category] = await tx.query(
+    "SELECT id FROM categories WHERE slug = ? AND is_active = 1",
+    [fields2.discipline]
+  );
+  const [level] = await tx.query(
+    "SELECT id FROM experience_levels WHERE slug = ? AND is_active = 1",
+    [fields2.level]
+  );
+  const [shipping] = await tx.query(
+    "SELECT id FROM shipping_classes WHERE slug = ? AND is_active = 1",
+    [fields2.shippingClass]
+  );
+  const brandOk = fields2.brandId === null || (await tx.query(
+    "SELECT id FROM brands WHERE id = ? AND is_active = 1",
+    [fields2.brandId]
+  )).length === 1;
+  if (!category || !level || !shipping || !brandOk) return null;
+  return { category: category.id, level: level.id, shipping: shipping.id };
+}
+async function facetChoice(tx, ids) {
+  const unique = [...new Set(ids)];
+  const found = await Promise.all(
+    unique.map(async (id) => {
+      const [value] = await tx.query(
+        "SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?",
+        [id]
+      );
+      return { id, value };
+    })
+  );
+  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
+    return "CAT_REFERENCE_INVALID";
+  const ordinary = found.filter(({ value }) => Number(value.is_system) !== 1).map(({ id }) => id);
+  const level = found.find(({ value }) => Number(value.is_system) === 1)?.value.code ?? null;
+  return { ordinary, level };
+}
+async function relinkLevel(tx, productId, level) {
+  await tx.query(
+    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1 AND g.code = 'nivel'",
+    [productId]
+  );
+  await tx.query(
+    "INSERT INTO product_facet_links (product_id, value_id) SELECT ?, v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.is_system = 1 AND g.code = 'nivel' AND v.code = ?",
+    [productId, level]
+  );
+}
+async function relinkFacets(tx, productId, ids) {
+  await tx.query(
+    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0",
+    [productId]
+  );
+  await Promise.all(
+    ids.map(
+      (id) => tx.query(
+        "INSERT INTO product_facet_links (product_id, value_id) VALUES (?, ?)",
+        [productId, id]
+      )
+    )
+  );
+}
+function settledLevel(given, fromFacets, current) {
+  if (given !== void 0 && fromFacets !== null && given !== fromFacets)
+    return null;
+  return given ?? fromFacets ?? current;
+}
+async function createProduct(tx, input2) {
+  const facets = await facetChoice(tx, input2.facetValueIds);
+  if (facets === "CAT_REFERENCE_INVALID") return facets;
+  const level = settledLevel(input2.level, facets.level, input2.level);
+  if (level === null) return "CAT_VALIDATION_ERROR";
+  const refs = await references(tx, input2);
+  if (refs === null) return "CAT_REFERENCE_INVALID";
+  await tx.query(
+    "INSERT INTO products (sku, slug, category_id, brand_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      input2.sku,
+      input2.slug,
+      refs.category,
+      input2.brandId,
+      refs.level,
+      input2.nameEs,
+      input2.nameEn,
+      input2.descriptionEs,
+      input2.descriptionEn,
+      input2.priceMxnCents,
+      input2.stock,
+      input2.weightGrams,
+      input2.lengthMm,
+      input2.widthMm,
+      input2.heightMm,
+      refs.shipping
+    ]
+  );
+  const [{ id }] = await tx.query(
+    "SELECT id FROM products WHERE sku = ?",
+    [input2.sku]
+  );
+  await relinkLevel(tx, id, level);
+  await relinkFacets(tx, id, facets.ordinary);
+  const row2 = await productRow(tx, id);
+  return { before: null, after: await fullProduct(tx, row2) };
+}
+async function updateProduct(tx, id, patch) {
+  const row2 = await lockedProduct(tx, id);
+  if (!row2) return "CAT_NOT_FOUND";
+  const before = await fullProduct(tx, row2);
+  const facets = await facetChoice(tx, patch.facetValueIds ?? []);
+  if (facets === "CAT_REFERENCE_INVALID") return facets;
+  const level = settledLevel(patch.level, facets.level, before.level);
+  if (level === null) return "CAT_VALIDATION_ERROR";
+  const { facetValueIds, isActive, ...fields2 } = patch;
+  const next = {
+    ...before,
+    ...fields2,
+    level,
+    isActive: isActive ?? before.isActive
+  };
+  if (next.stock < before.reservedStock) return "CAT_STOCK_BELOW_RESERVED";
+  const refs = await references(tx, next);
+  if (refs === null) return "CAT_REFERENCE_INVALID";
+  await tx.query(
+    "UPDATE products SET category_id = ?, brand_id = ?, experience_level_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
+    [
+      refs.category,
+      next.brandId,
+      refs.level,
+      next.nameEs,
+      next.nameEn,
+      next.descriptionEs,
+      next.descriptionEn,
+      next.priceMxnCents,
+      next.stock,
+      next.weightGrams,
+      next.lengthMm,
+      next.widthMm,
+      next.heightMm,
+      refs.shipping,
+      next.isActive ? 1 : 0,
+      id
+    ]
+  );
+  if (level !== before.level) await relinkLevel(tx, id, level);
+  if (facetValueIds !== void 0) await relinkFacets(tx, id, facets.ordinary);
+  const after = await fullProduct(tx, await productRow(tx, id));
+  return { before, after };
+}
+async function placeImage(tx, productId, image, index) {
+  const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
+  const [existing] = await tx.query(
+    "SELECT id FROM product_media WHERE product_id = ? AND media_sha256 = ? ORDER BY id ASC LIMIT 1",
+    [productId, image.sha256]
+  );
+  if (existing) {
+    await tx.query(
+      "UPDATE product_media SET alt_text_es = ?, alt_text_en = ?, sort_order = ?, is_primary = ?, is_active = 1 WHERE id = ?",
+      [...values, existing.id]
+    );
+  } else {
+    await tx.query(
+      "INSERT INTO product_media (alt_text_es, alt_text_en, sort_order, is_primary, product_id, media_sha256) VALUES (?, ?, ?, ?, ?, ?)",
+      [...values, productId, image.sha256]
+    );
+  }
+}
+async function replaceGallery(tx, id, images) {
+  const row2 = await lockedProduct(tx, id);
+  if (!row2) return "CAT_NOT_FOUND";
+  const blobs = await Promise.all(
+    images.map(
+      (image) => tx.query(
+        "SELECT sha256 FROM media_blobs WHERE sha256 = ?",
+        [image.sha256]
+      )
+    )
+  );
+  if (blobs.some((rows) => rows.length === 0)) return "CAT_REFERENCE_INVALID";
+  const before = await fullProduct(tx, row2);
+  await tx.query(
+    "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
+    [id]
+  );
+  await Promise.all(
+    images.map((image, index) => placeImage(tx, id, image, index))
+  );
+  return { before, after: await fullProduct(tx, row2) };
+}
+
+// src/routes/catalogProducts.ts
+var slug4 = (max) => external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(max);
+var text2 = (max) => external_exports.string().trim().min(1).max(max);
+var positive = external_exports.number().int().positive().max(1e8);
+var quantity = external_exports.number().int().min(0).max(1e6);
+var facetIds = external_exports.array(external_exports.number().int().positive()).max(50);
+var fields = {
+  nameEs: text2(200),
+  nameEn: text2(200),
+  descriptionEs: external_exports.string().max(1e4),
+  descriptionEn: external_exports.string().max(1e4),
+  priceMxnCents: positive,
+  stock: quantity,
+  discipline: slug4(40),
+  level: slug4(40),
+  brandId: external_exports.number().int().positive().nullable(),
+  shippingClass: slug4(40),
+  weightGrams: positive,
+  lengthMm: positive,
+  widthMm: positive,
+  heightMm: positive
+};
+var productCreate = external_exports.strictObject({
+  sku: external_exports.string().regex(/^[A-Z0-9][A-Z0-9-]{0,63}$/).max(64),
+  slug: slug4(160),
+  ...fields,
+  brandId: fields.brandId.default(null),
+  facetValueIds: facetIds.default([])
+});
+var productPatch = external_exports.strictObject({
+  ...Object.fromEntries(
+    Object.entries(fields).map(([key, schema2]) => [key, schema2.optional()])
+  ),
+  isActive: external_exports.boolean().optional(),
+  facetValueIds: facetIds.optional()
+});
+var altText = external_exports.string().trim().max(255).nullable().default(null);
+var galleryPatch = external_exports.strictObject({
+  images: external_exports.array(
+    external_exports.strictObject({
+      sha256: external_exports.string().regex(SHA256_HEX),
+      altEs: altText,
+      altEn: altText
+    })
+  ).max(12).refine(
+    (images) => new Set(images.map((image) => image.sha256)).size === images.length,
+    "An image appears twice"
+  )
+});
+var productListQuery = external_exports.object({
+  page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
+  pageSize: external_exports.coerce.number().int().min(1).max(100).default(50)
+});
+var adminProductSchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  sku: external_exports.string(),
+  slug: external_exports.string(),
+  nameEs: external_exports.string(),
+  nameEn: external_exports.string(),
+  descriptionEs: external_exports.string(),
+  descriptionEn: external_exports.string(),
+  priceMxnCents: external_exports.number().int().positive(),
+  stock: external_exports.number().int().nonnegative(),
+  reservedStock: external_exports.number().int().nonnegative(),
+  discipline: external_exports.string(),
+  level: external_exports.string(),
+  brandId: external_exports.number().int().positive().nullable(),
+  shippingClass: external_exports.string(),
+  weightGrams: external_exports.number().int().positive(),
+  lengthMm: external_exports.number().int().positive(),
+  widthMm: external_exports.number().int().positive(),
+  heightMm: external_exports.number().int().positive(),
+  isActive: external_exports.boolean(),
+  isTest: external_exports.boolean(),
+  facetValueIds: external_exports.array(external_exports.number().int().positive()),
+  gallery: external_exports.array(
+    external_exports.object({
+      sha256: external_exports.string().regex(SHA256_HEX),
+      altEs: external_exports.string().nullable(),
+      altEn: external_exports.string().nullable(),
+      sortOrder: external_exports.number().int(),
+      isPrimary: external_exports.boolean()
+    })
+  )
+});
+var adminProductPageSchema = external_exports.object({
+  items: external_exports.array(adminProductSchema),
+  total: external_exports.number().int().nonnegative(),
+  page: external_exports.number().int().positive(),
+  pageSize: external_exports.number().int().positive()
+});
+function registerCatalogProductRoutes(app, deps) {
+  app.get("/v1/admin/catalog/products", async (request, reply) => {
+    const query = productListQuery.safeParse(request.query);
+    if (!query.success) {
+      return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid catalog data", "CAT_VALIDATION_ERROR"));
+    }
+    return { ...await listAdminProducts(deps.db, query.data), ...query.data };
+  });
+  app.get("/v1/admin/catalog/products/:id", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const product = params.success ? await readAdminProduct(deps.db, params.data.id) : null;
+    if (product === null) {
+      const status = params.success ? 404 : 400;
+      return reply.code(status).type(PROBLEM_TYPE).send(
+        problem(
+          status,
+          params.success ? "Not found" : "Invalid catalog data",
+          params.success ? "CAT_NOT_FOUND" : "CAT_VALIDATION_ERROR"
+        )
+      );
+    }
+    return product;
+  });
+  mutationRoute(app, deps, {
+    method: "POST",
+    url: "/v1/admin/catalog/products",
+    entityType: "products",
+    body: productCreate,
+    run: (tx, { body }) => createProduct(tx, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/products/:id",
+    entityType: "products",
+    params: idParams,
+    body: productPatch,
+    run: (tx, { params, body }) => updateProduct(tx, params.id, body)
+  });
+  mutationRoute(app, deps, {
+    method: "PATCH",
+    url: "/v1/admin/catalog/products/:id/media",
+    entityType: "products",
+    params: idParams,
+    body: galleryPatch,
+    run: (tx, { params, body }) => replaceGallery(tx, params.id, body.images)
+  });
+}
+
 // src/routes/catalogAdmin.ts
 var mediaUploadedSchema = external_exports.object({
   code: external_exports.literal("MEDIA_ACCEPTED"),
@@ -100489,6 +100893,7 @@ function registerCatalogAdminRoutes(app, deps) {
     }
   );
   registerCatalogEntityRoutes(app, deps);
+  registerCatalogProductRoutes(app, deps);
   app.delete(
     "/v1/admin/catalog/*",
     (_request, reply) => reply.code(405).header("Allow", "GET, HEAD, POST, PUT, PATCH").type(PROBLEM_TYPE).send(problem(405, "Method not allowed", "CAT_DELETE_FORBIDDEN"))
@@ -100970,6 +101375,9 @@ var SIGNED_IN_REFUSALS = {
   403: problemSchema,
   503: problemSchema
 };
+var UNPROCESSABLE = {
+  422: problemSchema
+};
 var catalogRead = (path3, summary2, item) => ({
   method: "GET",
   path: path3,
@@ -100989,6 +101397,7 @@ var catalogWrite = (method, path3, summary2, shape) => ({
     400: problemSchema,
     404: problemSchema,
     409: problemSchema,
+    ...shape.references ? UNPROCESSABLE : {},
     ...SIGNED_IN_REFUSALS
   }
 });
@@ -101294,6 +101703,59 @@ var ROUTE_CONTRACTS = [
     "/v1/admin/catalog/facet-values/:id",
     "Relabel or reorder a facet value (not of the system group)",
     { params: idParams, body: facetValuePatch, answer: facetValueSchema }
+  ),
+  {
+    method: "GET",
+    path: "/v1/admin/catalog/products",
+    summary: "One page of every product, active or not, by Spanish name",
+    permission: "catalog:write",
+    request: { query: productListQuery },
+    responses: {
+      200: adminProductPageSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/catalog/products/:id",
+    summary: "One product with its facet values and gallery, active or not",
+    permission: "catalog:write",
+    request: { params: idParams },
+    responses: {
+      200: adminProductSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  catalogWrite(
+    "POST",
+    "/v1/admin/catalog/products",
+    "Create a product; its level links the system group Nivel (T2.6)",
+    { body: productCreate, answer: adminProductSchema, references: true }
+  ),
+  catalogWrite(
+    "PATCH",
+    "/v1/admin/catalog/products/:id",
+    "Edit or retire a product; SKU and slug are fixed, level and Nivel move together",
+    {
+      params: idParams,
+      body: productPatch,
+      answer: adminProductSchema,
+      references: true
+    }
+  ),
+  catalogWrite(
+    "PATCH",
+    "/v1/admin/catalog/products/:id/media",
+    "Replace the gallery in order (first is primary); images that leave are retired",
+    {
+      params: idParams,
+      body: galleryPatch,
+      answer: adminProductSchema,
+      references: true
+    }
   )
 ];
 
@@ -107010,12 +107472,12 @@ function _isSpaceCode(code2) {
 function _isWordCode(code2) {
   return code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 90 || code2 >= 97 && code2 <= 122 || code2 === 95;
 }
-function _isBoundary(text2, at) {
-  return _isWordCode(text2.charCodeAt(at - 1)) !== _isWordCode(text2.charCodeAt(at));
+function _isBoundary(text3, at) {
+  return _isWordCode(text3.charCodeAt(at - 1)) !== _isWordCode(text3.charCodeAt(at));
 }
-function _indexOfAt(text2, from, to) {
+function _indexOfAt(text3, from, to) {
   for (let i = from; i < to; i++) {
-    if (text2.charCodeAt(i) === 64) {
+    if (text3.charCodeAt(i) === 64) {
       return i;
     }
   }
@@ -107053,11 +107515,11 @@ function _collapseAtSpacing(value) {
   }
   return _joinAtSpacing(value, at);
 }
-function _looseAddressStart(text2) {
-  const len = text2.length;
+function _looseAddressStart(text3) {
+  const len = text3.length;
   let pos = 0;
   while (pos < len) {
-    while (pos < len && _isSpaceCode(text2.charCodeAt(pos))) {
+    while (pos < len && _isSpaceCode(text3.charCodeAt(pos))) {
       pos++;
     }
     if (pos >= len) {
@@ -107065,14 +107527,14 @@ function _looseAddressStart(text2) {
     }
     const runStart = pos;
     let runEnd = pos;
-    while (runEnd < len && !_isSpaceCode(text2.charCodeAt(runEnd))) {
+    while (runEnd < len && !_isSpaceCode(text3.charCodeAt(runEnd))) {
       runEnd++;
     }
-    let at = _indexOfAt(text2, runStart, runEnd);
+    let at = _indexOfAt(text3, runStart, runEnd);
     if (at >= 0) {
       let lastBoundary = -1;
       for (let k = runEnd; k > runStart; k--) {
-        if (_isBoundary(text2, k)) {
+        if (_isBoundary(text3, k)) {
           lastBoundary = k;
           break;
         }
@@ -107081,12 +107543,12 @@ function _looseAddressStart(text2) {
       while (lastBoundary >= 0 && at >= 0) {
         if (at > atomStart && runEnd > at + 1 && lastBoundary > at + 1) {
           for (let start2 = atomStart; start2 < at; start2++) {
-            if (_isBoundary(text2, start2)) {
+            if (_isBoundary(text3, start2)) {
               if (start2 > runStart) {
                 return start2;
               }
               let padded = runStart;
-              while (padded > 0 && _isSpaceCode(text2.charCodeAt(padded - 1))) {
+              while (padded > 0 && _isSpaceCode(text3.charCodeAt(padded - 1))) {
                 padded--;
               }
               return padded;
@@ -107094,7 +107556,7 @@ function _looseAddressStart(text2) {
           }
         }
         atomStart = at + 1;
-        at = _indexOfAt(text2, atomStart, runEnd);
+        at = _indexOfAt(text3, atomStart, runEnd);
       }
     }
     pos = runEnd;
@@ -107208,7 +107670,7 @@ function _stripAddressComments(address) {
   if (depth) {
     comments.push(comment.trim());
   }
-  return { address: result.trim(), comments: comments.filter((text2) => text2) };
+  return { address: result.trim(), comments: comments.filter((text3) => text3) };
 }
 function _collectAddressParts(tokens, from, to) {
   let state = "text";
@@ -109273,16 +109735,16 @@ var MailComposer = class {
    */
   getAlternatives() {
     const alternatives = [];
-    let text2, html, watchHtml, amp, eventObject;
+    let text3, html, watchHtml, amp, eventObject;
     if (this.mail.text) {
       if (isContentObject(this.mail.text)) {
-        text2 = this.mail.text;
+        text3 = this.mail.text;
       } else {
-        text2 = {
+        text3 = {
           content: this.mail.text
         };
       }
-      text2.contentType = "text/plain; charset=utf-8";
+      text3.contentType = "text/plain; charset=utf-8";
     }
     if (this.mail.watchHtml) {
       if (isContentObject(this.mail.watchHtml)) {
@@ -109322,7 +109784,7 @@ var MailComposer = class {
       }
       html.contentType = "text/html; charset=utf-8";
     }
-    [].concat(text2 || []).concat(watchHtml || []).concat(amp || []).concat(html || []).concat(eventObject || []).concat(this.mail.alternatives || []).forEach((alternative) => {
+    [].concat(text3 || []).concat(watchHtml || []).concat(amp || []).concat(html || []).concat(eventObject || []).concat(this.mail.alternatives || []).forEach((alternative) => {
       if (/^data:/i.test(alternative.path || alternative.href)) {
         alternative = this._processDataUrl(alternative);
       }
@@ -109911,16 +110373,16 @@ function relaxedHeaders(headers, fieldNames, skipFields) {
     }
   }
   const headersList = [];
-  const fields = [];
+  const fields2 = [];
   includedFields.forEach((field) => {
     if (headerFields.has(field)) {
-      fields.push(field);
+      fields2.push(field);
       headersList.push(field + ":" + headerFields.get(field));
     }
   });
   return {
     headers: headersList.join("\r\n") + "\r\n",
-    fieldNames: fields.join(":")
+    fieldNames: fields2.join(":")
   };
 }
 function relaxedHeaderLine(line) {
@@ -115662,9 +116124,9 @@ function purchaseWeight(lines) {
   let physical = BigInt(0);
   let volume = BigInt(0);
   for (const line of lines) {
-    const quantity = BigInt(line.quantity);
-    physical += BigInt(line.weightGrams) * quantity;
-    volume += BigInt(line.lengthMm) * BigInt(line.widthMm) * BigInt(line.heightMm) * quantity;
+    const quantity2 = BigInt(line.quantity);
+    physical += BigInt(line.weightGrams) * quantity2;
+    volume += BigInt(line.lengthMm) * BigInt(line.widthMm) * BigInt(line.heightMm) * quantity2;
   }
   const volumetric = (volume + VOLUMETRIC_DIVISOR - BigInt(1)) / VOLUMETRIC_DIVISOR;
   const chargeable = physical > volumetric ? physical : volumetric;
@@ -116376,7 +116838,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "fc4458440671fc0567464ff3ef6392397eb31722" : void 0;
+var sha = true ? "57220b1d152aa9f2199c800e75d2797ba8a7f5dd" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
