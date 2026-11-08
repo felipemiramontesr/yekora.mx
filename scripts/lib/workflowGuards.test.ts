@@ -1147,3 +1147,53 @@ describe('lazyAdminChunkViolations (FC 043 T2.4 · catalog console on demand)', 
     ).toEqual([]);
   });
 });
+
+describe('FC 043 T2.5 · the API smoke retries a cold-start 503 and keeps the body', () => {
+  const lf = deploy.replace(/\r\n/g, '\n');
+
+  it('accepts the committed deploy.yml', () => {
+    expect(deployWorkflowViolations(lf)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a probe that never retries',
+      (w: string) =>
+        w.replace('              [ "$status" = "503" ] || break\n', ''),
+      ['the api-release smoke probe must have: [ "$status" = "503" ] || break'],
+    ],
+    [
+      'a failure that no longer prints the answer',
+      (w: string) =>
+        w.replace(
+          'echo "FATAL: $name → $status: $(head -c 2000 "$body")"',
+          'echo "FATAL: $name → $status"'
+        ),
+      ['the api-release smoke probe must have: head -c 2000 "$body"'],
+    ],
+    [
+      'a check that goes around the probe again',
+      (w: string) =>
+        w.replace(
+          '          probe catalog 200 /tmp/catalog.json https://apiv1.yekora.mx/v1/catalog\n',
+          '          curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/v1/catalog -o /tmp/catalog.json\n'
+        ),
+      ['every api-release smoke check must go through probe: 1 bare curl'],
+    ],
+    [
+      'a pipeline without the Web Vitals budget (FC 043 T0.1)',
+      (w: string) =>
+        w.replace(
+          ' --project=mobile-chrome --workers=1 e2e/perf.spec.ts',
+          ' --project=mobile-chrome e2e/perf.spec.ts'
+        ),
+      [
+        'the e2e-validation job must run: playwright test --config=playwright.local.config.ts --project=mobile-chrome --workers=1 e2e/perf.spec.ts',
+      ],
+    ],
+  ])('flags %s', (_case, tamper, expected) => {
+    const tampered = tamper(lf);
+    expect(tampered).not.toBe(lf);
+    expect(deployWorkflowViolations(tampered)).toEqual(expected);
+  });
+});

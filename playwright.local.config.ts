@@ -12,9 +12,14 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   // realStack.spec.ts needs the real API and MariaDB: it runs with playwright.stack.config.ts.
-  testIgnore: process.env.E2E_APACHE
-    ? ['**/smoke.spec.ts', '**/realStack.spec.ts']
-    : ['**/smoke.spec.ts', '**/htaccess.spec.ts', '**/realStack.spec.ts'],
+  // FC 043 T0.1: perf.spec.ts times the page under a throttled CPU, so it runs only alone, in its
+  // own CI step with one worker (E2E_PERF); next to other workers it would time the runner.
+  testIgnore: [
+    ...(process.env.E2E_APACHE
+      ? ['**/smoke.spec.ts', '**/realStack.spec.ts']
+      : ['**/smoke.spec.ts', '**/htaccess.spec.ts', '**/realStack.spec.ts']),
+    ...(process.env.E2E_PERF ? [] : ['**/perf.spec.ts']),
+  ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

@@ -197,6 +197,9 @@ const STAGE_ONE_JOBS: Readonly<Record<string, readonly string[]>> = {
     'httpd:2.4',
     ...APACHE_PROBE,
     'playwright test --config=playwright.local.config.ts --project=${{ matrix.project }} --shard=${{ matrix.shard }}',
+    // FC 043 T0.1: the Web Vitals budget, alone with one worker on the Android project.
+    "E2E_PERF: '1'",
+    'playwright test --config=playwright.local.config.ts --project=mobile-chrome --workers=1 e2e/perf.spec.ts',
   ],
   'e2e-stack-validation': [
     'image: mariadb:11.8.9',
@@ -392,10 +395,47 @@ function boundedNetworkViolations(workflow: string): string[] {
       violations.push(`the api-release smoke must run: ${required}`);
     }
   }
+  violations.push(...smokeProbeViolations(release));
   violations.push(
     ...siteGateViolations(blocks.get('hostinger-deployment') ?? [])
   );
   violations.push(...browserCacheViolations(code, blocks));
+  return violations;
+}
+
+/** The one curl of the smoke's `probe` helper: status to stdout, body to a file. */
+const PROBE_CURL = `-o "$body" -w '%{http_code}' "$@"`;
+
+/**
+ * FC 043 T2.5: after the wait, every smoke check of the released API goes through `probe`, which
+ * retries a 503 (a cold start) 5 times 3 s apart and prints the kept body with the failure. Only
+ * the wait loop, its IPv4/IPv6 diagnosis and the probe itself may call curl in that job.
+ */
+function smokeProbeViolations(release: readonly string[]): string[] {
+  const violations: string[] = [];
+  for (const required of [
+    'probe() {',
+    'for attempt in 1 2 3 4 5; do',
+    PROBE_CURL,
+    '[ "$status" = "503" ] || break',
+    'head -c 2000 "$body"',
+  ]) {
+    if (!release.some((line) => line.includes(required))) {
+      violations.push(`the api-release smoke probe must have: ${required}`);
+    }
+  }
+  const bare = release.filter(
+    (line) =>
+      /\bcurl\b/.test(line) &&
+      !line.includes('until [ "$(curl') &&
+      !/curl -[46] /.test(line) &&
+      !line.includes(PROBE_CURL)
+  );
+  if (bare.length > 0) {
+    violations.push(
+      `every api-release smoke check must go through probe: ${bare.length} bare curl`
+    );
+  }
   return violations;
 }
 

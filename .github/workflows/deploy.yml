@@ -459,6 +459,14 @@ jobs:
         env:
           E2E_APACHE: '1'
         run: bunx playwright test --config=playwright.local.config.ts --project=${{ matrix.project }} --shard=${{ matrix.shard }}
+      - name: Core Web Vitals budget on a phone (FC 043 T0.1 · CLS ≤ 0.10, LCP ≤ 2500 ms)
+        # Alone and with one worker: a CPU-throttled timing shared with three other workers times
+        # the runner, not the page (locally, in parallel, LCP read 4508 ms; alone, under 1 s).
+        if: matrix.project == 'mobile-chrome' && matrix.shard == '1/2'
+        env:
+          E2E_APACHE: '1'
+          E2E_PERF: '1'
+        run: bunx playwright test --config=playwright.local.config.ts --project=mobile-chrome --workers=1 e2e/perf.spec.ts
       - name: Apache logs
         if: failure()
         run: docker logs yekora-httpd
@@ -761,30 +769,47 @@ jobs:
             sleep 3
           done
           echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA after ${SECONDS} s"
-          curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/health | jq -e '.status == "ok" and .db == "connected"'
-          curl --connect-timeout 5 --max-time 10 -fsS https://apiv1.yekora.mx/v1/catalog | jq -e '.items | type == "array"' > /dev/null
-          # A Banxico FIX is stored since 2026-10-19: a 503 here would mean the rates were lost.
-          RATE=$(curl --connect-timeout 5 --max-time 10 -sS -o /dev/null -w '%{http_code}' https://apiv1.yekora.mx/v1/exchange-rate)
-          [ "$RATE" = "200" ] || { echo "FATAL: /v1/exchange-rate → $RATE"; exit 1; }
+          # FC 043 T2.5: every check below goes through probe. A 503 right after the restart (a
+          # cold start on Hostinger) is retried 5 times, 3 s apart; any other status stops at once.
+          # The answer body is kept in a file and printed with the failure, so a red smoke says why
+          # (runs 42332989996 and 42406872614 failed here on a transient 503 and passed on re-run).
+          probe() {
+            local name=$1 expected=$2 body=$3 status=000
+            shift 3
+            for attempt in 1 2 3 4 5; do
+              status=$(curl --connect-timeout 5 --max-time 10 -sS -o "$body" -w '%{http_code}' "$@")
+              [ "$status" = "503" ] || break
+              echo "[RETRY] $name → 503 (attempt $attempt/5): $(head -c 500 "$body")"
+              sleep 3
+            done
+            [ "$status" = "$expected" ] || { echo "FATAL: $name → $status: $(head -c 2000 "$body")"; exit 1; }
+          }
+          fail() { echo "FATAL: $1: $(head -c 2000 "$2")"; exit 1; }
+          probe health 200 /tmp/health.json https://apiv1.yekora.mx/health
+          jq -e '.status == "ok" and .db == "connected"' /tmp/health.json || fail health /tmp/health.json
+          probe catalog 200 /tmp/catalog.json https://apiv1.yekora.mx/v1/catalog
+          jq -e '.items | type == "array"' /tmp/catalog.json > /dev/null || fail catalog /tmp/catalog.json
+          # A Banxico FIX is stored since 2026-10-19: a 503 that outlasts the retries means the rates were lost.
+          probe exchange-rate 200 /tmp/rate.json https://apiv1.yekora.mx/v1/exchange-rate
           # FC 009 F4: the cart quote answers the empty cart with a zeroed summary.
-          curl --connect-timeout 5 --max-time 10 -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+          probe 'cart quote (empty)' 200 /tmp/quote.json -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
-            -d '{"items":[]}' \
-            | jq -e '.items == [] and .warnings == [] and .summary.totalMxnCents == 0 and .summary.subtotalMxnCents == 0 and .summary.taxMxnCents == 0' > /dev/null \
-            || { echo "FATAL: /v1/cart/quote does not quote the empty cart"; exit 1; }
+            -d '{"items":[]}'
+          jq -e '.items == [] and .warnings == [] and .summary.totalMxnCents == 0 and .summary.subtotalMxnCents == 0 and .summary.taxMxnCents == 0' /tmp/quote.json > /dev/null \
+            || fail '/v1/cart/quote does not quote the empty cart' /tmp/quote.json
           # FC 011: an unknown SKU makes the quote read products with the physical columns of
           # migration 002 (a missing column is a 500). Without a destination it is a 200 with an
           # `unavailable` warning; with one, T1.1 V refuses it with a 400 problem.
-          curl --connect-timeout 5 --max-time 10 -fsS -X POST https://apiv1.yekora.mx/v1/cart/quote \
+          probe 'cart quote (no destination)' 200 /tmp/quote.json -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
-            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}]}' \
-            | jq -e '.warnings == [{"sku":"SMOKE-NONE","code":"unavailable"}] and .summary.shippingCode == null and .summary.serviceable == true' > /dev/null \
-            || { echo "FATAL: /v1/cart/quote without destination"; exit 1; }
-          SHIP=$(curl --connect-timeout 5 --max-time 10 -sS -o /tmp/ship.json -w '%{http_code}' -X POST https://apiv1.yekora.mx/v1/cart/quote \
+            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}]}'
+          jq -e '.warnings == [{"sku":"SMOKE-NONE","code":"unavailable"}] and .summary.shippingCode == null and .summary.serviceable == true' /tmp/quote.json > /dev/null \
+            || fail '/v1/cart/quote without destination' /tmp/quote.json
+          probe 'cart quote (destination)' 400 /tmp/ship.json -X POST https://apiv1.yekora.mx/v1/cart/quote \
             -H 'Content-Type: application/json' -H 'Origin: https://yekora.mx' \
-            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}],"destination":{"stateCode":"ZAC"}}')
-          [ "$SHIP" = "400" ] && jq -e '.detail == "EMPTY_OR_UNAVAILABLE_CART"' /tmp/ship.json > /dev/null \
-            || { echo "FATAL: /v1/cart/quote with destination → $SHIP $(cat /tmp/ship.json)"; exit 1; }
+            -d '{"items":[{"sku":"SMOKE-NONE","quantity":1}],"destination":{"stateCode":"ZAC"}}'
+          jq -e '.detail == "EMPTY_OR_UNAVAILABLE_CART"' /tmp/ship.json > /dev/null \
+            || fail '/v1/cart/quote with destination' /tmp/ship.json
           echo "[OK] apiv1.yekora.mx runs $GITHUB_SHA · db connected · catalog OK · exchange-rate 200 · cart quote OK · shipping quote OK"
 
   hostinger-deployment:
