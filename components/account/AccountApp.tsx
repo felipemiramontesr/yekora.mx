@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { type MouseEvent, useCallback, useEffect, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import {
@@ -21,7 +22,20 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
-import { CatalogConsole } from './catalog/CatalogConsole';
+import type { CatalogTexts } from './catalog/catalogTexts';
+
+/**
+ * The catalog console, in its own chunk (FC 043 T1.3, T2.4): only an account with
+ * `catalog:write` opens it, so buyers never download it with `/cuenta/`. `ssr: false` because it
+ * only ever renders after sign-in, in the browser. While the chunk arrives the panel stays empty
+ * under the tabs (a placeholder could not be localized: `loading` gets no props); once loaded, the
+ * console shows its own «Cargando…» until the API answers.
+ */
+const CatalogConsole = dynamic<{ texts: CatalogTexts }>(
+  () =>
+    import('./catalog/CatalogConsole').then((module) => module.CatalogConsole),
+  { ssr: false }
+);
 
 /** Props of {@link AccountApp}. */
 interface AccountAppProps {

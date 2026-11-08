@@ -19,6 +19,8 @@
  *      Certification check, with SECURITY_AUTOFIX_TOKEN; minor and major wait for Ω.
  *   k) FC 039: no E2E suite waits for networkidle, and every wait for the released API demands
  *      this commit with status ok and its database connected.
+ *   l) FC 043 T2.4: the catalog console of the account area is a lazy chunk (next/dynamic with
+ *      ssr: false), never imported statically, so buyers do not download it with /cuenta/.
  * CLI: `bun scripts/checkPipelineIntegrity.ts` — exit 0 = intact · exit 1 = tampered or unpinned.
  */
 import { spawnSync } from 'node:child_process';
@@ -30,6 +32,7 @@ import {
   dependabotViolations,
   dependencyViolations,
   deployWorkflowViolations,
+  lazyAdminChunkViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
   networkIdleViolations,
@@ -193,11 +196,20 @@ for (const violation of networkIdleViolations(playwrightFiles)) {
   failures.push(`k) ${violation}`);
 }
 
+const accountApp = 'components/account/AccountApp.tsx';
+for (const violation of lazyAdminChunkViolations(
+  accountApp,
+  readFileSync(join(root, accountApp), 'utf8'),
+  './catalog/CatalogConsole'
+)) {
+  failures.push(`l) ${violation}`);
+}
+
 if (failures.length > 0) {
   console.error('[FAIL] A08 pipeline integrity:');
   for (const failure of failures) console.error(`  - ${failure}`);
   process.exit(1);
 }
 console.log(
-  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit, Dependabot policy and patch-only auto-merge in place, E2E without networkidle, API waits on a healthy database.'
+  '[OK] A08 pipeline integrity: valid YAML with unique keys, no legacy workflow, pinned actions, one CI job per layer, eight E2E shards, no wait-on, service workers blocked but in the PWA suite, lockfile in sync, migrations workflow manual-only and the only one on self-hosted, daily dependency audit, Dependabot policy and patch-only auto-merge in place, E2E without networkidle, API waits on a healthy database, catalog console loaded on demand.'
 );

@@ -511,6 +511,9 @@ export function dependencyViolations(packageJson: string): string[] {
     : [];
 }
 
+/** Whether a TypeScript line is a comment (`//`, `/*` or a ` * ` continuation). */
+const isTsComment = (line: string) => /^\s*(?:\/\/|\/\*|\*)/.test(line);
+
 /**
  * FC 039 (270_AN): no E2E suite waits for `networkidle`. It needs 500 ms with no request, which
  * WebKit sometimes never reports (run 41542562137); a suite waits for what the page shows.
@@ -522,14 +525,47 @@ export function dependencyViolations(packageJson: string): string[] {
 export function networkIdleViolations(
   files: ReadonlyMap<string, string>
 ): string[] {
-  const isComment = (line: string) => /^\s*(?:\/\/|\/\*|\*)/.test(line);
   return [...files]
     .filter(([, text]) =>
       text
         .split(/\r?\n/)
-        .some((line) => !isComment(line) && line.includes('networkidle'))
+        .some((line) => !isTsComment(line) && line.includes('networkidle'))
     )
     .map(([path]) => `${path} waits for networkidle (wait for page content)`);
+}
+
+/**
+ * FC 043 T2.4: a heavy admin module reaches the browser only on demand. Its importer loads it
+ * through `next/dynamic` with `ssr: false` and never imports it statically, so the module stays
+ * out of the chunk every buyer downloads with the page (the catalog console of `/cuenta/`).
+ *
+ * @param importer - Repository path of the file that renders the module, for the message.
+ * @param text - Text of that file.
+ * @param module - Specifier the importer uses for the module, e.g. `./catalog/CatalogConsole`.
+ * @returns Human-readable violations; empty when the module is a lazy, client-only chunk.
+ */
+export function lazyAdminChunkViolations(
+  importer: string,
+  text: string,
+  module: string
+): string[] {
+  const code = text
+    .split(/\r?\n/)
+    .filter((line) => !isTsComment(line))
+    .join('\n');
+  const violations: string[] = [];
+  if (new RegExp(`from '${module}'`).test(code)) {
+    violations.push(`${importer} imports ${module} statically`);
+  }
+  if (!code.includes(`import('${module}')`)) {
+    violations.push(
+      `${importer} must load ${module} with dynamic(() => import(...))`
+    );
+  }
+  if (!/\bdynamic\b[\s\S]*ssr: false/.test(code)) {
+    violations.push(`${importer} must load ${module} with ssr: false`);
+  }
+  return violations;
 }
 
 /**

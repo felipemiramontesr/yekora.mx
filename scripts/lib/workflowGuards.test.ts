@@ -6,6 +6,7 @@ import {
   dependabotViolations,
   dependencyViolations,
   deployWorkflowViolations,
+  lazyAdminChunkViolations,
   mentionsSelfHosted,
   migrationsWorkflowViolations,
   networkIdleViolations,
@@ -1089,5 +1090,60 @@ describe('FC 026 Enmienda 10 · site built at t = 0, WebKit apt cache', () => {
       "key: ${{ runner.os }}-webkit-apt-${{ hashFiles('.playwright-version') }}"
     );
     expect(deployWorkflowViolations(lf)).toEqual([]);
+  });
+});
+
+describe('lazyAdminChunkViolations (FC 043 T2.4 · catalog console on demand)', () => {
+  const importer = 'components/account/AccountApp.tsx';
+  const module = './catalog/CatalogConsole';
+  const committed = readFileSync(importer, 'utf8');
+  const lazy = [
+    "import dynamic from 'next/dynamic';",
+    'const CatalogConsole = dynamic(',
+    `  () => import('${module}').then((m) => m.CatalogConsole),`,
+    '  { ssr: false }',
+    ');',
+  ].join('\n');
+
+  it('accepts the committed account area', () => {
+    expect(lazyAdminChunkViolations(importer, committed, module)).toEqual([]);
+  });
+
+  it('accepts a lazy, client-only import', () => {
+    expect(lazyAdminChunkViolations(importer, lazy, module)).toEqual([]);
+  });
+
+  it('refuses a static import, which puts the console in every buyer’s chunk', () => {
+    expect(
+      lazyAdminChunkViolations(
+        importer,
+        `import { CatalogConsole } from '${module}';`,
+        module
+      )
+    ).toEqual([
+      `${importer} imports ${module} statically`,
+      `${importer} must load ${module} with dynamic(() => import(...))`,
+      `${importer} must load ${module} with ssr: false`,
+    ]);
+  });
+
+  it('refuses a dynamic import that is still rendered on the server', () => {
+    expect(
+      lazyAdminChunkViolations(
+        importer,
+        lazy.replace('ssr: false', 'ssr: true'),
+        module
+      )
+    ).toEqual([`${importer} must load ${module} with ssr: false`]);
+  });
+
+  it('does not count an import written only in a comment', () => {
+    expect(
+      lazyAdminChunkViolations(
+        importer,
+        `// was: import { CatalogConsole } from '${module}';\n${lazy}`,
+        module
+      )
+    ).toEqual([]);
   });
 });
