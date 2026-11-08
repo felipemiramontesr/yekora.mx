@@ -102,7 +102,17 @@ test('filters by discipline and level, sorts by price and recovers from an empty
 test('a card opens its product page, which switches language and leads back', async ({
   page,
 }) => {
+  // The canonical link search engines read is the one of the served page: exactly one.
+  await page.goto('/catalogo/e2e-arnes-alpino/');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'https://yekora.mx/catalogo/e2e-arnes-alpino/'
+  );
   await page.goto('/catalogo/');
+  // FC 043: a card is a next/link. Clicked while React still hydrates (WebKit, run 42521281000),
+  // the client navigation leaves the catalog's canonical link behind in the open page only; the
+  // served HTML above is unaffected. The selects turn enabled at hydration (FC 035 T1.1).
+  await expect(filter(page, 'Disciplina')).toBeEnabled();
   await cards(page)
     .filter({ hasText: 'Arnés alpino' })
     .getByRole('link')
