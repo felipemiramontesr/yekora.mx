@@ -167,6 +167,18 @@ function refuse(reply: FastifyReply, status: number, code: string) {
     .send(problem(status, TITLES[code], code));
 }
 
+/** FC 042 T2.6: a new password that breaks the policy is a 400 naming the rule, and false. */
+function strongEnough(
+  password: string,
+  context: PasswordContext,
+  reply: FastifyReply
+): boolean {
+  const broken = passwordViolation(password, context);
+  if (broken === null) return true;
+  void refuse(reply, 400, PASSWORD_PROBLEMS[broken]);
+  return false;
+}
+
 const LIMITED = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
 /** T2.8e: the challenge endpoint, 30 per minute per IP. */
 const CHALLENGE_LIMIT = {
@@ -283,18 +295,6 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     );
     if (outcome === 'passed') return true;
     void refuse(reply, 400, outcome);
-    return false;
-  }
-
-  /** FC 042 T2.6: a new password that breaks the policy is a 400 naming the rule, and false. */
-  function strongEnough(
-    password: string,
-    context: PasswordContext,
-    reply: FastifyReply
-  ): boolean {
-    const broken = passwordViolation(password, context);
-    if (broken === null) return true;
-    void refuse(reply, 400, PASSWORD_PROBLEMS[broken]);
     return false;
   }
 
