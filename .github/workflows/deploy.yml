@@ -223,9 +223,9 @@ jobs:
       DB_USER: root
       DB_PASSWORD: ci-only-root
       DB_NAME: yekora_ci
-      # Fingerprint after 001–006 (FC 029 F0), measured on yekora_dev; production must match it
-      # once 006 is applied with db-migrations.yml (Rule 23). After 001–005 it was 4dc9d3df….
-      EXPECTED_FINGERPRINT: fa8a845a1c60318edeaab1a7f8d1ba87 (526 elementos)
+      # Fingerprint after 001–007 (FC 042 F0), measured on yekora_dev; production must match it
+      # once 007 is applied with db-migrations.yml (Rule 23). After 001–006 it was fa8a845a….
+      EXPECTED_FINGERPRINT: 7980244a68ecd02e0cb7437a94beacb8 (541 elementos)
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Bun
@@ -234,11 +234,11 @@ jobs:
           bun-version: '1.3.14'
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Migrations from scratch (001–006) with their verify counters
+      - name: Migrations from scratch (001–007) with their verify counters
         run: |
           set -euo pipefail
           bun scripts/migrateDb.ts | tee migrate.log
-          for n in 001 002 003 004 005 006; do
+          for n in 001 002 003 004 005 006 007; do
             grep -q "^\[VERIFY\] $n " migrate.log || { echo "FATAL: no [VERIFY] $n"; exit 1; }
           done
       - name: Idempotency (DB_LAW) — a second run applies nothing
@@ -249,10 +249,10 @@ jobs:
           grep -q '^\[OK\] migrations: 0 applied' rerun.log
       - name: Schema fingerprint equals production's (Rule 23)
         run: bun scripts/dbParityCheck.ts --expect "$EXPECTED_FINGERPRINT"
-      - name: Reversibility — down 006, 005, 004, 003, 002, 001, then up again with the same fingerprint
+      - name: Reversibility — down 007, 006, 005, 004, 003, 002, 001, then up again with the same fingerprint
         run: |
           set -euo pipefail
-          for n in 006 005 004 003 002 001; do bun scripts/migrateDb.ts --down "$n"; done
+          for n in 007 006 005 004 003 002 001; do bun scripts/migrateDb.ts --down "$n"; done
           bun scripts/migrateDb.ts --plan | tee plan.log
           grep -q '^\[PLAN\] tables=1$' plan.log || { echo "FATAL: business tables left after the rollback"; exit 1; }
           bun scripts/migrateDb.ts

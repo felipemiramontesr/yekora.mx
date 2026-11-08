@@ -1,7 +1,7 @@
 /**
  * Real-SQL suite (FC 025 T1.2 S): the API's own services against a migrated MariaDB, with the
  * real pool and no fake `Db`. Only the Database (SQL) job runs it (vitest.db.config.ts), after
- * it has applied migrations 001–006 to its `yekora_ci` service.
+ * it has applied migrations 001–007 to its `yekora_ci` service.
  *
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
@@ -1348,5 +1348,68 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
     );
     expect([Number(rows.n), Number(rows.active)]).toEqual([2, 2]);
     await expect(gallery(['e'])).resolves.toBe('CAT_REFERENCE_INVALID');
+  });
+});
+
+describe('password reset tokens of migration 007 (FC 042 F0)', () => {
+  const USER = '00000000-0000-4000-8000-000000000042';
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const hash = (letter: string) => letter.repeat(64);
+  const insert = (tokenHash: string, userId = USER) =>
+    db.query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, UTC_TIMESTAMP() + INTERVAL 15 MINUTE)',
+      [userId, tokenHash]
+    );
+  const tokensOf = async (userId: string) =>
+    Number(
+      (
+        await db.query<{ n: number }>(
+          'SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?',
+          [userId]
+        )
+      )[0].n
+    );
+
+  beforeAll(async () => {
+    await db.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, 'reset@example.test', ?, 'Restablece')",
+      [USER, ARGON]
+    );
+  });
+
+  it('keys each link with BIGINT UNSIGNED and looks it up by hash, expiry and use (T0.1)', async () => {
+    const [{ column_type }] = await db.query<{ column_type: string }>(
+      "SELECT COLUMN_TYPE AS column_type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens' AND COLUMN_NAME = 'id'"
+    );
+    expect(column_type).toBe('bigint(20) unsigned');
+    const lookup = await db.query<{ column_name: string }>(
+      "SELECT COLUMN_NAME AS column_name FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens' AND INDEX_NAME = 'idx_token_lookup' ORDER BY SEQ_IN_INDEX"
+    );
+    expect(lookup.map((row) => row.column_name)).toEqual([
+      'token_hash',
+      'expires_at',
+      'consumed_at',
+    ]);
+  });
+
+  it('stores each token hash once, and only as 64 hexadecimal characters (T2.2)', async () => {
+    await insert(hash('a'));
+    await expect(insert(hash('a'))).rejects.toThrow(
+      'uq_password_reset_tokens_hash'
+    );
+    await expect(insert('a-plain-token')).rejects.toThrow(
+      'ck_password_reset_tokens_hash'
+    );
+  });
+
+  it('refuses a link for an unknown user and deletes the links with their user (T0.1)', async () => {
+    await expect(
+      insert(hash('b'), '00000000-0000-4000-8000-0000000000ff')
+    ).rejects.toThrow('fk_password_reset_tokens_user');
+    await insert(hash('c'));
+    expect(await tokensOf(USER)).toBe(2);
+    await db.query('DELETE FROM users WHERE id = ?', [USER]);
+    expect(await tokensOf(USER)).toBe(0);
   });
 });
