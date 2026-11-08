@@ -63,6 +63,8 @@ interface AppDeps {
   now?: () => Date;
   /** Mail sender of the outbox; by default SMTP from the configured mailbox (tests inject one). */
   sendMail?: SendMail;
+  /** Pause of `forgot-password`'s least time (FC 042 T2.1); setTimeout by default. */
+  wait?: (ms: number) => Promise<void>;
 }
 
 /** The processors whose secrets are configured; the others stay absent (T1.1 K = ⊥). */
@@ -183,6 +185,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       ? createOutboxDispatcher({
           db: deps.db,
           totpKey: auth.totpKey,
+          siteUrl: deps.config.payments.siteUrl,
           send: deps.sendMail ?? smtpSender(mail),
           now,
           log: app.log,
@@ -211,6 +214,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     auth,
     mailReady: dispatcher !== null,
     now,
+    wait: deps.wait,
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });

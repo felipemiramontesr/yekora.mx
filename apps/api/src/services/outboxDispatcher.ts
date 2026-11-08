@@ -82,10 +82,25 @@ export function smtpSender(mail: MailConfig): SendMail {
   };
 }
 
+/**
+ * The reset links of a token (FC 042 T1.1), one per language: the account page reads the token
+ * from the query and drops it from the address bar at once.
+ */
+function resetLinks(
+  siteUrl: string,
+  token: string
+): { es: string; en: string } {
+  const query = `?action=reset-password&token=${token}`;
+  return {
+    es: `${siteUrl}/cuenta/${query}`,
+    en: `${siteUrl}/en/account/${query}`,
+  };
+}
+
 /** The text of one message, addressed to the account's current e-mail. */
 async function render(
   db: Db,
-  totpKey: Buffer,
+  keys: { totpKey: Buffer; siteUrl: string },
   row: OutboxRow
 ): Promise<MailMessage> {
   const event = {
@@ -93,30 +108,58 @@ async function render(
     ...JSON.parse(row.payload),
   } as MailEvent;
   const to = await emailOf(db, event.userId);
-  if (event.type === 'SIGN_IN_CODE') {
-    const code = decryptTotpSecret(totpKey, event.challengeId, event.code);
-    return {
-      to,
-      subject: 'Tu código de acceso a YĒKORA',
-      text: `Tu código de acceso es ${code.toString('utf8')}. Vence en 5 minutos.\n\nSi no intentaste entrar, cambia tu contraseña: alguien la conoce.\n\nYour YĒKORA sign-in code is ${code.toString('utf8')}. It expires in 5 minutes.`,
-    };
+  switch (event.type) {
+    case 'SIGN_IN_CODE': {
+      const code = decryptTotpSecret(
+        keys.totpKey,
+        event.challengeId,
+        event.code
+      ).toString('utf8');
+      return {
+        to,
+        subject: 'Tu código de acceso a YĒKORA',
+        text: `Tu código de acceso es ${code}. Vence en 5 minutos.\n\nSi no intentaste entrar, cambia tu contraseña: alguien la conoce.\n\nYour YĒKORA sign-in code is ${code}. It expires in 5 minutes.`,
+      };
+    }
+    case 'PASSWORD_RESET': {
+      const token = decryptTotpSecret(
+        keys.totpKey,
+        event.userId,
+        event.token
+      ).toString('utf8');
+      const link = resetLinks(keys.siteUrl, token);
+      return {
+        to,
+        subject: 'Restablece tu contraseña de YĒKORA',
+        text: `Para elegir una contraseña nueva, abre este enlace. Vence en 15 minutos y sirve una sola vez:\n${link.es}\n\nSi no lo pediste, ignora este correo: tu contraseña no cambia.\n\nTo choose a new YĒKORA password, open this link. It expires in 15 minutes and works once:\n${link.en}`,
+      };
+    }
+    case 'PASSWORD_CHANGED':
+      return {
+        to,
+        subject: 'Cambiaste tu contraseña de YĒKORA',
+        text: 'Tu contraseña cambió y cerramos todas tus sesiones abiertas.\n\nSi no fuiste tú, escríbenos de inmediato.\n\nYour YĒKORA password changed and every open session was closed.',
+      };
+    case 'TOTP_ENABLED':
+      return {
+        to,
+        subject: 'Activaste la verificación en dos pasos en YĒKORA',
+        text: 'Tu cuenta ahora pide el código de tu app de autenticación al entrar.\n\nSi no fuiste tú, escríbenos de inmediato.\n\nTwo-step verification is now on for your YĒKORA account.',
+      };
   }
-  return {
-    to,
-    subject: 'Activaste la verificación en dos pasos en YĒKORA',
-    text: 'Tu cuenta ahora pide el código de tu app de autenticación al entrar.\n\nSi no fuiste tú, escríbenos de inmediato.\n\nTwo-step verification is now on for your YĒKORA account.',
-  };
 }
 
 /**
  * Builds the dispatcher of one application.
  *
- * @param deps - Database, the key of queued codes, the sender, clock, logger and, for tests, the pause.
+ * @param deps - Database, the key of queued codes and links, the site's address (for reset links),
+ *   the sender, clock, logger and, for tests, the pause.
  * @returns The dispatcher; nothing runs until {@link OutboxDispatcher.start} or a kick.
  */
 export function createOutboxDispatcher(deps: {
   db: Db;
   totpKey: Buffer;
+  siteUrl: string;
   send: SendMail;
   now: () => Date;
   log: { error(details: object, message: string): void };
@@ -138,7 +181,7 @@ export function createOutboxDispatcher(deps: {
     // Another run took it first.
     if ((claim as { affectedRows: number }).affectedRows !== 1) return;
     try {
-      await deps.send(await render(db, deps.totpKey, row));
+      await deps.send(await render(db, deps, row));
       await db.query(
         "UPDATE outbox_events SET status = 'SENT', sent_at = ?, error_message = NULL WHERE id = ?",
         [now, row.id]

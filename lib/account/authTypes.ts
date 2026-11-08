@@ -16,14 +16,47 @@ const emailField = z.string().trim().pipe(z.email().max(255));
  */
 const altchaField = z.string().min(1).max(2000).optional();
 
+/**
+ * A new password as sent. The schema only bounds the size; the policy of lib/account/passwordPolicy
+ * (FC 042 T1.2, T2.6) is checked by the route, which answers 400 with the code of the broken
+ * rule (`PASSWORD_LENGTH`, `PASSWORD_SYMBOL`…) instead of a generic invalid request.
+ */
+const newPasswordField = z.string().min(1).max(1024);
+
 /** Body of `POST /v1/auth/register`. */
 export const registerRequestSchema = z.strictObject({
   email: emailField,
-  // NIST SP 800-63B: length over composition rules; 12 to 128 characters.
-  password: z.string().min(12).max(128),
+  password: newPasswordField,
   fullName: z.string().trim().min(2).max(150),
   altcha: altchaField,
 });
+
+/** Body of `POST /v1/auth/forgot-password` (FC 042 T1.1): the e-mail and the anti-bot proof. */
+export const forgotPasswordRequestSchema = z.strictObject({
+  email: emailField,
+  altcha: altchaField,
+});
+
+/**
+ * Answer of `POST /v1/auth/forgot-password`: always the same, whether the e-mail has an account
+ * or not (T2.1), so it never tells who is registered.
+ */
+export const forgotPasswordResponseSchema = z.object({
+  ok: z.literal(true),
+  message: z.string(),
+});
+
+/**
+ * Body of `POST /v1/auth/reset-password` (FC 042 T1.2): the token of the mailed link (32 random
+ * bytes in hex) and the new password. The «repeat password» field never travels (T2.7).
+ */
+export const resetPasswordRequestSchema = z.strictObject({
+  token: z.string().regex(/^[0-9a-f]{64}$/),
+  password: newPasswordField,
+});
+
+/** Answer of `POST /v1/auth/reset-password`: the password changed and every session ended. */
+export const resetPasswordResponseSchema = z.object({ ok: z.literal(true) });
 
 /** Body of `POST /v1/auth/login`. */
 export const loginRequestSchema = z.strictObject({

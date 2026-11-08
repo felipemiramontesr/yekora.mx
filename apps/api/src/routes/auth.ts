@@ -17,6 +17,13 @@
  *   BOT_CHALLENGE_FAILED (T1.4).
  * - A buyer may ask `verify` to remember the device for 30 days (E2). On that device `login` then
  *   answers 201 signed in after the password alone. Never for staff or admin (T2.9b).
+ * - FC 042: every new password (`register`, `reset-password`) follows the policy of
+ *   lib/account/passwordPolicy (T2.6): a broken rule is a 400 whose detail names it.
+ * - `forgot-password` (T1.1, T2.1) answers the same 200, in the same least time, whether the
+ *   e-mail has an account or not; only for an active account it opens a 15-minute link and queues
+ *   its mail in one transaction. Besides the 10 per minute per IP, each e-mail gets 10 per minute.
+ * - `reset-password` (T1.2, T2.3) takes the link's token and the new password: it spends the
+ *   link, ends every session of the account and queues the confirmation mail.
  * A wrong code counts against the challenge (5 at most). Without AUTH_SECRET and
  * TOTP_ENCRYPTION_KEY every route answers 503; without the SMTP account, a sign-in that needs the
  * mailed code answers 503 MAIL_UNAVAILABLE.
@@ -27,6 +34,7 @@
  *
  * @module
  */
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 import {
@@ -34,17 +42,31 @@ import {
   codeRequestSchema,
   confirmResponseSchema,
   enrollResponseSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResponseSchema,
   loginRequestSchema,
   loginResponseSchema,
   registeredSchema,
   registerRequestSchema,
+  resetPasswordRequestSchema,
+  resetPasswordResponseSchema,
   signedInSchema,
   verifyRequestSchema,
 } from '../../../../lib/account/authTypes';
+import {
+  PASSWORD_PROBLEMS,
+  type PasswordContext,
+  passwordViolation,
+} from '../../../../lib/account/passwordPolicy';
 import type { AuthSecrets } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
-import { deviceCookie, readDeviceToken, sessionCookie } from '../lib/session';
+import {
+  clearedSessionCookie,
+  deviceCookie,
+  readDeviceToken,
+  sessionCookie,
+} from '../lib/session';
 import {
   base32,
   codeHash,
@@ -55,6 +77,7 @@ import {
   newTotpSecret,
   otpauthUri,
   sameHash,
+  tokenHash,
   verifyTotp,
 } from '../services/authCrypto';
 import { checkChallenge, issueChallenge } from '../services/botChallenge';
@@ -79,6 +102,11 @@ import {
   useBackupCode,
 } from '../services/identity';
 import { enqueueMail } from '../services/outbox';
+import {
+  completeReset,
+  liveReset,
+  openReset,
+} from '../services/passwordResets';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
 import { isTrustedDevice, rememberDevice } from '../services/trustedDevices';
 
@@ -89,7 +117,25 @@ interface AuthDeps {
   /** Whether the outbox can mail (an SMTP account is configured). */
   mailReady: boolean;
   now: () => Date;
+  /** For tests: the pause that evens out the time of `forgot-password` (setTimeout by default). */
+  wait?: (ms: number) => Promise<void>;
 }
+
+/**
+ * Least time `forgot-password` takes (T2.1): with or without an account the answer leaves after
+ * this, so its timing never tells them apart.
+ */
+const RESET_REQUEST_FLOOR_MS = 500;
+/** Per e-mail, at most this many `forgot-password` per {@link RESET_WINDOW_MS} (T1.1 R). */
+const RESET_REQUESTS_PER_EMAIL = 10;
+/** The window of {@link RESET_REQUESTS_PER_EMAIL}: one minute. */
+const RESET_WINDOW_MS = 60_000;
+/** The answer of `forgot-password`, identical for every e-mail (T2.1). */
+const RESET_REQUEST_ANSWER = {
+  ok: true,
+  message:
+    'Si el correo está registrado, enviamos instrucciones para restablecer tu contraseña.',
+} as const;
 
 const TITLES: Record<string, string> = {
   AUTH_UNAVAILABLE: 'Sign-in unavailable',
@@ -102,6 +148,15 @@ const TITLES: Record<string, string> = {
   TOTP_NOT_ENROLLED: 'Set up the authenticator first',
   BOT_CHALLENGE_REQUIRED: 'Anti-bot check required',
   BOT_CHALLENGE_FAILED: 'Anti-bot check failed',
+  RATE_LIMITED: 'Too many requests, try again in a minute',
+  RESET_TOKEN_INVALID: 'Reset link expired or already used',
+  PASSWORD_LENGTH: 'The password needs 12 to 128 characters',
+  PASSWORD_UPPERCASE: 'The password needs an upper-case letter',
+  PASSWORD_LOWERCASE: 'The password needs a lower-case letter',
+  PASSWORD_DIGIT: 'The password needs a digit',
+  PASSWORD_SYMBOL: 'The password needs a symbol',
+  PASSWORD_PERSONAL: 'The password must not contain your e-mail or name',
+  PASSWORD_COMMON: 'The password is too common',
 };
 
 /** An RFC 7807 refusal whose detail is its machine code. */
@@ -231,6 +286,38 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     return false;
   }
 
+  /** FC 042 T2.6: a new password that breaks the policy is a 400 naming the rule, and false. */
+  function strongEnough(
+    password: string,
+    context: PasswordContext,
+    reply: FastifyReply
+  ): boolean {
+    const broken = passwordViolation(password, context);
+    if (broken === null) return true;
+    void refuse(reply, 400, PASSWORD_PROBLEMS[broken]);
+    return false;
+  }
+
+  const wait = deps.wait ?? sleep;
+  /** When each e-mail (by its SHA-256) asked for a reset link, inside the window. */
+  const resetRequests = new Map<string, number[]>();
+
+  /** T1.1 R: whether this e-mail may ask for one more link now; counts the request when it may. */
+  function underEmailLimit(email: string, at: number): boolean {
+    for (const [key, times] of resetRequests) {
+      if (times.every((time) => at - time >= RESET_WINDOW_MS)) {
+        resetRequests.delete(key);
+      }
+    }
+    const key = tokenHash(email);
+    const recent = (resetRequests.get(key) ?? []).filter(
+      (time) => at - time < RESET_WINDOW_MS
+    );
+    if (recent.length >= RESET_REQUESTS_PER_EMAIL) return false;
+    resetRequests.set(key, [...recent, at]);
+    return true;
+  }
+
   app.get(
     '/v1/auth/bot-challenge',
     CHALLENGE_LIMIT,
@@ -246,12 +333,68 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     if (parsed === null) return reply;
     const { auth, body } = parsed;
     if (!(await botCheck(auth, body.altcha, reply))) return reply;
+    if (!strongEnough(body.password, body, reply)) return reply;
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
       fullName: body.fullName,
     });
     return reply.code(202).send(registeredSchema.parse({ status: 'accepted' }));
+  });
+
+  app.post('/v1/auth/forgot-password', LIMITED, async (request, reply) => {
+    const started = deps.now().getTime();
+    const parsed = parse(forgotPasswordRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { auth, body } = parsed;
+    if (!(await botCheck(auth, body.altcha, reply))) return reply;
+    const email = canonicalEmail(body.email);
+    if (!underEmailLimit(email, started)) {
+      return refuse(reply, 429, 'RATE_LIMITED');
+    }
+    if (!deps.mailReady) return refuse(reply, 503, 'MAIL_UNAVAILABLE');
+    const user = await findUserByEmail(deps.db, email);
+    if (user) {
+      // The link and its mail commit together, or neither does (T2.4).
+      await deps.db.transaction(async (tx) => {
+        const token = await openReset(tx, user.id, deps.now());
+        await enqueueMail(tx, {
+          type: 'PASSWORD_RESET',
+          userId: user.id,
+          token: encryptTotpSecret(
+            auth.totpKey,
+            user.id,
+            Buffer.from(token, 'utf8')
+          ),
+        });
+      });
+      request.outboxQueued = true;
+    }
+    // T2.1: the same answer after the same least time, with or without an account.
+    const elapsed = deps.now().getTime() - started;
+    await wait(Math.max(0, RESET_REQUEST_FLOOR_MS - elapsed));
+    return forgotPasswordResponseSchema.parse(RESET_REQUEST_ANSWER);
+  });
+
+  app.post('/v1/auth/reset-password', LIMITED, async (request, reply) => {
+    const parsed = parse(resetPasswordRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const { body } = parsed;
+    const reset = await liveReset(deps.db, body.token, deps.now());
+    if (reset === null) return refuse(reply, 400, 'RESET_TOKEN_INVALID');
+    if (!strongEnough(body.password, reset, reply)) return reply;
+    const changed = await completeReset(
+      deps.db,
+      reset,
+      await hashPassword(body.password),
+      deps.now(),
+      clientFacts(request.ip, undefined).ip
+    );
+    if (!changed) return refuse(reply, 400, 'RESET_TOKEN_INVALID');
+    request.outboxQueued = true;
+    return reply
+      .header('Set-Cookie', clearedSessionCookie())
+      .send(resetPasswordResponseSchema.parse({ ok: true }));
   });
 
   app.post('/v1/auth/login', LIMITED, async (request, reply) => {

@@ -25,6 +25,18 @@ export type MailEvent =
       /** Security alert: the authenticator was turned on for the account. */
       type: 'TOTP_ENABLED';
       userId: string;
+    }
+  | {
+      /** The 15-minute link of «¿Olvidaste tu contraseña?» (FC 042 T1.1). */
+      type: 'PASSWORD_RESET';
+      userId: string;
+      /** `v1:` ciphertext of the link's token, bound to the user id. */
+      token: string;
+    }
+  | {
+      /** Security alert: the password changed through a reset link (FC 042 T2.3). */
+      type: 'PASSWORD_CHANGED';
+      userId: string;
     };
 
 declare module 'fastify' {

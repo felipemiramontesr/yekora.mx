@@ -57,6 +57,7 @@ import {
 import { findOrder, listOrders } from './services/orderReads';
 import { enqueueMail } from './services/outbox';
 import { createOutboxDispatcher } from './services/outboxDispatcher';
+import { completeReset, liveReset, openReset } from './services/passwordResets';
 import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
 import { createTableRateProvider } from './services/shippingRates';
@@ -755,6 +756,7 @@ describe('mailed code and outbox on real SQL (identity.ts, outbox.ts, outboxDisp
     const outbox = createOutboxDispatcher({
       db,
       totpKey: KEY,
+      siteUrl: 'https://yekora.mx',
       send: async (message) => {
         if (fail) throw new Error('smtp down');
         sent.push(`${message.to} ${message.subject}`);
@@ -1411,5 +1413,81 @@ describe('password reset tokens of migration 007 (FC 042 F0)', () => {
     expect(await tokensOf(USER)).toBe(2);
     await db.query('DELETE FROM users WHERE id = ?', [USER]);
     expect(await tokensOf(USER)).toBe(0);
+  });
+});
+
+describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () => {
+  const USER = '00000000-0000-4000-8000-000000000043';
+  const AT = new Date('2026-11-08T18:00:00Z');
+
+  beforeAll(async () => {
+    await db.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, 'link@example.test', ?, 'Enlace Prueba')",
+      [USER, await hashPassword('Glaciar-Norte9$Ruta')]
+    );
+    await db.transaction((tx) =>
+      openSession(tx, {
+        challengeId: null,
+        userId: USER,
+        privileged: false,
+        ip: null,
+        userAgent: null,
+        now: AT,
+      })
+    );
+  });
+
+  it('finds a link only while it is unspent and unexpired (T1.2, T2.2)', async () => {
+    const token = await db.transaction((tx) => openReset(tx, USER, AT));
+    const live = await liveReset(db, token, AT);
+    expect(live).toMatchObject({
+      userId: USER,
+      email: 'link@example.test',
+      fullName: 'Enlace Prueba',
+    });
+    expect(
+      await liveReset(db, token, new Date(AT.getTime() + 15 * 60_000))
+    ).toBeNull();
+    expect(await liveReset(db, 'f'.repeat(64), AT)).toBeNull();
+  });
+
+  it('changes the password, spends every link, ends every session, audits and queues the alert (T2.3)', async () => {
+    const other = await db.transaction((tx) => openReset(tx, USER, AT));
+    const token = await db.transaction((tx) => openReset(tx, USER, AT));
+    const live = await liveReset(db, token, AT);
+    if (live === null) throw new Error('link not found');
+    const hash = await hashPassword('Nueva-Cumbre8&Paso');
+    expect(await completeReset(db, live, hash, AT, '203.0.113.9')).toBe(true);
+    const [user] = await db.query<{ password_hash: string }>(
+      'SELECT password_hash FROM users WHERE id = ?',
+      [USER]
+    );
+    expect(user.password_hash).toBe(hash);
+    expect(await liveReset(db, other, AT)).toBeNull();
+    const [open] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ? AND consumed_at IS NULL',
+      [USER]
+    );
+    expect(Number(open.n)).toBe(0);
+    const [sessions] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM user_sessions WHERE user_id = ?',
+      [USER]
+    );
+    expect(Number(sessions.n)).toBe(0);
+    const [audit] = await db.query<{ action: string; ip_address: string }>(
+      "SELECT action, ip_address FROM audit_log WHERE user_id = ? AND action = 'PASSWORD_RESET'",
+      [USER]
+    );
+    expect(audit).toEqual({
+      action: 'PASSWORD_RESET',
+      ip_address: '203.0.113.9',
+    });
+    const [mail] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type = 'PASSWORD_CHANGED' AND payload LIKE ?",
+      [`%${USER}%`]
+    );
+    expect(Number(mail.n)).toBe(1);
+    // The same link a second time changes nothing.
+    expect(await completeReset(db, live, hash, AT, null)).toBe(false);
   });
 });

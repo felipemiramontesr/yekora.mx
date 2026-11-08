@@ -72,6 +72,7 @@ function dispatcher(
   const outbox = createOutboxDispatcher({
     db,
     totpKey: KEY,
+    siteUrl: 'https://yekora.mx',
     send,
     now: () => NOW,
     log,
@@ -241,6 +242,7 @@ describe('outbox dispatcher (FC 028 T1.3 S)', () => {
     const outbox = createOutboxDispatcher({
       db,
       totpKey: KEY,
+      siteUrl: 'https://yekora.mx',
       send,
       now: () => NOW,
       log,

@@ -30,6 +30,9 @@ const INVENTORY = [
   // FC 028 Enmienda 1: the anti-bot challenge, public and rate limited.
   '├── /v1/auth/bot-challenge (GET, HEAD)',
   '├── /v1/auth/register (POST)',
+  // FC 042: the password reset, public and rate limited (10/min per IP, and per e-mail).
+  '├── /v1/auth/reset-password (POST)',
+  '├── /v1/auth/forgot-password (POST)',
   '├── /v1/auth/login (POST)',
   '├── /v1/auth/totp/enroll (POST)',
   '├── /v1/auth/totp/confirm (POST)',

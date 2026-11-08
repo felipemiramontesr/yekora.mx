@@ -23,7 +23,8 @@ function totpCode(secret: Buffer, step: number): string {
   const value = mac.readUInt32BE(mac[mac.length - 1] & 0x0f) & 0x7fffffff;
   return String(value % 1_000_000).padStart(6, '0');
 }
-const PASSWORD = 'correct horse battery staple';
+// Meets the policy of FC 042 (12+ characters, the four classes, nothing personal or common).
+const PASSWORD = 'Correct horse 7 battery';
 const TOTP_KEY = Buffer.alloc(32, 2);
 const KEYS = {
   AUTH_SECRET: Buffer.alloc(32, 1).toString('base64'),
@@ -80,6 +81,15 @@ function freshState() {
     }[],
     nonces: new Set<string>(),
     devices: [] as { user: string; hash: string; expires: Date }[],
+    // FC 042 (migration 007) and the audit entries of a reset.
+    resets: [] as {
+      id: number;
+      user: string;
+      hash: string;
+      expires: Date;
+      consumed: Date | null;
+    }[],
+    audit: [] as Params[],
   };
 }
 type State = ReturnType<typeof freshState>;
@@ -176,6 +186,26 @@ const forgetRow = (s: State, p: Params) =>
       ...s.devices.filter((d) => !(d.hash === p[0] && d.user === p[1]))
     )
   );
+const liveResetRow = (s: State, p: Params) =>
+  s.resets
+    .filter(
+      (r) =>
+        r.hash === p[0] &&
+        r.consumed === null &&
+        r.expires > (p[1] as Date) &&
+        s.users.get(r.user)?.is_active === 1
+    )
+    .map((r) => ({
+      id: r.id,
+      user_id: r.user,
+      email: s.users.get(r.user)?.email,
+      full_name: s.users.get(r.user)?.full_name,
+    }));
+const spendReset = (s: State, p: Params) => {
+  const reset = s.resets.find((r) => r.id === p[1] && r.consumed === null);
+  if (reset) reset.consumed = p[0] as Date;
+  return { affectedRows: reset ? 1 : 0 };
+};
 const claimOutbox = (s: State, p: Params) => {
   const row = s.outbox.find((r) => r.id === p[1] && r.status === 'PENDING');
   if (row) row.status = 'PROCESSING';
@@ -309,6 +339,49 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
   ],
   ['SELECT s.id, s.user_id', sessionRow],
   [
+    'DELETE FROM user_sessions WHERE user_id',
+    (s, p) =>
+      write(() => {
+        for (const [id, session] of s.sessions) {
+          if (session.user === p[0]) s.sessions.delete(id);
+        }
+      }),
+  ],
+  [
+    'INSERT INTO password_reset_tokens',
+    (s, p) =>
+      write(() =>
+        s.resets.push({
+          id: s.resets.length + 1,
+          user: p[0] as string,
+          hash: p[1] as string,
+          expires: p[2] as Date,
+          consumed: null,
+        })
+      ),
+  ],
+  ['SELECT t.id, t.user_id', liveResetRow],
+  ['UPDATE password_reset_tokens SET consumed_at = ? WHERE id', spendReset],
+  [
+    'UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id',
+    (s, p) =>
+      write(() => {
+        for (const r of s.resets) {
+          if (r.user === p[1] && r.consumed === null) r.consumed = p[0] as Date;
+        }
+      }),
+  ],
+  [
+    'UPDATE users SET password_hash',
+    (s, p) =>
+      write(() =>
+        Object.assign(s.users.get(p[1] as string) ?? {}, {
+          password_hash: p[0],
+        })
+      ),
+  ],
+  ['INSERT INTO audit_log', (s, p) => write(() => s.audit.push(p))],
+  [
     'DELETE FROM user_sessions',
     (s, p) => write(() => s.sessions.delete(p[0] as string)),
   ],
@@ -384,18 +457,27 @@ function memoryDb() {
 let app: FastifyInstance;
 let store: ReturnType<typeof memoryDb>;
 let sent: { to: string; subject: string; text: string }[];
+/** Every pause `forgot-password` asked for (FC 042 T2.1), instead of waiting for real. */
+let waits: number[];
 
-async function start(env: Record<string, string> = { ...KEYS, ...MAIL }) {
+async function start(
+  env: Record<string, string> = { ...KEYS, ...MAIL },
+  now: () => Date = () => NOW
+) {
   store = memoryDb();
   sent = [];
+  waits = [];
   app = await buildApp({
     config: loadConfig({ ...BASE, ...env }),
     db: store.db,
     rate: async () => null,
     logger: false,
-    now: () => NOW,
+    now,
     sendMail: async (message) => {
       sent.push(message);
+    },
+    wait: async (ms) => {
+      waits.push(ms);
     },
   });
   return app;
@@ -532,23 +614,39 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.userRoles).toEqual([[user.id, 'customer']]);
   });
 
-  it('OWASP-A07 · refuses short passwords and unknown fields (400), before any work', async () => {
+  it('OWASP-A07 · refuses unknown fields (400), before any work', async () => {
     await start();
-    for (const payload of [
-      { email: 'a@example.test', password: 'short', fullName: 'Ana' },
-      {
-        email: 'a@example.test',
-        password: PASSWORD,
-        fullName: 'Ana',
-        role: 'admin',
-      },
-    ]) {
-      const response = await post('/v1/auth/register', payload);
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({ detail: 'INVALID_REQUEST' });
-    }
+    const response = await post('/v1/auth/register', {
+      email: 'a@example.test',
+      password: PASSWORD,
+      fullName: 'Ana',
+      role: 'admin',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ detail: 'INVALID_REQUEST' });
     expect(store.users.size).toBe(0);
   });
+
+  it.each([
+    ['too short', 'Ruta-Neva7#', 'PASSWORD_LENGTH'],
+    ['without a symbol', 'RutaNevado7Sur', 'PASSWORD_SYMBOL'],
+    ['with the name in it', 'Prueba-Nevado7#', 'PASSWORD_PERSONAL'],
+    ['common', 'Password123!x', 'PASSWORD_COMMON'],
+  ])(
+    'OWASP-A07 · refuses a password %s with the code of its rule, and creates nothing (FC 042 T2.6)',
+    async (_case, password, code) => {
+      await start();
+      const response = await post('/v1/auth/register', {
+        email: 'ana@example.test',
+        password,
+        fullName: 'Ana Prueba',
+        altcha: await solved(),
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ detail: code });
+      expect(store.users.size).toBe(0);
+    }
+  );
 
   it('OWASP-A07 · answers the same 401 to a wrong password and to an unknown e-mail', async () => {
     await start();
@@ -1173,6 +1271,261 @@ describe(
       expect(store.devices).toEqual([]);
       const without = await post('/v1/account/forget-device', {}, session);
       expect(without.statusCode).toBe(204);
+    });
+  }
+);
+
+describe(
+  'FC 042 · forgot-password and reset-password',
+  { timeout: 20_000 },
+  () => {
+    const NEUTRAL = {
+      ok: true,
+      message:
+        'Si el correo está registrado, enviamos instrucciones para restablecer tu contraseña.',
+    };
+    const NEW_PASSWORD = 'Glaciar norte 9 ruta';
+
+    /** One request, from its own address unless told: the per-IP limit stays out of the way. */
+    let address = 0;
+    async function forgot(email: string) {
+      address += 1;
+      return app.inject({
+        method: 'POST',
+        url: '/v1/auth/forgot-password',
+        payload: { email, altcha: await solved() },
+        remoteAddress: `198.51.100.${address % 250}`,
+      });
+    }
+
+    /** The token of the last reset link queued, decrypted as the dispatcher does. */
+    function mailedToken(): string {
+      const row = store.outbox.findLast((r) => r.type === 'PASSWORD_RESET');
+      const { userId, token } = JSON.parse(String(row?.payload)) as {
+        userId: string;
+        token: string;
+      };
+      return decryptTotpSecret(TOTP_KEY, userId, token).toString('utf8');
+    }
+
+    it('T1.1 · opens a 15-minute link for an account and queues its mail, storing only the hash', async () => {
+      await start();
+      await register('ana@example.test');
+      const response = await forgot('Ana@Example.test ');
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(NEUTRAL);
+      const token = mailedToken();
+      expect(token).toMatch(/^[0-9a-f]{64}$/);
+      expect(store.resets).toEqual([
+        {
+          id: 1,
+          user: [...store.users.keys()][0],
+          hash: tokenHash(token),
+          expires: new Date(NOW.getTime() + 15 * 60_000),
+          consumed: null,
+        },
+      ]);
+      // The payload carries the ciphertext only, never the token in clear.
+      expect(store.outbox.at(-1)?.payload).not.toContain(token);
+      await vi.waitFor(() =>
+        expect(sent.map((m) => m.subject)).toContain(
+          'Restablece tu contraseña de YĒKORA'
+        )
+      );
+      const mail = sent.find((m) => m.subject.startsWith('Restablece'));
+      expect(mail?.to).toBe('ana@example.test');
+      expect(mail?.text).toContain(
+        `https://yekora.mx/cuenta/?action=reset-password&token=${token}`
+      );
+      expect(mail?.text).toContain(
+        `https://yekora.mx/en/account/?action=reset-password&token=${token}`
+      );
+    });
+
+    it('T2.1 · answers an unknown e-mail the same, after the same least time, and queues nothing', async () => {
+      await start();
+      await register('ana@example.test');
+      const known = await forgot('ana@example.test');
+      const unknown = await forgot('nadie@example.test');
+      expect([unknown.statusCode, unknown.json()]).toEqual([
+        known.statusCode,
+        known.json(),
+      ]);
+      expect(store.resets).toHaveLength(1);
+      expect(
+        store.outbox.filter((r) => r.type === 'PASSWORD_RESET')
+      ).toHaveLength(1);
+      // The clock of the test stands still: both answers waited the whole floor.
+      expect(waits).toEqual([500, 500]);
+    });
+
+    it('T2.1 · really waits out the floor when no pause is injected (production)', async () => {
+      store = memoryDb();
+      app = await buildApp({
+        config: loadConfig({ ...BASE, ...KEYS, ...MAIL }),
+        db: store.db,
+        rate: async () => null,
+        logger: false,
+        now: () => NOW,
+        sendMail: async () => undefined,
+      });
+      const started = performance.now();
+      const response = await forgot('nadie@example.test');
+      expect(response.json()).toEqual(NEUTRAL);
+      expect(performance.now() - started).toBeGreaterThanOrEqual(450);
+    });
+
+    it('T1.1 V · refuses a request without the anti-bot proof or with a bad e-mail (400)', async () => {
+      await start();
+      const bot = await post('/v1/auth/forgot-password', {
+        email: 'ana@example.test',
+      });
+      expect(bot.json()).toMatchObject({ detail: 'BOT_CHALLENGE_REQUIRED' });
+      const email = await post('/v1/auth/forgot-password', {
+        email: 'not-an-email',
+      });
+      expect([email.statusCode, email.json().detail]).toEqual([
+        400,
+        'INVALID_REQUEST',
+      ]);
+      expect(store.resets).toEqual([]);
+    });
+
+    it('T1.1 R · gives each e-mail 10 requests a minute (429), whether it has an account or not', async () => {
+      let clock = NOW;
+      await start(undefined, () => clock);
+      for (let i = 0; i < 10; i += 1) {
+        expect((await forgot('nadie@example.test')).statusCode).toBe(200);
+      }
+      const limited = await forgot('NADIE@example.test');
+      expect([limited.statusCode, limited.json().detail]).toEqual([
+        429,
+        'RATE_LIMITED',
+      ]);
+      expect((await forgot('otra@example.test')).statusCode).toBe(200);
+      clock = new Date(NOW.getTime() + 60_000);
+      expect((await forgot('nadie@example.test')).statusCode).toBe(200);
+    });
+
+    it('answers 503 MAIL_UNAVAILABLE without the SMTP account, and opens no link', async () => {
+      await start(KEYS);
+      await register('ana@example.test');
+      const response = await forgot('ana@example.test');
+      expect([response.statusCode, response.json().detail]).toEqual([
+        503,
+        'MAIL_UNAVAILABLE',
+      ]);
+      expect(store.resets).toEqual([]);
+    });
+
+    it('T1.2, T2.3 · sets the new password, spends every link, ends every session and queues the alert', async () => {
+      await start();
+      const { cookie } = await signedInBuyer();
+      await forgot('ana@example.test');
+      const older = mailedToken();
+      await forgot('ana@example.test');
+      const token = mailedToken();
+      const response = await post('/v1/auth/reset-password', {
+        token,
+        password: NEW_PASSWORD,
+      });
+      expect([response.statusCode, response.json()]).toEqual([
+        200,
+        { ok: true },
+      ]);
+      expect(String(response.headers['set-cookie'])).toContain('Max-Age=0');
+      const [user] = [...store.users.values()];
+      expect(String(user.password_hash)).toMatch(
+        /^\$argon2id\$v=19\$m=19456,t=2,p=1\$/
+      );
+      expect(
+        store.resets.every((r) => r.consumed?.getTime() === NOW.getTime())
+      ).toBe(true);
+      expect(store.sessions.size).toBe(0);
+      expect(
+        (await app.inject({ url: '/v1/account/me', headers: { cookie } }))
+          .statusCode
+      ).toBe(401);
+      expect(store.audit).toHaveLength(1);
+      expect(store.audit[0].slice(0, 4)).toEqual([
+        user.id,
+        'PASSWORD_RESET',
+        'users',
+        user.id,
+      ]);
+      expect(store.outbox.at(-1)?.type).toBe('PASSWORD_CHANGED');
+      // The old password no longer opens the account; the new one does.
+      expect((await loginAs('ana@example.test')).statusCode).toBe(401);
+      expect((await loginAs('ana@example.test', NEW_PASSWORD)).statusCode).toBe(
+        200
+      );
+      // Every link of the account was spent, the older one too.
+      for (const spent of [token, older]) {
+        const again = await post('/v1/auth/reset-password', {
+          token: spent,
+          password: NEW_PASSWORD,
+        });
+        expect([again.statusCode, again.json().detail]).toEqual([
+          400,
+          'RESET_TOKEN_INVALID',
+        ]);
+      }
+    });
+
+    it('T1.2 · refuses an unknown or expired link, and a weak password without spending the link', async () => {
+      let clock = NOW;
+      await start(undefined, () => clock);
+      await register('ana@example.test');
+      await forgot('ana@example.test');
+      const token = mailedToken();
+      const weak = await post('/v1/auth/reset-password', {
+        token,
+        password: 'Ana prueba 7 sol',
+      });
+      expect([weak.statusCode, weak.json().detail]).toEqual([
+        400,
+        'PASSWORD_PERSONAL',
+      ]);
+      expect(store.resets[0].consumed).toBeNull();
+      const unknown = await post('/v1/auth/reset-password', {
+        token: 'f'.repeat(64),
+        password: NEW_PASSWORD,
+      });
+      expect(unknown.json().detail).toBe('RESET_TOKEN_INVALID');
+      clock = new Date(NOW.getTime() + 15 * 60_000);
+      const expired = await post('/v1/auth/reset-password', {
+        token,
+        password: NEW_PASSWORD,
+      });
+      expect(expired.json().detail).toBe('RESET_TOKEN_INVALID');
+      const malformed = await post('/v1/auth/reset-password', {
+        token: 'not-hex',
+        password: NEW_PASSWORD,
+      });
+      expect(malformed.json().detail).toBe('INVALID_REQUEST');
+    });
+
+    it('T2.3 · lets only one of two submissions of the same link win', async () => {
+      await start();
+      await register('ana@example.test');
+      await forgot('ana@example.test');
+      const token = mailedToken();
+      // The second submission found the link live, but the first spent it before its update.
+      const [reset] = store.resets;
+      const original = store.db.transaction;
+      store.db.transaction = async (work) => {
+        reset.consumed = NOW;
+        return original(work);
+      };
+      const lost = await post('/v1/auth/reset-password', {
+        token,
+        password: NEW_PASSWORD,
+      });
+      expect([lost.statusCode, lost.json().detail]).toEqual([
+        400,
+        'RESET_TOKEN_INVALID',
+      ]);
+      expect(store.audit).toEqual([]);
     });
   }
 );

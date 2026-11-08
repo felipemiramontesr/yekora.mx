@@ -52,9 +52,13 @@ import {
   enrollResponseSchema,
   loginRequestSchema,
   loginResponseSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResponseSchema,
   meResponseSchema,
   registeredSchema,
   registerRequestSchema,
+  resetPasswordRequestSchema,
+  resetPasswordResponseSchema,
   signedInSchema,
   verifyRequestSchema,
   botChallengeSchema,
@@ -335,9 +339,22 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   // FC 028: sign-up and sign-in are public by nature; everything signed-in is /v1/account.
   auth(
     '/v1/auth/register',
-    'Creates a buyer account; never says whether the e-mail existed',
+    'Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042)',
     registerRequestSchema,
     { 202: registeredSchema }
+  ),
+  // FC 042: «¿Olvidaste tu contraseña?», neutral for every e-mail, and the reset through its link.
+  auth(
+    '/v1/auth/forgot-password',
+    'Mails a 15-minute reset link when the e-mail has an account; the same answer either way (10/min per IP and per e-mail)',
+    forgotPasswordRequestSchema,
+    { 200: forgotPasswordResponseSchema, 429: problemSchema }
+  ),
+  auth(
+    '/v1/auth/reset-password',
+    'Sets a new password through the mailed link, spends it and ends every session of the account',
+    resetPasswordRequestSchema,
+    { 200: resetPasswordResponseSchema }
   ),
   {
     method: 'GET',
