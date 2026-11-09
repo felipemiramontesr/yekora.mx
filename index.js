@@ -4240,7 +4240,7 @@ var require_LocalStore = __commonJS({
         }
       }
       this.lru.set(ip, current);
-      cb(null, current);
+      cb(null, { current: current.current, ttl: current.ttl });
     };
     LocalStore.prototype.read = function(ip, cb, timeWindow, max) {
       const nowInMs = Date.now();
@@ -7670,8 +7670,10 @@ var require_error_status = __commonJS({
     } = require_symbols2();
     function setErrorStatusCode(reply, err) {
       if (!reply[kReplyHasStatusCode] || reply.statusCode === 200) {
-        const statusCode = err && (err.statusCode || err.status);
-        reply.code(statusCode >= 400 ? statusCode : 500);
+        let statusCode = 500;
+        if (err?.statusCode >= 400 && err.statusCode <= 599) statusCode = err.statusCode;
+        else if (err?.status >= 400 && err.status <= 599) statusCode = err.status;
+        reply.code(statusCode);
       }
     }
     module2.exports = { setErrorStatusCode };
@@ -8464,7 +8466,7 @@ var require_config_validator = __commonJS({
     "use strict";
     module2.exports = validate10;
     module2.exports.default = validate10;
-    var schema11 = { "type": "object", "additionalProperties": false, "properties": { "connectionTimeout": { "type": "integer", "default": 0 }, "keepAliveTimeout": { "type": "integer", "default": 72e3 }, "forceCloseConnections": { "oneOf": [{ "type": "string", "pattern": "idle" }, { "type": "boolean" }] }, "maxRequestsPerSocket": { "type": "integer", "default": 0, "nullable": true }, "requestTimeout": { "type": "integer", "default": 0 }, "handlerTimeout": { "type": "integer", "default": 0 }, "bodyLimit": { "type": "integer", "default": 1048576 }, "caseSensitive": { "type": "boolean", "default": true }, "allowUnsafeRegex": { "type": "boolean", "default": false }, "http2": { "type": "boolean" }, "https": { "if": { "not": { "oneOf": [{ "type": "boolean" }, { "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["allowHTTP1"], "properties": { "allowHTTP1": { "type": "boolean" } } }] } }, "then": { "setDefaultValue": true } }, "ignoreTrailingSlash": { "type": "boolean", "default": false }, "ignoreDuplicateSlashes": { "type": "boolean", "default": false }, "disableRequestLogging": { "default": false }, "maxParamLength": { "type": "integer", "default": 100 }, "onProtoPoisoning": { "type": "string", "default": "error" }, "onConstructorPoisoning": { "type": "string", "default": "error" }, "pluginTimeout": { "type": "integer", "default": 1e4 }, "requestIdHeader": { "anyOf": [{ "type": "boolean" }, { "type": "string" }], "default": false }, "requestIdLogLabel": { "type": "string", "default": "reqId" }, "http2SessionTimeout": { "type": "integer", "default": 72e3 }, "exposeHeadRoutes": { "type": "boolean", "default": true }, "useSemicolonDelimiter": { "type": "boolean", "default": false }, "routerOptions": { "type": "object", "additionalProperties": true, "properties": { "ignoreTrailingSlash": { "type": "boolean", "default": false }, "ignoreDuplicateSlashes": { "type": "boolean", "default": false }, "maxParamLength": { "type": "integer", "default": 100 }, "allowUnsafeRegex": { "type": "boolean", "default": false }, "useSemicolonDelimiter": { "type": "boolean", "default": false } } }, "constraints": { "type": "object", "additionalProperties": { "type": "object", "required": ["name", "storage", "validate", "deriveConstraint"], "additionalProperties": true, "properties": { "name": { "type": "string" }, "storage": {}, "validate": {}, "deriveConstraint": {} } } } } };
+    var schema11 = { "type": "object", "additionalProperties": false, "properties": { "connectionTimeout": { "type": "integer", "default": 0 }, "keepAliveTimeout": { "type": "integer", "default": 72e3 }, "forceCloseConnections": { "oneOf": [{ "type": "string", "pattern": "idle" }, { "type": "boolean" }] }, "maxRequestsPerSocket": { "type": "integer", "default": 0, "nullable": true }, "requestTimeout": { "type": "integer", "default": 0 }, "handlerTimeout": { "type": "integer", "default": 0 }, "bodyLimit": { "type": "integer", "default": 1048576 }, "caseSensitive": { "type": "boolean", "default": true }, "allowUnsafeRegex": { "type": "boolean", "default": false }, "http2": { "type": "boolean" }, "https": { "if": { "not": { "oneOf": [{ "type": "boolean" }, { "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["allowHTTP1"], "properties": { "allowHTTP1": { "type": "boolean" } } }] } }, "then": { "setDefaultValue": true } }, "ignoreTrailingSlash": { "type": "boolean", "default": false }, "ignoreDuplicateSlashes": { "type": "boolean", "default": false }, "disableRequestLogging": { "default": false }, "maxParamLength": { "type": "integer", "default": 100 }, "onProtoPoisoning": { "type": "string", "default": "error" }, "onConstructorPoisoning": { "type": "string", "default": "error" }, "pluginTimeout": { "type": "integer", "default": 1e4 }, "requestIdHeader": { "anyOf": [{ "type": "boolean" }, { "type": "string" }], "default": false }, "requestIdLogLabel": { "type": "string", "default": "reqId" }, "http2SessionTimeout": { "type": "integer", "default": 72e3 }, "exposeHeadRoutes": { "type": "boolean", "default": true }, "useSemicolonDelimiter": { "type": "boolean", "default": false }, "routerOptions": { "type": "object", "additionalProperties": true, "properties": { "compile": { "type": "boolean", "default": false }, "ignoreTrailingSlash": { "type": "boolean", "default": false }, "ignoreDuplicateSlashes": { "type": "boolean", "default": false }, "maxParamLength": { "type": "integer", "default": 100 }, "allowUnsafeRegex": { "type": "boolean", "default": false }, "useSemicolonDelimiter": { "type": "boolean", "default": false } } }, "constraints": { "type": "object", "additionalProperties": { "type": "object", "required": ["name", "storage", "validate", "deriveConstraint"], "additionalProperties": true, "properties": { "name": { "type": "string" }, "storage": {}, "validate": {}, "deriveConstraint": {} } } } } };
     var func2 = Object.prototype.hasOwnProperty;
     var pattern0 = new RegExp("idle", "u");
     function validate10(data, { instancePath = "", parentData, parentDataProperty, rootData = data } = {}) {
@@ -9385,6 +9387,9 @@ var require_config_validator = __commonJS({
                                                           const _errs69 = errors2;
                                                           if (errors2 === _errs69) {
                                                             if (data23 && typeof data23 == "object" && !Array.isArray(data23)) {
+                                                              if (data23.compile === void 0) {
+                                                                data23.compile = false;
+                                                              }
                                                               if (data23.ignoreTrailingSlash === void 0) {
                                                                 data23.ignoreTrailingSlash = false;
                                                               }
@@ -9400,7 +9405,7 @@ var require_config_validator = __commonJS({
                                                               if (data23.useSemicolonDelimiter === void 0) {
                                                                 data23.useSemicolonDelimiter = false;
                                                               }
-                                                              let data24 = data23.ignoreTrailingSlash;
+                                                              let data24 = data23.compile;
                                                               const _errs72 = errors2;
                                                               if (typeof data24 !== "boolean") {
                                                                 let coerced26 = void 0;
@@ -9410,20 +9415,20 @@ var require_config_validator = __commonJS({
                                                                   } else if (data24 === "true" || data24 === 1) {
                                                                     coerced26 = true;
                                                                   } else {
-                                                                    validate10.errors = [{ instancePath: instancePath + "/routerOptions/ignoreTrailingSlash", schemaPath: "#/properties/routerOptions/properties/ignoreTrailingSlash/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
+                                                                    validate10.errors = [{ instancePath: instancePath + "/routerOptions/compile", schemaPath: "#/properties/routerOptions/properties/compile/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
                                                                     return false;
                                                                   }
                                                                 }
                                                                 if (coerced26 !== void 0) {
                                                                   data24 = coerced26;
                                                                   if (data23 !== void 0) {
-                                                                    data23["ignoreTrailingSlash"] = coerced26;
+                                                                    data23["compile"] = coerced26;
                                                                   }
                                                                 }
                                                               }
                                                               var valid7 = _errs72 === errors2;
                                                               if (valid7) {
-                                                                let data25 = data23.ignoreDuplicateSlashes;
+                                                                let data25 = data23.ignoreTrailingSlash;
                                                                 const _errs74 = errors2;
                                                                 if (typeof data25 !== "boolean") {
                                                                   let coerced27 = void 0;
@@ -9433,65 +9438,65 @@ var require_config_validator = __commonJS({
                                                                     } else if (data25 === "true" || data25 === 1) {
                                                                       coerced27 = true;
                                                                     } else {
-                                                                      validate10.errors = [{ instancePath: instancePath + "/routerOptions/ignoreDuplicateSlashes", schemaPath: "#/properties/routerOptions/properties/ignoreDuplicateSlashes/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
+                                                                      validate10.errors = [{ instancePath: instancePath + "/routerOptions/ignoreTrailingSlash", schemaPath: "#/properties/routerOptions/properties/ignoreTrailingSlash/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
                                                                       return false;
                                                                     }
                                                                   }
                                                                   if (coerced27 !== void 0) {
                                                                     data25 = coerced27;
                                                                     if (data23 !== void 0) {
-                                                                      data23["ignoreDuplicateSlashes"] = coerced27;
+                                                                      data23["ignoreTrailingSlash"] = coerced27;
                                                                     }
                                                                   }
                                                                 }
                                                                 var valid7 = _errs74 === errors2;
                                                                 if (valid7) {
-                                                                  let data26 = data23.maxParamLength;
+                                                                  let data26 = data23.ignoreDuplicateSlashes;
                                                                   const _errs76 = errors2;
-                                                                  if (!(typeof data26 == "number" && (!(data26 % 1) && !isNaN(data26)) && isFinite(data26))) {
-                                                                    let dataType28 = typeof data26;
+                                                                  if (typeof data26 !== "boolean") {
                                                                     let coerced28 = void 0;
                                                                     if (!(coerced28 !== void 0)) {
-                                                                      if (dataType28 === "boolean" || data26 === null || dataType28 === "string" && data26 && data26 == +data26 && !(data26 % 1)) {
-                                                                        coerced28 = +data26;
+                                                                      if (data26 === "false" || data26 === 0 || data26 === null) {
+                                                                        coerced28 = false;
+                                                                      } else if (data26 === "true" || data26 === 1) {
+                                                                        coerced28 = true;
                                                                       } else {
-                                                                        validate10.errors = [{ instancePath: instancePath + "/routerOptions/maxParamLength", schemaPath: "#/properties/routerOptions/properties/maxParamLength/type", keyword: "type", params: { type: "integer" }, message: "must be integer" }];
+                                                                        validate10.errors = [{ instancePath: instancePath + "/routerOptions/ignoreDuplicateSlashes", schemaPath: "#/properties/routerOptions/properties/ignoreDuplicateSlashes/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
                                                                         return false;
                                                                       }
                                                                     }
                                                                     if (coerced28 !== void 0) {
                                                                       data26 = coerced28;
                                                                       if (data23 !== void 0) {
-                                                                        data23["maxParamLength"] = coerced28;
+                                                                        data23["ignoreDuplicateSlashes"] = coerced28;
                                                                       }
                                                                     }
                                                                   }
                                                                   var valid7 = _errs76 === errors2;
                                                                   if (valid7) {
-                                                                    let data27 = data23.allowUnsafeRegex;
+                                                                    let data27 = data23.maxParamLength;
                                                                     const _errs78 = errors2;
-                                                                    if (typeof data27 !== "boolean") {
+                                                                    if (!(typeof data27 == "number" && (!(data27 % 1) && !isNaN(data27)) && isFinite(data27))) {
+                                                                      let dataType29 = typeof data27;
                                                                       let coerced29 = void 0;
                                                                       if (!(coerced29 !== void 0)) {
-                                                                        if (data27 === "false" || data27 === 0 || data27 === null) {
-                                                                          coerced29 = false;
-                                                                        } else if (data27 === "true" || data27 === 1) {
-                                                                          coerced29 = true;
+                                                                        if (dataType29 === "boolean" || data27 === null || dataType29 === "string" && data27 && data27 == +data27 && !(data27 % 1)) {
+                                                                          coerced29 = +data27;
                                                                         } else {
-                                                                          validate10.errors = [{ instancePath: instancePath + "/routerOptions/allowUnsafeRegex", schemaPath: "#/properties/routerOptions/properties/allowUnsafeRegex/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
+                                                                          validate10.errors = [{ instancePath: instancePath + "/routerOptions/maxParamLength", schemaPath: "#/properties/routerOptions/properties/maxParamLength/type", keyword: "type", params: { type: "integer" }, message: "must be integer" }];
                                                                           return false;
                                                                         }
                                                                       }
                                                                       if (coerced29 !== void 0) {
                                                                         data27 = coerced29;
                                                                         if (data23 !== void 0) {
-                                                                          data23["allowUnsafeRegex"] = coerced29;
+                                                                          data23["maxParamLength"] = coerced29;
                                                                         }
                                                                       }
                                                                     }
                                                                     var valid7 = _errs78 === errors2;
                                                                     if (valid7) {
-                                                                      let data28 = data23.useSemicolonDelimiter;
+                                                                      let data28 = data23.allowUnsafeRegex;
                                                                       const _errs80 = errors2;
                                                                       if (typeof data28 !== "boolean") {
                                                                         let coerced30 = void 0;
@@ -9501,18 +9506,42 @@ var require_config_validator = __commonJS({
                                                                           } else if (data28 === "true" || data28 === 1) {
                                                                             coerced30 = true;
                                                                           } else {
-                                                                            validate10.errors = [{ instancePath: instancePath + "/routerOptions/useSemicolonDelimiter", schemaPath: "#/properties/routerOptions/properties/useSemicolonDelimiter/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
+                                                                            validate10.errors = [{ instancePath: instancePath + "/routerOptions/allowUnsafeRegex", schemaPath: "#/properties/routerOptions/properties/allowUnsafeRegex/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
                                                                             return false;
                                                                           }
                                                                         }
                                                                         if (coerced30 !== void 0) {
                                                                           data28 = coerced30;
                                                                           if (data23 !== void 0) {
-                                                                            data23["useSemicolonDelimiter"] = coerced30;
+                                                                            data23["allowUnsafeRegex"] = coerced30;
                                                                           }
                                                                         }
                                                                       }
                                                                       var valid7 = _errs80 === errors2;
+                                                                      if (valid7) {
+                                                                        let data29 = data23.useSemicolonDelimiter;
+                                                                        const _errs82 = errors2;
+                                                                        if (typeof data29 !== "boolean") {
+                                                                          let coerced31 = void 0;
+                                                                          if (!(coerced31 !== void 0)) {
+                                                                            if (data29 === "false" || data29 === 0 || data29 === null) {
+                                                                              coerced31 = false;
+                                                                            } else if (data29 === "true" || data29 === 1) {
+                                                                              coerced31 = true;
+                                                                            } else {
+                                                                              validate10.errors = [{ instancePath: instancePath + "/routerOptions/useSemicolonDelimiter", schemaPath: "#/properties/routerOptions/properties/useSemicolonDelimiter/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" }];
+                                                                              return false;
+                                                                            }
+                                                                          }
+                                                                          if (coerced31 !== void 0) {
+                                                                            data29 = coerced31;
+                                                                            if (data23 !== void 0) {
+                                                                              data23["useSemicolonDelimiter"] = coerced31;
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                        var valid7 = _errs82 === errors2;
+                                                                      }
                                                                     }
                                                                   }
                                                                 }
@@ -9528,39 +9557,39 @@ var require_config_validator = __commonJS({
                                                         }
                                                         if (valid0) {
                                                           if (data.constraints !== void 0) {
-                                                            let data29 = data.constraints;
-                                                            const _errs82 = errors2;
-                                                            if (errors2 === _errs82) {
-                                                              if (data29 && typeof data29 == "object" && !Array.isArray(data29)) {
-                                                                for (const key2 in data29) {
-                                                                  let data30 = data29[key2];
-                                                                  const _errs85 = errors2;
-                                                                  if (errors2 === _errs85) {
-                                                                    if (data30 && typeof data30 == "object" && !Array.isArray(data30)) {
+                                                            let data30 = data.constraints;
+                                                            const _errs84 = errors2;
+                                                            if (errors2 === _errs84) {
+                                                              if (data30 && typeof data30 == "object" && !Array.isArray(data30)) {
+                                                                for (const key2 in data30) {
+                                                                  let data31 = data30[key2];
+                                                                  const _errs87 = errors2;
+                                                                  if (errors2 === _errs87) {
+                                                                    if (data31 && typeof data31 == "object" && !Array.isArray(data31)) {
                                                                       let missing1;
-                                                                      if (data30.name === void 0 && (missing1 = "name") || data30.storage === void 0 && (missing1 = "storage") || data30.validate === void 0 && (missing1 = "validate") || data30.deriveConstraint === void 0 && (missing1 = "deriveConstraint")) {
+                                                                      if (data31.name === void 0 && (missing1 = "name") || data31.storage === void 0 && (missing1 = "storage") || data31.validate === void 0 && (missing1 = "validate") || data31.deriveConstraint === void 0 && (missing1 = "deriveConstraint")) {
                                                                         validate10.errors = [{ instancePath: instancePath + "/constraints/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/properties/constraints/additionalProperties/required", keyword: "required", params: { missingProperty: missing1 }, message: "must have required property '" + missing1 + "'" }];
                                                                         return false;
                                                                       } else {
-                                                                        if (data30.name !== void 0) {
-                                                                          let data31 = data30.name;
-                                                                          if (typeof data31 !== "string") {
-                                                                            let dataType31 = typeof data31;
-                                                                            let coerced31 = void 0;
-                                                                            if (!(coerced31 !== void 0)) {
-                                                                              if (dataType31 == "number" || dataType31 == "boolean") {
-                                                                                coerced31 = "" + data31;
-                                                                              } else if (data31 === null) {
-                                                                                coerced31 = "";
+                                                                        if (data31.name !== void 0) {
+                                                                          let data32 = data31.name;
+                                                                          if (typeof data32 !== "string") {
+                                                                            let dataType32 = typeof data32;
+                                                                            let coerced32 = void 0;
+                                                                            if (!(coerced32 !== void 0)) {
+                                                                              if (dataType32 == "number" || dataType32 == "boolean") {
+                                                                                coerced32 = "" + data32;
+                                                                              } else if (data32 === null) {
+                                                                                coerced32 = "";
                                                                               } else {
                                                                                 validate10.errors = [{ instancePath: instancePath + "/constraints/" + key2.replace(/~/g, "~0").replace(/\//g, "~1") + "/name", schemaPath: "#/properties/constraints/additionalProperties/properties/name/type", keyword: "type", params: { type: "string" }, message: "must be string" }];
                                                                                 return false;
                                                                               }
                                                                             }
-                                                                            if (coerced31 !== void 0) {
-                                                                              data31 = coerced31;
-                                                                              if (data30 !== void 0) {
-                                                                                data30["name"] = coerced31;
+                                                                            if (coerced32 !== void 0) {
+                                                                              data32 = coerced32;
+                                                                              if (data31 !== void 0) {
+                                                                                data31["name"] = coerced32;
                                                                               }
                                                                             }
                                                                           }
@@ -9571,7 +9600,7 @@ var require_config_validator = __commonJS({
                                                                       return false;
                                                                     }
                                                                   }
-                                                                  var valid8 = _errs85 === errors2;
+                                                                  var valid8 = _errs87 === errors2;
                                                                   if (!valid8) {
                                                                     break;
                                                                   }
@@ -9581,7 +9610,7 @@ var require_config_validator = __commonJS({
                                                                 return false;
                                                               }
                                                             }
-                                                            var valid0 = _errs82 === errors2;
+                                                            var valid0 = _errs84 === errors2;
                                                           } else {
                                                             var valid0 = true;
                                                           }
@@ -9617,7 +9646,7 @@ var require_config_validator = __commonJS({
       validate10.errors = vErrors;
       return errors2 === 0;
     }
-    module2.exports.defaultInitOptions = { "connectionTimeout": 0, "keepAliveTimeout": 72e3, "maxRequestsPerSocket": 0, "requestTimeout": 0, "handlerTimeout": 0, "bodyLimit": 1048576, "caseSensitive": true, "allowUnsafeRegex": false, "disableRequestLogging": false, "ignoreTrailingSlash": false, "ignoreDuplicateSlashes": false, "maxParamLength": 100, "onProtoPoisoning": "error", "onConstructorPoisoning": "error", "pluginTimeout": 1e4, "requestIdHeader": false, "requestIdLogLabel": "reqId", "http2SessionTimeout": 72e3, "exposeHeadRoutes": true, "useSemicolonDelimiter": false, "allowErrorHandlerOverride": true, "routerOptions": { "ignoreTrailingSlash": false, "ignoreDuplicateSlashes": false, "maxParamLength": 100, "allowUnsafeRegex": false, "useSemicolonDelimiter": false } };
+    module2.exports.defaultInitOptions = { "connectionTimeout": 0, "keepAliveTimeout": 72e3, "maxRequestsPerSocket": 0, "requestTimeout": 0, "handlerTimeout": 0, "bodyLimit": 1048576, "caseSensitive": true, "allowUnsafeRegex": false, "disableRequestLogging": false, "ignoreTrailingSlash": false, "ignoreDuplicateSlashes": false, "maxParamLength": 100, "onProtoPoisoning": "error", "onConstructorPoisoning": "error", "pluginTimeout": 1e4, "requestIdHeader": false, "requestIdLogLabel": "reqId", "http2SessionTimeout": 72e3, "exposeHeadRoutes": true, "useSemicolonDelimiter": false, "allowErrorHandlerOverride": true, "routerOptions": { "compile": false, "ignoreTrailingSlash": false, "ignoreDuplicateSlashes": false, "maxParamLength": 100, "allowUnsafeRegex": false, "useSemicolonDelimiter": false } };
   }
 });
 
@@ -15134,10 +15163,18 @@ var require_error_handler = __commonJS({
       const context = reply[kRouteContext];
       if (reply[kReplyNextErrorHandler] === false) {
         fallbackErrorHandler(error63, reply, function(reply2, payload) {
+          if (reply2.raw.headersSent === true || reply2.raw.destroyed === true) {
+            reply2.raw.destroy(error63);
+            return;
+          }
           try {
             reply2.raw.writeHead(reply2.raw.statusCode, reply2[kReplyHeaders]);
           } catch (error64) {
             reply2.server[kLogController].writeHeadError(error64, reply2.request, reply2);
+            if (error64.code === "ERR_HTTP_HEADERS_SENT" || reply2.raw.headersSent === true || reply2.raw.destroyed === true) {
+              reply2.raw.destroy(error64);
+              return;
+            }
             reply2.raw.writeHead(reply2.raw.statusCode);
           }
           reply2.raw.end(payload);
@@ -15217,15 +15254,15 @@ var require_error_handler = __commonJS({
     function setErrorHeaders(error63, reply) {
       const res = reply.raw;
       let statusCode = res.statusCode;
-      statusCode = statusCode >= 400 ? statusCode : 500;
+      statusCode = statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
       if (error63 != null) {
         if (error63.headers !== void 0) {
           reply.headers(error63.headers);
         }
-        if (error63.status >= 400) {
-          statusCode = error63.status;
-        } else if (error63.statusCode >= 400) {
+        if (error63.statusCode >= 400 && error63.statusCode <= 599) {
           statusCode = error63.statusCode;
+        } else if (error63.status >= 400 && error63.status <= 599) {
+          statusCode = error63.status;
         }
       }
       res.statusCode = statusCode;
@@ -15273,10 +15310,11 @@ var require_decorate = __commonJS({
       if (!checkExistence(this, name2)) {
         throw new FST_ERR_DEC_UNDECLARED(name2, "instance");
       }
-      if (typeof this[name2] === "function") {
-        return this[name2].bind(this);
+      const decorator = this[name2];
+      if (typeof decorator === "function") {
+        return decorator.bind(this);
       }
-      return this[name2];
+      return decorator;
     }
     function decorateConstructor(konstructor, name2, fn, dependencies) {
       const instance = konstructor.prototype;
@@ -16042,7 +16080,6 @@ var require_reply = __commonJS({
     function sendStream(payload, res, reply) {
       let sourceOpen = true;
       let errorLogged = false;
-      sendStreamTrailer(payload, res, reply);
       eos(payload, { readable: true, writable: false }, function(err) {
         sourceOpen = false;
         if (err != null) {
@@ -16055,6 +16092,10 @@ var require_reply = __commonJS({
           } else {
             onErrorHook(reply, err);
           }
+          return;
+        }
+        if (reply[kReplyTrailers] !== null) {
+          sendTrailer(null, res, reply);
         }
       });
       eos(res, function(err) {
@@ -16081,7 +16122,11 @@ var require_reply = __commonJS({
       } else {
         reply.log.warn("response will send, but you shouldn't use res.writeHead in stream mode");
       }
-      payload.pipe(res);
+      if (reply[kReplyTrailers] !== null) {
+        payload.pipe(res, { end: false });
+      } else {
+        payload.pipe(res);
+      }
     }
     function sendTrailer(payload, res, reply) {
       if (reply[kReplyTrailers] === null) {
@@ -16119,10 +16164,6 @@ var require_reply = __commonJS({
         }
       }
       if (skipped) res.end(null, null, null);
-    }
-    function sendStreamTrailer(payload, res, reply) {
-      if (reply[kReplyTrailers] === null) return;
-      payload.on("end", () => sendTrailer(null, res, reply));
     }
     function onErrorHook(reply, error63, cb) {
       if (reply[kRouteContext].onError !== null && !reply[kReplyNextErrorHandler]) {
@@ -17290,6 +17331,7 @@ var require_request = __commonJS({
     var { FST_ERR_REQ_INVALID_VALIDATION_INVOCATION, FST_ERR_DEC_UNDECLARED } = require_errors2();
     var decorators = require_decorate();
     var ContentType = require_content_type();
+    var PORT_REGEX = /(?<port>:\d+)$/;
     var HTTP_PART_SYMBOL_MAP = {
       body: kSchemaBody,
       headers: kSchemaHeaders,
@@ -17497,8 +17539,7 @@ var require_request = __commonJS({
       },
       port: {
         get() {
-          const portReg = /(?<port>:\d+)$/;
-          const matches = portReg.exec(this.host);
+          const matches = PORT_REGEX.exec(this.host);
           if (matches === null || matches[1] === void 0) {
             return null;
           }
@@ -17984,7 +18025,13 @@ var require_content_type_parser = __commonJS({
         );
         return;
       }
-      const result = parser.fn(request, request[kRequestPayloadStream], done);
+      let result;
+      try {
+        result = parser.fn(request, request[kRequestPayloadStream], done);
+      } catch (error63) {
+        done(error63, void 0);
+        return;
+      }
       if (result && typeof result.then === "function") {
         result.then((body) => {
           done(null, body);
@@ -18053,7 +18100,13 @@ var require_content_type_parser = __commonJS({
         } else {
           body = Buffer.concat(chunks, receivedLength);
         }
-        const result = parser.fn(request, body, done);
+        let result;
+        try {
+          result = parser.fn(request, body, done);
+        } catch (error63) {
+          done(error63, void 0);
+          return;
+        }
         if (result && typeof result.then === "function") {
           result.then((body2) => {
             done(null, body2);
@@ -52345,6 +52398,7 @@ var require_route = __commonJS({
     var { onRequestAbortHookRunner, lifecycleHooks, preParsingHookRunner, onTimeoutHookRunner, onRequestHookRunner } = require_hooks();
     var { normalizeSchema } = require_schemas();
     var { parseHeadOnSendHandlers } = require_head_route();
+    var { defaultInitOptions } = require_initial_config_validation();
     var {
       compileSchemasForValidation,
       compileSchemasForSerialization
@@ -52440,8 +52494,10 @@ var require_route = __commonJS({
           return503OnClosing = Object.hasOwn(options2, "return503OnClosing") ? options2.return503OnClosing : true;
           keepAliveConnections = fastifyArgs.keepAliveConnections;
         },
-        routing: router.lookup.bind(router),
-        // router func to find the right handler to call
+        // router func to find the right handler to call, not bound because
+        // router.compile() replaces router.lookup
+        routing: (req, res, done) => router.lookup(req, res, done),
+        compileRoutes: () => router.compile(),
         route,
         // configure a route in the fastify instance
         hasRoute,
@@ -52757,12 +52813,21 @@ var require_route = __commonJS({
           const ac = new AbortController();
           request[kRequestSignal] = ac;
           request[kTimeoutTimer] = setTimeout(() => {
-            if (!reply.sent) {
-              const err = new FST_ERR_HANDLER_TIMEOUT(handlerTimeout, context.config?.url);
-              ac.abort(err);
-              reply[kReplyIsError] = true;
-              reply.send(err);
+            if (reply.sent === true) {
+              return;
             }
+            const err = new FST_ERR_HANDLER_TIMEOUT(handlerTimeout, context.config?.url);
+            ac.abort(err);
+            if (reply.sent === true) {
+              return;
+            }
+            if (reply.raw.headersSent === true) {
+              reply[kReplyIsError] = true;
+              reply.raw.destroy(err);
+              return;
+            }
+            reply[kReplyIsError] = true;
+            reply.send(err);
           }, handlerTimeout);
           const onAbort = () => {
             if (!ac.signal.aborted) {
@@ -52878,6 +52943,7 @@ var require_route = __commonJS({
           routerOptions[key] = options[key] ?? defaultOptions[key];
         }
       }
+      routerOptions.compile ??= defaultInitOptions.routerOptions.compile;
       return routerOptions;
     }
     function removeTrackedSocket() {
@@ -55422,7 +55488,7 @@ var require_light_my_request = __commonJS({
 var require_fastify = __commonJS({
   "../../node_modules/fastify/fastify.js"(exports2, module2) {
     "use strict";
-    var VERSION = "5.12.7";
+    var VERSION = "5.12.8";
     var Avvio = require_avvio();
     var http2 = require("node:http");
     var diagnostics = require("node:diagnostics_channel");
@@ -55498,6 +55564,21 @@ var require_fastify = __commonJS({
     var { buildErrorHandler } = require_error_handler();
     var { FSTWRN004, FSTDEP023, FSTDEP024, FSTDEP025 } = require_warnings();
     var initChannel = diagnostics.channel("fastify.initialization");
+    function asyncDisposableHook(disposable) {
+      return function(instance, done) {
+        disposable[Symbol.asyncDispose]().then(() => done(), done);
+      };
+    }
+    function disposableHook(disposable) {
+      return function(instance, done) {
+        try {
+          disposable[Symbol.dispose]();
+          done();
+        } catch (err) {
+          done(err);
+        }
+      };
+    }
     function fastify(serverOptions) {
       const {
         options,
@@ -55776,6 +55857,10 @@ var require_fastify = __commonJS({
       fastify2.ready = ready;
       fastify2.printPlugins = avvio.prettyPrint.bind(avvio);
       avvio.once("preReady", () => {
+        if (options.routerOptions.compile === true) {
+          router.compileRoutes();
+          fourOhFour.router.compile();
+        }
         fastify2.onClose((instance, done) => {
           fastify2[kState].closing = true;
           router.closeRoutes();
@@ -55929,6 +56014,15 @@ var require_fastify = __commonJS({
         } else {
           if (fn.constructor.name === "AsyncFunction" && fn.length === 3) {
             throw new errorCodes.FST_ERR_HOOK_INVALID_ASYNC_HANDLER();
+          }
+        }
+        if (name2 === "onClose" && typeof fn !== "function") {
+          if (typeof fn[Symbol.asyncDispose] === "function") {
+            fn = asyncDisposableHook(fn);
+          } else if (typeof fn[Symbol.dispose] === "function") {
+            fn = disposableHook(fn);
+          } else {
+            throw new errorCodes.FST_ERR_HOOK_INVALID_HANDLER(name2, Object.prototype.toString.call(fn));
           }
         }
         if (name2 === "onClose") {
@@ -117260,7 +117354,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "339829006a90a8a8ab3889e88b289a682128b203" : void 0;
+var sha = true ? "86a0ada2d2dc96a2a1c86f57d2724d13e6183821" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
