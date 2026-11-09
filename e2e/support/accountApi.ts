@@ -13,7 +13,7 @@ import {
  * remembered device (FC 028 Enmienda 1, E1 and E2), as the real API does. Shared by account.spec.ts, a11y.spec.ts and
  * responsive.spec.ts (signed out by default). FC 042: sign-up, «¿Olvidaste tu contraseña?» and
  * the reset through {@link E2E_RESET_TOKEN}, refusing a new password with the shared policy, as
- * the API does.
+ * the API does. Enmienda 2: `reset-password/check` names the account of that link.
  */
 
 /** The code every challenge of the interceptor accepts. */
@@ -25,6 +25,9 @@ export const E2E_ORDER = 'YEK-2026-E2E00001';
 
 /** The only reset link the interceptor accepts (FC 042). */
 export const E2E_RESET_TOKEN = 'e'.repeat(64);
+
+/** The account {@link E2E_RESET_TOKEN} resets, as `reset-password/check` names it (Enmienda 2). */
+const RESET_ACCOUNT = { email: 'ana@example.test', fullName: 'Ana E2E' };
 
 /** The 400 of a new password that breaks the policy, or null when it passes. */
 function weakPassword(
@@ -165,9 +168,13 @@ const PASSWORD_ROUTES: Record<
     solved(body.altcha)
       ? json(route, 200, { ok: true, message: 'neutral' })
       : problem(route, 400, 'BOT_CHALLENGE_REQUIRED'),
+  '/v1/auth/reset-password/check': (route, body) =>
+    body.token === E2E_RESET_TOKEN
+      ? json(route, 200, RESET_ACCOUNT)
+      : problem(route, 400, 'RESET_TOKEN_INVALID'),
   '/v1/auth/reset-password': (route, body) =>
     body.token === E2E_RESET_TOKEN
-      ? (weakPassword(route, body.password, { email: '', fullName: '' }) ??
+      ? (weakPassword(route, body.password, RESET_ACCOUNT) ??
         json(route, 200, { ok: true }))
       : problem(route, 400, 'RESET_TOKEN_INVALID'),
 };

@@ -11,7 +11,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { recordAudit } from './audit';
-import { tokenHash } from './authCrypto';
+import { encryptTotpSecret, tokenHash } from './authCrypto';
 import type { Db, Transactional, TxQuery } from './db';
 import { enqueueMail } from './outbox';
 
@@ -46,6 +46,24 @@ export async function openReset(
     [userId, tokenHash(token), new Date(now.getTime() + RESET_TTL_MS)]
   );
   return token;
+}
+
+/**
+ * The work of a link for an e-mail without an account (T2.1, «hash simulado»): a token, its
+ * SHA-256 and the ciphertext its mail would carry, computed and thrown away, so both paths of
+ * `forgot-password` spend the same cryptographic work before the same least time.
+ *
+ * @param totpKey - TOTP_ENCRYPTION_KEY, as for a real link.
+ * @returns The ciphertext a real link's mail would carry (`v1:…`); nothing is stored.
+ */
+export function decoyReset(totpKey: Buffer): string {
+  const token = randomBytes(32).toString('hex');
+  // The hash a real link stores stands in for the user id the real ciphertext is bound to.
+  return encryptTotpSecret(
+    totpKey,
+    tokenHash(token),
+    Buffer.from(token, 'utf8')
+  );
 }
 
 /**

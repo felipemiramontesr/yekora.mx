@@ -19,6 +19,7 @@ import {
   loginResponseSchema,
   meResponseSchema,
   registeredSchema,
+  resetCheckResponseSchema,
   resetPasswordResponseSchema,
   signedInSchema,
 } from '@/lib/account/authTypes';
@@ -64,6 +65,7 @@ const CODES = [
   'PASSWORD_SYMBOL',
   'PASSWORD_PERSONAL',
   'PASSWORD_COMMON',
+  'PASSWORD_BREACHED',
   'RESET_TOKEN_INVALID',
 ] as const;
 
@@ -176,6 +178,23 @@ export function forgotPassword(email: string, options: ClientOptions = {}) {
     '/v1/auth/forgot-password',
     forgotPasswordResponseSchema,
     { email },
+    options
+  );
+}
+
+/**
+ * Whose account a mailed link resets (FC 042 Enmienda 2, T1.5), without spending it: the form
+ * names the account and checks the `personal` rule with it.
+ *
+ * @param token - The link's token.
+ * @param options - Injectable fetch.
+ * @returns The e-mail and name of the account, or why not (`RESET_TOKEN_INVALID`).
+ */
+export function checkReset(token: string, options: ClientOptions = {}) {
+  return request(
+    '/v1/auth/reset-password/check',
+    resetCheckResponseSchema,
+    { method: 'POST', body: { token } },
     options
   );
 }

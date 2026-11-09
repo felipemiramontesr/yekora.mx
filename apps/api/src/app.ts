@@ -44,6 +44,7 @@ import {
   type SendMail,
   smtpSender,
 } from './services/outboxDispatcher';
+import { breachVerdict } from './services/pwnedPasswords';
 import { createTableRateProvider } from './services/shippingRates';
 import { createStripeAdapter } from './services/stripeAdapter';
 
@@ -65,6 +66,8 @@ interface AppDeps {
   sendMail?: SendMail;
   /** Pause of `forgot-password`'s least time (FC 042 T2.1); setTimeout by default. */
   wait?: (ms: number) => Promise<void>;
+  /** `fetch` of the Pwned Passwords range (FC 042 Enmienda 2); the real one by default. */
+  pwnedFetch?: typeof fetch;
 }
 
 /** The processors whose secrets are configured; the others stay absent (T1.1 K = ⊥). */
@@ -215,6 +218,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     mailReady: dispatcher !== null,
     now,
     wait: deps.wait,
+    breach: (password) => breachVerdict(password, deps.pwnedFetch),
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });

@@ -22,8 +22,12 @@
  * - `forgot-password` (T1.1, T2.1) answers the same 200, in the same least time, whether the
  *   e-mail has an account or not; only for an active account it opens a 15-minute link and queues
  *   its mail in one transaction. Besides the 10 per minute per IP, each e-mail gets 10 per minute.
+ * - `reset-password/check` (Enmienda 2, T1.5) names the account of a live link (e-mail and name)
+ *   without spending it, so the form checks the `personal` rule; 400 RESET_TOKEN_INVALID else.
  * - `reset-password` (T1.2, T2.3) takes the link's token and the new password: it spends the
  *   link, ends every session of the account and queues the confirmation mail.
+ * - Enmienda 2: a new password the 7 rules accept is then looked up in the Pwned Passwords range
+ *   (400 PASSWORD_BREACHED when seen); with no valid range it is accepted (fail-open, by Ω).
  * A wrong code counts against the challenge (5 at most). Without AUTH_SECRET and
  * TOTP_ENCRYPTION_KEY every route answers 503; without the SMTP account, a sign-in that needs the
  * mailed code answers 503 MAIL_UNAVAILABLE.
@@ -48,6 +52,8 @@ import {
   loginResponseSchema,
   registeredSchema,
   registerRequestSchema,
+  resetCheckRequestSchema,
+  resetCheckResponseSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
   signedInSchema,
@@ -104,10 +110,12 @@ import {
 import { enqueueMail } from '../services/outbox';
 import {
   completeReset,
+  decoyReset,
   liveReset,
   openReset,
 } from '../services/passwordResets';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
+import type { BreachVerdict } from '../services/pwnedPasswords';
 import { isTrustedDevice, rememberDevice } from '../services/trustedDevices';
 
 /** Dependencies of the auth routes. */
@@ -119,6 +127,8 @@ interface AuthDeps {
   now: () => Date;
   /** For tests: the pause that evens out the time of `forgot-password` (setTimeout by default). */
   wait?: (ms: number) => Promise<void>;
+  /** FC 042 Enmienda 2: the breach range's verdict on a new password (services/pwnedPasswords). */
+  breach: (password: string) => Promise<BreachVerdict>;
 }
 
 /**
@@ -157,6 +167,7 @@ const TITLES: Record<string, string> = {
   PASSWORD_SYMBOL: 'The password needs a symbol',
   PASSWORD_PERSONAL: 'The password must not contain your e-mail or name',
   PASSWORD_COMMON: 'The password is too common',
+  PASSWORD_BREACHED: 'The password appears in a known data breach',
 };
 
 /** An RFC 7807 refusal whose detail is its machine code. */
@@ -167,15 +178,24 @@ function refuse(reply: FastifyReply, status: number, code: string) {
     .send(problem(status, TITLES[code], code));
 }
 
-/** FC 042 T2.6: a new password that breaks the policy is a 400 naming the rule, and false. */
-function strongEnough(
+/**
+ * FC 042 T2.6: a new password that breaks the policy is a 400 naming the rule, and false. Only a
+ * password the 7 rules accept goes to the breach range (Enmienda 2): `breached` is a 400
+ * PASSWORD_BREACHED, and `unknown` (no valid range) is the fail-open Ω accepted.
+ */
+async function strongEnough(
   password: string,
   context: PasswordContext,
-  reply: FastifyReply
-): boolean {
+  reply: FastifyReply,
+  breach: AuthDeps['breach']
+): Promise<boolean> {
   const broken = passwordViolation(password, context);
-  if (broken === null) return true;
-  void refuse(reply, 400, PASSWORD_PROBLEMS[broken]);
+  if (broken !== null) {
+    void refuse(reply, 400, PASSWORD_PROBLEMS[broken]);
+    return false;
+  }
+  if ((await breach(password)) !== 'breached') return true;
+  void refuse(reply, 400, 'PASSWORD_BREACHED');
   return false;
 }
 
@@ -333,7 +353,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     if (parsed === null) return reply;
     const { auth, body } = parsed;
     if (!(await botCheck(auth, body.altcha, reply))) return reply;
-    if (!strongEnough(body.password, body, reply)) return reply;
+    if (!(await strongEnough(body.password, body, reply, deps.breach))) {
+      return reply;
+    }
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
@@ -369,11 +391,27 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
         });
       });
       request.outboxQueued = true;
+    } else {
+      // T2.1: the same token, hash and encryption, thrown away instead of stored.
+      decoyReset(auth.totpKey);
     }
     // T2.1: the same answer after the same least time, with or without an account.
     const elapsed = deps.now().getTime() - started;
     await wait(Math.max(0, RESET_REQUEST_FLOOR_MS - elapsed));
     return forgotPasswordResponseSchema.parse(RESET_REQUEST_ANSWER);
+  });
+
+  app.post('/v1/auth/reset-password/check', LIMITED, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = parse(resetCheckRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    // T1.5: read, never spent; only the holder of a live link learns whose account it is.
+    const reset = await liveReset(deps.db, parsed.body.token, deps.now());
+    if (reset === null) return refuse(reply, 400, 'RESET_TOKEN_INVALID');
+    return resetCheckResponseSchema.parse({
+      email: reset.email,
+      fullName: reset.fullName,
+    });
   });
 
   app.post('/v1/auth/reset-password', LIMITED, async (request, reply) => {
@@ -382,7 +420,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const { body } = parsed;
     const reset = await liveReset(deps.db, body.token, deps.now());
     if (reset === null) return refuse(reply, 400, 'RESET_TOKEN_INVALID');
-    if (!strongEnough(body.password, reset, reply)) return reply;
+    if (!(await strongEnough(body.password, reset, reply, deps.breach))) {
+      return reply;
+    }
     const changed = await completeReset(
       deps.db,
       reset,

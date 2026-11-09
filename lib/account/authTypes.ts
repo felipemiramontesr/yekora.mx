@@ -46,12 +46,32 @@ export const forgotPasswordResponseSchema = z.object({
   message: z.string(),
 });
 
+/** The token of a mailed reset link: 32 random bytes in hex. */
+const resetTokenField = z.string().regex(/^[0-9a-f]{64}$/);
+
 /**
- * Body of `POST /v1/auth/reset-password` (FC 042 T1.2): the token of the mailed link (32 random
- * bytes in hex) and the new password. The «repeat password» field never travels (T2.7).
+ * Body of `POST /v1/auth/reset-password/check` (FC 042 Enmienda 2, T1.5): the token of the
+ * mailed link, checked without spending it.
+ */
+export const resetCheckRequestSchema = z.strictObject({
+  token: resetTokenField,
+});
+
+/**
+ * Answer of `POST /v1/auth/reset-password/check`: whose password the link changes, so the form
+ * names the account and checks the `personal` rule as the API will (T1.4, T2.7).
+ */
+export const resetCheckResponseSchema = z.object({
+  email: z.string(),
+  fullName: z.string(),
+});
+
+/**
+ * Body of `POST /v1/auth/reset-password` (FC 042 T1.2): the token of the mailed link and the new
+ * password. The «repeat password» field never travels (T2.7).
  */
 export const resetPasswordRequestSchema = z.strictObject({
-  token: z.string().regex(/^[0-9a-f]{64}$/),
+  token: resetTokenField,
   password: newPasswordField,
 });
 

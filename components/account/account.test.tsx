@@ -22,6 +22,7 @@ import {
   readOrder,
   register,
   resetPassword,
+  checkReset,
   verify,
 } from '@/lib/api/accountClient';
 import { AccountView } from '../views/AccountView';
@@ -40,6 +41,7 @@ vi.mock('@/lib/api/accountClient', () => ({
   readOrder: vi.fn(),
   forgotPassword: vi.fn(),
   resetPassword: vi.fn(),
+  checkReset: vi.fn(),
 }));
 
 const api = {
@@ -55,6 +57,7 @@ const api = {
   readOrder: vi.mocked(readOrder),
   forgotPassword: vi.mocked(forgotPassword),
   resetPassword: vi.mocked(resetPassword),
+  checkReset: vi.mocked(checkReset),
 };
 
 /** Meets every rule of FC 042 for Ana Flores. */
@@ -711,24 +714,32 @@ describe('account area · passwords (FC 042 F2)', () => {
       '',
       `/cuenta/?action=reset-password&token=${token}`
     );
+    api.checkReset.mockResolvedValueOnce(
+      ok({ email: BUYER.email, fullName: BUYER.fullName })
+    );
     renderApp();
     await screen.findByRole('heading', { name: account.reset.title });
     expect(globalThis.location.search).toBe('');
     expect(api.me).not.toHaveBeenCalled();
-    // The reset form cannot know the e-mail or name: that rule is left to the API.
-    expect(screen.queryByText(account.password.rules.personal)).toBeNull();
+    // Enmienda 2: the link names its account, and the personal rule is checked against it.
+    await screen.findByText(`Cambiando la contraseña de ${BUYER.email}`);
+    expect(api.checkReset).toHaveBeenCalledWith(token);
+    expect(screen.getByText(account.password.rules.personal)).toBeTruthy();
     const submit = () =>
       screen.getByRole('button', {
         name: account.reset.submit,
       }) as HTMLButtonElement;
     expect(submit().disabled).toBe(true);
+    type(account.reset.password, 'Ana-Flores-Nevado7#');
+    type(account.reset.confirm, 'Ana-Flores-Nevado7#');
+    expect(submit().disabled).toBe(true);
     type(account.reset.password, STRONG);
     type(account.reset.confirm, STRONG);
-    api.resetPassword.mockResolvedValueOnce(no('PASSWORD_PERSONAL'));
+    api.resetPassword.mockResolvedValueOnce(no('PASSWORD_BREACHED'));
     press(account.reset.submit);
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(
-        account.errors.PASSWORD_PERSONAL
+        account.errors.PASSWORD_BREACHED
       )
     );
     expect(screen.queryByText(account.reset.again)).toBeNull();
@@ -741,25 +752,67 @@ describe('account area · passwords (FC 042 F2)', () => {
     });
   });
 
-  it('offers another link when the mailed one expired or was used', async () => {
+  it('offers another link when the mailed one expired or was used, asking no password', async () => {
     globalThis.history.replaceState(
       null,
       '',
       `/cuenta/?action=reset-password&token=${'b'.repeat(64)}`
     );
+    api.checkReset.mockResolvedValueOnce(no('RESET_TOKEN_INVALID'));
     renderApp();
     await screen.findByRole('heading', { name: account.reset.title });
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        account.errors.RESET_TOKEN_INVALID
+      )
+    );
+    expect(screen.queryByLabelText(account.reset.password)).toBeNull();
+    expect(screen.queryByText(account.reset.checking)).toBeNull();
+    press(account.reset.again);
+    await screen.findByRole('heading', { name: account.forgot.title });
+  });
+
+  it('spends a link that died after it was checked: the refusal offers another', async () => {
+    globalThis.history.replaceState(
+      null,
+      '',
+      `/cuenta/?action=reset-password&token=${'c'.repeat(64)}`
+    );
+    api.checkReset.mockResolvedValueOnce(
+      ok({ email: BUYER.email, fullName: BUYER.fullName })
+    );
+    api.resetPassword.mockResolvedValueOnce(no('RESET_TOKEN_INVALID'));
+    renderApp();
+    await screen.findByText(`Cambiando la contraseña de ${BUYER.email}`);
     type(account.reset.password, STRONG);
     type(account.reset.confirm, STRONG);
-    api.resetPassword.mockResolvedValueOnce(no('RESET_TOKEN_INVALID'));
     press(account.reset.submit);
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(
         account.errors.RESET_TOKEN_INVALID
       )
     );
-    press(account.reset.again);
-    await screen.findByRole('heading', { name: account.forgot.title });
+    expect(screen.getByText(account.reset.again)).toBeTruthy();
+  });
+
+  it('drops a late answer of the check once the form is gone', async () => {
+    globalThis.history.replaceState(
+      null,
+      '',
+      `/cuenta/?action=reset-password&token=${'d'.repeat(64)}`
+    );
+    const late =
+      Promise.withResolvers<Awaited<ReturnType<typeof checkReset>>>();
+    const answer = late.resolve;
+    api.checkReset.mockReturnValueOnce(late.promise);
+    const { unmount } = renderApp();
+    await screen.findByRole('heading', { name: account.reset.title });
+    // While the API has not answered, the form says it is checking the link.
+    expect(screen.getByText(account.reset.checking)).toBeTruthy();
+    unmount();
+    answer(ok({ email: BUYER.email, fullName: BUYER.fullName }));
+    await Promise.resolve();
+    expect(api.checkReset).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a malformed reset link and shows the sign-in form', async () => {

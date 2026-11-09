@@ -57,6 +57,8 @@ import {
   meResponseSchema,
   registeredSchema,
   registerRequestSchema,
+  resetCheckRequestSchema,
+  resetCheckResponseSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
   signedInSchema,
@@ -355,6 +357,13 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     'Sets a new password through the mailed link, spends it and ends every session of the account',
     resetPasswordRequestSchema,
     { 200: resetPasswordResponseSchema }
+  ),
+  // FC 042 Enmienda 2: whose account a live link resets, without spending it.
+  auth(
+    '/v1/auth/reset-password/check',
+    'Names the account of a live reset link (e-mail and name) without spending it; 400 when spent or expired (10/min per IP, no-store)',
+    resetCheckRequestSchema,
+    { 200: resetCheckResponseSchema }
   ),
   {
     method: 'GET',

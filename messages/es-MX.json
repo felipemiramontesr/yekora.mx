@@ -708,7 +708,9 @@
       "submit": "Guardar contraseña nueva",
       "submitting": "Guardando… puede tardar unos segundos",
       "done": "Listo: tu contraseña cambió y cerramos tus sesiones abiertas. Entra con la nueva.",
-      "again": "Pedir otro enlace"
+      "again": "Pedir otro enlace",
+      "checking": "Revisando tu enlace…",
+      "account": "Cambiando la contraseña de {email}"
     },
     "code": {
       "titleEmail": "Revisa tu correo",
@@ -829,6 +831,7 @@
       "PASSWORD_SYMBOL": "La contraseña necesita un símbolo.",
       "PASSWORD_PERSONAL": "La contraseña no puede incluir tu correo ni tu nombre.",
       "PASSWORD_COMMON": "Esa contraseña es demasiado común. Elige otra.",
+      "PASSWORD_BREACHED": "Esa contraseña aparece en filtraciones de datos conocidas. Elige otra.",
       "RESET_TOKEN_INVALID": "El enlace venció o ya se usó. Pide otro."
     },
     "catalog": {

@@ -12,6 +12,7 @@ import {
   readOrder,
   register,
   resetPassword,
+  checkReset,
   verify,
 } from './accountClient';
 
@@ -357,7 +358,11 @@ describe('password reset client (FC 042 F2)', () => {
       token,
       password: 'Ruta nevado 7 sur',
     });
-    for (const detail of ['RESET_TOKEN_INVALID', 'PASSWORD_COMMON']) {
+    for (const detail of [
+      'RESET_TOKEN_INVALID',
+      'PASSWORD_COMMON',
+      'PASSWORD_BREACHED',
+    ]) {
       expect(
         await resetPassword(
           { token, password: 'x' },
@@ -365,5 +370,26 @@ describe('password reset client (FC 042 F2)', () => {
         )
       ).toEqual({ ok: false, reason: detail });
     }
+  });
+
+  it('checks a link with its token only, and reads its account or a spent link (Enmienda 2)', async () => {
+    const token = 'a'.repeat(64);
+    const account = { email: 'ana@example.test', fullName: 'Ana Flores' };
+    const fetchImpl = answer(200, account);
+    expect(await checkReset(token, { fetchImpl })).toEqual({
+      ok: true,
+      data: account,
+    });
+    const [url, init] = sent(fetchImpl);
+    expect([url, init.method, JSON.parse(String(init.body))]).toEqual([
+      expect.stringMatching(/\/v1\/auth\/reset-password\/check$/),
+      'POST',
+      { token },
+    ]);
+    expect(
+      await checkReset(token, {
+        fetchImpl: answer(400, { detail: 'RESET_TOKEN_INVALID' }),
+      })
+    ).toEqual({ ok: false, reason: 'RESET_TOKEN_INVALID' });
   });
 });

@@ -9,6 +9,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { createHash, createHmac } from 'node:crypto';
+import { sha1 } from 'hash-wasm';
 import { base32, decryptTotpSecret, tokenHash } from '../services/authCrypto';
 import type { Db, Transactional, TxQuery } from '../services/db';
 
@@ -459,6 +460,17 @@ let store: ReturnType<typeof memoryDb>;
 let sent: { to: string; subject: string; text: string }[];
 /** Every pause `forgot-password` asked for (FC 042 T2.1), instead of waiting for real. */
 let waits: number[];
+/**
+ * What the stand-in of Pwned Passwords answers (FC 042 Enmienda 2): by default a valid range
+ * that lists no password of these tests. CI never reaches HIBP.
+ */
+let pwned: { status: number; body: string };
+/** Every range URL the API asked the stand-in for. */
+let pwnedAsked: string[];
+const pwnedFetch: typeof fetch = async (url) => {
+  pwnedAsked.push(String(url));
+  return new Response(pwned.body, { status: pwned.status });
+};
 
 async function start(
   env: Record<string, string> = { ...KEYS, ...MAIL },
@@ -467,6 +479,8 @@ async function start(
   store = memoryDb();
   sent = [];
   waits = [];
+  pwned = { status: 200, body: `${'0'.repeat(35)}:0\r\n` };
+  pwnedAsked = [];
   app = await buildApp({
     config: loadConfig({ ...BASE, ...env }),
     db: store.db,
@@ -479,6 +493,7 @@ async function start(
     wait: async (ms) => {
       waits.push(ms);
     },
+    pwnedFetch,
   });
   return app;
 }
@@ -1527,5 +1542,162 @@ describe(
       ]);
       expect(store.audit).toEqual([]);
     });
+
+    it('T1.5 · names the account of a live link without spending it, never cached', async () => {
+      await start();
+      await register('ana@example.test', 'Ana Prueba');
+      await forgot('ana@example.test');
+      const token = mailedToken();
+      const check = await post('/v1/auth/reset-password/check', { token });
+      expect([check.statusCode, check.json()]).toEqual([
+        200,
+        { email: 'ana@example.test', fullName: 'Ana Prueba' },
+      ]);
+      expect(check.headers['cache-control']).toBe('no-store');
+      expect(store.resets[0].consumed).toBeNull();
+      // The same link still changes the password after being checked.
+      const reset = await post('/v1/auth/reset-password', {
+        token,
+        password: NEW_PASSWORD,
+      });
+      expect(reset.statusCode).toBe(200);
+      const spent = await post('/v1/auth/reset-password/check', { token });
+      expect([spent.statusCode, spent.json().detail]).toEqual([
+        400,
+        'RESET_TOKEN_INVALID',
+      ]);
+      expect(spent.headers['cache-control']).toBe('no-store');
+    });
+
+    it('T1.5 · refuses an unknown, expired or malformed token, and limits each IP to 10 a minute', async () => {
+      let clock = NOW;
+      await start(undefined, () => clock);
+      await register('ana@example.test');
+      await forgot('ana@example.test');
+      const token = mailedToken();
+      const unknown = await post('/v1/auth/reset-password/check', {
+        token: 'f'.repeat(64),
+      });
+      expect(unknown.json().detail).toBe('RESET_TOKEN_INVALID');
+      const malformed = await post('/v1/auth/reset-password/check', {
+        token: 'not-hex',
+      });
+      expect([malformed.statusCode, malformed.json().detail]).toEqual([
+        400,
+        'INVALID_REQUEST',
+      ]);
+      clock = new Date(NOW.getTime() + 15 * 60_000);
+      const expired = await post('/v1/auth/reset-password/check', { token });
+      expect(expired.json().detail).toBe('RESET_TOKEN_INVALID');
+      // Three asked so far: seven more fill the 10 of this minute, the eleventh is refused.
+      const codes = [];
+      for (let i = 0; i < 8; i += 1) {
+        codes.push(
+          (await post('/v1/auth/reset-password/check', { token })).statusCode
+        );
+      }
+      expect(codes).toEqual([400, 400, 400, 400, 400, 400, 400, 429]);
+    });
+
+    it('T1.5 · answers 503 without the identity keys', async () => {
+      await start({});
+      const response = await post('/v1/auth/reset-password/check', {
+        token: 'f'.repeat(64),
+      });
+      expect([response.statusCode, response.json().detail]).toEqual([
+        503,
+        'AUTH_UNAVAILABLE',
+      ]);
+    });
+  }
+);
+
+describe(
+  'FC 042 Enmienda 2 · Pwned Passwords range, fail-open (T1.2, T2.6)',
+  { timeout: 20_000 },
+  () => {
+    const NEW_PASSWORD = 'Glaciar norte 9 ruta';
+
+    /** A valid range that lists this password as seen `count` times. */
+    async function rangeListing(password: string, count: number) {
+      const suffix = (await sha1(password)).toUpperCase().slice(5);
+      return `${'0'.repeat(35)}:0\r\n${suffix}:${count}\r\n`;
+    }
+
+    /** Opens a reset link for a fresh account; its token. */
+    async function liveLink(): Promise<string> {
+      await register('ana@example.test');
+      await post('/v1/auth/forgot-password', {
+        email: 'ana@example.test',
+        altcha: await solved(),
+      });
+      const row = store.outbox.findLast((r) => r.type === 'PASSWORD_RESET');
+      const { userId, token } = JSON.parse(String(row?.payload)) as {
+        userId: string;
+        token: string;
+      };
+      return decryptTotpSecret(TOTP_KEY, userId, token).toString('utf8');
+    }
+
+    it('refuses a breached password at sign-up (400 PASSWORD_BREACHED), sending only the prefix', async () => {
+      await start();
+      pwned = { status: 200, body: await rangeListing(PASSWORD, 3) };
+      const response = await register('ana@example.test');
+      expect([response.statusCode, response.json().detail]).toEqual([
+        400,
+        'PASSWORD_BREACHED',
+      ]);
+      expect(store.users.size).toBe(0);
+      const prefix = (await sha1(PASSWORD)).toUpperCase().slice(0, 5);
+      expect(pwnedAsked).toEqual([
+        `https://api.pwnedpasswords.com/range/${prefix}`,
+      ]);
+    });
+
+    it('refuses a breached password at reset without spending the link', async () => {
+      await start();
+      const token = await liveLink();
+      pwned = { status: 200, body: await rangeListing(NEW_PASSWORD, 1) };
+      const response = await post('/v1/auth/reset-password', {
+        token,
+        password: NEW_PASSWORD,
+      });
+      expect([response.statusCode, response.json().detail]).toEqual([
+        400,
+        'PASSWORD_BREACHED',
+      ]);
+      expect(store.resets[0].consumed).toBeNull();
+    });
+
+    it('asks the range only for a password the 7 rules accept', async () => {
+      await start();
+      const response = await post('/v1/auth/register', {
+        email: 'ana@example.test',
+        password: 'short',
+        fullName: 'Ana',
+        altcha: await solved(),
+      });
+      expect(response.json().detail).toBe('PASSWORD_LENGTH');
+      expect(pwnedAsked).toEqual([]);
+    });
+
+    it.each([
+      ['a 5xx', 503, ''],
+      ['an empty 200', 200, ''],
+      ['a 200 that is not a range', 200, '<html>busy</html>'],
+    ])(
+      'fails open on %s: the 7 rules alone decide',
+      async (_c, status, body) => {
+        await start();
+        const token = await liveLink();
+        pwned = { status, body };
+        const response = await post('/v1/auth/reset-password', {
+          token,
+          password: NEW_PASSWORD,
+        });
+        expect(response.statusCode).toBe(200);
+        expect(pwnedAsked).toHaveLength(2);
+      }
+    );
   }
 );

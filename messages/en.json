@@ -708,7 +708,9 @@
       "submit": "Save new password",
       "submitting": "Saving… this can take a few seconds",
       "done": "Done: your password changed and every open session was closed. Sign in with the new one.",
-      "again": "Ask for another link"
+      "again": "Ask for another link",
+      "checking": "Checking your link…",
+      "account": "Changing the password of {email}"
     },
     "code": {
       "titleEmail": "Check your e-mail",
@@ -829,6 +831,7 @@
       "PASSWORD_SYMBOL": "The password needs a symbol.",
       "PASSWORD_PERSONAL": "The password cannot contain your e-mail or name.",
       "PASSWORD_COMMON": "That password is too common. Choose another.",
+      "PASSWORD_BREACHED": "That password appears in known data breaches. Choose another.",
       "RESET_TOKEN_INVALID": "The link expired or was already used. Ask for another."
     },
     "catalog": {

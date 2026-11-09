@@ -32,6 +32,8 @@ const INVENTORY = [
   '├── /v1/auth/register (POST)',
   // FC 042: the password reset, public and rate limited (10/min per IP, and per e-mail).
   '├── /v1/auth/reset-password (POST)',
+  // Enmienda 2: names the account of a live link without spending it (10/min per IP).
+  '│   └── /check (POST)',
   '├── /v1/auth/forgot-password (POST)',
   '├── /v1/auth/login (POST)',
   '├── /v1/auth/totp/enroll (POST)',

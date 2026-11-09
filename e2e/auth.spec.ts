@@ -119,9 +119,17 @@ test('the mailed link opens the new-password form, leaves the address and change
     page.getByRole('heading', { name: 'Elige tu contraseña nueva' })
   ).toBeVisible();
   await expect(page).toHaveURL(/\/cuenta\/$/);
+  // Enmienda 2: the link names its account, and the personal rule is checked against it.
+  await expect(
+    page.getByText('Cambiando la contraseña de ana@example.test')
+  ).toBeVisible();
   const submit = page.getByRole('button', { name: 'Guardar contraseña nueva' });
   await expect(submit).toBeDisabled();
-  await page.getByLabel('Contraseña nueva', { exact: true }).fill(STRONG);
+  const field = page.getByLabel('Contraseña nueva', { exact: true });
+  await field.fill('Ana-E2E-Nevado7#');
+  await page.getByLabel('Repetir contraseña nueva').fill('Ana-E2E-Nevado7#');
+  await expect(submit).toBeDisabled();
+  await field.fill(STRONG);
   await page.getByLabel('Repetir contraseña nueva').fill(STRONG);
   await submit.click();
   await expect(page.getByText(/^Listo: tu contraseña cambió/)).toBeVisible();
@@ -131,12 +139,13 @@ test('the mailed link opens the new-password form, leaves the address and change
 test('a spent or expired link says so and offers another', async ({ page }) => {
   await mockAccountApi(page);
   await page.goto(`/cuenta/?action=reset-password&token=${'f'.repeat(64)}`);
-  await page.getByLabel('Contraseña nueva', { exact: true }).fill(STRONG);
-  await page.getByLabel('Repetir contraseña nueva').fill(STRONG);
-  await page.getByRole('button', { name: 'Guardar contraseña nueva' }).click();
+  // Enmienda 2: the link is checked on opening, so no password is asked for a dead one.
   await expect(page.locator('main').getByRole('alert')).toHaveText(
     'El enlace venció o ya se usó. Pide otro.'
   );
+  await expect(
+    page.getByLabel('Contraseña nueva', { exact: true })
+  ).toHaveCount(0);
   await page.getByRole('button', { name: 'Pedir otro enlace' }).click();
   await expect(
     page.getByRole('heading', { name: 'Restablecer tu contraseña' })

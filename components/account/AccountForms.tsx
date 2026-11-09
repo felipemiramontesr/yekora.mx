@@ -11,10 +11,12 @@ import {
 import type { Messages } from '@/app/i18n';
 import {
   PASSWORD_RULES,
+  type PasswordContext,
   type PasswordRule,
 } from '@/lib/account/passwordPolicy';
 import {
   type AccountFailure,
+  checkReset,
   confirm,
   enroll,
   forgotPassword,
@@ -174,12 +176,11 @@ export function SignInForm({
   );
 }
 
-/** Every rule of the policy: sign-up knows the e-mail and name, so it checks them all. */
+/**
+ * Every rule of the policy. Sign-up knows the e-mail and name as they are typed; reset learns them
+ * from `reset-password/check` (Enmienda 2), so both forms check all seven.
+ */
 const ALL_RULES: readonly PasswordRule[] = PASSWORD_RULES;
-/** Reset knows neither (the link carries only a token): the API checks that rule on its own. */
-const RESET_RULES: readonly PasswordRule[] = PASSWORD_RULES.filter(
-  (rule) => rule !== 'personal'
-);
 
 /**
  * Sign-up of a buyer account (FC 042 Enmienda 1). The password is typed twice, each field with its
@@ -340,9 +341,10 @@ export function ForgotForm({
 }
 
 /**
- * The page of the mailed link (FC 042 T1.2): the new password twice, with the eyes and the live
- * list. The API checks the link, spends it and ends every session; a spent or expired link offers
- * to ask for another.
+ * The page of the mailed link (FC 042 T1.2). It first asks `reset-password/check` whose account
+ * the link resets (Enmienda 2, T1.5) and names it; then the new password twice, with the eyes and
+ * the live list of all 8 lines, `personal` checked against that account (T2.7). The API checks the
+ * link again, spends it and ends every session; a spent or expired link offers to ask for another.
  *
  * @param messages - `account` texts.
  * @param token - The token of the link, already taken out of the address bar.
@@ -365,8 +367,22 @@ export function ResetForm({
   const [repeated, setRepeated] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AccountFailure | null>(null);
-  const context = { email: '', fullName: '' };
-  const ready = newPasswordReady(password, repeated, context, RESET_RULES);
+  const [account, setAccount] = useState<PasswordContext | null>(null);
+  const ready =
+    account !== null &&
+    newPasswordReady(password, repeated, account, ALL_RULES);
+
+  useEffect(() => {
+    let live = true;
+    void checkReset(token).then((result) => {
+      if (!live) return;
+      if (result.ok) setAccount(result.data);
+      else setError(result.reason);
+    });
+    return () => {
+      live = false;
+    };
+  }, [token]);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -387,23 +403,33 @@ export function ResetForm({
       <h2 className="text-2xl font-semibold">{messages.reset.title}</h2>
       <p className="text-petroleo/80">{messages.reset.intro}</p>
       <FormAlert text={error && failureText(messages, error)} />
-      <NewPasswordFields
-        id={base}
-        labels={{
-          password: messages.reset.password,
-          confirm: messages.reset.confirm,
-        }}
-        password={password}
-        confirm={repeated}
-        onPassword={setPassword}
-        onConfirm={setRepeated}
-        context={context}
-        rules={RESET_RULES}
-        texts={messages.password}
-      />
-      <button type="submit" disabled={busy || !ready} className={BUTTON}>
-        {busy ? messages.reset.submitting : messages.reset.submit}
-      </button>
+      {account === null && error === null && (
+        <output className="block">{messages.reset.checking}</output>
+      )}
+      {account && (
+        <>
+          <p className="font-medium break-all">
+            {fill(messages.reset.account, { email: account.email })}
+          </p>
+          <NewPasswordFields
+            id={base}
+            labels={{
+              password: messages.reset.password,
+              confirm: messages.reset.confirm,
+            }}
+            password={password}
+            confirm={repeated}
+            onPassword={setPassword}
+            onConfirm={setRepeated}
+            context={account}
+            rules={ALL_RULES}
+            texts={messages.password}
+          />
+          <button type="submit" disabled={busy || !ready} className={BUTTON}>
+            {busy ? messages.reset.submitting : messages.reset.submit}
+          </button>
+        </>
+      )}
       {error === 'RESET_TOKEN_INVALID' && (
         <button type="button" onClick={onForgot} className={LINK_BUTTON}>
           {messages.reset.again}
