@@ -26,7 +26,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "lucide-react": "^1.65.0",
+    "lucide-react": "^1.70.0",
     "next": "^15.5.29",
     "qrcode-generator": "2.0.4",
     "react": "^19.3.1",
