@@ -57549,7 +57549,7 @@ var require_index_umd = __commonJS({
       };
       const mutex$d = new Mutex();
       let wasmCache$d = null;
-      function sha1(data2) {
+      function sha12(data2) {
         if (wasmCache$d === null) {
           return lockedCreate(mutex$d, wasmJson$c, 20).then((wasm) => {
             wasmCache$d = wasm;
@@ -58675,7 +58675,7 @@ var require_index_umd = __commonJS({
       exports3.pbkdf2 = pbkdf2;
       exports3.ripemd160 = ripemd160;
       exports3.scrypt = scrypt;
-      exports3.sha1 = sha1;
+      exports3.sha1 = sha12;
       exports3.sha224 = sha224;
       exports3.sha256 = sha2562;
       exports3.sha3 = sha3;
@@ -70534,7 +70534,7 @@ var require_auth_41 = __commonJS({
   "../../node_modules/mysql2/lib/auth_41.js"(exports2) {
     "use strict";
     var crypto8 = require("crypto");
-    function sha1(msg, msg1, msg2) {
+    function sha12(msg, msg1, msg2) {
       const hash2 = crypto8.createHash("sha1");
       hash2.update(msg);
       if (msg1) {
@@ -70557,24 +70557,24 @@ var require_auth_41 = __commonJS({
       if (!password) {
         return Buffer.alloc(0);
       }
-      const stage1 = sha1(password);
+      const stage1 = sha12(password);
       return exports2.calculateTokenFromPasswordSha(stage1, scramble1, scramble2);
     }
     exports2.calculateTokenFromPasswordSha = function(passwordSha, scramble1, scramble2) {
       const authPluginData1 = scramble1.slice(0, 8);
       const authPluginData2 = scramble2.slice(0, 12);
-      const stage2 = sha1(passwordSha);
-      const stage3 = sha1(authPluginData1, authPluginData2, stage2);
+      const stage2 = sha12(passwordSha);
+      const stage3 = sha12(authPluginData1, authPluginData2, stage2);
       return xor2(stage3, passwordSha);
     };
     exports2.calculateToken = token;
     exports2.verifyToken = function(publicSeed1, publicSeed2, token2, doubleSha) {
-      const hashStage1 = xor2(token2, sha1(publicSeed1, publicSeed2, doubleSha));
-      const candidateHash2 = sha1(hashStage1);
+      const hashStage1 = xor2(token2, sha12(publicSeed1, publicSeed2, doubleSha));
+      const candidateHash2 = sha12(hashStage1);
       return candidateHash2.compare(doubleSha) === 0;
     };
     exports2.doubleSha1 = function(password) {
-      return sha1(sha1(password));
+      return sha12(sha12(password));
     };
     function xorRotating(a, seed) {
       const result = Buffer.allocUnsafe(a.length);
@@ -99650,8 +99650,16 @@ var forgotPasswordResponseSchema = external_exports.object({
   ok: external_exports.literal(true),
   message: external_exports.string()
 });
+var resetTokenField = external_exports.string().regex(/^[0-9a-f]{64}$/);
+var resetCheckRequestSchema = external_exports.strictObject({
+  token: resetTokenField
+});
+var resetCheckResponseSchema = external_exports.object({
+  email: external_exports.string(),
+  fullName: external_exports.string()
+});
 var resetPasswordRequestSchema = external_exports.strictObject({
-  token: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  token: resetTokenField,
   password: newPasswordField
 });
 var resetPasswordResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
@@ -101078,6 +101086,13 @@ var ROUTE_CONTRACTS = [
     resetPasswordRequestSchema,
     { 200: resetPasswordResponseSchema }
   ),
+  // FC 042 Enmienda 2: whose account a live link resets, without spending it.
+  auth(
+    "/v1/auth/reset-password/check",
+    "Names the account of a live reset link (e-mail and name) without spending it; 400 when spent or expired (10/min per IP, no-store)",
+    resetCheckRequestSchema,
+    { 200: resetCheckResponseSchema }
+  ),
   {
     method: "GET",
     path: "/v1/auth/bot-challenge",
@@ -101984,6 +101999,14 @@ async function openReset(tx, userId, now) {
   );
   return token;
 }
+function decoyReset(totpKey) {
+  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
+  return encryptTotpSecret(
+    totpKey,
+    tokenHash2(token),
+    Buffer.from(token, "utf8")
+  );
+}
 async function liveReset(db, token, now) {
   const [row2] = await db.query(
     "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
@@ -102085,15 +102108,20 @@ var TITLES2 = {
   PASSWORD_DIGIT: "The password needs a digit",
   PASSWORD_SYMBOL: "The password needs a symbol",
   PASSWORD_PERSONAL: "The password must not contain your e-mail or name",
-  PASSWORD_COMMON: "The password is too common"
+  PASSWORD_COMMON: "The password is too common",
+  PASSWORD_BREACHED: "The password appears in a known data breach"
 };
 function refuse3(reply, status, code2) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code2], code2));
 }
-function strongEnough(password, context, reply) {
+async function strongEnough(password, context, reply, breach) {
   const broken = passwordViolation(password, context);
-  if (broken === null) return true;
-  void refuse3(reply, 400, PASSWORD_PROBLEMS[broken]);
+  if (broken !== null) {
+    void refuse3(reply, 400, PASSWORD_PROBLEMS[broken]);
+    return false;
+  }
+  if (await breach(password) !== "breached") return true;
+  void refuse3(reply, 400, "PASSWORD_BREACHED");
   return false;
 }
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
@@ -102196,7 +102224,9 @@ function registerAuthRoutes(app, deps) {
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     if (!await botCheck(auth2, body.altcha, reply)) return reply;
-    if (!strongEnough(body.password, body, reply)) return reply;
+    if (!await strongEnough(body.password, body, reply, deps.breach)) {
+      return reply;
+    }
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
@@ -102230,10 +102260,23 @@ function registerAuthRoutes(app, deps) {
         });
       });
       request.outboxQueued = true;
+    } else {
+      decoyReset(auth2.totpKey);
     }
     const elapsed = deps.now().getTime() - started;
     await wait(Math.max(0, RESET_REQUEST_FLOOR_MS - elapsed));
     return forgotPasswordResponseSchema.parse(RESET_REQUEST_ANSWER);
+  });
+  app.post("/v1/auth/reset-password/check", LIMITED, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = parse4(resetCheckRequestSchema, request, reply);
+    if (parsed === null) return reply;
+    const reset = await liveReset(deps.db, parsed.body.token, deps.now());
+    if (reset === null) return refuse3(reply, 400, "RESET_TOKEN_INVALID");
+    return resetCheckResponseSchema.parse({
+      email: reset.email,
+      fullName: reset.fullName
+    });
   });
   app.post("/v1/auth/reset-password", LIMITED, async (request, reply) => {
     const parsed = parse4(resetPasswordRequestSchema, request, reply);
@@ -102241,7 +102284,9 @@ function registerAuthRoutes(app, deps) {
     const { body } = parsed;
     const reset = await liveReset(deps.db, body.token, deps.now());
     if (reset === null) return refuse3(reply, 400, "RESET_TOKEN_INVALID");
-    if (!strongEnough(body.password, reset, reply)) return reply;
+    if (!await strongEnough(body.password, reset, reply, deps.breach)) {
+      return reply;
+    }
     const changed = await completeReset(
       deps.db,
       reset,
@@ -116620,6 +116665,37 @@ function createOutboxDispatcher(deps) {
   };
 }
 
+// src/services/pwnedPasswords.ts
+var import_hash_wasm2 = __toESM(require_index_umd(), 1);
+var RANGE_URL = "https://api.pwnedpasswords.com/range/";
+var PWNED_TIMEOUT_MS = 1500;
+var RANGE_LINE = /^[0-9A-F]{35}:\d+$/i;
+function rangeLines(body) {
+  const lines = body.split(/\r?\n/).filter((line) => line !== "");
+  if (lines.length === 0) return null;
+  return lines.every((line) => RANGE_LINE.test(line)) ? lines : null;
+}
+async function breachVerdict(password, fetchImpl = fetch, timeoutMs = PWNED_TIMEOUT_MS) {
+  const digest = (await (0, import_hash_wasm2.sha1)(password)).toUpperCase();
+  const suffix = digest.slice(5);
+  try {
+    const answer = await fetchImpl(`${RANGE_URL}${digest.slice(0, 5)}`, {
+      headers: { "Add-Padding": "true" },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (answer.status !== 200) return "unknown";
+    const lines = rangeLines(await answer.text());
+    if (lines === null) return "unknown";
+    const seen = lines.some((line) => {
+      const [listed, count] = line.split(":");
+      return listed.toUpperCase() === suffix && Number(count) > 0;
+    });
+    return seen ? "breached" : "clear";
+  } catch {
+    return "unknown";
+  }
+}
+
 // src/services/dimensioning.ts
 var VOLUMETRIC_DIVISOR = BigInt(5e3);
 function toSafeNumber(value) {
@@ -117032,7 +117108,8 @@ async function buildApp(deps) {
     auth: auth2,
     mailReady: dispatcher !== null,
     now,
-    wait: deps.wait
+    wait: deps.wait,
+    breach: (password) => breachVerdict(password, deps.pwnedFetch)
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
@@ -117354,7 +117431,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "eae69b5ebcb49bc5d708537edbfd672f266f4d1f" : void 0;
+var sha = true ? "921ae8f6e3050901a178941cc38ce997caa7b2a2" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
