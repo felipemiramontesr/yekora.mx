@@ -14,12 +14,14 @@ import {
   confirm,
   enroll,
   forgetDevice,
+  forgotPassword,
   listOrders,
   login,
   logout,
   me,
   readOrder,
   register,
+  resetPassword,
   verify,
 } from '@/lib/api/accountClient';
 import { AccountView } from '../views/AccountView';
@@ -36,6 +38,8 @@ vi.mock('@/lib/api/accountClient', () => ({
   logout: vi.fn(),
   listOrders: vi.fn(),
   readOrder: vi.fn(),
+  forgotPassword: vi.fn(),
+  resetPassword: vi.fn(),
 }));
 
 const api = {
@@ -49,7 +53,12 @@ const api = {
   logout: vi.mocked(logout),
   listOrders: vi.mocked(listOrders),
   readOrder: vi.mocked(readOrder),
+  forgotPassword: vi.mocked(forgotPassword),
+  resetPassword: vi.mocked(resetPassword),
 };
+
+/** Meets every rule of FC 042 for Ana Flores. */
+const STRONG = 'Ruta-Nevado7#Sur';
 
 const { account, checkout } = getMessages('es-MX');
 const CHALLENGE = 'c0000000-0000-4000-8000-000000000001';
@@ -224,26 +233,41 @@ describe('account area · signing in (FC 028 F2)', () => {
     renderApp();
     await screen.findByRole('heading', { name: account.signIn.title });
     press(account.signIn.toRegister);
+    const submit = () =>
+      screen.getByRole('button', {
+        name: account.register.submit,
+      }) as HTMLButtonElement;
+    // FC 042 T1.4: «Crear cuenta» stays off until the password meets every rule and both match.
+    expect(submit().disabled).toBe(true);
+    type(account.register.password, STRONG);
+    type(account.register.confirm, STRONG);
     press(account.register.submit);
     expect(screen.getByRole('alert').textContent).toBe(account.errors.required);
     type(account.register.fullName, 'Ana Flores');
     type(account.register.email, ' ana@example.test ');
     type(account.register.password, 'short');
-    press(account.register.submit);
-    expect(screen.getByRole('alert').textContent).toBe(
-      account.errors.passwordLength
-    );
-    type(account.register.password, 'correct horse battery');
-    api.register.mockResolvedValueOnce(no('rate_limited'));
+    expect(submit().disabled).toBe(true);
+    type(account.register.password, STRONG);
+    type(account.register.confirm, `${STRONG}x`);
+    expect(submit().disabled).toBe(true);
+    type(account.register.confirm, STRONG);
+    expect(submit().disabled).toBe(false);
+    api.register.mockResolvedValueOnce(no('PASSWORD_COMMON'));
     press(account.register.submit);
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(
-        account.errors.rate_limited
+        account.errors.PASSWORD_COMMON
       )
     );
     api.register.mockResolvedValueOnce(ok({ status: 'accepted' }));
     press(account.register.submit);
     await screen.findByText(account.register.accepted);
+    // T2.7: the repetition never travels.
+    expect(api.register).toHaveBeenLastCalledWith({
+      email: 'ana@example.test',
+      password: STRONG,
+      fullName: 'Ana Flores',
+    });
     expect(
       (screen.getByLabelText(account.signIn.email) as HTMLInputElement).value
     ).toBe('ana@example.test');
@@ -586,5 +610,166 @@ describe('account page (FC 028 F2)', () => {
     await screen.findByRole('heading', {
       name: getMessages('en').account.signIn.title,
     });
+  });
+});
+
+describe('account area · passwords (FC 042 F2)', () => {
+  /** The line of the live list for a text, and whether it reads «met». */
+  const line = (text: string) => {
+    const item = screen.getByText(text).closest('li');
+    return item?.textContent?.startsWith(account.password.met) ?? false;
+  };
+
+  it('gives every password field its own eye, which shows and hides it (T1.3, T2.5)', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    const input = screen.getByLabelText(
+      account.signIn.password
+    ) as HTMLInputElement;
+    const eye = screen.getByRole('button', { name: account.password.show });
+    expect([input.type, eye.getAttribute('aria-pressed')]).toEqual([
+      'password',
+      'false',
+    ]);
+    expect(eye.getAttribute('type')).toBe('button');
+    fireEvent.click(eye);
+    expect([input.type, eye.getAttribute('aria-pressed')]).toEqual([
+      'text',
+      'true',
+    ]);
+    expect(eye.getAttribute('aria-label')).toBe(account.password.hide);
+    press(account.password.hide);
+    expect(input.type).toBe('password');
+    press(account.signIn.toRegister);
+    expect(screen.getAllByRole('button', { name: /contraseña/i })).toHaveLength(
+      2
+    );
+    press(account.password.showRepeat);
+    expect(
+      (screen.getByLabelText(account.register.confirm) as HTMLInputElement).type
+    ).toBe('text');
+  });
+
+  it('marks each rule met or missing as the person types, in words and with the icon (T1.4)', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    press(account.signIn.toRegister);
+    const list = screen
+      .getByText(account.password.rulesTitle)
+      .closest('[aria-live]');
+    expect(list?.getAttribute('aria-live')).toBe('polite');
+    expect(line(account.password.rules.length)).toBe(false);
+    type(account.register.fullName, 'Ana Flores');
+    type(account.register.password, 'Ana-Flores7#Sur');
+    expect(
+      ['length', 'uppercase', 'lowercase', 'digit', 'symbol', 'personal'].map(
+        (rule) =>
+          line(
+            account.password.rules[rule as keyof typeof account.password.rules]
+          )
+      )
+    ).toEqual([true, true, true, true, true, false]);
+    expect(line(account.password.match)).toBe(false);
+    type(account.register.confirm, 'Ana-Flores7#Sur');
+    expect(line(account.password.match)).toBe(true);
+  });
+
+  it('asks for a reset link with the e-mail typed, and answers the same either way (T1.1)', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    type(account.signIn.email, 'ana@example.test ');
+    press(account.signIn.forgot);
+    await screen.findByRole('heading', { name: account.forgot.title });
+    expect(
+      (screen.getByLabelText(account.forgot.email) as HTMLInputElement).value
+    ).toBe('ana@example.test');
+    api.forgotPassword.mockResolvedValueOnce(no('rate_limited'));
+    press(account.forgot.submit);
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        account.errors.rate_limited
+      )
+    );
+    api.forgotPassword.mockResolvedValueOnce(
+      ok({ ok: true, message: 'neutral' })
+    );
+    press(account.forgot.submit);
+    await screen.findByText(account.forgot.sent);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(api.forgotPassword).toHaveBeenLastCalledWith('ana@example.test');
+    type(account.forgot.email, ' ');
+    press(account.forgot.submit);
+    expect(screen.getByRole('alert').textContent).toBe(account.errors.required);
+    press(account.forgot.back);
+    await screen.findByRole('heading', { name: account.signIn.title });
+  });
+
+  it('opens the reset form from the mailed link, drops the token from the address and sets the password (T1.2)', async () => {
+    const token = 'a'.repeat(64);
+    globalThis.history.replaceState(
+      null,
+      '',
+      `/cuenta/?action=reset-password&token=${token}`
+    );
+    renderApp();
+    await screen.findByRole('heading', { name: account.reset.title });
+    expect(globalThis.location.search).toBe('');
+    expect(api.me).not.toHaveBeenCalled();
+    // The reset form cannot know the e-mail or name: that rule is left to the API.
+    expect(screen.queryByText(account.password.rules.personal)).toBeNull();
+    const submit = () =>
+      screen.getByRole('button', {
+        name: account.reset.submit,
+      }) as HTMLButtonElement;
+    expect(submit().disabled).toBe(true);
+    type(account.reset.password, STRONG);
+    type(account.reset.confirm, STRONG);
+    api.resetPassword.mockResolvedValueOnce(no('PASSWORD_PERSONAL'));
+    press(account.reset.submit);
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        account.errors.PASSWORD_PERSONAL
+      )
+    );
+    expect(screen.queryByText(account.reset.again)).toBeNull();
+    api.resetPassword.mockResolvedValueOnce(ok({ ok: true }));
+    press(account.reset.submit);
+    await screen.findByText(account.reset.done);
+    expect(api.resetPassword).toHaveBeenLastCalledWith({
+      token,
+      password: STRONG,
+    });
+  });
+
+  it('offers another link when the mailed one expired or was used', async () => {
+    globalThis.history.replaceState(
+      null,
+      '',
+      `/cuenta/?action=reset-password&token=${'b'.repeat(64)}`
+    );
+    renderApp();
+    await screen.findByRole('heading', { name: account.reset.title });
+    type(account.reset.password, STRONG);
+    type(account.reset.confirm, STRONG);
+    api.resetPassword.mockResolvedValueOnce(no('RESET_TOKEN_INVALID'));
+    press(account.reset.submit);
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        account.errors.RESET_TOKEN_INVALID
+      )
+    );
+    press(account.reset.again);
+    await screen.findByRole('heading', { name: account.forgot.title });
+  });
+
+  it('ignores a malformed reset link and shows the sign-in form', async () => {
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/cuenta/?action=reset-password&token=not-a-token'
+    );
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    await waitFor(() => expect(api.me).toHaveBeenCalled());
   });
 });

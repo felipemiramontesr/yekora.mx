@@ -18,7 +18,9 @@ import {
   CodeForm,
   EnrollForm,
   failureText,
+  ForgotForm,
   RegisterForm,
+  ResetForm,
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
@@ -51,6 +53,8 @@ interface AccountAppProps {
 type Stage =
   | { kind: 'signIn'; email: string; notice: string | null }
   | { kind: 'register' }
+  | { kind: 'forgot'; email: string }
+  | { kind: 'reset'; token: string }
   | { kind: 'code'; challengeId: string; channel: Channel; email: string }
   | { kind: 'enroll'; challengeId: string }
   | { kind: 'backup'; codes: string[] }
@@ -67,6 +71,23 @@ const signedOut = (notice: string | null = null): Stage => ({
   email: '',
   notice,
 });
+
+/** The token of a mailed reset link (FC 042): `?action=reset-password&token=<64 hex>`. */
+const RESET_TOKEN = /^[0-9a-f]{64}$/;
+
+/**
+ * The reset token the address carries, if any.
+ *
+ * @param search - `location.search`.
+ * @returns The token, or null.
+ */
+function resetTokenOf(search: string): string | null {
+  const query = new URLSearchParams(search);
+  const token = query.get('token') ?? '';
+  return query.get('action') === 'reset-password' && RESET_TOKEN.test(token)
+    ? token
+    : null;
+}
 
 /**
  * The account area (FC 028 F2, ADR 0011): one client-rendered page that signs the person in
@@ -119,7 +140,15 @@ export function AccountApp({
     const read = () =>
       setView(parseAccountPath(globalThis.location.pathname, area));
     read();
-    void loadSession(true);
+    // FC 042: a mailed reset link opens the new-password form. Its token leaves the address bar
+    // at once, so it stays out of the history, of a shared screen and of any Referer.
+    const token = resetTokenOf(globalThis.location.search);
+    if (token === null) {
+      void loadSession(true);
+    } else {
+      globalThis.history.replaceState(null, '', area);
+      setStage({ kind: 'reset', token });
+    }
     globalThis.addEventListener('popstate', read);
     return () => globalThis.removeEventListener('popstate', read);
   }, [area, loadSession]);
@@ -145,6 +174,22 @@ export function AccountApp({
           onChallenge={(challenge) => setStage({ kind: 'code', ...challenge })}
           onSignedIn={() => void loadSession()}
           onRegister={() => setStage({ kind: 'register' })}
+          onForgot={(email) => setStage({ kind: 'forgot', email })}
+        />
+      )}
+      {stage.kind === 'forgot' && (
+        <ForgotForm
+          messages={messages}
+          initialEmail={stage.email}
+          onSignIn={() => setStage(signedOut())}
+        />
+      )}
+      {stage.kind === 'reset' && (
+        <ResetForm
+          messages={messages}
+          token={stage.token}
+          onDone={() => setStage(signedOut(messages.reset.done))}
+          onForgot={() => setStage({ kind: 'forgot', email: '' })}
         />
       )}
       {stage.kind === 'register' && (

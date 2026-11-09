@@ -15,9 +15,11 @@ import {
   botChallengeSchema,
   confirmResponseSchema,
   enrollResponseSchema,
+  forgotPasswordResponseSchema,
   loginResponseSchema,
   meResponseSchema,
   registeredSchema,
+  resetPasswordResponseSchema,
   signedInSchema,
 } from '@/lib/account/authTypes';
 import { solveBotChallenge } from '@/lib/account/botSolver';
@@ -54,6 +56,15 @@ const CODES = [
   'DATA_DOMAIN_FORBIDDEN',
   'BOT_CHALLENGE_REQUIRED',
   'BOT_CHALLENGE_FAILED',
+  // FC 042: the rule a new password breaks, and a spent or expired reset link.
+  'PASSWORD_LENGTH',
+  'PASSWORD_UPPERCASE',
+  'PASSWORD_LOWERCASE',
+  'PASSWORD_DIGIT',
+  'PASSWORD_SYMBOL',
+  'PASSWORD_PERSONAL',
+  'PASSWORD_COMMON',
+  'RESET_TOKEN_INVALID',
 ] as const;
 
 /** Why a request gave no usable answer. */
@@ -140,7 +151,8 @@ async function withProof<T>(
 /**
  * Creates a buyer account. The API answers the same whether the e-mail existed or not.
  *
- * @param body - E-mail, password (12 to 128 characters) and full name.
+ * @param body - E-mail, password (the policy of lib/account/passwordPolicy) and full name; the
+ *   «repeat password» field stays in the form (FC 042 T2.7).
  * @param options - Injectable fetch.
  * @returns Accepted, or why not.
  */
@@ -149,6 +161,42 @@ export function register(
   options: ClientOptions = {}
 ) {
   return withProof('/v1/auth/register', registeredSchema, body, options);
+}
+
+/**
+ * Asks for a reset link (FC 042 T1.1). The API answers the same whether the e-mail has an
+ * account or not, so this never tells either.
+ *
+ * @param email - The e-mail as typed.
+ * @param options - Injectable fetch.
+ * @returns Accepted, or why not (anti-bot check, rate limit, mail unavailable).
+ */
+export function forgotPassword(email: string, options: ClientOptions = {}) {
+  return withProof(
+    '/v1/auth/forgot-password',
+    forgotPasswordResponseSchema,
+    { email },
+    options
+  );
+}
+
+/**
+ * Sets a new password through the mailed link (FC 042 T1.2): the API ends every session.
+ *
+ * @param body - The link's token and the new password; never the repeated one (T2.7).
+ * @param options - Injectable fetch.
+ * @returns Changed, or why not (`RESET_TOKEN_INVALID`, or the rule the password breaks).
+ */
+export function resetPassword(
+  body: { token: string; password: string },
+  options: ClientOptions = {}
+) {
+  return request(
+    '/v1/auth/reset-password',
+    resetPasswordResponseSchema,
+    { method: 'POST', body },
+    options
+  );
 }
 
 /** What sign-in answers: a challenge whose code comes next, or signed in on a trusted device. */

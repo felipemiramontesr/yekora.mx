@@ -10,15 +10,26 @@ import {
 } from 'react';
 import type { Messages } from '@/app/i18n';
 import {
+  PASSWORD_RULES,
+  type PasswordRule,
+} from '@/lib/account/passwordPolicy';
+import {
   type AccountFailure,
   confirm,
   enroll,
+  forgotPassword,
   login,
   register,
+  resetPassword,
   verify,
 } from '@/lib/api/accountClient';
 import { fill } from '@/lib/catalog/format';
 import { Field } from '../checkout/CheckoutFields';
+import {
+  NewPasswordFields,
+  newPasswordReady,
+  PasswordField,
+} from './PasswordFields';
 
 /** The `account` texts. */
 type AccountMessages = Messages['account'];
@@ -60,6 +71,7 @@ export function failureText(
  * @param onChallenge - Called with the open challenge.
  * @param onSignedIn - The session is open without a code (trusted device).
  * @param onRegister - Switches to the sign-up form.
+ * @param onForgot - Switches to «¿Olvidaste tu contraseña?» (FC 042), with the e-mail typed.
  */
 export function SignInForm({
   messages,
@@ -68,6 +80,7 @@ export function SignInForm({
   onChallenge,
   onSignedIn,
   onRegister,
+  onForgot,
 }: Readonly<{
   messages: AccountMessages;
   initialEmail: string;
@@ -79,6 +92,7 @@ export function SignInForm({
   }) => void;
   onSignedIn: () => void;
   onRegister: () => void;
+  onForgot: (email: string) => void;
 }>) {
   const base = useId();
   const [email, setEmail] = useState(initialEmail);
@@ -134,19 +148,23 @@ export function SignInForm({
           onChange={setEmail}
           input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
         />
-        <Field
+        <PasswordField
           id={`${base}-password`}
           label={messages.signIn.password}
           value={password}
           onChange={setPassword}
-          input={{
-            type: 'password',
-            autoComplete: 'current-password',
-            maxLength: 128,
-          }}
+          autoComplete="current-password"
+          toggle={messages.password}
         />
         <button type="submit" disabled={busy} className={BUTTON}>
           {busy ? messages.signIn.submitting : messages.signIn.submit}
+        </button>
+        <button
+          type="button"
+          onClick={() => onForgot(email.trim())}
+          className={LINK_BUTTON}
+        >
+          {messages.signIn.forgot}
         </button>
         <button type="button" onClick={onRegister} className={LINK_BUTTON}>
           {messages.signIn.toRegister}
@@ -156,9 +174,19 @@ export function SignInForm({
   );
 }
 
+/** Every rule of the policy: sign-up knows the e-mail and name, so it checks them all. */
+const ALL_RULES: readonly PasswordRule[] = PASSWORD_RULES;
+/** Reset knows neither (the link carries only a token): the API checks that rule on its own. */
+const RESET_RULES: readonly PasswordRule[] = PASSWORD_RULES.filter(
+  (rule) => rule !== 'personal'
+);
+
 /**
- * Sign-up of a buyer account. The API answers the same whether the e-mail existed or not, so
- * the form says the same too, and goes back to sign-in with the e-mail filled in.
+ * Sign-up of a buyer account (FC 042 Enmienda 1). The password is typed twice, each field with its
+ * eye, and the live list under them shows every rule met or missing; «Crear cuenta» turns on
+ * only when all are met and both match (T1.4). The repetition never leaves the browser (T2.7).
+ * The API answers the same whether the e-mail existed or not, so the form says the same too, and
+ * goes back to sign-in with the e-mail filled in.
  *
  * @param messages - `account` texts.
  * @param onRegistered - Called with the e-mail after the API accepted.
@@ -177,17 +205,16 @@ export function RegisterForm({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [repeated, setRepeated] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const context = { email, fullName };
+  const ready = newPasswordReady(password, repeated, context, ALL_RULES);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!fullName.trim() || !email.trim() || !password) {
+    if (!fullName.trim() || !email.trim()) {
       setError(messages.errors.required);
-      return;
-    }
-    if (password.length < 12) {
-      setError(messages.errors.passwordLength);
       return;
     }
     setBusy(true);
@@ -201,7 +228,12 @@ export function RegisterForm({
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex max-w-md flex-col gap-4">
+    <form
+      noValidate
+      method="post"
+      onSubmit={submit}
+      className="flex max-w-md flex-col gap-4"
+    >
       <h2 className="text-2xl font-semibold">{messages.register.title}</h2>
       <p className="text-petroleo/80">{messages.register.intro}</p>
       <FormAlert text={error} />
@@ -219,25 +251,164 @@ export function RegisterForm({
         onChange={setEmail}
         input={{ type: 'email', autoComplete: 'email', maxLength: 255 }}
       />
-      <Field
-        id={`${base}-password`}
-        label={messages.register.password}
-        hint={messages.register.passwordHint}
-        value={password}
-        onChange={setPassword}
-        input={{
-          type: 'password',
-          autoComplete: 'new-password',
-          minLength: 12,
-          maxLength: 128,
+      <NewPasswordFields
+        id={base}
+        labels={{
+          password: messages.register.password,
+          confirm: messages.register.confirm,
         }}
+        password={password}
+        confirm={repeated}
+        onPassword={setPassword}
+        onConfirm={setRepeated}
+        context={context}
+        rules={ALL_RULES}
+        texts={messages.password}
       />
-      <button type="submit" disabled={busy} className={BUTTON}>
+      <button type="submit" disabled={busy || !ready} className={BUTTON}>
         {busy ? messages.register.submitting : messages.register.submit}
       </button>
       <button type="button" onClick={onSignIn} className={LINK_BUTTON}>
         {messages.register.toSignIn}
       </button>
+    </form>
+  );
+}
+
+/**
+ * «¿Olvidaste tu contraseña?» (FC 042 T1.1): the e-mail of the account, for a 15-minute link.
+ * The API answers the same whether the e-mail has an account or not, and so does this form.
+ *
+ * @param messages - `account` texts.
+ * @param initialEmail - The e-mail already typed in the sign-in form.
+ * @param onSignIn - Back to the sign-in form.
+ */
+export function ForgotForm({
+  messages,
+  initialEmail,
+  onSignIn,
+}: Readonly<{
+  messages: AccountMessages;
+  initialEmail: string;
+  onSignIn: () => void;
+}>) {
+  const base = useId();
+  const [email, setEmail] = useState(initialEmail);
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!email.trim()) {
+      setError(messages.errors.required);
+      return;
+    }
+    setBusy(true);
+    const result = await forgotPassword(email);
+    setBusy(false);
+    setError(result.ok ? null : failureText(messages, result.reason));
+    setSent(result.ok);
+  }
+
+  return (
+    <form
+      noValidate
+      method="post"
+      onSubmit={submit}
+      className="flex max-w-md flex-col gap-4"
+    >
+      <h2 className="text-2xl font-semibold">{messages.forgot.title}</h2>
+      <p className="text-petroleo/80">{messages.forgot.intro}</p>
+      <FormAlert text={error} />
+      {sent && <output className="block">{messages.forgot.sent}</output>}
+      <Field
+        id={`${base}-email`}
+        label={messages.forgot.email}
+        value={email}
+        onChange={setEmail}
+        input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
+      />
+      <button type="submit" disabled={busy} className={BUTTON}>
+        {busy ? messages.forgot.submitting : messages.forgot.submit}
+      </button>
+      <button type="button" onClick={onSignIn} className={LINK_BUTTON}>
+        {messages.forgot.back}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * The page of the mailed link (FC 042 T1.2): the new password twice, with the eyes and the live
+ * list. The API checks the link, spends it and ends every session; a spent or expired link offers
+ * to ask for another.
+ *
+ * @param messages - `account` texts.
+ * @param token - The token of the link, already taken out of the address bar.
+ * @param onDone - The password changed: back to sign-in with a notice.
+ * @param onForgot - Ask for another link.
+ */
+export function ResetForm({
+  messages,
+  token,
+  onDone,
+  onForgot,
+}: Readonly<{
+  messages: AccountMessages;
+  token: string;
+  onDone: () => void;
+  onForgot: () => void;
+}>) {
+  const base = useId();
+  const [password, setPassword] = useState('');
+  const [repeated, setRepeated] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<AccountFailure | null>(null);
+  const context = { email: '', fullName: '' };
+  const ready = newPasswordReady(password, repeated, context, RESET_RULES);
+
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    const result = await resetPassword({ token, password });
+    setBusy(false);
+    if (result.ok) onDone();
+    else setError(result.reason);
+  }
+
+  return (
+    <form
+      noValidate
+      method="post"
+      onSubmit={submit}
+      className="flex max-w-md flex-col gap-4"
+    >
+      <h2 className="text-2xl font-semibold">{messages.reset.title}</h2>
+      <p className="text-petroleo/80">{messages.reset.intro}</p>
+      <FormAlert text={error && failureText(messages, error)} />
+      <NewPasswordFields
+        id={base}
+        labels={{
+          password: messages.reset.password,
+          confirm: messages.reset.confirm,
+        }}
+        password={password}
+        confirm={repeated}
+        onPassword={setPassword}
+        onConfirm={setRepeated}
+        context={context}
+        rules={RESET_RULES}
+        texts={messages.password}
+      />
+      <button type="submit" disabled={busy || !ready} className={BUTTON}>
+        {busy ? messages.reset.submitting : messages.reset.submit}
+      </button>
+      {error === 'RESET_TOKEN_INVALID' && (
+        <button type="button" onClick={onForgot} className={LINK_BUTTON}>
+          {messages.reset.again}
+        </button>
+      )}
     </form>
   );
 }

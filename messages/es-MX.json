@@ -657,7 +657,8 @@
       "password": "Contraseña",
       "submit": "Continuar",
       "submitting": "Revisando… puede tardar unos segundos",
-      "toRegister": "¿No tienes cuenta? Crea una"
+      "toRegister": "¿No tienes cuenta? Crea una",
+      "forgot": "¿Olvidaste tu contraseña?"
     },
     "register": {
       "title": "Crear cuenta",
@@ -665,11 +666,49 @@
       "fullName": "Nombre completo",
       "email": "Correo electrónico",
       "password": "Contraseña",
-      "passwordHint": "Mínimo 12 caracteres. Una frase larga es más segura que una palabra con símbolos.",
+      "confirm": "Repetir contraseña",
       "submit": "Crear cuenta",
       "submitting": "Creando tu cuenta… puede tardar unos segundos",
       "toSignIn": "¿Ya tienes cuenta? Entra",
       "accepted": "Listo. Si el correo no tenía cuenta, ya la tiene: entra con él y tu contraseña."
+    },
+    "password": {
+      "show": "Mostrar contraseña",
+      "hide": "Ocultar contraseña",
+      "showRepeat": "Mostrar la contraseña repetida",
+      "hideRepeat": "Ocultar la contraseña repetida",
+      "rulesTitle": "Tu contraseña necesita:",
+      "met": "Cumple:",
+      "missing": "Falta:",
+      "rules": {
+        "length": "Entre 12 y 128 caracteres",
+        "uppercase": "Una letra mayúscula",
+        "lowercase": "Una letra minúscula",
+        "digit": "Un número",
+        "symbol": "Un símbolo (por ejemplo # $ % o un espacio)",
+        "personal": "No incluir tu correo ni tu nombre",
+        "common": "No ser una contraseña común (como Password123!)"
+      },
+      "match": "Las dos contraseñas coinciden"
+    },
+    "forgot": {
+      "title": "Restablecer tu contraseña",
+      "intro": "Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva. El enlace vence en 15 minutos.",
+      "email": "Correo electrónico",
+      "submit": "Enviar enlace",
+      "submitting": "Enviando… puede tardar unos segundos",
+      "sent": "Si el correo está registrado, te enviamos un enlace. Revisa también la carpeta de spam.",
+      "back": "Volver a entrar"
+    },
+    "reset": {
+      "title": "Elige tu contraseña nueva",
+      "intro": "Al guardarla cerraremos todas tus sesiones abiertas.",
+      "password": "Contraseña nueva",
+      "confirm": "Repetir contraseña nueva",
+      "submit": "Guardar contraseña nueva",
+      "submitting": "Guardando… puede tardar unos segundos",
+      "done": "Listo: tu contraseña cambió y cerramos tus sesiones abiertas. Entra con la nueva.",
+      "again": "Pedir otro enlace"
     },
     "code": {
       "titleEmail": "Revisa tu correo",
@@ -781,9 +820,16 @@
       "invalid": "Algo salió mal. Intenta de nuevo.",
       "codeFormat": "Escribe los 6 dígitos (u 8 de un código de respaldo).",
       "required": "Completa todos los campos.",
-      "passwordLength": "La contraseña necesita al menos 12 caracteres.",
       "BOT_CHALLENGE_REQUIRED": "No pudimos confirmar que eres una persona. Recarga la página e intenta de nuevo.",
-      "BOT_CHALLENGE_FAILED": "La verificación de seguridad venció. Intenta de nuevo."
+      "BOT_CHALLENGE_FAILED": "La verificación de seguridad venció. Intenta de nuevo.",
+      "PASSWORD_LENGTH": "La contraseña necesita entre 12 y 128 caracteres.",
+      "PASSWORD_UPPERCASE": "La contraseña necesita una letra mayúscula.",
+      "PASSWORD_LOWERCASE": "La contraseña necesita una letra minúscula.",
+      "PASSWORD_DIGIT": "La contraseña necesita un número.",
+      "PASSWORD_SYMBOL": "La contraseña necesita un símbolo.",
+      "PASSWORD_PERSONAL": "La contraseña no puede incluir tu correo ni tu nombre.",
+      "PASSWORD_COMMON": "Esa contraseña es demasiado común. Elige otra.",
+      "RESET_TOKEN_INVALID": "El enlace venció o ya se usó. Pide otro."
     },
     "catalog": {
       "sectionsLabel": "Secciones del catálogo",

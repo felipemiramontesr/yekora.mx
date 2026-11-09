@@ -14,7 +14,9 @@ test('a buyer signs in with the mailed code and opens an order', async ({
   await mockAccountApi(page);
   await page.goto('/cuenta/');
   await page.getByLabel('Correo electrónico').fill('ana@example.test');
-  await page.getByLabel('Contraseña').fill('correct horse battery');
+  await page
+    .getByLabel('Contraseña', { exact: true })
+    .fill('correct horse battery');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(
     page.getByRole('heading', { name: 'Revisa tu correo' })
@@ -53,7 +55,9 @@ test('a buyer remembers this device, signs in again without a code, then forgets
   await page.goto('/cuenta/');
   const signIn = async () => {
     await page.getByLabel('Correo electrónico').fill('ana@example.test');
-    await page.getByLabel('Contraseña').fill('correct horse battery');
+    await page
+      .getByLabel('Contraseña', { exact: true })
+      .fill('correct horse battery');
     await page.getByRole('button', { name: 'Continuar' }).click();
   };
   await signIn();

@@ -4,12 +4,14 @@ import {
   confirm,
   enroll,
   forgetDevice,
+  forgotPassword,
   listOrders,
   login,
   logout,
   me,
   readOrder,
   register,
+  resetPassword,
   verify,
 } from './accountClient';
 
@@ -317,5 +319,51 @@ describe('account client (FC 028 F2)', () => {
     await confirm({ challengeId: CHALLENGE, code: '123456' });
     // Sign-up and sign-in stop at the challenge, which this answer does not fit.
     expect(fetchImpl).toHaveBeenCalledTimes(10);
+  });
+});
+
+describe('password reset client (FC 042 F2)', () => {
+  it('asks for a link with a solved challenge, and reads the neutral answer', async () => {
+    const fetchImpl = proved(200, { ok: true, message: 'neutral' });
+    const result = await forgotPassword('ana@example.test', { fetchImpl });
+    expect(result).toEqual({
+      ok: true,
+      data: { ok: true, message: 'neutral' },
+    });
+    const [url, init] = provedCall(fetchImpl);
+    expect(url).toMatch(/\/v1\/auth\/forgot-password$/);
+    expect(JSON.parse(String(init.body))).toEqual({
+      email: 'ana@example.test',
+      altcha: expect.any(String),
+    });
+  });
+
+  it('sets the new password with the token only, and names a spent link or a broken rule', async () => {
+    const token = 'a'.repeat(64);
+    const fetchImpl = answer(200, { ok: true });
+    expect(
+      await resetPassword(
+        { token, password: 'Ruta nevado 7 sur' },
+        { fetchImpl }
+      )
+    ).toEqual({ ok: true, data: { ok: true } });
+    const [url, init] = sent(fetchImpl);
+    expect([url, init.method, init.credentials]).toEqual([
+      expect.stringMatching(/\/v1\/auth\/reset-password$/),
+      'POST',
+      'include',
+    ]);
+    expect(JSON.parse(String(init.body))).toEqual({
+      token,
+      password: 'Ruta nevado 7 sur',
+    });
+    for (const detail of ['RESET_TOKEN_INVALID', 'PASSWORD_COMMON']) {
+      expect(
+        await resetPassword(
+          { token, password: 'x' },
+          { fetchImpl: answer(400, { detail }) }
+        )
+      ).toEqual({ ok: false, reason: detail });
+    }
   });
 });

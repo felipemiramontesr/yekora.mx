@@ -1,12 +1,19 @@
 import { createHash } from 'node:crypto';
 import type { Page, Route } from '@playwright/test';
+import {
+  PASSWORD_PROBLEMS,
+  type PasswordContext,
+  passwordViolation,
+} from '../../lib/account/passwordPolicy';
 
 /**
  * The account API as the E2E suites see it (FC 028 F2): `/v1/auth/*` and `/v1/account/*`,
  * `/v1/admin/*` intercepted in the browser, with a session that only opens after the right code,
  * so no test ever reaches production. Sign-in asks for a solved anti-bot challenge and honours a
  * remembered device (FC 028 Enmienda 1, E1 and E2), as the real API does. Shared by account.spec.ts, a11y.spec.ts and
- * responsive.spec.ts (signed out by default).
+ * responsive.spec.ts (signed out by default). FC 042: sign-up, «¿Olvidaste tu contraseña?» and
+ * the reset through {@link E2E_RESET_TOKEN}, refusing a new password with the shared policy, as
+ * the API does.
  */
 
 /** The code every challenge of the interceptor accepts. */
@@ -15,6 +22,21 @@ export const E2E_CODE = '482913';
 const CHALLENGE = 'c0000000-0000-4000-8000-000000000001';
 
 export const E2E_ORDER = 'YEK-2026-E2E00001';
+
+/** The only reset link the interceptor accepts (FC 042). */
+export const E2E_RESET_TOKEN = 'e'.repeat(64);
+
+/** The 400 of a new password that breaks the policy, or null when it passes. */
+function weakPassword(
+  route: Route,
+  password: unknown,
+  context: PasswordContext
+) {
+  const broken = passwordViolation(String(password), context);
+  return broken === null
+    ? null
+    : problem(route, 400, PASSWORD_PROBLEMS[broken]);
+}
 
 /** A small anti-bot challenge (secret number 42) the browser solves for real. */
 const SALT = 'e2e0salt?expires=4102444800';
@@ -127,6 +149,29 @@ const withCors = (answer: (route: Route) => Promise<void>) => (route: Route) =>
 const problem = (route: Route, status: number, detail: string) =>
   json(route, status, { type: 'about:blank', title: detail, status, detail });
 
+/** FC 042: the routes that set a password or ask for a reset link, which keep no state. */
+const PASSWORD_ROUTES: Record<
+  string,
+  (route: Route, body: Record<string, unknown>) => Promise<void>
+> = {
+  '/v1/auth/register': (route, body) =>
+    solved(body.altcha)
+      ? (weakPassword(route, body.password, {
+          email: String(body.email),
+          fullName: String(body.fullName),
+        }) ?? json(route, 202, { status: 'accepted' }))
+      : problem(route, 400, 'BOT_CHALLENGE_REQUIRED'),
+  '/v1/auth/forgot-password': (route, body) =>
+    solved(body.altcha)
+      ? json(route, 200, { ok: true, message: 'neutral' })
+      : problem(route, 400, 'BOT_CHALLENGE_REQUIRED'),
+  '/v1/auth/reset-password': (route, body) =>
+    body.token === E2E_RESET_TOKEN
+      ? (weakPassword(route, body.password, { email: '', fullName: '' }) ??
+        json(route, 200, { ok: true }))
+      : problem(route, 400, 'RESET_TOKEN_INVALID'),
+};
+
 /**
  * Intercepts the account API of a page.
  *
@@ -160,6 +205,8 @@ export async function mockAccountApi(
           channel: 'email',
         });
       }
+      const password = PASSWORD_ROUTES[path];
+      if (password) return password(route, body);
       if (path === '/v1/auth/verify') {
         if (body.code !== E2E_CODE) return problem(route, 401, 'INVALID_CODE');
         user = persona;

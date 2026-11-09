@@ -17,10 +17,10 @@
 /** Shortest accepted password. */
 const PASSWORD_MIN = 12;
 /** Longest accepted password. */
-const PASSWORD_MAX = 128;
+export const PASSWORD_MAX = 128;
 
 /** Every rule, in the order the form lists them and the API reports the first one broken. */
-const PASSWORD_RULES = [
+export const PASSWORD_RULES = [
   'length',
   'uppercase',
   'lowercase',
@@ -31,7 +31,7 @@ const PASSWORD_RULES = [
 ] as const;
 
 /** One rule of the policy. */
-type PasswordRule = (typeof PASSWORD_RULES)[number];
+export type PasswordRule = (typeof PASSWORD_RULES)[number];
 
 /** Whether each rule is met. */
 type PasswordChecks = Readonly<Record<PasswordRule, boolean>>;
@@ -138,7 +138,7 @@ function isCommon(password: string): boolean {
  * @param context - The e-mail and name it must not contain.
  * @returns Whether each rule is met.
  */
-function passwordChecks(
+export function passwordChecks(
   password: string,
   context: PasswordContext
 ): PasswordChecks {
