@@ -102037,6 +102037,9 @@ function completeReset(db, reset, passwordHash, now, ip) {
     await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [
       reset.userId
     ]);
+    await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
+      reset.userId
+    ]);
     await recordAudit(tx, {
       userId: reset.userId,
       action: "PASSWORD_RESET",
@@ -116502,6 +116505,7 @@ function retryDelaySeconds(attempt, baseSeconds = 30, capSeconds = 3600) {
 }
 
 // src/services/outboxDispatcher.ts
+var SUPPORT_EMAIL = "contacto@yekora.mx";
 var BATCH = 10;
 var GAP_MS = 1e3;
 var LEASE_MS = 5 * 6e4;
@@ -116570,7 +116574,11 @@ ${link.en}`
       return {
         to,
         subject: "Cambiaste tu contrase\xF1a de Y\u0112KORA",
-        text: "Tu contrase\xF1a cambi\xF3 y cerramos todas tus sesiones abiertas.\n\nSi no fuiste t\xFA, escr\xEDbenos de inmediato.\n\nYour Y\u0112KORA password changed and every open session was closed."
+        text: `Tu contrase\xF1a cambi\xF3 y cerramos todas tus sesiones abiertas.
+
+Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL}.
+
+Your Y\u0112KORA password changed and every open session was closed. If this was not you, write to ${SUPPORT_EMAIL} right away.`
       };
     case "TOTP_ENABLED":
       return {
@@ -117431,7 +117439,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "921ae8f6e3050901a178941cc38ce997caa7b2a2" : void 0;
+var sha = true ? "a3096c07e9194671d231d2958d62f3be1c089d0e" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
