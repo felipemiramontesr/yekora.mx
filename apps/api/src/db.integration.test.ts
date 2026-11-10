@@ -1451,7 +1451,12 @@ describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () =
     expect(await liveReset(db, 'f'.repeat(64), AT)).toBeNull();
   });
 
-  it('changes the password, spends every link, ends every session, audits and queues the alert (T2.3)', async () => {
+  it('changes the password, spends every link, ends every session, forgets every device, audits and queues the alert (T2.3)', async () => {
+    // Enmienda 3: a device the account remembered before the reset.
+    await db.query(
+      'INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at) VALUES (?, ?, ?)',
+      [USER, 'd'.repeat(64), new Date(AT.getTime() + 60_000)]
+    );
     const other = await db.transaction((tx) => openReset(tx, USER, AT));
     const token = await db.transaction((tx) => openReset(tx, USER, AT));
     const live = await liveReset(db, token, AT);
@@ -1474,6 +1479,11 @@ describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () =
       [USER]
     );
     expect(Number(sessions.n)).toBe(0);
+    const [devices] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM user_trusted_devices WHERE user_id = ?',
+      [USER]
+    );
+    expect(Number(devices.n)).toBe(0);
     const [audit] = await db.query<{ action: string; ip_address: string }>(
       "SELECT action, ip_address FROM audit_log WHERE user_id = ? AND action = 'PASSWORD_RESET'",
       [USER]

@@ -24,6 +24,8 @@ import type { Db } from './db';
 import { emailOf } from './identity';
 import type { MailEvent } from './outbox';
 
+/** Where a mail tells the person to write when a change was not theirs (FC 042 Enmienda 3). */
+const SUPPORT_EMAIL = 'contacto@yekora.mx';
 /** Messages one run sends at most. */
 const BATCH = 10;
 /** Pause between two messages of a run. */
@@ -138,7 +140,7 @@ async function render(
       return {
         to,
         subject: 'Cambiaste tu contraseña de YĒKORA',
-        text: 'Tu contraseña cambió y cerramos todas tus sesiones abiertas.\n\nSi no fuiste tú, escríbenos de inmediato.\n\nYour YĒKORA password changed and every open session was closed.',
+        text: `Tu contraseña cambió y cerramos todas tus sesiones abiertas.\n\nSi no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.\n\nYour YĒKORA password changed and every open session was closed. If this was not you, write to ${SUPPORT_EMAIL} right away.`,
       };
     case 'TOTP_ENABLED':
       return {

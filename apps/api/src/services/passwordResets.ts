@@ -4,8 +4,9 @@
  *
  * A link carries 32 random bytes in hex; the row keeps only their SHA-256, so the database never
  * holds a working link. A link lasts {@link RESET_TTL_MS} and serves once. Changing the password
- * spends every open link of the account, ends every session of it (T2.3), writes the audit entry
- * and queues the confirmation mail, all in one transaction.
+ * spends every open link of the account, ends every session of it and forgets every device it
+ * remembered (T2.3, Enmienda 3), writes the audit entry and queues the confirmation mail, all in
+ * one transaction.
  *
  * @module
  */
@@ -101,7 +102,8 @@ export async function liveReset(
 /**
  * Sets the new password through a live link (T2.3): spends this link (only if still unspent, so
  * two submissions never both win) and every other open link of the account, ends all its
- * sessions, audits the change without personal data and queues the confirmation mail.
+ * sessions, forgets all its remembered devices, audits the change without personal data and
+ * queues the confirmation mail.
  *
  * @param db - Database with transactions.
  * @param reset - The link, as {@link liveReset} found it.
@@ -132,6 +134,11 @@ export function completeReset(
       [now, reset.userId]
     );
     await tx.query('DELETE FROM user_sessions WHERE user_id = ?', [
+      reset.userId,
+    ]);
+    // Enmienda 3: a remembered device stands in for the mailed code (FC 028 E2), so whoever
+    // knew the old password on one would keep that shortcut; the next sign-in asks for the code.
+    await tx.query('DELETE FROM user_trusted_devices WHERE user_id = ?', [
       reset.userId,
     ]);
     await recordAudit(tx, {

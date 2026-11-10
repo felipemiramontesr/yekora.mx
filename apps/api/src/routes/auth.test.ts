@@ -413,6 +413,17 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
       ),
   ],
   ['SELECT id FROM user_trusted_devices', trustedRow],
+  [
+    'DELETE FROM user_trusted_devices WHERE user_id',
+    (s, p) =>
+      write(() =>
+        s.devices.splice(
+          0,
+          s.devices.length,
+          ...s.devices.filter((d) => d.user !== p[0])
+        )
+      ),
+  ],
   ['DELETE FROM user_trusted_devices', forgetRow],
   [
     'SELECT id, event_type, payload',
@@ -1485,6 +1496,54 @@ describe(
           'RESET_TOKEN_INVALID',
         ]);
       }
+    });
+
+    it('T2.3 (Enmienda 3) · forgets every remembered device: the next sign-in asks for the code again', async () => {
+      await start();
+      await register('ana@example.test');
+      const { challengeId } = await login('ana@example.test');
+      const verify = await post('/v1/auth/verify', {
+        challengeId,
+        code: mailedCode(challengeId),
+        rememberDevice: true,
+      });
+      const device = [verify.headers['set-cookie']]
+        .flat()
+        .map(String)[1]
+        .split(';')[0];
+      // Before the reset the device skips the code (201).
+      const before = await loginAs('ana@example.test', PASSWORD, device);
+      expect(before.statusCode).toBe(201);
+      await forgot('ana@example.test');
+      const reset = await post('/v1/auth/reset-password', {
+        token: mailedToken(),
+        password: NEW_PASSWORD,
+      });
+      expect(reset.statusCode).toBe(200);
+      expect(store.devices).toEqual([]);
+      const after = await loginAs('ana@example.test', NEW_PASSWORD, device);
+      expect(after.statusCode).toBe(200);
+      expect(after.json()).toMatchObject({ next: 'verify', channel: 'email' });
+    });
+
+    it('T2.4 (Enmienda 3) · the mail of a changed password says where to write if it was not you', async () => {
+      await start();
+      await register('ana@example.test');
+      await forgot('ana@example.test');
+      await post('/v1/auth/reset-password', {
+        token: mailedToken(),
+        password: NEW_PASSWORD,
+      });
+      await vi.waitFor(() =>
+        expect(sent.map((m) => m.subject)).toContain(
+          'Cambiaste tu contraseña de YĒKORA'
+        )
+      );
+      const mail = sent.find((m) => m.subject.startsWith('Cambiaste'));
+      expect(mail?.text).toContain(
+        'Si no fuiste tú, escríbenos de inmediato a contacto@yekora.mx.'
+      );
+      expect(mail?.text).toContain('write to contacto@yekora.mx right away');
     });
 
     it('T1.2 · refuses an unknown or expired link, and a weak password without spending the link', async () => {
