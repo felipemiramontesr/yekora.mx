@@ -101999,6 +101999,14 @@ async function openReset(tx, userId, now) {
   );
   return token;
 }
+async function mailResetLink(tx, userId, totpKey, now) {
+  const token = await openReset(tx, userId, now);
+  await enqueueMail(tx, {
+    type: "PASSWORD_RESET",
+    userId,
+    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, "utf8"))
+  });
+}
 function decoyReset(totpKey) {
   const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
@@ -102250,18 +102258,9 @@ function registerAuthRoutes(app, deps) {
     if (!deps.mailReady) return refuse3(reply, 503, "MAIL_UNAVAILABLE");
     const user = await findUserByEmail(deps.db, email3);
     if (user) {
-      await deps.db.transaction(async (tx) => {
-        const token = await openReset(tx, user.id, deps.now());
-        await enqueueMail(tx, {
-          type: "PASSWORD_RESET",
-          userId: user.id,
-          token: encryptTotpSecret(
-            auth2.totpKey,
-            user.id,
-            Buffer.from(token, "utf8")
-          )
-        });
-      });
+      await deps.db.transaction(
+        (tx) => mailResetLink(tx, user.id, auth2.totpKey, deps.now())
+      );
       request.outboxQueued = true;
     } else {
       decoyReset(auth2.totpKey);
@@ -117439,7 +117438,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "a3096c07e9194671d231d2958d62f3be1c089d0e" : void 0;
+var sha = true ? "ef3b14dec02be1eeeff40a721f61adad98179af5" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
