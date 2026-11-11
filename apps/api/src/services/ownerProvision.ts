@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { recordAudit } from './audit';
 import type { Transactional, TxQuery } from './db';
-import { canonicalEmail } from './identity';
+import { canonicalEmail, revokeAccess } from './identity';
 import { mailResetLink } from './passwordResets';
 import { unmatchableHash } from './passwords';
 
@@ -107,18 +107,6 @@ async function ownerAccount(
 }
 
 /**
- * Ends every session of an account and forgets every device it remembered. A buyer promoted to
- * owner must not keep a session opened without the authenticator, nor a device that skips the
- * mailed code (T2.4).
- */
-async function endAccess(tx: TxQuery, userId: string): Promise<void> {
-  await tx.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
-  await tx.query('DELETE FROM user_trusted_devices WHERE user_id = ?', [
-    userId,
-  ]);
-}
-
-/**
  * First provision of the owner (T1.1a): refuses when an account already holds `owner`;
  * otherwise creates or promotes the account, mails its 15-minute link and audits, atomically.
  *
@@ -143,7 +131,9 @@ export function provisionOwner(
       "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'owner')",
       [id]
     );
-    await endAccess(tx, id);
+    // A buyer promoted to owner must not keep a session opened without the authenticator, nor
+    // a device that skips the mailed code (T2.4).
+    await revokeAccess(tx, id);
     await mailResetLink(tx, id, deps.totpKey, deps.now);
     await recordAudit(tx, {
       userId: id,
@@ -184,7 +174,7 @@ export function recoverOwner(
     await tx.query('DELETE FROM two_factor_backup_codes WHERE user_id = ?', [
       owner.id,
     ]);
-    await endAccess(tx, owner.id);
+    await revokeAccess(tx, owner.id);
     await tx.query(
       'UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL',
       [deps.now, owner.id]

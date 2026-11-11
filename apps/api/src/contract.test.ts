@@ -68,6 +68,8 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (Object.keys(route.responses).join() === '405') return 'public';
   if (route.path.startsWith('/v1/account/')) return 'account:self';
   if (route.path.startsWith('/v1/admin/catalog')) return 'catalog:write';
+  // FC 044 F1: the administrators console; its handlers also demand the role owner.
+  if (route.path.startsWith('/v1/admin/admins')) return 'users:manage';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';
   return 'public';
 }

@@ -150,6 +150,24 @@ export function createCustomer(
 }
 
 /**
+ * Ends every session of an account and forgets every device it remembered, in the caller's
+ * transaction (FC 044 T2.4, T2.5): an account that gains or loses a privileged role must sign in
+ * again, with the second factor its new roles demand.
+ *
+ * @param tx - Transaction of the role change.
+ * @param userId - The account.
+ */
+export async function revokeAccess(
+  tx: Pick<Db, 'query'>,
+  userId: string
+): Promise<void> {
+  await tx.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+  await tx.query('DELETE FROM user_trusted_devices WHERE user_id = ?', [
+    userId,
+  ]);
+}
+
+/**
  * Roles and permissions of a user (only active roles), and whether TOTP is on.
  *
  * @param db - Database port.

@@ -83,6 +83,8 @@ type Mutation = (tx: TxQuery, userId: string) => Promise<MutationAnswer>;
  * Sends one catalog mutation through its Idempotency-Key: 409 on a key reused for another
  * request, else the answer of the first run, now or replayed.
  *
+ * FC 044 F1 reuses it for the administrators console: the same key rules, another permission.
+ *
  * @param deps - Database and clock.
  * @param request - The request (its user, method, route and body name the key's request).
  * @param reply - The reply.
@@ -91,7 +93,7 @@ type Mutation = (tx: TxQuery, userId: string) => Promise<MutationAnswer>;
  * @returns The sent reply.
  */
 export async function runOnce(
-  deps: CatalogAdminDeps,
+  deps: Pick<CatalogAdminDeps, 'db' | 'now'>,
   request: FastifyRequest,
   reply: FastifyReply,
   key: string,

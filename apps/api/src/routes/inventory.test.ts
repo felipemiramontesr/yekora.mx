@@ -46,6 +46,9 @@ const INVENTORY = [
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  // FC 044 F1: the owner's console of administrators (users:manage, then the role owner).
+  '├── /v1/admin/admins (GET, HEAD, POST)',
+  '│   └── /:id (PATCH)',
   // FC 029 F2: the catalog backoffice (catalog:write). Its DELETE /v1/admin/catalog/* refusal
   // is a wildcard this view does not print; routes/catalogAdmin.test.ts proves its 405.
   '├── /v1/admin/catalog/media (POST)',
@@ -223,13 +226,14 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     }
   });
 
-  it('OWASP-A01 · keeps the panel to read-only orders and the catalog: no other /admin or /v1/admin route exists', () => {
+  it('OWASP-A01 · keeps the panel to read-only orders, the administrators console and the catalog: no other /admin or /v1/admin route exists', () => {
     const panel = app
       .printRoutes({ commonPrefix: false })
       .split('\n')
       .filter((line) => /\/admin\b/.test(line));
     expect(panel).toEqual([
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
+      '├── /v1/admin/admins (GET, HEAD, POST)',
       '├── /v1/admin/catalog/media (POST)',
       '├── /v1/admin/catalog/brands (GET, HEAD, POST)',
       '├── /v1/admin/catalog/facets (GET, HEAD)',

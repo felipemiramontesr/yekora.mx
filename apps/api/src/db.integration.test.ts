@@ -10,6 +10,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
 import { PERMISSIONS } from './lib/permissions';
+import { createAdmin, listAdmins, updateAdmin } from './services/adminUsers';
 import { auditTrail, recordAudit } from './services/audit';
 import {
   createBrand,
@@ -1634,5 +1635,121 @@ describe('the owner role and its out-of-band account on real SQL (migration 008,
       [`%${id}%`]
     );
     expect(Number(mail.n)).toBe(2);
+  });
+});
+
+describe('administrators managed by the owner on real SQL (adminUsers.ts, FC 044 F1)', () => {
+  const KEY = Buffer.alloc(32, 8);
+  const AT = new Date('2026-11-11T19:00:00Z');
+  const ADMIN_EMAIL = 'admin-f1@example.test';
+  let owner: string;
+  let actor: { userId: string; ip: string | null };
+  const input = (email: string) => ({
+    email,
+    fullName: 'Admin Prueba',
+    totpKey: KEY,
+    now: AT,
+  });
+  const sessions = async (userId: string) => {
+    const [row] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM user_sessions WHERE user_id = ?',
+      [userId]
+    );
+    return Number(row.n);
+  };
+
+  beforeAll(async () => {
+    const [row] = await db.query<{ id: string }>(
+      "SELECT user_id AS id FROM user_roles WHERE role_id = 'owner'"
+    );
+    owner = row.id;
+    actor = { userId: owner, ip: '203.0.113.9' };
+  });
+
+  it('creates an administrator without a password, lists it after the owner and refuses a second grant (T1.2, T2.2)', async () => {
+    const created = await db.transaction((tx) =>
+      createAdmin(tx, input(ADMIN_EMAIL), actor)
+    );
+    expect(created).toMatchObject({
+      email: ADMIN_EMAIL,
+      fullName: 'Admin Prueba',
+      roles: ['admin', 'customer'],
+      isActive: true,
+      totpEnabled: false,
+    });
+    const listed = await listAdmins(db);
+    expect(listed.map((account) => account.roles)).toEqual([
+      ['owner'],
+      ['admin', 'customer'],
+    ]);
+    expect(listed[0].id).toBe(owner);
+    const { id } = listed[1];
+    const [link] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ? AND consumed_at IS NULL',
+      [id]
+    );
+    expect(Number(link.n)).toBe(1);
+    const [audit] = await db.query<{ user_id: string; after_state: string }>(
+      "SELECT user_id, after_state FROM audit_log WHERE action = 'ADMIN_CREATED' AND entity_id = ?",
+      [id]
+    );
+    expect(audit.user_id).toBe(owner);
+    expect(JSON.parse(audit.after_state)).toEqual({
+      role: 'admin',
+      created: true,
+    });
+    expect(
+      await db.transaction((tx) => createAdmin(tx, input(ADMIN_EMAIL), actor))
+    ).toBe('ADMIN_ALREADY_EXISTS');
+    expect(
+      await db.transaction((tx) =>
+        createAdmin(tx, input('owner@example.test'), actor)
+      )
+    ).toBe('OWNER_IMMUTABLE');
+  });
+
+  it('switches it off and withdraws the role, ending its sessions each time; the owner stays untouched (T1.3, T2.1, T2.5)', async () => {
+    const [{ id }] = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?',
+      [ADMIN_EMAIL]
+    );
+    const open = () =>
+      db.transaction((tx) =>
+        openSession(tx, {
+          challengeId: null,
+          userId: id,
+          privileged: true,
+          ip: null,
+          userAgent: null,
+          now: AT,
+        })
+      );
+    await open();
+    expect(
+      await db.transaction((tx) =>
+        updateAdmin(tx, { id, isActive: false }, actor)
+      )
+    ).toMatchObject({ isActive: false, roles: ['admin', 'customer'] });
+    expect(await sessions(id)).toBe(0);
+    await open();
+    expect(
+      await db.transaction((tx) =>
+        updateAdmin(tx, { id, isActive: true, revokeAdmin: true }, actor)
+      )
+    ).toMatchObject({ isActive: true, roles: ['customer'] });
+    expect(await sessions(id)).toBe(0);
+    expect(
+      await db.transaction((tx) =>
+        updateAdmin(tx, { id, isActive: false }, actor)
+      )
+    ).toBe('ADMIN_NOT_FOUND');
+    expect(
+      await db.transaction((tx) =>
+        updateAdmin(tx, { id: owner, isActive: false }, actor)
+      )
+    ).toBe('OWNER_IMMUTABLE');
+    expect((await listAdmins(db)).map((account) => account.id)).toEqual([
+      owner,
+    ]);
   });
 });
