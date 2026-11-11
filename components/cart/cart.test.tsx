@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import {
   afterEach,
   beforeAll,
@@ -256,6 +257,32 @@ describe('cart button and panel', () => {
       name: 'Agotado',
     }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+  });
+
+  it('ships disabled in the static HTML, in stock or not, and is enabled once mounted only when in stock (FC 045 T1.1, T2.1)', () => {
+    const button = (inStock: boolean) => (
+      <AddToCartButton
+        sku="TENT"
+        inStock={inStock}
+        label="Agregar a la mochila"
+        outOfStockLabel="Agotado"
+      />
+    );
+    // What the static export writes: no effect has run, so no click can be lost before hydration.
+    const prerendered = renderToString(button(true));
+    expect(prerendered).toMatch(/<button type="button" disabled=""/);
+    expect(prerendered).toContain('Agregar a la mochila');
+    expect(renderToString(button(false))).toMatch(
+      /<button type="button" disabled=""/
+    );
+    // The size classes are the same in both states: enabling it moves nothing (CLS 0).
+    expect(prerendered).toContain('min-h-12');
+    render(button(true));
+    const mounted = screen.getByRole('button', {
+      name: 'Agregar a la mochila',
+    }) as HTMLButtonElement;
+    expect(mounted.disabled).toBe(false);
+    expect(mounted.className).toContain('min-h-12');
   });
 });
 
