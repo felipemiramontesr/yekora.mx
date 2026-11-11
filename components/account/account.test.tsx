@@ -25,6 +25,11 @@ import {
   checkReset,
   verify,
 } from '@/lib/api/accountClient';
+import {
+  inviteAdminUser,
+  listAdminUsers,
+  updateAdminUser,
+} from '@/lib/api/adminUsersClient';
 import { AccountView } from '../views/AccountView';
 import { AccountApp } from './AccountApp';
 
@@ -44,7 +49,16 @@ vi.mock('@/lib/api/accountClient', () => ({
   checkReset: vi.fn(),
 }));
 
+vi.mock('@/lib/api/adminUsersClient', () => ({
+  listAdminUsers: vi.fn(),
+  inviteAdminUser: vi.fn(),
+  updateAdminUser: vi.fn(),
+}));
+
 const api = {
+  listAdminUsers: vi.mocked(listAdminUsers),
+  inviteAdminUser: vi.mocked(inviteAdminUser),
+  updateAdminUser: vi.mocked(updateAdminUser),
   register: vi.mocked(register),
   login: vi.mocked(login),
   verify: vi.mocked(verify),
@@ -824,5 +838,162 @@ describe('account area · passwords (FC 042 F2)', () => {
     renderApp();
     await screen.findByRole('heading', { name: account.signIn.title });
     await waitFor(() => expect(api.me).toHaveBeenCalled());
+  });
+});
+
+describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', () => {
+  const t = account.admins;
+  const OWNER = {
+    ...BUYER,
+    fullName: 'GrayMan',
+    roles: ['owner'],
+    permissions: [
+      'account:self',
+      'audit:read',
+      'catalog:write',
+      'orders:read',
+      'users:manage',
+    ],
+  };
+  const OWNER_ROW = {
+    id: OWNER.id,
+    email: 'owner@example.test',
+    fullName: 'GrayMan',
+    roles: ['owner'],
+    isActive: true,
+    totpEnabled: true,
+    createdAt: '2026-11-11T18:00:00.000Z',
+  };
+  const ZOE = {
+    ...OWNER_ROW,
+    id: 'a0000000-0000-4000-8000-000000000002',
+    email: 'zoe@example.test',
+    fullName: 'Zoe Admin',
+    roles: ['admin', 'customer'],
+    totpEnabled: false,
+  };
+  const LEO = {
+    ...ZOE,
+    id: 'a0000000-0000-4000-8000-000000000003',
+    email: 'leo@example.test',
+    fullName: 'Leo Apagado',
+    isActive: false,
+  };
+  const accounts = (...items: (typeof OWNER_ROW)[]) => ok({ items });
+
+  /** Opens the console as the owner, with these accounts listed. */
+  async function openConsole(...items: (typeof OWNER_ROW)[]) {
+    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
+    api.me.mockResolvedValue(ok(OWNER));
+    api.listAdminUsers.mockResolvedValue(accounts(...items));
+    renderApp();
+    await screen.findByText(t.caption);
+  }
+
+  it('ADMIN_LIST_GRANTED · shows the owner the badge, the tab and the accounts, the owner row without controls', async () => {
+    await openConsole(OWNER_ROW, ZOE, LEO);
+    expect(screen.getByText(account.dashboard.ownerBadge)).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: account.dashboard.admins })
+        .getAttribute('aria-current')
+    ).toBe('page');
+    const rows = screen.getAllByRole('row').map((row) => row.textContent);
+    expect(rows[1]).toBe(
+      `GrayManowner@example.test${t.roleOwner}${t.active}${t.twoStepOn}${t.protected}`
+    );
+    expect(rows[2]).toContain(
+      `Zoe Adminzoe@example.test${t.roleAdmin}${t.active}${t.twoStepOff}`
+    );
+    expect(rows[3]).toContain(`${t.roleAdmin}${t.inactive}`);
+    // T2.1: nothing on the page can switch the owner off or withdraw its role.
+    expect(
+      screen.queryByRole('button', { name: `${t.deactivate}: GrayMan` })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: `${t.revoke}: GrayMan` })
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: `${t.activate}: Leo Apagado` })
+    ).toBeTruthy();
+  });
+
+  it('ADMIN_LIST_NOT_OWNER · offers an administrator neither the badge nor the console, even at its path', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
+    api.me.mockResolvedValue(ok({ ...OWNER, roles: ['admin', 'customer'] }));
+    renderApp();
+    await screen.findByRole('link', { name: account.dashboard.orders });
+    expect(
+      screen.queryByRole('link', { name: account.dashboard.admins })
+    ).toBeNull();
+    expect(screen.queryByText(account.dashboard.ownerBadge)).toBeNull();
+    expect(api.listAdminUsers).not.toHaveBeenCalled();
+  });
+
+  it('invites an administrator by name and e-mail, with no password field, and says where the link went', async () => {
+    await openConsole(OWNER_ROW);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    type(t.name, '  Zoe Admin ');
+    type(t.email, ' zoe@example.test ');
+    api.inviteAdminUser.mockResolvedValue(ok(ZOE));
+    api.listAdminUsers.mockResolvedValue(accounts(OWNER_ROW, ZOE));
+    press(t.invite);
+    expect(screen.getByRole('button', { name: t.inviting })).toBeTruthy();
+    await screen.findByText('Listo. Enviamos el enlace a zoe@example.test.');
+    expect(api.inviteAdminUser).toHaveBeenCalledWith({
+      email: 'zoe@example.test',
+      fullName: 'Zoe Admin',
+    });
+    expect(await screen.findByText('zoe@example.test')).toBeTruthy();
+    expect((screen.getByLabelText(t.email) as HTMLInputElement).value).toBe('');
+  });
+
+  it('keeps what was typed and names the refusal when the invitation is refused', async () => {
+    await openConsole(OWNER_ROW, ZOE);
+    type(t.name, 'Zoe Admin');
+    type(t.email, 'zoe@example.test');
+    api.inviteAdminUser.mockResolvedValue(no('ADMIN_ALREADY_EXISTS'));
+    press(t.invite);
+    await screen.findByText(t.errors.ADMIN_ALREADY_EXISTS);
+    expect((screen.getByLabelText(t.email) as HTMLInputElement).value).toBe(
+      'zoe@example.test'
+    );
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches an administrator off and on and withdraws its role, reloading the list each time (T2.5)', async () => {
+    await openConsole(OWNER_ROW, ZOE, LEO);
+    api.updateAdminUser.mockResolvedValue(ok({ ...ZOE, isActive: false }));
+    press(`${t.deactivate}: Zoe Admin`);
+    await screen.findByText(t.saved);
+    expect(api.updateAdminUser).toHaveBeenLastCalledWith(ZOE.id, {
+      isActive: false,
+    });
+    press(`${t.activate}: Leo Apagado`);
+    await waitFor(() =>
+      expect(api.updateAdminUser).toHaveBeenLastCalledWith(LEO.id, {
+        isActive: true,
+      })
+    );
+    await waitFor(() => expect(api.listAdminUsers).toHaveBeenCalledTimes(3));
+    api.listAdminUsers.mockResolvedValue(accounts(OWNER_ROW, LEO));
+    press(`${t.revoke}: Zoe Admin`);
+    await waitFor(() => expect(screen.queryByText('Zoe Admin')).toBeNull());
+    expect(api.updateAdminUser).toHaveBeenLastCalledWith(ZOE.id, {
+      revokeAdmin: true,
+    });
+  });
+
+  it('says why the list could not be read, by its code or generically', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
+    api.me.mockResolvedValue(ok(OWNER));
+    api.listAdminUsers.mockResolvedValue(no('OWNER_ROLE_REQUIRED'));
+    renderApp();
+    await screen.findByText(t.errors.OWNER_ROLE_REQUIRED);
+    expect(screen.getByText(t.loading)).toBeTruthy();
+    cleanup();
+    api.listAdminUsers.mockResolvedValue(no('invalid'));
+    renderApp();
+    await screen.findByText(t.errors.unknown);
   });
 });

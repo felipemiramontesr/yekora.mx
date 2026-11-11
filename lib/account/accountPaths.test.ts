@@ -48,3 +48,20 @@ describe('catalog console path (FC 029 F3)', () => {
     }
   });
 });
+
+describe('administrators console path (FC 044 F2)', () => {
+  it('reads and writes /administradores/ in both languages, whatever follows it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}administradores/`, area)).toEqual({
+        tab: 'admins',
+        orderNumber: null,
+      });
+      expect(parseAccountPath(`${area}administradores/x/`, area).tab).toBe(
+        'admins'
+      );
+      expect(accountPath(area, { tab: 'admins', orderNumber: null })).toBe(
+        `${area}administradores/`
+      );
+    }
+  });
+});

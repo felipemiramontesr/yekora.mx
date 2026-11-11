@@ -14,6 +14,8 @@ import {
  * responsive.spec.ts (signed out by default). FC 042: sign-up, «¿Olvidaste tu contraseña?» and
  * the reset through {@link E2E_RESET_TOKEN}, refusing a new password with the shared policy, as
  * the API does. Enmienda 2: `reset-password/check` names the account of that link.
+ * FC 044 F2: the owner persona gets `/v1/admin/admins`, which keeps its accounts in memory, never
+ * changes the owner's and answers everyone else 403, as the API does.
  */
 
 /** The code every challenge of the interceptor accepts. */
@@ -99,8 +101,10 @@ const DETAIL = {
   ],
 };
 
-/** Who signs in: a buyer, or staff with the panel. */
-type Persona = 'buyer' | 'staff';
+/** Who signs in: a buyer, staff with the panel, or the owner. */
+type Persona = 'buyer' | 'staff' | 'owner';
+
+const OWNER_ID = 'd0000000-0000-4000-8000-000000000003';
 
 const USERS: Record<Persona, object> = {
   buyer: {
@@ -117,7 +121,97 @@ const USERS: Record<Persona, object> = {
     roles: ['staff_orders'],
     permissions: ['account:self', 'orders:read'],
   },
+  owner: {
+    id: OWNER_ID,
+    email: 'owner@example.test',
+    fullName: 'GrayMan',
+    roles: ['owner'],
+    permissions: [
+      'account:self',
+      'audit:read',
+      'catalog:write',
+      'orders:read',
+      'users:manage',
+    ],
+  },
 };
+
+/** An account of the administrators console (FC 044). */
+interface AdminAccount {
+  id: string;
+  email: string;
+  fullName: string;
+  roles: string[];
+  isActive: boolean;
+  totpEnabled: boolean;
+  createdAt: string;
+}
+
+/** The accounts `/v1/admin/admins` starts with: the owner and one administrator. */
+const adminAccounts = (): AdminAccount[] => [
+  {
+    id: OWNER_ID,
+    email: 'owner@example.test',
+    fullName: 'GrayMan',
+    roles: ['owner'],
+    isActive: true,
+    totpEnabled: true,
+    createdAt: '2026-11-11T18:00:00.000Z',
+  },
+  {
+    id: 'd0000000-0000-4000-8000-000000000004',
+    email: 'zoe@example.test',
+    fullName: 'Zoe E2E',
+    roles: ['admin', 'customer'],
+    isActive: true,
+    totpEnabled: true,
+    createdAt: '2026-11-11T18:05:00.000Z',
+  },
+];
+
+/**
+ * `/v1/admin/admins` for the owner (FC 044 T1.2, T1.3): writes need an Idempotency-Key, the
+ * owner's account is immutable, and a withdrawn administrator leaves the list.
+ */
+function answerAdmins(route: Route, accounts: AdminAccount[]) {
+  const request = route.request();
+  const method = request.method();
+  if (method === 'GET') return json(route, 200, { items: accounts });
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  const body = request.postDataJSON() as Record<string, unknown>;
+  if (method === 'POST') {
+    const email = String(body.email).trim().toLowerCase();
+    const taken = accounts.find((account) => account.email === email);
+    if (taken) {
+      return taken.id === OWNER_ID
+        ? problem(route, 403, 'OWNER_IMMUTABLE')
+        : problem(route, 409, 'ADMIN_ALREADY_EXISTS');
+    }
+    const created: AdminAccount = {
+      id: `d0000000-0000-4000-8000-0000000000${accounts.length + 10}`,
+      email,
+      fullName: String(body.fullName),
+      roles: ['admin', 'customer'],
+      isActive: true,
+      totpEnabled: false,
+      createdAt: '2026-11-11T19:00:00.000Z',
+    };
+    accounts.push(created);
+    return json(route, 201, created);
+  }
+  const id = new URL(request.url()).pathname.split('/').pop();
+  if (id === OWNER_ID) return problem(route, 403, 'OWNER_IMMUTABLE');
+  const account = accounts.find((candidate) => candidate.id === id);
+  if (!account) return problem(route, 404, 'ADMIN_NOT_FOUND');
+  if (typeof body.isActive === 'boolean') account.isActive = body.isActive;
+  if (body.revokeAdmin === true) {
+    account.roles = ['customer'];
+    accounts.splice(accounts.indexOf(account), 1);
+  }
+  return json(route, 200, account);
+}
 
 /** CORS of a credentialed request, as the real API answers the site's origin. */
 const CORS = {
@@ -144,7 +238,7 @@ const withCors = (answer: (route: Route) => Promise<void>) => (route: Route) =>
         headers: {
           ...CORS,
           'access-control-allow-methods': 'GET, POST, PATCH',
-          'access-control-allow-headers': 'content-type',
+          'access-control-allow-headers': 'content-type, idempotency-key',
         },
       })
     : answer(route);
@@ -192,6 +286,7 @@ export async function mockAccountApi(
   let user: Persona | null = options.signedIn ?? null;
   let trusted = false;
   const persona = options.persona ?? options.signedIn ?? 'buyer';
+  const admins = adminAccounts();
   await page.route(
     'https://apiv1.yekora.mx/v1/auth/**',
     withCors(async (route) => {
@@ -236,11 +331,17 @@ export async function mockAccountApi(
   );
   await page.route(
     'https://apiv1.yekora.mx/v1/admin/**',
-    withCors((route) =>
-      user === 'staff'
+    withCors((route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.startsWith('/v1/admin/admins')) {
+        return user === 'owner'
+          ? answerAdmins(route, admins)
+          : problem(route, 403, 'OWNER_ROLE_REQUIRED');
+      }
+      return user === 'staff' || user === 'owner'
         ? answerOrders(route)
-        : problem(route, 403, 'PERMISSION_DENIED')
-    )
+        : problem(route, 403, 'PERMISSION_DENIED');
+    })
   );
 }
 

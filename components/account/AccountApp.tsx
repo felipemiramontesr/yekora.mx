@@ -24,6 +24,7 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
+import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
 /**
@@ -36,6 +37,16 @@ import type { CatalogTexts } from './catalog/catalogTexts';
 const CatalogConsole = dynamic<{ texts: CatalogTexts }>(
   () =>
     import('./catalog/CatalogConsole').then((module) => module.CatalogConsole),
+  { ssr: false }
+);
+
+/**
+ * The administrators console, in its own chunk too (FC 044 F2): only the owner opens it, so
+ * nobody else downloads it with `/cuenta/`.
+ */
+const AdminUsersConsole = dynamic<{ texts: AdminUsersTexts }>(
+  () =>
+    import('./AdminUsersConsole').then((module) => module.AdminUsersConsole),
   { ssr: false }
 );
 
@@ -65,6 +76,19 @@ const PANEL_PERMISSION = 'orders:read';
 
 /** The permission that opens the catalog console (FC 029 F3). */
 const CATALOG_PERMISSION = 'catalog:write';
+
+/** The role that opens the administrators console (FC 044 T1.4): no permission grants it. */
+const OWNER_ROLE = 'owner';
+
+/** Who is offered each tab; the API would refuse the rest anyway. */
+const TAB_ACCESS: Readonly<
+  Record<AccountView['tab'], (user: MeResponse) => boolean>
+> = {
+  orders: () => true,
+  panel: (user) => user.permissions.includes(PANEL_PERMISSION),
+  catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
+  admins: (user) => user.roles.includes(OWNER_ROLE),
+};
 
 const signedOut = (notice: string | null = null): Stage => ({
   kind: 'signIn',
@@ -268,23 +292,26 @@ function Dashboard({
   const [leaving, setLeaving] = useState(false);
   const [forgetting, setForgetting] = useState(false);
   const [deviceNote, setDeviceNote] = useState<string | null>(null);
-  // A tab is offered only with its permission; the API would refuse it anyway.
-  const tabs = (['orders', 'panel', 'catalog'] as const).filter(
-    (name) =>
-      name === 'orders' ||
-      user.permissions.includes(
-        name === 'panel' ? PANEL_PERMISSION : CATALOG_PERMISSION
-      )
+  // A tab is offered only with its permission or role; the API would refuse it anyway.
+  const tabs = (['orders', 'panel', 'catalog', 'admins'] as const).filter(
+    (name) => TAB_ACCESS[name](user)
   );
+  const isOwner = TAB_ACCESS.admins(user);
   const tab = tabs.includes(view.tab) ? view.tab : 'orders';
   const scope = tab === 'panel' ? 'admin' : 'account';
+  const isOrders = tab === 'orders' || tab === 'panel';
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-xl font-semibold">
+        <p className="flex flex-wrap items-center gap-3 text-xl font-semibold">
           {fill(dashboard.greeting, { name: user.fullName })}
+          {isOwner && (
+            <span className="rounded-full border border-petroleo px-3 py-0.5 text-sm font-medium">
+              {dashboard.ownerBadge}
+            </span>
+          )}
         </p>
         <button
           type="button"
@@ -339,7 +366,8 @@ function Dashboard({
         </ul>
       </nav>
       {tab === 'catalog' && <CatalogConsole texts={texts.account.catalog} />}
-      {tab !== 'catalog' && view.orderNumber && (
+      {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
+      {isOrders && view.orderNumber && (
         <OrderDetailView
           scope={scope}
           orderNumber={view.orderNumber}
@@ -349,7 +377,7 @@ function Dashboard({
           onBack={() => open(null)}
         />
       )}
-      {tab !== 'catalog' && !view.orderNumber && (
+      {isOrders && !view.orderNumber && (
         <OrderList
           key={scope}
           scope={scope}

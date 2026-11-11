@@ -151,3 +151,67 @@ test('a spent or expired link says so and offers another', async ({ page }) => {
     page.getByRole('heading', { name: 'Restablecer tu contraseña' })
   ).toBeVisible();
 });
+
+/**
+ * FC 044 F2 · The administrators console of the owner, against the emulated `/v1/admin/admins`:
+ * the owner's badge and tab, the protected owner row, an invitation without any password and
+ * switching an administrator off and withdrawing its role.
+ */
+test('the owner invites, switches off and withdraws administrators; the owner row has no controls (FC 044 T1.4, T2.1, T2.2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'owner' });
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, GrayMan')).toBeVisible();
+  await expect(page.getByText('Owner', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Administradores' }).click();
+  await expect(page).toHaveURL(/\/cuenta\/administradores\/$/);
+  const row = (name: string) => page.getByRole('row').filter({ hasText: name });
+  await expect(row('GrayMan')).toContainText(
+    'Protegida: nadie puede cambiarla'
+  );
+  await expect(row('GrayMan').getByRole('button')).toHaveCount(0);
+  await expect(row('Zoe E2E')).toContainText('Activa');
+  // T2.2: an invitation is a name and an e-mail; the page has no password field at all.
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  await page.getByLabel('Nombre').fill('Leo Nuevo');
+  await page.getByLabel('Correo').fill('leo@example.test');
+  await page.getByRole('button', { name: 'Enviar invitación' }).click();
+  await expect(
+    page.getByText('Listo. Enviamos el enlace a leo@example.test.')
+  ).toBeVisible();
+  await expect(row('Leo Nuevo')).toContainText('Sin activar');
+  await page.getByRole('button', { name: 'Desactivar: Zoe E2E' }).click();
+  await expect(row('Zoe E2E')).toContainText('Desactivada');
+  await page.getByRole('button', { name: 'Quitar el rol: Zoe E2E' }).click();
+  await expect(row('Zoe E2E')).toHaveCount(0);
+  // A second invitation of the same e-mail is refused by name.
+  await page.getByLabel('Nombre').fill('Leo Nuevo');
+  await page.getByLabel('Correo').fill('leo@example.test');
+  await page.getByRole('button', { name: 'Enviar invitación' }).click();
+  await expect(
+    page.getByText('Esa cuenta ya es de administrador.')
+  ).toBeVisible();
+});
+
+test('the administrators console has its own address in English, and only the owner is offered it (FC 044 T1.4)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'owner' });
+  await page.goto('/en/account/');
+  await page.getByRole('link', { name: 'Administrators' }).click();
+  await expect(page).toHaveURL(/\/en\/account\/administradores\/$/);
+  await expect(
+    page.getByRole('link', { name: 'Administrators' })
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('row').filter({ hasText: 'GrayMan' })
+  ).toContainText('Protected: nobody can change it');
+  await page.unrouteAll({ behavior: 'wait' });
+  await mockAccountApi(page, { signedIn: 'staff' });
+  await page.goto('/en/account/');
+  await expect(page.getByText('Hello, Luis E2E')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Administrators' })).toHaveCount(
+    0
+  );
+});

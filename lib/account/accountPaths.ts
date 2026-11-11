@@ -6,15 +6,16 @@
  *
  * - `{area}` my orders · `{area}{order}/` one of them;
  * - `{area}panel/` every order (staff) · `{area}panel/{order}/` one of them;
- * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`).
+ * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`);
+ * - `{area}administradores/` the administrators console (FC 044 F2, the owner only).
  *
  * @module
  */
 
 /** Which list, and which order of it, the area shows. */
 export interface AccountView {
-  /** The buyer's own orders, the panel's, or the catalog console. */
-  tab: 'orders' | 'panel' | 'catalog';
+  /** The buyer's own orders, the panel's, the catalog console or the administrators console. */
+  tab: 'orders' | 'panel' | 'catalog' | 'admins';
   /** The open order, or null for the list. */
   orderNumber: string | null;
 }
@@ -33,6 +34,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
   const rest = pathname.startsWith(area) ? pathname.slice(area.length) : '';
   const [first = '', second = ''] = rest.split('/');
   if (first === 'catalogo') return { tab: 'catalog', orderNumber: null };
+  if (first === 'administradores') return { tab: 'admins', orderNumber: null };
   if (first === 'panel') {
     return {
       tab: 'panel',
@@ -54,6 +56,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
  */
 export function accountPath(area: string, view: AccountView): string {
   if (view.tab === 'catalog') return `${area}catalogo/`;
+  if (view.tab === 'admins') return `${area}administradores/`;
   const tab = view.tab === 'panel' ? 'panel/' : '';
   const order = view.orderNumber ? `${view.orderNumber}/` : '';
   return `${area}${tab}${order}`;
