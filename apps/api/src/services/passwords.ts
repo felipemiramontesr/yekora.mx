@@ -53,6 +53,17 @@ export async function verifyPassword(
   }
 }
 
+/**
+ * The hash a privileged account is born with (FC 044 T2.2): Argon2id of 64 random bytes thrown
+ * away here, so no password matches it and none is ever shown, mailed or stored. The holder
+ * sets the real one through a 15-minute reset link.
+ *
+ * @returns An `$argon2id$…` string that satisfies `ck_users_hash` and opens nothing.
+ */
+export function unmatchableHash(): Promise<string> {
+  return hashPassword(randomBytes(64).toString('hex'));
+}
+
 let decoy: Promise<string> | undefined;
 
 /**

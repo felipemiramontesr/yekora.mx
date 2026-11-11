@@ -112,7 +112,7 @@ import {
   completeReset,
   decoyReset,
   liveReset,
-  openReset,
+  mailResetLink,
 } from '../services/passwordResets';
 import { decoyHash, hashPassword, verifyPassword } from '../services/passwords';
 import type { BreachVerdict } from '../services/pwnedPasswords';
@@ -378,18 +378,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const user = await findUserByEmail(deps.db, email);
     if (user) {
       // The link and its mail commit together, or neither does (T2.4).
-      await deps.db.transaction(async (tx) => {
-        const token = await openReset(tx, user.id, deps.now());
-        await enqueueMail(tx, {
-          type: 'PASSWORD_RESET',
-          userId: user.id,
-          token: encryptTotpSecret(
-            auth.totpKey,
-            user.id,
-            Buffer.from(token, 'utf8')
-          ),
-        });
-      });
+      await deps.db.transaction((tx) =>
+        mailResetLink(tx, user.id, auth.totpKey, deps.now())
+      );
       request.outboxQueued = true;
     } else {
       // T2.1: the same token, hash and encryption, thrown away instead of stored.

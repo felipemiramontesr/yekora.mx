@@ -7,7 +7,8 @@
  * live in scripts/lib/sourceFiles.ts, shared with the TSDoc gate (FC 006).
  * FC 008: the scripts that `bun run build` runs (package.json "build", e.g. the catalog snapshot)
  * are part of the product build, so they count as consumers. They are not scanned themselves,
- * and no other script counts.
+ * FC 044: an operator script that is the only entry point of a product service (OPERATOR_SCRIPTS)
+ * counts as a consumer too; no other script does.
  * FC 003 F2: also fails when a file in public/ is not referenced by its URL path from any
  * non-test source file, since everything in public/ is published to yekora.mx. Server
  * configuration files (SERVER_FILES) are read by Apache, not by the site.
@@ -25,6 +26,12 @@ import {
 const root = process.cwd();
 const PUBLIC_DIR = 'public';
 const SERVER_FILES = new Set(['.htaccess']);
+
+/**
+ * Scripts the operator runs against production that are the only way into a product service:
+ * the owner account is provisioned out of band, never through a route (FC 044 T2.1).
+ */
+const OPERATOR_SCRIPTS = ['scripts/provisionOwner.ts'];
 
 const MODIFIERS = new Set(['declare', 'async']);
 const DECLARATION_KEYWORDS = new Set([
@@ -80,8 +87,11 @@ const buildScript: string =
   JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts?.build ??
   '';
 const buildEntries = [
-  ...buildScript.matchAll(/\bbun (scripts\/\S+\.ts)\b/g),
-].map(([, script]) => join(root, script));
+  ...[...buildScript.matchAll(/\bbun (scripts\/\S+\.ts)\b/g)].map(
+    ([, script]) => script
+  ),
+  ...OPERATOR_SCRIPTS,
+].map((script) => join(root, script));
 // Sources plus build entry points: everything an export or a public/ file may be used by.
 const consumers = new Map([
   ...contents,
@@ -119,5 +129,5 @@ if (orphans.length > 0) {
   process.exit(1);
 }
 console.log(
-  `[OK] DC4 no dead exports across ${files.length} source file(s) (+${buildEntries.length} build script(s) as consumers) and no unreferenced public/ file across ${publicFiles.length}.`
+  `[OK] DC4 no dead exports across ${files.length} source file(s) (+${buildEntries.length} build or operator script(s) as consumers) and no unreferenced public/ file across ${publicFiles.length}.`
 );

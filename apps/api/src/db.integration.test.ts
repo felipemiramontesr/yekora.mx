@@ -1,7 +1,7 @@
 /**
  * Real-SQL suite (FC 025 T1.2 S): the API's own services against a migrated MariaDB, with the
  * real pool and no fake `Db`. Only the Database (SQL) job runs it (vitest.db.config.ts), after
- * it has applied migrations 001–007 to its `yekora_ci` service.
+ * it has applied migrations 001–008 to its `yekora_ci` service.
  *
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
@@ -9,6 +9,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
+import { PERMISSIONS } from './lib/permissions';
 import { auditTrail, recordAudit } from './services/audit';
 import {
   createBrand,
@@ -26,7 +27,12 @@ import {
   listProducts,
 } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
-import { codeHash, encryptTotpSecret, newToken } from './services/authCrypto';
+import {
+  codeHash,
+  decryptTotpSecret,
+  encryptTotpSecret,
+  newToken,
+} from './services/authCrypto';
 import {
   createProduct,
   listAdminProducts,
@@ -55,9 +61,14 @@ import {
   useBackupCode,
 } from './services/identity';
 import { findOrder, listOrders } from './services/orderReads';
+import { provisionOwner, recoverOwner } from './services/ownerProvision';
 import { enqueueMail } from './services/outbox';
 import { createOutboxDispatcher } from './services/outboxDispatcher';
-import { completeReset, liveReset, openReset } from './services/passwordResets';
+import {
+  completeReset,
+  liveReset,
+  mailResetLink,
+} from './services/passwordResets';
 import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
 import { createTableRateProvider } from './services/shippingRates';
@@ -1419,6 +1430,17 @@ describe('password reset tokens of migration 007 (FC 042 F0)', () => {
 describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () => {
   const USER = '00000000-0000-4000-8000-000000000043';
   const AT = new Date('2026-11-08T18:00:00Z');
+  const KEY = Buffer.alloc(32, 9);
+  /** Opens a link as `forgot-password` does and reads its token back from the queued mail. */
+  const openLink = async () => {
+    await db.transaction((tx) => mailResetLink(tx, USER, KEY, AT));
+    const [mail] = await db.query<{ payload: string }>(
+      "SELECT payload FROM outbox_events WHERE event_type = 'PASSWORD_RESET' AND payload LIKE ? ORDER BY id DESC LIMIT 1",
+      [`%${USER}%`]
+    );
+    const { token } = JSON.parse(mail.payload) as { token: string };
+    return decryptTotpSecret(KEY, USER, token).toString('utf8');
+  };
 
   beforeAll(async () => {
     await db.query(
@@ -1438,7 +1460,7 @@ describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () =
   });
 
   it('finds a link only while it is unspent and unexpired (T1.2, T2.2)', async () => {
-    const token = await db.transaction((tx) => openReset(tx, USER, AT));
+    const token = await openLink();
     const live = await liveReset(db, token, AT);
     expect(live).toMatchObject({
       userId: USER,
@@ -1457,8 +1479,8 @@ describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () =
       'INSERT INTO user_trusted_devices (user_id, device_token_hash, expires_at) VALUES (?, ?, ?)',
       [USER, 'd'.repeat(64), new Date(AT.getTime() + 60_000)]
     );
-    const other = await db.transaction((tx) => openReset(tx, USER, AT));
-    const token = await db.transaction((tx) => openReset(tx, USER, AT));
+    const other = await openLink();
+    const token = await openLink();
     const live = await liveReset(db, token, AT);
     if (live === null) throw new Error('link not found');
     const hash = await hashPassword('Nueva-Cumbre8&Paso');
@@ -1499,5 +1521,118 @@ describe('password reset links on real SQL (passwordResets.ts, FC 042 F1)', () =
     expect(Number(mail.n)).toBe(1);
     // The same link a second time changes nothing.
     expect(await completeReset(db, live, hash, AT, null)).toBe(false);
+  });
+});
+
+describe('the owner role and its out-of-band account on real SQL (migration 008, ownerProvision.ts, FC 044 F0)', () => {
+  const KEY = Buffer.alloc(32, 8);
+  const AT = new Date('2026-11-11T18:00:00Z');
+  const DEPS = { totpKey: KEY, now: AT };
+  const REQUEST = {
+    email: 'owner@example.test',
+    fullName: 'GrayMan',
+    recover: false,
+  };
+  const count = async (table: string, userId: string) => {
+    const sql: Record<string, string> = {
+      user_sessions:
+        'SELECT COUNT(*) AS n FROM user_sessions WHERE user_id = ?',
+      two_factor_auth:
+        'SELECT COUNT(*) AS n FROM two_factor_auth WHERE user_id = ?',
+      two_factor_backup_codes:
+        'SELECT COUNT(*) AS n FROM two_factor_backup_codes WHERE user_id = ?',
+      open_links:
+        'SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ? AND consumed_at IS NULL',
+    };
+    const [row] = await db.query<{ n: number }>(sql[table], [userId]);
+    return Number(row.n);
+  };
+
+  it('seeds owner active with every permission, like admin (T0.1, T2.1)', async () => {
+    const [role] = await db.query<{ is_active: number }>(
+      "SELECT is_active FROM roles WHERE id = 'owner'"
+    );
+    expect(Number(role.is_active)).toBe(1);
+    const [{ missing }] = await db.query<{ missing: number }>(
+      "SELECT COUNT(*) AS missing FROM permissions p WHERE NOT EXISTS (SELECT 1 FROM role_permissions r WHERE r.role_id = 'owner' AND r.permission_id = p.id)"
+    );
+    expect(Number(missing)).toBe(0);
+  });
+
+  it('provisions one owner with an unmatchable hash and a queued link, then refuses a second (T1.1a, T2.2)', async () => {
+    expect(await provisionOwner(db, REQUEST, DEPS)).toBe('OWNER_PROVISIONED');
+    const [user] = await db.query<{
+      id: string;
+      full_name: string;
+      password_hash: string;
+    }>('SELECT id, full_name, password_hash FROM users WHERE email = ?', [
+      REQUEST.email,
+    ]);
+    expect(user.full_name).toBe('GrayMan');
+    expect(user.password_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
+    const capabilities = await capabilitiesOf(db, user.id);
+    expect(capabilities.roles).toEqual(['owner']);
+    expect(capabilities.permissions).toHaveLength(PERMISSIONS.length);
+    expect(await count('open_links', user.id)).toBe(1);
+    const [audit] = await db.query<{ after_state: string }>(
+      "SELECT after_state FROM audit_log WHERE action = 'OWNER_PROVISIONED' AND entity_id = ?",
+      [user.id]
+    );
+    expect(JSON.parse(audit.after_state)).toEqual({
+      role: 'owner',
+      created: true,
+    });
+    expect(
+      await provisionOwner(
+        db,
+        { ...REQUEST, email: 'second@example.test' },
+        DEPS
+      )
+    ).toBe('OWNER_ALREADY_EXISTS');
+    const [second] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM users WHERE email = 'second@example.test'"
+    );
+    expect(Number(second.n)).toBe(0);
+  });
+
+  it('recovers the owner: no authenticator, backup code, session nor old link left, one new link (T1.1b, T2.4)', async () => {
+    const [{ id }] = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?',
+      [REQUEST.email]
+    );
+    await db.query(
+      "INSERT INTO two_factor_auth (user_id, totp_secret_encrypted, is_totp_enabled) VALUES (?, 'v1:a:b:c', 1)",
+      [id]
+    );
+    await db.query(
+      'INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES (?, ?)',
+      [id, 'c'.repeat(64)]
+    );
+    await db.transaction((tx) =>
+      openSession(tx, {
+        challengeId: null,
+        userId: id,
+        privileged: true,
+        ip: null,
+        userAgent: null,
+        now: AT,
+      })
+    );
+    expect(
+      await recoverOwner(db, { ...REQUEST, email: 'second@example.test' }, DEPS)
+    ).toBe('OWNER_NOT_FOUND');
+    expect(await count('user_sessions', id)).toBe(1);
+    expect(await recoverOwner(db, REQUEST, DEPS)).toBe(
+      'OWNER_RECOVERY_DISPATCHED'
+    );
+    expect(await count('two_factor_auth', id)).toBe(0);
+    expect(await count('two_factor_backup_codes', id)).toBe(0);
+    expect(await count('user_sessions', id)).toBe(0);
+    expect(await count('open_links', id)).toBe(1);
+    const [mail] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type = 'PASSWORD_RESET' AND payload LIKE ?",
+      [`%${id}%`]
+    );
+    expect(Number(mail.n)).toBe(2);
   });
 });

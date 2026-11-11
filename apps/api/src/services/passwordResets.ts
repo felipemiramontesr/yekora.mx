@@ -36,7 +36,7 @@ interface LiveReset {
  * @param now - Current time.
  * @returns The token of the link (64 hex characters); only its hash is stored.
  */
-export async function openReset(
+async function openReset(
   tx: TxQuery,
   userId: string,
   now: Date
@@ -47,6 +47,30 @@ export async function openReset(
     [userId, tokenHash(token), new Date(now.getTime() + RESET_TTL_MS)]
   );
   return token;
+}
+
+/**
+ * Opens a reset link and queues its mail, in the caller's transaction, so the link and its mail
+ * commit together or neither does (FC 042 T2.4). FC 044 T2.2 reuses it to hand a new privileged
+ * account its only way in.
+ *
+ * @param tx - Transaction of the change that needs the link.
+ * @param userId - The account.
+ * @param totpKey - TOTP_ENCRYPTION_KEY: the token waits encrypted in the outbox.
+ * @param now - Current time.
+ */
+export async function mailResetLink(
+  tx: TxQuery,
+  userId: string,
+  totpKey: Buffer,
+  now: Date
+): Promise<void> {
+  const token = await openReset(tx, userId, now);
+  await enqueueMail(tx, {
+    type: 'PASSWORD_RESET',
+    userId,
+    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, 'utf8')),
+  });
 }
 
 /**
