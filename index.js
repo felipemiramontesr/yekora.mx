@@ -53637,7 +53637,7 @@ var require_parse_url = __commonJS({
 var require_form_data = __commonJS({
   "../../node_modules/light-my-request/lib/form-data.js"(exports2, module2) {
     "use strict";
-    var { randomUUID: randomUUID2 } = require("node:crypto");
+    var { randomUUID: randomUUID3 } = require("node:crypto");
     var { Readable } = require("node:stream");
     var textEncoder;
     function isFormDataLike(payload) {
@@ -53645,7 +53645,7 @@ var require_form_data = __commonJS({
     }
     function formDataToStream(formdata) {
       textEncoder = textEncoder ?? new TextEncoder();
-      const boundary = `----formdata-${randomUUID2()}`;
+      const boundary = `----formdata-${randomUUID3()}`;
       const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
       const escape2 = (str) => str.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
@@ -99758,6 +99758,34 @@ var adminOrdersQuery = external_exports.strictObject({
 var languageSchema = external_exports.enum(["es-MX", "en"]).default("es-MX");
 var languageQuery = external_exports.object({ lang: languageSchema });
 
+// ../../lib/account/adminUserTypes.ts
+var adminCreateRequestSchema = external_exports.strictObject({
+  email: external_exports.string().trim().pipe(external_exports.email().max(255)),
+  fullName: external_exports.string().trim().min(2).max(150)
+});
+var adminUpdateRequestSchema = external_exports.strictObject({
+  isActive: external_exports.boolean().optional(),
+  revokeAdmin: external_exports.boolean().optional()
+}).refine(
+  (body) => body.isActive !== void 0 || body.revokeAdmin !== void 0
+);
+var adminUserParams = external_exports.object({ id: external_exports.uuid() });
+var adminUserSchema = external_exports.object({
+  id: external_exports.uuid(),
+  email: external_exports.email(),
+  fullName: external_exports.string(),
+  /** Role slugs, in alphabetical order. An `owner` here is protected: no route changes it. */
+  roles: external_exports.array(external_exports.string()),
+  isActive: external_exports.boolean(),
+  /** Whether the authenticator is on; until then the account cannot use the panel. */
+  totpEnabled: external_exports.boolean(),
+  /** ISO 8601, UTC. */
+  createdAt: external_exports.iso.datetime()
+});
+var adminUserListSchema = external_exports.object({
+  items: external_exports.array(adminUserSchema)
+});
+
 // src/lib/problem.ts
 var problemSchema = external_exports.object({
   /** Problem type; `about:blank` means "see the status". */
@@ -101198,6 +101226,47 @@ var ROUTE_CONTRACTS = [
     }
   },
   ...ORDER_PATHS.flatMap(readOnly),
+  // FC 044 F1: the administrators console. `users:manage` gets past the guard; the handlers
+  // then demand the role `owner` (403 OWNER_ROLE_REQUIRED), which no route grants.
+  {
+    method: "GET",
+    path: "/v1/admin/admins",
+    summary: "Owner only: every owner and administrator account",
+    permission: "users:manage",
+    request: {},
+    responses: { 200: adminUserListSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/admins",
+    summary: "Owner only: grants admin to an e-mail and mails its 15-minute link; no temporary password",
+    permission: "users:manage",
+    request: { headers: mutationHeaders, body: adminCreateRequestSchema },
+    responses: {
+      201: adminUserSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PATCH",
+    path: "/v1/admin/admins/:id",
+    summary: "Owner only: switches an administrator on or off, or withdraws the role (revokeAdmin)",
+    permission: "users:manage",
+    request: {
+      params: adminUserParams,
+      headers: mutationHeaders,
+      body: adminUpdateRequestSchema
+    },
+    responses: {
+      200: adminUserSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
   // FC 029 F2: the catalog backoffice. Every write needs catalog:write and an Idempotency-Key.
   {
     method: "POST",
@@ -101492,6 +101561,12 @@ function createCustomer(db, user) {
     );
     return true;
   });
+}
+async function revokeAccess(tx, userId) {
+  await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
+    userId
+  ]);
 }
 async function capabilitiesOf(db, userId) {
   const rows = await db.query(
@@ -101809,6 +101884,314 @@ function registerAdminRoutes(app, deps) {
   });
 }
 
+// src/services/adminUsers.ts
+var import_node_crypto9 = require("node:crypto");
+
+// src/services/passwordResets.ts
+var import_node_crypto7 = require("node:crypto");
+
+// src/services/outbox.ts
+async function enqueueMail(tx, event) {
+  const { type, ...payload } = event;
+  await tx.query(
+    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
+    [type, JSON.stringify(payload)]
+  );
+}
+
+// src/services/passwordResets.ts
+var RESET_TTL_MS = 15 * 6e4;
+async function openReset(tx, userId, now) {
+  const token = (0, import_node_crypto7.randomBytes)(32).toString("hex");
+  await tx.query(
+    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+    [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
+  );
+  return token;
+}
+async function mailResetLink(tx, userId, totpKey, now) {
+  const token = await openReset(tx, userId, now);
+  await enqueueMail(tx, {
+    type: "PASSWORD_RESET",
+    userId,
+    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, "utf8"))
+  });
+}
+function decoyReset(totpKey) {
+  const token = (0, import_node_crypto7.randomBytes)(32).toString("hex");
+  return encryptTotpSecret(
+    totpKey,
+    tokenHash2(token),
+    Buffer.from(token, "utf8")
+  );
+}
+async function liveReset(db, token, now) {
+  const [row2] = await db.query(
+    "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
+    [tokenHash2(token), now]
+  );
+  return row2 ? {
+    id: Number(row2.id),
+    userId: row2.user_id,
+    email: row2.email,
+    fullName: row2.full_name
+  } : null;
+}
+function completeReset(db, reset, passwordHash, now, ip) {
+  return db.transaction(async (tx) => {
+    const spent = await tx.query(
+      "UPDATE password_reset_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+      [now, reset.id]
+    );
+    if (spent.affectedRows !== 1) return false;
+    await tx.query("UPDATE users SET password_hash = ? WHERE id = ?", [
+      passwordHash,
+      reset.userId
+    ]);
+    await tx.query(
+      "UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+      [now, reset.userId]
+    );
+    await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [
+      reset.userId
+    ]);
+    await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
+      reset.userId
+    ]);
+    await recordAudit(tx, {
+      userId: reset.userId,
+      action: "PASSWORD_RESET",
+      entityType: "users",
+      entityId: reset.userId,
+      before: null,
+      after: { sessionsRevoked: true },
+      ip
+    });
+    await enqueueMail(tx, { type: "PASSWORD_CHANGED", userId: reset.userId });
+    return true;
+  });
+}
+
+// src/services/passwords.ts
+var import_node_crypto8 = require("node:crypto");
+var import_hash_wasm = __toESM(require_index_umd(), 1);
+var PARAMETERS = {
+  memorySize: 19456,
+  iterations: 2,
+  parallelism: 1,
+  hashLength: 32
+};
+function hashPassword(password) {
+  return (0, import_hash_wasm.argon2id)({
+    ...PARAMETERS,
+    password,
+    salt: (0, import_node_crypto8.randomBytes)(16),
+    outputType: "encoded"
+  });
+}
+async function verifyPassword(hash2, password) {
+  try {
+    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
+  } catch {
+    return false;
+  }
+}
+function unmatchableHash() {
+  return hashPassword((0, import_node_crypto8.randomBytes)(64).toString("hex"));
+}
+var decoy;
+function decoyHash() {
+  decoy ??= hashPassword((0, import_node_crypto8.randomBytes)(32).toString("base64url"));
+  return decoy;
+}
+
+// src/services/adminUsers.ts
+var toAdminUser = (row2) => ({
+  id: row2.id,
+  email: row2.email,
+  fullName: row2.full_name,
+  roles: row2.roles.split(","),
+  isActive: Number(row2.is_active) === 1,
+  totpEnabled: Number(row2.totp_enabled) === 1,
+  createdAt: row2.created_at.toISOString()
+});
+async function listAdmins(db) {
+  const rows = await db.query(
+    "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at HAVING SUM(ur.role_id IN ('owner', 'admin')) > 0 ORDER BY SUM(ur.role_id = 'owner') DESC, u.email"
+  );
+  return rows.map(toAdminUser);
+}
+async function accountOf(tx, id) {
+  const [row2] = await tx.query(
+    "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id WHERE u.id = ? GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at",
+    [id]
+  );
+  return toAdminUser(row2);
+}
+async function lockedRoles(tx, userId) {
+  const rows = await tx.query(
+    "SELECT role_id FROM user_roles WHERE user_id = ? FOR UPDATE",
+    [userId]
+  );
+  return rows.map((row2) => row2.role_id);
+}
+async function createAdmin(tx, input2, actor) {
+  const [existing] = await tx.query(
+    "SELECT id FROM users WHERE email = ? FOR UPDATE",
+    [input2.email]
+  );
+  const id = existing?.id ?? (0, import_node_crypto9.randomUUID)();
+  if (existing) {
+    const roles = await lockedRoles(tx, id);
+    if (roles.includes("owner")) return "OWNER_IMMUTABLE";
+    if (roles.includes("admin")) return "ADMIN_ALREADY_EXISTS";
+    await tx.query("UPDATE users SET is_active = 1 WHERE id = ?", [id]);
+    await revokeAccess(tx, id);
+  } else {
+    await tx.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
+      [id, input2.email, await unmatchableHash(), input2.fullName]
+    );
+  }
+  await tx.query(
+    "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'customer'), (?, 'admin')",
+    [id, id]
+  );
+  await mailResetLink(tx, id, input2.totpKey, input2.now);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "ADMIN_CREATED",
+    entityType: "users",
+    entityId: id,
+    before: null,
+    after: { role: "admin", created: !existing },
+    ip: actor.ip
+  });
+  return accountOf(tx, id);
+}
+async function updateAdmin(tx, input2, actor) {
+  const roles = await lockedRoles(tx, input2.id);
+  if (roles.includes("owner")) return "OWNER_IMMUTABLE";
+  if (!roles.includes("admin")) return "ADMIN_NOT_FOUND";
+  const before = await accountOf(tx, input2.id);
+  if (input2.isActive !== void 0) {
+    await tx.query("UPDATE users SET is_active = ? WHERE id = ?", [
+      input2.isActive ? 1 : 0,
+      input2.id
+    ]);
+  }
+  if (input2.revokeAdmin === true) {
+    await tx.query(
+      "DELETE FROM user_roles WHERE user_id = ? AND role_id = 'admin'",
+      [input2.id]
+    );
+    await tx.query(
+      "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
+      [input2.id]
+    );
+  }
+  if (input2.isActive === false || input2.revokeAdmin === true) {
+    await revokeAccess(tx, input2.id);
+  }
+  const after = await accountOf(tx, input2.id);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "ADMIN_UPDATED",
+    entityType: "users",
+    entityId: input2.id,
+    before: { isActive: before.isActive, roles: before.roles },
+    after: { isActive: after.isActive, roles: after.roles },
+    ip: actor.ip
+  });
+  return after;
+}
+
+// src/routes/adminUsers.ts
+var REFUSALS2 = {
+  OWNER_IMMUTABLE: [403, "The owner account cannot be changed"],
+  ADMIN_ALREADY_EXISTS: [409, "Already an administrator"],
+  ADMIN_NOT_FOUND: [404, "Not found"]
+};
+var isOwner = (request) => request.user.roles.includes("owner");
+var notOwner = (reply) => refuse(
+  reply,
+  403,
+  "Only the owner manages administrators",
+  "OWNER_ROLE_REQUIRED"
+);
+function answerOf(outcome, created) {
+  if (typeof outcome !== "string") {
+    return { status: created ? 201 : 200, body: outcome };
+  }
+  const [status, title] = REFUSALS2[outcome];
+  return { status, body: problem(status, title, outcome) };
+}
+function registerAdminUserRoutes(app, deps) {
+  app.get("/v1/admin/admins", async (request, reply) => {
+    if (!isOwner(request)) return notOwner(reply);
+    return adminUserListSchema.parse({ items: await listAdmins(deps.db) });
+  });
+  app.post("/v1/admin/admins", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    if (!isOwner(request)) return notOwner(reply);
+    const body = adminCreateRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    const { totpKey } = deps.auth;
+    const sent = await runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx, userId) => answerOf(
+        await createAdmin(
+          tx,
+          {
+            email: canonicalEmail(body.data.email),
+            fullName: body.data.fullName,
+            totpKey,
+            now: deps.now()
+          },
+          { userId, ip: request.ip }
+        ),
+        true
+      )
+    );
+    request.outboxQueued = reply.statusCode === 201;
+    return sent;
+  });
+  app.patch("/v1/admin/admins/:id", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    if (!isOwner(request)) return notOwner(reply);
+    const params = adminUserParams.safeParse(request.params);
+    const body = adminUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx, userId) => answerOf(
+        await updateAdmin(
+          tx,
+          { id: params.data.id, ...body.data },
+          { userId, ip: request.ip }
+        ),
+        false
+      )
+    );
+  });
+}
+
 // src/routes/auth.ts
 var import_promises = require("node:timers/promises");
 
@@ -101921,7 +102304,7 @@ var PASSWORD_PROBLEMS = {
 };
 
 // src/services/botChallenge.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -101932,16 +102315,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto7.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto10.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto7.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto10.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto7.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto7.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto10.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto10.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto7.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto7.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto10.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto10.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -101977,119 +102360,6 @@ async function checkChallenge(db, secret, payload, now) {
     [solution.challenge, new Date(expires * 1e3)]
   );
   return spent.affectedRows === 1 ? "passed" : "BOT_CHALLENGE_FAILED";
-}
-
-// src/services/outbox.ts
-async function enqueueMail(tx, event) {
-  const { type, ...payload } = event;
-  await tx.query(
-    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
-    [type, JSON.stringify(payload)]
-  );
-}
-
-// src/services/passwordResets.ts
-var import_node_crypto8 = require("node:crypto");
-var RESET_TTL_MS = 15 * 6e4;
-async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
-  await tx.query(
-    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
-    [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
-  );
-  return token;
-}
-async function mailResetLink(tx, userId, totpKey, now) {
-  const token = await openReset(tx, userId, now);
-  await enqueueMail(tx, {
-    type: "PASSWORD_RESET",
-    userId,
-    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, "utf8"))
-  });
-}
-function decoyReset(totpKey) {
-  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
-  return encryptTotpSecret(
-    totpKey,
-    tokenHash2(token),
-    Buffer.from(token, "utf8")
-  );
-}
-async function liveReset(db, token, now) {
-  const [row2] = await db.query(
-    "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
-    [tokenHash2(token), now]
-  );
-  return row2 ? {
-    id: Number(row2.id),
-    userId: row2.user_id,
-    email: row2.email,
-    fullName: row2.full_name
-  } : null;
-}
-function completeReset(db, reset, passwordHash, now, ip) {
-  return db.transaction(async (tx) => {
-    const spent = await tx.query(
-      "UPDATE password_reset_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
-      [now, reset.id]
-    );
-    if (spent.affectedRows !== 1) return false;
-    await tx.query("UPDATE users SET password_hash = ? WHERE id = ?", [
-      passwordHash,
-      reset.userId
-    ]);
-    await tx.query(
-      "UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
-      [now, reset.userId]
-    );
-    await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [
-      reset.userId
-    ]);
-    await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
-      reset.userId
-    ]);
-    await recordAudit(tx, {
-      userId: reset.userId,
-      action: "PASSWORD_RESET",
-      entityType: "users",
-      entityId: reset.userId,
-      before: null,
-      after: { sessionsRevoked: true },
-      ip
-    });
-    await enqueueMail(tx, { type: "PASSWORD_CHANGED", userId: reset.userId });
-    return true;
-  });
-}
-
-// src/services/passwords.ts
-var import_node_crypto9 = require("node:crypto");
-var import_hash_wasm = __toESM(require_index_umd(), 1);
-var PARAMETERS = {
-  memorySize: 19456,
-  iterations: 2,
-  parallelism: 1,
-  hashLength: 32
-};
-function hashPassword(password) {
-  return (0, import_hash_wasm.argon2id)({
-    ...PARAMETERS,
-    password,
-    salt: (0, import_node_crypto9.randomBytes)(16),
-    outputType: "encoded"
-  });
-}
-async function verifyPassword(hash2, password) {
-  try {
-    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
-  } catch {
-    return false;
-  }
-}
-var decoy;
-function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto9.randomBytes)(32).toString("base64url"));
-  return decoy;
 }
 
 // src/routes/auth.ts
@@ -103342,7 +103612,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -103487,9 +103757,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto10.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto11.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto10.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto11.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -107107,7 +107377,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto11 = __toESM(require("node:crypto"), 1);
+var import_node_crypto12 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -108840,7 +109110,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto11.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto12.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -110017,8 +110287,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto11.default.randomBytes(len).toString("hex"),
-      import_node_crypto11.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto12.default.randomBytes(len).toString("hex"),
+      import_node_crypto12.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -110706,7 +110976,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto12 = __toESM(require("node:crypto"), 1);
+var import_node_crypto13 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -110717,7 +110987,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto12.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto13.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -110827,7 +111097,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -110842,7 +111112,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto13.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto14.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -110909,7 +111179,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -110922,7 +111192,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto14.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto15.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -111532,7 +111802,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -111850,7 +112120,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto15.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto16.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -111885,7 +112155,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -112050,7 +112320,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto16.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto17.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -113398,7 +113668,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto16.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto17.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -113732,7 +114002,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -114055,7 +114325,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto17.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto18.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -116850,7 +117120,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto18 = require("node:crypto");
+var import_node_crypto19 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -116913,7 +117183,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto18.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto19.timingSafeEqual)(a, b);
 }
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   async function call(path3, init) {
@@ -116964,7 +117234,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto18.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto19.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -117120,6 +117390,7 @@ async function buildApp(deps) {
   });
   registerAccountRoutes(app, { db: deps.db, now });
   registerAdminRoutes(app, { db: deps.db, now });
+  registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerCatalogAdminRoutes(app, {
     db: deps.db,
     now,
@@ -117438,7 +117709,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "82c4acf8cc76116fef5b9d70343b363573486d8d" : void 0;
+var sha = true ? "8aa65d7647cadd604510becbb0d6f232dcbb6efb" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
