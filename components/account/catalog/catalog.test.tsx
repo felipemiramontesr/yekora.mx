@@ -957,7 +957,7 @@ describe('product gallery (FC 029 F3d)', () => {
     fireEvent.click(screen.getByRole('button', { name: g.addPhoto }));
     const input = screen.getByLabelText(g.choose) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [PHOTO] } });
-    await screen.findByRole('img', { name: g.preview });
+    await screen.findByText(g.preview);
   }
 
   it('shows the photos in order, the first one primary, with their alt texts', async () => {
@@ -1128,7 +1128,7 @@ describe('product gallery (FC 029 F3d)', () => {
     expect(screen.getByText(g.invalid)).toBeTruthy();
     api.openImage.mockResolvedValue(BITMAP);
     fireEvent.change(input, { target: { files: [PHOTO] } });
-    await screen.findByRole('img', { name: g.preview });
+    await screen.findByText(g.preview);
     expect(screen.queryByText(g.invalid)).toBeNull();
     // The browser gives no canvas, then cannot encode, then the API refuses the size.
     let uploadDraws = false;

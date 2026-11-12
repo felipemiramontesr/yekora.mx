@@ -246,7 +246,7 @@ test('the owner crops a photo in the browser Canvas and uploads it at the chosen
     buffer: solidPng(40, 20),
   });
   await expect(
-    page.getByRole('img', { name: 'Vista previa del recorte cuadrado' })
+    page.getByText('Vista previa del recorte cuadrado')
   ).toBeVisible();
   await page.getByLabel('Acercamiento').fill('2');
   await page.getByLabel('Tamaño de la foto').selectOption('600');

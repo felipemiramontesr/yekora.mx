@@ -112,14 +112,16 @@ export function PhotoCropper({
       {error && <output className="block text-red-800">{error}</output>}
       {image && (
         <>
-          <canvas
-            ref={preview}
-            role="img"
-            aria-label={t.preview}
-            width={PREVIEW_SIDE}
-            height={PREVIEW_SIDE}
-            className="size-60 rounded-md border border-petroleo/30"
-          />
+          <figure className="flex flex-col gap-1">
+            <canvas
+              ref={preview}
+              aria-hidden="true"
+              width={PREVIEW_SIDE}
+              height={PREVIEW_SIDE}
+              className="size-60 rounded-md border border-petroleo/30"
+            />
+            <figcaption className="text-sm">{t.preview}</figcaption>
+          </figure>
           {slider(t.zoom, 'zoom', 1, 4, 0.05)}
           {slider(t.horizontal, 'x', 0, 1, 0.01)}
           {slider(t.vertical, 'y', 0, 1, 0.01)}
