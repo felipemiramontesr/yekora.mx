@@ -115,7 +115,6 @@ export function PhotoCropper({
           <figure className="flex flex-col gap-1">
             <canvas
               ref={preview}
-              aria-hidden="true"
               width={PREVIEW_SIDE}
               height={PREVIEW_SIDE}
               className="size-60 rounded-md border border-petroleo/30"
