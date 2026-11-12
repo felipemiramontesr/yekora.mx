@@ -840,6 +840,7 @@
       "sectionsLabel": "Catalog sections",
       "sections": {
         "brands": "Brands",
+        "facets": "Facets",
         "publish": "Publish"
       },
       "loading": "Loading…",
@@ -866,6 +867,43 @@
         "cancel": "Cancel",
         "retire": "Retire",
         "reactivate": "Reactivate"
+      },
+      "facets": {
+        "caption": "Facet groups with their values",
+        "empty": "There are no facet groups yet.",
+        "system": "System",
+        "retired": "Retired",
+        "flags": {
+          "required": "Required",
+          "ordered": "Ordered",
+          "filterable": "Filterable",
+          "landing": "On the landing page"
+        },
+        "code": "Identifier",
+        "codeHint": "Lower-case letters, numbers and hyphens, e.g. “material”. It does not change later.",
+        "nameEs": "Name in Spanish",
+        "nameEn": "Name in English",
+        "order": "Order",
+        "newGroup": "New group",
+        "createGroup": "Create group",
+        "creating": "Creating…",
+        "groupCreated": "Group created.",
+        "edit": "Edit",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Changes saved.",
+        "cancel": "Cancel",
+        "retire": "Retire",
+        "reactivate": "Reactivate",
+        "values": "Values",
+        "noValues": "This group has no values yet.",
+        "systemValues": "The values of the Level group are system values: they are not added or edited.",
+        "valueEs": "Value in Spanish",
+        "valueEn": "Value in English",
+        "newValue": "New value",
+        "addValue": "Add value",
+        "adding": "Adding…",
+        "valueAdded": "Value added."
       },
       "publish": {
         "title": "Publish changes",

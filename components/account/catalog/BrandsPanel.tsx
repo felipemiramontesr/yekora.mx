@@ -8,18 +8,7 @@ import {
   updateBrand,
 } from '@/lib/api/catalogAdminClient';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
-
-/** What the panel says after an action: a confirmation or the refusal. */
-type Note = { kind: 'ok' | 'error'; text: string } | null;
-
-/** A text field, like the checkout's. */
-const FIELD = 'min-h-11 rounded-md border border-petroleo/30 bg-white px-3';
-
-/** A form field as trimmed text; a file or a missing field reads as empty. */
-function textOf(data: FormData, name: string): string {
-  const value = data.get(name);
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { FIELD, type Note, textOf } from './formHelpers';
 
 /** An empty website field is "no website". */
 const websiteOf = (data: FormData) => textOf(data, 'website') || null;

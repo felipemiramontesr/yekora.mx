@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { BrandsPanel } from './BrandsPanel';
+import { FacetsPanel } from './FacetsPanel';
 import type { CatalogTexts } from './catalogTexts';
 import { PublishPanel } from './PublishPanel';
 
 /** Sections of the console, in the order of its tabs. */
-const SECTIONS = ['brands', 'publish'] as const;
+const SECTIONS = ['brands', 'facets', 'publish'] as const;
 
 /**
  * The catalog console of `/cuenta/catalogo` (FC 029 F3, ADR 0011): shown only to an account
@@ -38,11 +39,9 @@ export function CatalogConsole({ texts }: Readonly<{ texts: CatalogTexts }>) {
         ))}
       </div>
       <div role="tabpanel">
-        {section === 'brands' ? (
-          <BrandsPanel texts={texts} />
-        ) : (
-          <PublishPanel texts={texts} />
-        )}
+        {section === 'brands' && <BrandsPanel texts={texts} />}
+        {section === 'facets' && <FacetsPanel texts={texts} />}
+        {section === 'publish' && <PublishPanel texts={texts} />}
       </div>
     </div>
   );

@@ -14,6 +14,12 @@ import {
   type brandCreate,
   type brandPatch,
   brandSchema,
+  type facetGroupCreate,
+  type facetGroupPatch,
+  facetGroupSchema,
+  type facetValueCreate,
+  type facetValuePatch,
+  facetValueSchema,
   publishRequestedSchema,
 } from '@/lib/catalog/adminTypes';
 import { sessionRequest, type TransportFailure } from './http';
@@ -72,6 +78,9 @@ function request<T>(
 /** A brand as the console shows it. */
 export type Brand = z.infer<typeof brandSchema>;
 
+/** A facet group with its values, as the console shows it. */
+export type FacetGroup = z.infer<typeof facetGroupSchema>;
+
 /**
  * Every brand, active or retired.
  *
@@ -124,6 +133,109 @@ export function updateBrand(
   return request(
     `/v1/admin/catalog/brands/${id}`,
     brandSchema,
+    'PATCH',
+    patch,
+    fetchImpl
+  );
+}
+
+/**
+ * Every facet group with its values, active or retired.
+ *
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The groups, or why there are none.
+ */
+export function listFacets(fetchImpl: typeof fetch = fetch) {
+  return request(
+    '/v1/admin/catalog/facets',
+    z.array(facetGroupSchema),
+    'GET',
+    undefined,
+    fetchImpl
+  );
+}
+
+/**
+ * Creates a facet group (never a system one).
+ *
+ * @param input - Code, names in both languages, flags and order.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The new group, or why it was refused.
+ */
+export function createFacetGroup(
+  input: z.input<typeof facetGroupCreate>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    '/v1/admin/catalog/facet-groups',
+    facetGroupSchema,
+    'POST',
+    input,
+    fetchImpl
+  );
+}
+
+/**
+ * Edits, retires (`isActive: false`) or reactivates a facet group; the system group Nivel is
+ * never retired.
+ *
+ * @param id - The group.
+ * @param patch - The fields to change.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The group after the change, or why it was refused.
+ */
+export function updateFacetGroup(
+  id: number,
+  patch: z.input<typeof facetGroupPatch>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/catalog/facet-groups/${id}`,
+    facetGroupSchema,
+    'PATCH',
+    patch,
+    fetchImpl
+  );
+}
+
+/**
+ * Adds a value to a facet group (not to the system group).
+ *
+ * @param groupId - The group.
+ * @param input - Code, labels in both languages and order.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The new value, or why it was refused.
+ */
+export function createFacetValue(
+  groupId: number,
+  input: z.input<typeof facetValueCreate>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/catalog/facet-groups/${groupId}/values`,
+    facetValueSchema,
+    'POST',
+    input,
+    fetchImpl
+  );
+}
+
+/**
+ * Relabels or reorders a facet value (not of the system group).
+ *
+ * @param id - The value.
+ * @param patch - The fields to change.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The value after the change, or why it was refused.
+ */
+export function updateFacetValue(
+  id: number,
+  patch: z.input<typeof facetValuePatch>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/catalog/facet-values/${id}`,
+    facetValueSchema,
     'PATCH',
     patch,
     fetchImpl

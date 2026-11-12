@@ -840,6 +840,7 @@
       "sectionsLabel": "Secciones del catálogo",
       "sections": {
         "brands": "Marcas",
+        "facets": "Facetas",
         "publish": "Publicar"
       },
       "loading": "Cargando…",
@@ -866,6 +867,43 @@
         "cancel": "Cancelar",
         "retire": "Retirar",
         "reactivate": "Reactivar"
+      },
+      "facets": {
+        "caption": "Grupos de facetas con sus valores",
+        "empty": "Aún no hay grupos de facetas.",
+        "system": "Del sistema",
+        "retired": "Retirado",
+        "flags": {
+          "required": "Obligatorio",
+          "ordered": "Ordenado",
+          "filterable": "Filtrable",
+          "landing": "En la portada"
+        },
+        "code": "Identificador",
+        "codeHint": "Minúsculas, números y guiones, por ejemplo «material». No cambia después.",
+        "nameEs": "Nombre en español",
+        "nameEn": "Nombre en inglés",
+        "order": "Orden",
+        "newGroup": "Nuevo grupo",
+        "createGroup": "Crear grupo",
+        "creating": "Creando…",
+        "groupCreated": "Grupo creado.",
+        "edit": "Editar",
+        "save": "Guardar",
+        "saving": "Guardando…",
+        "saved": "Cambios guardados.",
+        "cancel": "Cancelar",
+        "retire": "Retirar",
+        "reactivate": "Reactivar",
+        "values": "Valores",
+        "noValues": "Este grupo aún no tiene valores.",
+        "systemValues": "Los valores del grupo Nivel son del sistema: no se agregan ni se editan.",
+        "valueEs": "Valor en español",
+        "valueEn": "Valor en inglés",
+        "newValue": "Nuevo valor",
+        "addValue": "Agregar valor",
+        "adding": "Agregando…",
+        "valueAdded": "Valor agregado."
       },
       "publish": {
         "title": "Publicar cambios",

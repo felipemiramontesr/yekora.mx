@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createBrand,
+  createFacetGroup,
+  createFacetValue,
   listBrands,
+  listFacets,
   publishCatalog,
   updateBrand,
+  updateFacetGroup,
+  updateFacetValue,
 } from './catalogAdminClient';
 
 const BRAND = {
@@ -107,6 +112,106 @@ describe('catalog console client (FC 029 F3)', () => {
     await updateBrand(1, {}).catch(() => undefined);
     await publishCatalog().catch(() => undefined);
     expect(spy).toHaveBeenCalledTimes(4);
+    spy.mockRestore();
+  });
+});
+
+describe('facet console client (FC 029 F3b)', () => {
+  const VALUE = {
+    id: 10,
+    code: 'nailon',
+    valueEs: 'Nailon',
+    valueEn: 'Nylon',
+    sortOrder: 0,
+  };
+  const GROUP = {
+    id: 2,
+    code: 'material',
+    nameEs: 'Material',
+    nameEn: 'Material',
+    isRequired: false,
+    isOrdered: false,
+    isFilterable: true,
+    showOnLanding: false,
+    isSystem: false,
+    isActive: true,
+    sortOrder: 5,
+    values: [VALUE],
+  };
+
+  it('reads every group with the session cookie and no Idempotency-Key', async () => {
+    const fetchImpl = answering(200, [GROUP]);
+    await expect(listFacets(fetchImpl)).resolves.toEqual({
+      ok: true,
+      data: [GROUP],
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://apiv1.yekora.mx/v1/admin/catalog/facets');
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).not.toHaveProperty('Idempotency-Key');
+  });
+
+  it('sends each write to its route, under a fresh Idempotency-Key', async () => {
+    const group = answering(201, GROUP);
+    await createFacetGroup(
+      { code: 'material', nameEs: 'Material', nameEn: 'Material' },
+      group
+    );
+    await updateFacetGroup(2, { isActive: false }, answering(200, GROUP));
+    const value = answering(201, VALUE);
+    await createFacetValue(
+      2,
+      { code: 'nailon', valueEs: 'Nailon', valueEn: 'Nylon' },
+      value
+    );
+    const relabel = answering(200, VALUE);
+    await updateFacetValue(10, { valueEn: 'Nylon 6' }, relabel);
+    expect(group.mock.calls[0][0]).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/facet-groups'
+    );
+    expect(group.mock.calls[0][1]).toMatchObject({ method: 'POST' });
+    expect(value.mock.calls[0][0]).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/facet-groups/2/values'
+    );
+    expect(relabel.mock.calls[0][0]).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/facet-values/10'
+    );
+    expect(relabel.mock.calls[0][1]).toMatchObject({
+      method: 'PATCH',
+      body: '{"valueEn":"Nylon 6"}',
+    });
+    for (const call of [group, value, relabel]) {
+      const key = (call.mock.calls[0][1]?.headers as Record<string, string>)[
+        'Idempotency-Key'
+      ];
+      expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    }
+  });
+
+  it('names the refusal of the system group', async () => {
+    await expect(
+      updateFacetGroup(
+        1,
+        { isActive: false },
+        answering(409, { detail: 'CAT_SYSTEM_GROUP_LOCKED' })
+      )
+    ).resolves.toEqual({ ok: false, reason: 'CAT_SYSTEM_GROUP_LOCKED' });
+  });
+
+  it('uses the global fetch by default', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('[]', { status: 200 }));
+    await listFacets();
+    await createFacetGroup({ code: 'a', nameEs: 'A', nameEn: 'A' }).catch(
+      () => undefined
+    );
+    await updateFacetGroup(1, {}).catch(() => undefined);
+    await createFacetValue(1, { code: 'a', valueEs: 'A', valueEn: 'A' }).catch(
+      () => undefined
+    );
+    await updateFacetValue(1, {}).catch(() => undefined);
+    expect(spy).toHaveBeenCalledTimes(5);
     spy.mockRestore();
   });
 });
