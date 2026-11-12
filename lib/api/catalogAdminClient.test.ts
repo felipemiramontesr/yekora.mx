@@ -3,12 +3,15 @@ import {
   createBrand,
   createFacetGroup,
   createFacetValue,
+  createProduct,
   listBrands,
   listFacets,
+  listProducts,
   publishCatalog,
   updateBrand,
   updateFacetGroup,
   updateFacetValue,
+  updateProduct,
 } from './catalogAdminClient';
 
 const BRAND = {
@@ -212,6 +215,113 @@ describe('facet console client (FC 029 F3b)', () => {
     );
     await updateFacetValue(1, {}).catch(() => undefined);
     expect(spy).toHaveBeenCalledTimes(5);
+    spy.mockRestore();
+  });
+});
+
+describe('product console client (FC 029 F3c)', () => {
+  const PRODUCT = {
+    id: 7,
+    sku: 'TRAIL-1',
+    slug: 'tenis-trail',
+    nameEs: 'Tenis trail',
+    nameEn: 'Trail shoes',
+    descriptionEs: '',
+    descriptionEn: '',
+    priceMxnCents: 485000,
+    stock: 10,
+    reservedStock: 0,
+    discipline: 'trail-running',
+    level: 'intermedio',
+    brandId: null,
+    shippingClass: 'estandar',
+    weightGrams: 800,
+    lengthMm: 300,
+    widthMm: 200,
+    heightMm: 120,
+    isActive: true,
+    isTest: false,
+    facetValueIds: [],
+    gallery: [],
+  };
+
+  it('reads a page of products by its number, with the session cookie', async () => {
+    const page = { items: [PRODUCT], total: 1, page: 2, pageSize: 50 };
+    const fetchImpl = answering(200, page);
+    await expect(listProducts(2, fetchImpl)).resolves.toEqual({
+      ok: true,
+      data: page,
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/products?page=2'
+    );
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).not.toHaveProperty('Idempotency-Key');
+  });
+
+  it('creates and edits under a fresh Idempotency-Key, and names the new refusals', async () => {
+    const create = answering(201, PRODUCT);
+    await createProduct(
+      {
+        sku: 'TRAIL-1',
+        slug: 'tenis-trail',
+        nameEs: 'Tenis trail',
+        nameEn: 'Trail shoes',
+        descriptionEs: '',
+        descriptionEn: '',
+        priceMxnCents: 485000,
+        stock: 10,
+        discipline: 'trail-running',
+        level: 'intermedio',
+        shippingClass: 'estandar',
+        weightGrams: 800,
+        lengthMm: 300,
+        widthMm: 200,
+        heightMm: 120,
+      },
+      create
+    );
+    const edit = answering(200, PRODUCT);
+    await updateProduct(7, { isActive: false }, edit);
+    expect(create.mock.calls[0][0]).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/products'
+    );
+    expect(create.mock.calls[0][1]).toMatchObject({ method: 'POST' });
+    expect(edit.mock.calls[0][0]).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/products/7'
+    );
+    expect(edit.mock.calls[0][1]).toMatchObject({
+      method: 'PATCH',
+      body: '{"isActive":false}',
+    });
+    for (const call of [create, edit]) {
+      const key = (call.mock.calls[0][1]?.headers as Record<string, string>)[
+        'Idempotency-Key'
+      ];
+      expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    }
+    await expect(
+      updateProduct(7, {}, answering(422, { detail: 'CAT_REFERENCE_INVALID' }))
+    ).resolves.toEqual({ ok: false, reason: 'CAT_REFERENCE_INVALID' });
+    await expect(
+      updateProduct(
+        7,
+        {},
+        answering(409, { detail: 'CAT_STOCK_BELOW_RESERVED' })
+      )
+    ).resolves.toEqual({ ok: false, reason: 'CAT_STOCK_BELOW_RESERVED' });
+  });
+
+  it('uses the global fetch by default', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    await listProducts();
+    await createProduct({} as never).catch(() => undefined);
+    await updateProduct(1, {}).catch(() => undefined);
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy.mock.calls[0][0]).toContain('/products?page=1');
     spy.mockRestore();
   });
 });

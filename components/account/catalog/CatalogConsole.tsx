@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { BrandsPanel } from './BrandsPanel';
+import type { Locale } from '@/app/i18n';
 import { FacetsPanel } from './FacetsPanel';
 import type { CatalogTexts } from './catalogTexts';
+import { ProductsPanel } from './ProductsPanel';
 import { PublishPanel } from './PublishPanel';
 
 /** Sections of the console, in the order of its tabs. */
-const SECTIONS = ['brands', 'facets', 'publish'] as const;
+const SECTIONS = ['brands', 'facets', 'products', 'publish'] as const;
 
 /**
  * The catalog console of `/cuenta/catalogo` (FC 029 F3, ADR 0011): shown only to an account
@@ -15,8 +17,12 @@ const SECTIONS = ['brands', 'facets', 'publish'] as const;
  * Changes are saved at once; «Publicar cambios» rebuilds the store with them.
  *
  * @param texts - `account.catalog` texts.
+ * @param locale - Language of the page, for the prices.
  */
-export function CatalogConsole({ texts }: Readonly<{ texts: CatalogTexts }>) {
+export function CatalogConsole({
+  texts,
+  locale,
+}: Readonly<{ texts: CatalogTexts; locale: Locale }>) {
   const [section, setSection] = useState<(typeof SECTIONS)[number]>('brands');
   return (
     <div className="flex flex-col gap-6">
@@ -41,6 +47,9 @@ export function CatalogConsole({ texts }: Readonly<{ texts: CatalogTexts }>) {
       <div role="tabpanel">
         {section === 'brands' && <BrandsPanel texts={texts} />}
         {section === 'facets' && <FacetsPanel texts={texts} />}
+        {section === 'products' && (
+          <ProductsPanel texts={texts} locale={locale} />
+        )}
         {section === 'publish' && <PublishPanel texts={texts} />}
       </div>
     </div>

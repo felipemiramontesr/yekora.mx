@@ -11,6 +11,8 @@
  */
 import { z } from 'zod';
 import {
+  adminProductPageSchema,
+  adminProductSchema,
   type brandCreate,
   type brandPatch,
   brandSchema,
@@ -20,6 +22,8 @@ import {
   type facetValueCreate,
   type facetValuePatch,
   facetValueSchema,
+  type productCreate,
+  type productPatch,
   publishRequestedSchema,
 } from '@/lib/catalog/adminTypes';
 import { sessionRequest, type TransportFailure } from './http';
@@ -34,6 +38,8 @@ const CODES = [
   'CAT_NOT_FOUND',
   'CAT_FORBIDDEN',
   'CAT_SYSTEM_GROUP_LOCKED',
+  'CAT_REFERENCE_INVALID',
+  'CAT_STOCK_BELOW_RESERVED',
   'CAT_PUBLISH_UNAVAILABLE',
   'CAT_PUBLISH_FAILED',
   'SESSION_INVALID_OR_EXPIRED',
@@ -80,6 +86,12 @@ export type Brand = z.infer<typeof brandSchema>;
 
 /** A facet group with its values, as the console shows it. */
 export type FacetGroup = z.infer<typeof facetGroupSchema>;
+
+/** A product as the console shows it. */
+export type AdminProduct = z.infer<typeof adminProductSchema>;
+
+/** One page of the product list. */
+export type ProductPage = z.infer<typeof adminProductPageSchema>;
 
 /**
  * Every brand, active or retired.
@@ -236,6 +248,65 @@ export function updateFacetValue(
   return request(
     `/v1/admin/catalog/facet-values/${id}`,
     facetValueSchema,
+    'PATCH',
+    patch,
+    fetchImpl
+  );
+}
+
+/**
+ * One page of products, active or retired.
+ *
+ * @param page - Page number, from 1.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The page, or why there is none.
+ */
+export function listProducts(page = 1, fetchImpl: typeof fetch = fetch) {
+  return request(
+    `/v1/admin/catalog/products?page=${page}`,
+    adminProductPageSchema,
+    'GET',
+    undefined,
+    fetchImpl
+  );
+}
+
+/**
+ * Creates a product; its SKU and slug are fixed from then on.
+ *
+ * @param input - SKU, slug and every editable field.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The new product, or why it was refused.
+ */
+export function createProduct(
+  input: z.input<typeof productCreate>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    '/v1/admin/catalog/products',
+    adminProductSchema,
+    'POST',
+    input,
+    fetchImpl
+  );
+}
+
+/**
+ * Edits, retires (`isActive: false`) or reactivates a product.
+ *
+ * @param id - The product.
+ * @param patch - The fields to change.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The product after the change, or why it was refused.
+ */
+export function updateProduct(
+  id: number,
+  patch: z.infer<typeof productPatch>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/catalog/products/${id}`,
+    adminProductSchema,
     'PATCH',
     patch,
     fetchImpl

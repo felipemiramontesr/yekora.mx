@@ -34,7 +34,7 @@ import type { CatalogTexts } from './catalog/catalogTexts';
  * under the tabs (a placeholder could not be localized: `loading` gets no props); once loaded, the
  * console shows its own «Cargando…» until the API answers.
  */
-const CatalogConsole = dynamic<{ texts: CatalogTexts }>(
+const CatalogConsole = dynamic<{ texts: CatalogTexts; locale: Locale }>(
   () =>
     import('./catalog/CatalogConsole').then((module) => module.CatalogConsole),
   { ssr: false }
@@ -365,7 +365,9 @@ function Dashboard({
           ))}
         </ul>
       </nav>
-      {tab === 'catalog' && <CatalogConsole texts={texts.account.catalog} />}
+      {tab === 'catalog' && (
+        <CatalogConsole texts={texts.account.catalog} locale={locale} />
+      )}
       {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
       {isOrders && view.orderNumber && (
         <OrderDetailView
