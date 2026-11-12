@@ -20,11 +20,14 @@ import {
   listFacets,
   listProducts,
   publishCatalog,
+  replaceGallery,
   updateBrand,
   updateFacetGroup,
   updateFacetValue,
   updateProduct,
+  uploadMedia,
 } from '@/lib/api/catalogAdminClient';
+import { canvasBlob, drawSquare, openImage } from '@/lib/catalog/imageCrop';
 import { AccountApp } from '../AccountApp';
 import { CatalogConsole } from './CatalogConsole';
 
@@ -34,6 +37,12 @@ vi.mock('@/lib/api/accountClient', () => ({
   forgetDevice: vi.fn(),
   listOrders: vi.fn(),
   readOrder: vi.fn(),
+}));
+vi.mock('@/lib/catalog/imageCrop', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/catalog/imageCrop')>()),
+  openImage: vi.fn(),
+  drawSquare: vi.fn(),
+  canvasBlob: vi.fn(),
 }));
 vi.mock('@/lib/api/catalogAdminClient', () => ({
   listBrands: vi.fn(),
@@ -47,6 +56,8 @@ vi.mock('@/lib/api/catalogAdminClient', () => ({
   listProducts: vi.fn(),
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
+  replaceGallery: vi.fn(),
+  uploadMedia: vi.fn(),
   publishCatalog: vi.fn(),
 }));
 
@@ -64,6 +75,11 @@ const api = {
   listProducts: vi.mocked(listProducts),
   createProduct: vi.mocked(createProduct),
   updateProduct: vi.mocked(updateProduct),
+  replaceGallery: vi.mocked(replaceGallery),
+  uploadMedia: vi.mocked(uploadMedia),
+  openImage: vi.mocked(openImage),
+  drawSquare: vi.mocked(drawSquare),
+  canvasBlob: vi.mocked(canvasBlob),
   publishCatalog: vi.mocked(publishCatalog),
 };
 
@@ -887,5 +903,268 @@ describe('products (FC 029 F3c)', () => {
     expect(
       await screen.findByText(t.errors.SESSION_INVALID_OR_EXPIRED)
     ).toBeTruthy();
+  });
+});
+
+describe('product gallery (FC 029 F3d)', () => {
+  const g = t.media;
+  const SHA_A = 'a'.repeat(64);
+  const SHA_B = 'b'.repeat(64);
+  const SHA_NEW = 'c'.repeat(64);
+  const WITH_PHOTOS: AdminProduct = {
+    ...TRAIL,
+    gallery: [
+      {
+        sha256: SHA_A,
+        altEs: 'Frente',
+        altEn: null,
+        sortOrder: 0,
+        isPrimary: true,
+      },
+      {
+        sha256: SHA_B,
+        altEs: null,
+        altEn: 'Side',
+        sortOrder: 1,
+        isPrimary: false,
+      },
+    ],
+  };
+  const BITMAP = { width: 2000, height: 1000 } as ImageBitmap;
+  const PHOTO = new File(['x'], 'foto.png', { type: 'image/png' });
+  const srcs = () =>
+    [...document.querySelectorAll('ol img')].map((image) =>
+      image.getAttribute('src')
+    );
+
+  async function openGallery(product: AdminProduct) {
+    api.listProducts.mockResolvedValue(pageOf([product]));
+    renderConsole();
+    fireEvent.click(screen.getByRole('tab', { name: t.sections.products }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: `${t.products.gallery}: ${product.nameEs}`,
+      })
+    );
+    await screen.findByRole('heading', {
+      name: `Galería de ${product.nameEs}`,
+    });
+  }
+
+  /** Opens the crop panel and chooses a photo the browser decodes. */
+  async function choosePhoto() {
+    api.openImage.mockResolvedValue(BITMAP);
+    fireEvent.click(screen.getByRole('button', { name: g.addPhoto }));
+    const input = screen.getByLabelText(g.choose) as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [PHOTO] } });
+    await screen.findByRole('img', { name: g.preview });
+  }
+
+  it('shows the photos in order, the first one primary, with their alt texts', async () => {
+    await openGallery(WITH_PHOTOS);
+    expect(srcs()).toEqual([
+      `https://apiv1.yekora.mx/v1/media/${SHA_A}`,
+      `https://apiv1.yekora.mx/v1/media/${SHA_B}`,
+    ]);
+    expect(screen.getAllByText(g.primary)).toHaveLength(1);
+    const alts = screen.getAllByLabelText(g.altEs) as HTMLInputElement[];
+    expect(alts.map((field) => field.value)).toEqual(['Frente', '']);
+    const english = screen.getAllByLabelText(g.altEn) as HTMLInputElement[];
+    expect(english.map((field) => field.value)).toEqual(['', 'Side']);
+  });
+
+  it('says so when the product has no photos, and goes back to the list', async () => {
+    await openGallery(TRAIL);
+    expect(screen.getByText(g.empty)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: g.back }));
+    expect(
+      await screen.findByRole('button', { name: t.products.new })
+    ).toBeTruthy();
+  });
+
+  it('moves and removes photos; the first cannot go up nor the last down', async () => {
+    await openGallery(WITH_PHOTOS);
+    const up = screen.getAllByRole('button', {
+      name: g.moveUp,
+    }) as HTMLButtonElement[];
+    const down = screen.getAllByRole('button', {
+      name: g.moveDown,
+    }) as HTMLButtonElement[];
+    expect(up[0].disabled).toBe(true);
+    expect(down[1].disabled).toBe(true);
+    fireEvent.click(down[0]);
+    expect(srcs()[0]).toContain(SHA_B);
+    fireEvent.click(screen.getAllByRole('button', { name: g.moveUp })[1]);
+    expect(srcs()[0]).toContain(SHA_A);
+    fireEvent.click(screen.getAllByRole('button', { name: g.remove })[0]);
+    expect(srcs()).toEqual([`https://apiv1.yekora.mx/v1/media/${SHA_B}`]);
+  });
+
+  it('saves the gallery in order with the alt texts, empty ones as null, and returns to the list', async () => {
+    api.replaceGallery.mockResolvedValue(ok(WITH_PHOTOS));
+    await openGallery(WITH_PHOTOS);
+    fireEvent.change(screen.getAllByLabelText(g.altEs)[1], {
+      target: { value: ' Lateral ' },
+    });
+    fireEvent.change(screen.getAllByLabelText(g.altEn)[0], {
+      target: { value: 'Front' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: g.save }));
+    expect(await screen.findByText(g.saved)).toBeTruthy();
+    expect(api.replaceGallery).toHaveBeenCalledWith(7, {
+      images: [
+        { sha256: SHA_A, altEs: 'Frente', altEn: 'Front' },
+        { sha256: SHA_B, altEs: 'Lateral', altEn: 'Side' },
+      ],
+    });
+    expect(
+      await screen.findByRole('button', { name: t.products.new })
+    ).toBeTruthy();
+    expect(api.listProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it('names a refused save and stays on the gallery', async () => {
+    api.replaceGallery.mockResolvedValue(no('CAT_REFERENCE_INVALID'));
+    await openGallery(WITH_PHOTOS);
+    fireEvent.click(screen.getByRole('button', { name: g.save }));
+    expect(
+      await screen.findByText(t.errors.CAT_REFERENCE_INVALID)
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Galería de Tenis trail' })
+    ).toBeTruthy();
+  });
+
+  it('crops, resizes and uploads a photo, then adds it to the gallery', async () => {
+    api.drawSquare.mockReturnValue(true);
+    const blob = new Blob(['webp'], { type: 'image/webp' });
+    api.canvasBlob.mockResolvedValue(blob);
+    api.uploadMedia.mockResolvedValue(
+      ok({
+        code: 'MEDIA_ACCEPTED',
+        created: true,
+        sha256: SHA_NEW,
+        mimeType: 'image/webp',
+        width: 600,
+        height: 600,
+        sizeBytes: 4,
+      } as const)
+    );
+    await openGallery(WITH_PHOTOS);
+    await choosePhoto();
+    // The preview follows the sliders and the chosen width reaches the upload canvas.
+    fireEvent.change(screen.getByLabelText(g.zoom), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(g.horizontal), {
+      target: { value: '0.25' },
+    });
+    fireEvent.change(screen.getByLabelText(g.vertical), {
+      target: { value: '0.75' },
+    });
+    await waitFor(() =>
+      expect(api.drawSquare).toHaveBeenLastCalledWith(
+        expect.anything(),
+        BITMAP,
+        { zoom: 2, x: 0.25, y: 0.75 },
+        240
+      )
+    );
+    fireEvent.change(screen.getByLabelText(g.size), {
+      target: { value: '600' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: g.upload }));
+    await waitFor(() =>
+      expect(srcs()).toContain(`https://apiv1.yekora.mx/v1/media/${SHA_NEW}`)
+    );
+    expect(api.drawSquare).toHaveBeenLastCalledWith(
+      expect.anything(),
+      BITMAP,
+      { zoom: 2, x: 0.25, y: 0.75 },
+      600
+    );
+    expect(api.uploadMedia).toHaveBeenCalledWith(blob);
+    expect(screen.queryByRole('region', { name: g.cropTitle })).toBeNull();
+    // The new photo is last, with empty alt texts, and goes to the API when the gallery is saved.
+    api.replaceGallery.mockResolvedValue(ok(WITH_PHOTOS));
+    fireEvent.click(screen.getByRole('button', { name: g.save }));
+    await waitFor(() =>
+      expect(api.replaceGallery).toHaveBeenCalledWith(7, {
+        images: expect.arrayContaining([
+          { sha256: SHA_NEW, altEs: null, altEn: null },
+        ]),
+      })
+    );
+  });
+
+  it('does not add a photo twice, and tells it', async () => {
+    api.drawSquare.mockReturnValue(true);
+    api.canvasBlob.mockResolvedValue(new Blob(['w'], { type: 'image/webp' }));
+    api.uploadMedia.mockResolvedValue(
+      ok({
+        code: 'MEDIA_ACCEPTED',
+        created: false,
+        sha256: SHA_A,
+        mimeType: 'image/webp',
+        width: 1200,
+        height: 1200,
+        sizeBytes: 4,
+      } as const)
+    );
+    await openGallery(WITH_PHOTOS);
+    await choosePhoto();
+    fireEvent.click(screen.getByRole('button', { name: g.upload }));
+    expect(await screen.findByText(g.duplicate)).toBeTruthy();
+    expect(srcs()).toHaveLength(2);
+  });
+
+  it('says why a photo could not be used: unreadable, not prepared, or refused by the API', async () => {
+    await openGallery(TRAIL);
+    fireEvent.click(screen.getByRole('button', { name: g.addPhoto }));
+    const input = screen.getByLabelText(g.choose) as HTMLInputElement;
+    api.openImage.mockResolvedValueOnce(null);
+    fireEvent.change(input, { target: { files: [PHOTO] } });
+    expect(await screen.findByText(g.invalid)).toBeTruthy();
+    // No file chosen (the dialog was cancelled): nothing changes.
+    fireEvent.change(input, { target: { files: [] } });
+    expect(screen.getByText(g.invalid)).toBeTruthy();
+    api.openImage.mockResolvedValue(BITMAP);
+    fireEvent.change(input, { target: { files: [PHOTO] } });
+    await screen.findByRole('img', { name: g.preview });
+    expect(screen.queryByText(g.invalid)).toBeNull();
+    // The browser gives no canvas, then cannot encode, then the API refuses the size.
+    let uploadDraws = false;
+    api.drawSquare.mockImplementation(
+      (_canvas, _image, _crop, size) => size === 240 || uploadDraws
+    );
+    fireEvent.click(screen.getByRole('button', { name: g.upload }));
+    expect(await screen.findByText(g.prepare)).toBeTruthy();
+    uploadDraws = true;
+    api.canvasBlob.mockResolvedValueOnce(null);
+    fireEvent.click(screen.getByRole('button', { name: g.upload }));
+    await waitFor(() => expect(api.canvasBlob).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(g.prepare)).toBeTruthy();
+    api.canvasBlob.mockResolvedValue(new Blob(['w'], { type: 'image/webp' }));
+    api.uploadMedia.mockResolvedValue(no('MEDIA_SIZE_EXCEEDED'));
+    fireEvent.click(screen.getByRole('button', { name: g.upload }));
+    expect(await screen.findByText(t.errors.MEDIA_SIZE_EXCEEDED)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: g.cancel }));
+    expect(screen.queryByRole('region', { name: g.cropTitle })).toBeNull();
+  });
+
+  it('stops offering photos at twelve', async () => {
+    const full = {
+      ...TRAIL,
+      gallery: Array.from({ length: 12 }, (_, index) => ({
+        sha256: index.toString(16).padStart(64, '0'),
+        altEs: null,
+        altEn: null,
+        sortOrder: index,
+        isPrimary: index === 0,
+      })),
+    };
+    await openGallery(full);
+    const button = screen.getByRole('button', {
+      name: g.full,
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
   });
 });

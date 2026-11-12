@@ -22,6 +22,8 @@ import {
   type facetValueCreate,
   type facetValuePatch,
   facetValueSchema,
+  type galleryPatch,
+  mediaUploadedSchema,
   type productCreate,
   type productPatch,
   publishRequestedSchema,
@@ -40,6 +42,9 @@ const CODES = [
   'CAT_SYSTEM_GROUP_LOCKED',
   'CAT_REFERENCE_INVALID',
   'CAT_STOCK_BELOW_RESERVED',
+  'MEDIA_UNSAFE_TYPE',
+  'MEDIA_SIZE_EXCEEDED',
+  'MEDIA_DIMENSIONS_INVALID',
   'CAT_PUBLISH_UNAVAILABLE',
   'CAT_PUBLISH_FAILED',
   'SESSION_INVALID_OR_EXPIRED',
@@ -310,6 +315,55 @@ export function updateProduct(
     'PATCH',
     patch,
     fetchImpl
+  );
+}
+
+/**
+ * Replaces the gallery of a product, in order; the first image is the primary one.
+ *
+ * @param id - The product.
+ * @param gallery - The digests of already uploaded images and their alt texts.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The product with its new gallery, or why it was refused.
+ */
+export function replaceGallery(
+  id: number,
+  gallery: z.input<typeof galleryPatch>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/catalog/products/${id}/media`,
+    adminProductSchema,
+    'PATCH',
+    gallery,
+    fetchImpl
+  );
+}
+
+/**
+ * Uploads one cropped image as its raw bytes (T1.2): WebP, JPEG or PNG, at most 2 MB, 1200, 600
+ * or 300 px wide. The API stores it once per digest and answers with that digest.
+ *
+ * @param image - The cropped image, whose type is sent as the Content-Type.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns What the API stored, or why it was refused.
+ */
+export function uploadMedia(image: Blob, fetchImpl: typeof fetch = fetch) {
+  return sessionRequest(
+    fetchImpl,
+    '/v1/admin/catalog/media',
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': image.type,
+        'Idempotency-Key': crypto.randomUUID(),
+      },
+      raw: image,
+    },
+    TIMEOUT_MS,
+    mediaUploadedSchema,
+    refusal
   );
 }
 

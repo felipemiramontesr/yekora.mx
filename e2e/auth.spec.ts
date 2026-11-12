@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { E2E_RESET_TOKEN, mockAccountApi } from './support/accountApi';
+import {
+  E2E_RESET_TOKEN,
+  mockAccountApi,
+  mockCatalogApi,
+} from './support/accountApi';
+import { solidPng } from './support/imageFixtures';
 
 /**
  * FC 042 F2 · Passwords in a real browser, against the emulated account API
@@ -214,4 +219,45 @@ test('the administrators console has its own address in English, and only the ow
   await expect(page.getByRole('link', { name: 'Administrators' })).toHaveCount(
     0
   );
+});
+
+/**
+ * FC 029 F3d · The photo crop in the real browser. jsdom has no Canvas, so this is where
+ * `createImageBitmap`, the 2D context and `toBlob` actually run, in WebKit too, which cannot
+ * encode WebP and answers with another type: the console must then fall back to JPEG.
+ */
+test('the owner crops a photo in the browser Canvas and uploads it at the chosen width (FC 029 T1.2 D)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'owner' });
+  const uploadsSoFar = await mockCatalogApi(page);
+  await page.goto('/cuenta/');
+  // The header also has a «Catálogo» link, to the shop: the tab is the one of the account.
+  await page
+    .getByRole('navigation', { name: 'Secciones de tu cuenta' })
+    .getByRole('link', { name: 'Catálogo' })
+    .click();
+  await page.getByRole('tab', { name: 'Productos' }).click();
+  await page.getByRole('button', { name: 'Galería: Tenis trail E2E' }).click();
+  await page.getByRole('button', { name: 'Agregar foto' }).click();
+  await page.getByLabel('Elige una foto (JPG, PNG o WebP)').setInputFiles({
+    name: 'foto.png',
+    mimeType: 'image/png',
+    buffer: solidPng(40, 20),
+  });
+  await expect(
+    page.getByRole('img', { name: 'Vista previa del recorte cuadrado' })
+  ).toBeVisible();
+  await page.getByLabel('Acercamiento').fill('2');
+  await page.getByLabel('Tamaño de la foto').selectOption('600');
+  await page.getByRole('button', { name: 'Usar esta foto' }).click();
+  await expect(page.locator('ol img')).toHaveCount(1);
+  // The Canvas produced a square at the width asked, as WebP or, where it cannot, as JPEG.
+  const uploads = await uploadsSoFar();
+  expect(uploads).toHaveLength(1);
+  expect(uploads[0]).toMatchObject({ width: 600, height: 600 });
+  expect(uploads[0].type).toMatch(/^image\/(webp|jpeg)$/);
+  await page.getByLabel('Texto alternativo en español').fill('Tenis de frente');
+  await page.getByRole('button', { name: 'Guardar galería' }).click();
+  await expect(page.getByText('Galería guardada.')).toBeVisible();
 });

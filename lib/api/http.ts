@@ -62,7 +62,7 @@ type ApiResult<T, R> =
  *
  * @param fetchImpl - The fetch to use (injectable for tests).
  * @param path - Path on the API, e.g. `/v1/account/me`.
- * @param init - Method, headers and the JSON body, if any.
+ * @param init - Method, headers and the JSON body or the raw bytes, if any.
  * @param timeoutMs - Budget before aborting.
  * @param schema - The contract of a 2xx answer.
  * @param refusal - The reason of a non-2xx answer, from its status and body.
@@ -71,7 +71,13 @@ type ApiResult<T, R> =
 export async function sessionRequest<T, R>(
   fetchImpl: typeof fetch,
   path: string,
-  init: { method: string; headers: Record<string, string>; body?: object },
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body?: object;
+    /** Raw bytes sent as they are (an image upload), instead of a JSON body. */
+    raw?: Blob;
+  },
   timeoutMs: number,
   schema: z.ZodType<T>,
   refusal: (status: number, body: unknown) => R
@@ -83,7 +89,7 @@ export async function sessionRequest<T, R>(
       method: init.method,
       credentials: 'include',
       headers: init.headers,
-      body: init.body && JSON.stringify(init.body),
+      body: init.raw ?? (init.body && JSON.stringify(init.body)),
     },
     timeoutMs
   );

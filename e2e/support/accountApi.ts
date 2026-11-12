@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Page, Route } from '@playwright/test';
 import {
   PASSWORD_PROBLEMS,
@@ -16,6 +16,8 @@ import {
  * the API does. Enmienda 2: `reset-password/check` names the account of that link.
  * FC 044 F2: the owner persona gets `/v1/admin/admins`, which keeps its accounts in memory, never
  * changes the owner's and answers everyone else 403, as the API does.
+ * FC 029 F3d: {@link mockCatalogApi} stands in for the catalog backoffice and records every image
+ * the browser uploads, with the size it really has.
  */
 
 /** The code every challenge of the interceptor accepts. */
@@ -373,4 +375,118 @@ function answerOrders(route: Route) {
   return path.endsWith('/orders')
     ? json(route, 200, { items: [SUMMARY], page: 1, pageSize: 20, total: 1 })
     : json(route, 200, DETAIL);
+}
+
+/** An upload the page sent to the catalog backoffice, as the browser decoded it. */
+export interface Upload {
+  /** The Content-Type of the request: what the Canvas encoded. */
+  type: string;
+  /** Size of the encoded image in pixels. */
+  width: number;
+  height: number;
+}
+
+/** The one product of the interceptor's catalog. */
+const CATALOG_PRODUCT = {
+  id: 7,
+  sku: 'E2E-TRAIL',
+  slug: 'e2e-tenis-trail',
+  nameEs: 'Tenis trail E2E',
+  nameEn: 'Trail shoes E2E',
+  descriptionEs: '',
+  descriptionEn: '',
+  priceMxnCents: 485000,
+  stock: 10,
+  reservedStock: 0,
+  discipline: 'trail-running',
+  level: 'intermedio',
+  brandId: null,
+  shippingClass: 'estandar',
+  weightGrams: 800,
+  lengthMm: 300,
+  widthMm: 200,
+  heightMm: 120,
+  isActive: true,
+  isTest: true,
+  facetValueIds: [] as number[],
+  gallery: [] as object[],
+};
+
+/**
+ * Intercepts the catalog backoffice (FC 029 F3d): the product list, the image upload and the
+ * gallery of a product. Playwright's WebKit cannot read a Blob body from a request, so the
+ * uploads are recorded inside the page instead: a wrapper of `fetch` decodes each image sent to
+ * the media route and keeps its type and size. The interceptor judges the type as the API does
+ * and answers without decoding.
+ *
+ * @param page - The page under test.
+ * @returns A function that reads the uploads the page has sent so far, in order.
+ */
+export async function mockCatalogApi(
+  page: Page
+): Promise<() => Promise<Upload[]>> {
+  await page.addInitScript(() => {
+    const store: Upload[] = [];
+    (globalThis as { __uploads?: Upload[] }).__uploads = store;
+    const original = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (
+        url.endsWith('/v1/admin/catalog/media') &&
+        init?.body instanceof Blob
+      ) {
+        const bitmap = await createImageBitmap(init.body);
+        store.push({
+          type: init.body.type,
+          width: bitmap.width,
+          height: bitmap.height,
+        });
+      }
+      return original(input, init);
+    };
+  });
+  const product = { ...CATALOG_PRODUCT };
+  await page.route(
+    'https://apiv1.yekora.mx/v1/admin/catalog/**',
+    withCors(async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith('/products') && request.method() === 'GET') {
+        return json(route, 200, {
+          items: [product],
+          total: 1,
+          page: 1,
+          pageSize: 50,
+        });
+      }
+      if (path.endsWith('/catalog/media')) {
+        const type = String(request.headers()['content-type']);
+        if (!/^image\/(webp|jpeg)$/.test(type))
+          return problem(route, 415, 'MEDIA_UNSAFE_TYPE');
+        return json(route, 201, {
+          code: 'MEDIA_ACCEPTED',
+          created: true,
+          sha256: createHash('sha256').update(randomUUID()).digest('hex'),
+          mimeType: type,
+          width: 1200,
+          height: 1200,
+          sizeBytes: 1,
+        });
+      }
+      if (path.endsWith('/media')) {
+        const body = request.postDataJSON() as { images: object[] };
+        product.gallery = body.images.map((image, sortOrder) => ({
+          ...image,
+          sortOrder,
+          isPrimary: sortOrder === 0,
+        }));
+        return json(route, 200, product);
+      }
+      return problem(route, 404, 'CAT_NOT_FOUND');
+    })
+  );
+  return () =>
+    page.evaluate(
+      () => (globalThis as { __uploads?: Upload[] }).__uploads ?? []
+    );
 }

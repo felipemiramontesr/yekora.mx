@@ -8,10 +8,12 @@ import {
   listFacets,
   listProducts,
   publishCatalog,
+  replaceGallery,
   updateBrand,
   updateFacetGroup,
   updateFacetValue,
   updateProduct,
+  uploadMedia,
 } from './catalogAdminClient';
 
 const BRAND = {
@@ -322,6 +324,99 @@ describe('product console client (FC 029 F3c)', () => {
     await updateProduct(1, {}).catch(() => undefined);
     expect(spy).toHaveBeenCalledTimes(3);
     expect(spy.mock.calls[0][0]).toContain('/products?page=1');
+    spy.mockRestore();
+  });
+});
+
+describe('media console client (FC 029 F3d)', () => {
+  const SHA = 'a'.repeat(64);
+  const STORED = {
+    code: 'MEDIA_ACCEPTED',
+    created: true,
+    sha256: SHA,
+    mimeType: 'image/webp',
+    width: 1200,
+    height: 1200,
+    sizeBytes: 3,
+  };
+
+  it('uploads the raw bytes with their own type and a fresh Idempotency-Key, not as JSON', async () => {
+    const image = new Blob(['abc'], { type: 'image/webp' });
+    const fetchImpl = answering(201, STORED);
+    await expect(uploadMedia(image, fetchImpl)).resolves.toEqual({
+      ok: true,
+      data: STORED,
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://apiv1.yekora.mx/v1/admin/catalog/media');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.body).toBe(image);
+    const headers = init?.headers as Record<string, string>;
+    expect(headers['Content-Type']).toBe('image/webp');
+    expect(headers['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it.each([
+    [415, 'MEDIA_UNSAFE_TYPE'],
+    [413, 'MEDIA_SIZE_EXCEEDED'],
+    [422, 'MEDIA_DIMENSIONS_INVALID'],
+  ])('names a %i refusal of an upload by its code', async (status, code) => {
+    await expect(
+      uploadMedia(
+        new Blob(['x'], { type: 'image/png' }),
+        answering(status, { detail: code })
+      )
+    ).resolves.toEqual({ ok: false, reason: code });
+  });
+
+  it('replaces the gallery of a product with the digests in order', async () => {
+    const fetchImpl = answering(200, {
+      id: 7,
+      sku: 'TRAIL-1',
+      slug: 'tenis-trail',
+      nameEs: 'Tenis',
+      nameEn: 'Shoes',
+      descriptionEs: '',
+      descriptionEn: '',
+      priceMxnCents: 100,
+      stock: 1,
+      reservedStock: 0,
+      discipline: 'escalada',
+      level: 'principiante',
+      brandId: null,
+      shippingClass: 'estandar',
+      weightGrams: 1,
+      lengthMm: 1,
+      widthMm: 1,
+      heightMm: 1,
+      isActive: true,
+      isTest: false,
+      facetValueIds: [],
+      gallery: [],
+    });
+    const gallery = { images: [{ sha256: SHA, altEs: 'Frente', altEn: null }] };
+    await expect(replaceGallery(7, gallery, fetchImpl)).resolves.toMatchObject({
+      ok: true,
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe(
+      'https://apiv1.yekora.mx/v1/admin/catalog/products/7/media'
+    );
+    expect(init).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify(gallery),
+    });
+    expect(init?.headers).toHaveProperty('Idempotency-Key');
+  });
+
+  it('uses the global fetch by default', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    await uploadMedia(new Blob(['x'], { type: 'image/png' }));
+    await replaceGallery(1, { images: [] });
+    expect(spy).toHaveBeenCalledTimes(2);
     spy.mockRestore();
   });
 });

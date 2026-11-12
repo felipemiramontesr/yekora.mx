@@ -958,6 +958,41 @@
         "saving": "Saving…",
         "create": "Create product",
         "creating": "Creating…",
+        "cancel": "Cancel",
+        "gallery": "Gallery"
+      },
+      "media": {
+        "title": "Gallery of {name}",
+        "back": "Back to the list",
+        "empty": "This product has no photos yet.",
+        "primary": "Primary",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "altEs": "Alt text in Spanish",
+        "altEn": "Alt text in English",
+        "addPhoto": "Add photo",
+        "full": "The gallery already has 12 photos.",
+        "duplicate": "That photo is already in the gallery.",
+        "save": "Save gallery",
+        "saving": "Saving…",
+        "saved": "Gallery saved.",
+        "cropTitle": "New photo",
+        "choose": "Choose a photo (JPG, PNG or WebP)",
+        "invalid": "That image could not be read. Use a JPG, PNG or WebP photo.",
+        "prepare": "The photo could not be prepared. Try another one.",
+        "zoom": "Zoom",
+        "horizontal": "Horizontal position",
+        "vertical": "Vertical position",
+        "size": "Photo size",
+        "sizes": {
+          "300": "Thumbnail (300 px)",
+          "600": "Catalog (600 px)",
+          "1200": "Large (1200 px)"
+        },
+        "preview": "Preview of the square crop",
+        "upload": "Use this photo",
+        "uploading": "Uploading…",
         "cancel": "Cancel"
       },
       "publish": {
@@ -981,7 +1016,10 @@
         "timeout": "The server took too long. Try again.",
         "unknown": "Something went wrong. Try again.",
         "CAT_REFERENCE_INVALID": "The discipline, level, shipping class or brand does not exist or is retired.",
-        "CAT_STOCK_BELOW_RESERVED": "Stock cannot drop below what pending orders have already reserved."
+        "CAT_STOCK_BELOW_RESERVED": "Stock cannot drop below what pending orders have already reserved.",
+        "MEDIA_UNSAFE_TYPE": "That image type is not accepted. Use a JPG, PNG or WebP photo.",
+        "MEDIA_SIZE_EXCEEDED": "The photo is over 2 MB. Choose a smaller size.",
+        "MEDIA_DIMENSIONS_INVALID": "The photo dimensions are not valid."
       }
     },
     "admins": {

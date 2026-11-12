@@ -11,6 +11,7 @@ import {
 import { fill, formatMoney } from '@/lib/catalog/format';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
 import type { Note } from './formHelpers';
+import { GalleryEditor } from './GalleryEditor';
 import { ProductForm } from './ProductForm';
 
 /**
@@ -31,6 +32,7 @@ export function ProductsPanel({
   const [form, setForm] = useState<{ product: AdminProduct | null } | null>(
     null
   );
+  const [gallery, setGallery] = useState<AdminProduct | null>(null);
   const [note, setNote] = useState<Note>(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,6 +67,20 @@ export function ProductsPanel({
     await load();
   }
 
+  if (gallery) {
+    return (
+      <GalleryEditor
+        texts={texts}
+        product={gallery}
+        onCancel={() => setGallery(null)}
+        onSaved={(message) => {
+          setGallery(null);
+          setNote({ kind: 'ok', text: message });
+          void load();
+        }}
+      />
+    );
+  }
   if (form) {
     return (
       <ProductForm
@@ -136,6 +152,14 @@ export function ProductsPanel({
                       className="tap-target underline"
                     >
                       {t.edit}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${t.gallery}: ${product.nameEs}`}
+                      onClick={() => setGallery(product)}
+                      className="tap-target underline"
+                    >
+                      {t.gallery}
                     </button>
                     <button
                       type="button"
