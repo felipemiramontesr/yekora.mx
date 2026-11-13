@@ -99640,6 +99640,11 @@ var registerRequestSchema = external_exports.strictObject({
   email: emailField,
   password: newPasswordField,
   fullName: external_exports.string().trim().min(2).max(150),
+  /**
+   * Delivery postal code (FC 047 T1.3): optional, five digits inside a Mexican block; a
+   * malformed one is a 400 INVALID_POSTAL_CODE, and an empty one is the same as none.
+   */
+  postalCode: external_exports.string().trim().max(10).optional(),
   altcha: altchaField
 });
 var forgotPasswordRequestSchema = external_exports.strictObject({
@@ -99706,7 +99711,9 @@ var meResponseSchema = external_exports.object({
   email: external_exports.email(),
   fullName: external_exports.string(),
   roles: external_exports.array(external_exports.string()),
-  permissions: external_exports.array(external_exports.string())
+  permissions: external_exports.array(external_exports.string()),
+  /** The delivery postal code of the account, only ever given back to its holder (FC 047 T2.3). */
+  postalCode: external_exports.string().regex(/^\d{5}$/).nullish()
 });
 
 // ../../lib/account/orderTypes.ts
@@ -100513,15 +100520,15 @@ function parsePiiKey(base643) {
   }
   return key;
 }
-function additionalData(orderNumber, field) {
-  return Buffer.from(`${orderNumber}|${field}`, "utf8");
+function additionalData(subject, field) {
+  return Buffer.from(`${subject}|${field}`, "utf8");
 }
-function encryptPii(key, orderNumber, field, value) {
+function encryptPii(key, subject, field, value) {
   const iv = (0, import_node_crypto3.randomBytes)(IV_BYTES);
   const cipher = (0, import_node_crypto3.createCipheriv)("aes-256-gcm", key, iv, {
     authTagLength: TAG_BYTES
   });
-  cipher.setAAD(additionalData(orderNumber, field));
+  cipher.setAAD(additionalData(subject, field));
   const body = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   return Buffer.concat([
     Buffer.from([FORMAT_V1]),
@@ -100529,6 +100536,22 @@ function encryptPii(key, orderNumber, field, value) {
     body,
     cipher.getAuthTag()
   ]);
+}
+function decryptPii(key, subject, field, stored) {
+  if (stored.length < 1 + IV_BYTES + TAG_BYTES || stored[0] !== FORMAT_V1) {
+    throw new Error("Unreadable personal data");
+  }
+  const iv = stored.subarray(1, 1 + IV_BYTES);
+  const tag = stored.subarray(stored.length - TAG_BYTES);
+  const body = stored.subarray(1 + IV_BYTES, stored.length - TAG_BYTES);
+  const decipher = (0, import_node_crypto3.createDecipheriv)("aes-256-gcm", key, iv, {
+    authTagLength: TAG_BYTES
+  });
+  decipher.setAAD(additionalData(subject, field));
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(body), decipher.final()]).toString(
+    "utf8"
+  );
 }
 function emailHmac(pepper, email3) {
   return (0, import_node_crypto3.createHmac)("sha256", pepper).update(email3.trim().toLowerCase(), "utf8").digest();
@@ -101097,7 +101120,7 @@ var ROUTE_CONTRACTS = [
   // FC 028: sign-up and sign-in are public by nature; everything signed-in is /v1/account.
   auth(
     "/v1/auth/register",
-    "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042)",
+    "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); an optional delivery postal code is kept encrypted, a malformed one is a 400 INVALID_POSTAL_CODE (FC 047)",
     registerRequestSchema,
     { 202: registeredSchema }
   ),
@@ -101551,16 +101574,42 @@ function createCustomer(db, user) {
     );
     if (taken) return false;
     const id = (0, import_node_crypto6.randomUUID)();
-    await tx.query(
-      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
-      [id, user.email, user.passwordHash, user.fullName]
-    );
+    const { postal } = user;
+    const identity = [id, user.email, user.passwordHash, user.fullName];
+    if (postal) {
+      await tx.query(
+        "INSERT INTO users (id, email, password_hash, full_name, shipping_postal_code_enc, shipping_state) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          ...identity,
+          encryptPii(postal.key, id, "shipping_postal_code", postal.code),
+          postal.state
+        ]
+      );
+    } else {
+      await tx.query(
+        "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
+        identity
+      );
+    }
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
       [id]
     );
     return true;
   });
+}
+async function readPostalCode(db, key, userId) {
+  const [row2] = await db.query(
+    "SELECT shipping_postal_code_enc FROM users WHERE id = ?",
+    [userId]
+  );
+  if (!row2?.shipping_postal_code_enc || key === null) return null;
+  return decryptPii(
+    key,
+    userId,
+    "shipping_postal_code",
+    row2.shipping_postal_code_enc
+  );
 }
 async function revokeAccess(tx, userId) {
   await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [userId]);
@@ -101809,15 +101858,24 @@ function permissionGuard(deps) {
 
 // src/routes/account.ts
 function registerAccountRoutes(app, deps) {
-  app.get("/v1/account/me", (request, reply) => {
+  app.get("/v1/account/me", async (request, reply) => {
     const user = request.user;
+    const postalCode = await readPostalCode(
+      deps.db,
+      deps.piiKey,
+      user.userId
+    ).catch((error63) => {
+      request.log.error({ err: error63 }, "postal code unreadable");
+      return null;
+    });
     return reply.send(
       meResponseSchema.parse({
         id: user.userId,
         email: user.email,
         fullName: user.fullName,
         roles: user.roles,
-        permissions: user.permissions
+        permissions: user.permissions,
+        postalCode
       })
     );
   });
@@ -102303,6 +102361,49 @@ var PASSWORD_PROBLEMS = {
   common: "PASSWORD_COMMON"
 };
 
+// ../../lib/cart/postalRanges.ts
+var RANGES = [
+  [1, 16, "CMX"],
+  [20, 20, "AGU"],
+  [21, 22, "BCN"],
+  [23, 23, "BCS"],
+  [24, 24, "CAM"],
+  [25, 27, "COA"],
+  [28, 28, "COL"],
+  [29, 30, "CHP"],
+  [31, 33, "CHH"],
+  [34, 35, "DUR"],
+  [36, 38, "GUA"],
+  [39, 41, "GRO"],
+  [42, 43, "HID"],
+  [44, 49, "JAL"],
+  [50, 57, "MEX"],
+  [58, 61, "MIC"],
+  [62, 62, "MOR"],
+  [63, 63, "NAY"],
+  [64, 67, "NLE"],
+  [68, 71, "OAX"],
+  [72, 75, "PUE"],
+  [76, 76, "QUE"],
+  [77, 77, "ROO"],
+  [78, 79, "SLP"],
+  [80, 82, "SIN"],
+  [83, 85, "SON"],
+  [86, 86, "TAB"],
+  [87, 89, "TAM"],
+  [90, 90, "TLA"],
+  [91, 96, "VER"],
+  [97, 97, "YUC"],
+  [98, 99, "ZAC"]
+];
+var POSTAL_CODE = /^\d{5}$/;
+function stateOfPostalCode(postalCode) {
+  if (!POSTAL_CODE.test(postalCode)) return null;
+  const prefix = Number(postalCode.slice(0, 2));
+  const hit = RANGES.find(([from, to]) => prefix >= from && prefix <= to);
+  return hit ? hit[2] : null;
+}
+
 // src/services/botChallenge.ts
 var import_node_crypto10 = require("node:crypto");
 var MAX_NUMBER = 2e4;
@@ -102390,7 +102491,9 @@ var TITLES2 = {
   PASSWORD_SYMBOL: "The password needs a symbol",
   PASSWORD_PERSONAL: "The password must not contain your e-mail or name",
   PASSWORD_COMMON: "The password is too common",
-  PASSWORD_BREACHED: "The password appears in a known data breach"
+  PASSWORD_BREACHED: "The password appears in a known data breach",
+  INVALID_POSTAL_CODE: "The postal code is not valid",
+  POSTAL_CODE_UNAVAILABLE: "The postal code cannot be saved right now"
 };
 function refuse3(reply, status, code2) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code2], code2));
@@ -102508,10 +102611,19 @@ function registerAuthRoutes(app, deps) {
     if (!await strongEnough(body.password, body, reply, deps.breach)) {
       return reply;
     }
+    const postalCode = body.postalCode || void 0;
+    const state = postalCode ? stateOfPostalCode(postalCode) : null;
+    if (postalCode && state === null) {
+      return refuse3(reply, 400, "INVALID_POSTAL_CODE");
+    }
+    if (postalCode && deps.piiKey === null) {
+      return refuse3(reply, 503, "POSTAL_CODE_UNAVAILABLE");
+    }
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
-      fullName: body.fullName
+      fullName: body.fullName,
+      postal: postalCode && state && deps.piiKey ? { code: postalCode, state, key: deps.piiKey } : void 0
     });
     return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
   });
@@ -117391,9 +117503,14 @@ async function buildApp(deps) {
     mailReady: dispatcher !== null,
     now,
     wait: deps.wait,
-    breach: (password) => breachVerdict(password, deps.pwnedFetch)
+    breach: (password) => breachVerdict(password, deps.pwnedFetch),
+    piiKey: deps.config.payments.checkout?.piiKey ?? null
   });
-  registerAccountRoutes(app, { db: deps.db, now });
+  registerAccountRoutes(app, {
+    db: deps.db,
+    now,
+    piiKey: deps.config.payments.checkout?.piiKey ?? null
+  });
   registerAdminRoutes(app, { db: deps.db, now });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerCatalogAdminRoutes(app, {
@@ -117714,7 +117831,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "ee4c8d161c71d865f8d532260cecda7b9a8dce2f" : void 0;
+var sha = true ? "efe5832dbffbfd640c939a012e070d3bd88599ab" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
