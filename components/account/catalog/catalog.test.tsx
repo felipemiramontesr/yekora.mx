@@ -7,7 +7,15 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { getMessages } from '@/app/i18n';
 import { listOrders, me } from '@/lib/api/accountClient';
 import {
@@ -106,6 +114,15 @@ const EDITOR = {
 const renderConsole = () => render(<CatalogConsole texts={t} locale="es-MX" />);
 const press = (name: string) =>
   fireEvent.click(screen.getByRole('button', { name }));
+
+/** jsdom has no <dialog> methods: showModal only has to open it, as the browser does. */
+const showModal = vi.fn(function (this: HTMLDialogElement) {
+  this.setAttribute('open', '');
+});
+
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = showModal;
+});
 
 beforeEach(() => {
   api.listBrands.mockResolvedValue(ok([CUMBRE]));
@@ -1082,7 +1099,7 @@ describe('product gallery (FC 029 F3d)', () => {
       600
     );
     expect(api.uploadMedia).toHaveBeenCalledWith(blob);
-    expect(screen.queryByRole('region', { name: g.cropTitle })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: g.cropTitle })).toBeNull();
     // The new photo is last, with empty alt texts, and goes to the API when the gallery is saved.
     api.replaceGallery.mockResolvedValue(ok(WITH_PHOTOS));
     fireEvent.click(screen.getByRole('button', { name: g.save }));
@@ -1093,6 +1110,22 @@ describe('product gallery (FC 029 F3d)', () => {
         ]),
       })
     );
+  });
+
+  it('opens the crop as a native modal and closes it with Escape or Cancel', async () => {
+    await openGallery(TRAIL);
+    showModal.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: g.addPhoto }));
+    const modal = screen.getByRole('dialog', { name: g.cropTitle });
+    expect(showModal).toHaveBeenCalledTimes(1);
+    expect(modal.tagName).toBe('DIALOG');
+    // Escape is the browser's `cancel` event on the dialog.
+    fireEvent(modal, new Event('cancel'));
+    expect(screen.queryByRole('dialog', { name: g.cropTitle })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: g.addPhoto }));
+    expect(showModal).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('button', { name: g.cancel }));
+    expect(screen.queryByRole('dialog', { name: g.cropTitle })).toBeNull();
   });
 
   it('does not add a photo twice, and tells it', async () => {
@@ -1147,7 +1180,7 @@ describe('product gallery (FC 029 F3d)', () => {
     fireEvent.click(screen.getByRole('button', { name: g.upload }));
     expect(await screen.findByText(t.errors.MEDIA_SIZE_EXCEEDED)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: g.cancel }));
-    expect(screen.queryByRole('region', { name: g.cropTitle })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: g.cropTitle })).toBeNull();
   });
 
   it('stops offering photos at twelve', async () => {

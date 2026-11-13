@@ -18,7 +18,7 @@ const PREVIEW_SIDE = 240;
 const WHOLE: Crop = { zoom: 1, x: 0.5, y: 0.5 };
 
 /**
- * The panel that crops and uploads one photo (FC 029 F3, T1.2 D): the administrator chooses a
+ * The modal that crops and uploads one photo (FC 029 F3, T1.2 D): the administrator chooses a
  * file, picks a square with a zoom and a position, sees it in a preview, picks one of the three
  * widths and uploads it. The Canvas does the resize in the browser; the API checks the type, the
  * size and the width again. Sliders and a select, not dragging, so the keyboard reaches
@@ -44,6 +44,13 @@ export function PhotoCropper({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const preview = useRef<HTMLCanvasElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  // A native modal: the browser traps the focus inside, dims and blocks the page behind it, and
+  // closes it with Escape (the `cancel` event below).
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
 
   useEffect(() => {
     if (image && preview.current)
@@ -96,9 +103,11 @@ export function PhotoCropper({
   );
 
   return (
-    <section
+    <dialog
+      ref={dialog}
       aria-label={t.cropTitle}
-      className="flex max-w-xl flex-col gap-3 rounded-lg border border-petroleo/20 p-4"
+      onCancel={onCancel}
+      className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl flex-col gap-3 overflow-y-auto rounded-lg border border-petroleo/20 bg-marfil p-4 text-petroleo open:flex backdrop:bg-black/60"
     >
       <h3 className="text-lg font-semibold">{t.cropTitle}</h3>
       <label className="flex flex-col gap-1">
@@ -157,6 +166,6 @@ export function PhotoCropper({
       >
         {t.cancel}
       </button>
-    </section>
+    </dialog>
   );
 }

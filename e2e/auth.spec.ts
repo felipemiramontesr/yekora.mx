@@ -239,6 +239,11 @@ test('the owner crops a photo in the browser Canvas and uploads it at the chosen
     .click();
   await page.getByRole('tab', { name: 'Productos' }).click();
   await page.getByRole('button', { name: 'Galería: Tenis trail E2E' }).click();
+  // A real modal: it opens over the page, Escape closes it, and the page can open it again.
+  await page.getByRole('button', { name: 'Agregar foto' }).click();
+  await expect(page.getByRole('dialog', { name: 'Nueva foto' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Nueva foto' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Agregar foto' }).click();
   await page.getByLabel('Elige una foto (JPG, PNG o WebP)').setInputFiles({
     name: 'foto.png',
