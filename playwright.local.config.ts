@@ -44,7 +44,12 @@ export default defineConfig({
     : {
         command: 'bun run build && bun scripts/serveStatic.ts 3100',
         // FC 008: the catalog suite builds from the fixture (deploy.yml sets the same in CI).
-        env: { CATALOG_FIXTURE: 'e2e/fixtures/catalog.json' },
+        // An empty NEXT_PUBLIC_API_URL beats a local `.env.local`: the E2E build always targets the
+        // production address the tests intercept, never the API on this machine.
+        env: {
+          CATALOG_FIXTURE: 'e2e/fixtures/catalog.json',
+          NEXT_PUBLIC_API_URL: '',
+        },
         url: 'http://localhost:3100',
         reuseExistingServer: false,
         timeout: 180_000,

@@ -21,9 +21,10 @@ import {
   type CartLine,
   type CartQuote,
 } from '@/lib/cart/cartTypes';
+import { API_URL } from './http';
 
 /** The canonical quote endpoint. E2E tests intercept it; they never reach production. */
-const QUOTE_URL = 'https://apiv1.yekora.mx/v1/cart/quote';
+const QUOTE_URL = `${API_URL}/v1/cart/quote`;
 /** Budget of one quote request (FC 009). */
 const TIMEOUT_MS = 5000;
 /** Pause after the last edit before re-quoting. */

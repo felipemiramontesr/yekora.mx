@@ -7,8 +7,20 @@
  */
 import type { z } from 'zod';
 
-/** The API. E2E tests intercept it; they never reach production. */
-export const API_URL = 'https://apiv1.yekora.mx';
+/** The production API. */
+const PRODUCTION_API = 'https://apiv1.yekora.mx';
+
+/**
+ * The API. E2E tests intercept it; they never reach production. For local work only,
+ * `NEXT_PUBLIC_API_URL=http://localhost:3001` in `.env.local` points a development server at the API
+ * running on this machine; anything that is not a `http://localhost:` address is ignored, so a
+ * build can never be pointed anywhere else by mistake.
+ */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL?.startsWith(
+  'http://localhost:'
+)
+  ? process.env.NEXT_PUBLIC_API_URL
+  : PRODUCTION_API;
 
 /** Why a request did not give an answer within the contract. */
 export type TransportFailure = 'offline' | 'timeout' | 'server' | 'invalid';
