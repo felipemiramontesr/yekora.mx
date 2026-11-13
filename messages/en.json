@@ -404,6 +404,10 @@
     "names": {
       "es-MX": "Español",
       "en": "English"
+    },
+    "codes": {
+      "es-MX": "ES",
+      "en": "EN"
     }
   },
   "notFound": {
@@ -932,8 +936,6 @@
         "titleEdit": "Edit product",
         "back": "Back to the list",
         "slug": "Page identifier",
-        "slugHint": "Lower-case letters, numbers and hyphens. It does not change later, because it forms the published address.",
-        "skuHint": "Capital letters, numbers and hyphens. It does not change later.",
         "nameEs": "Name in Spanish",
         "nameEn": "Name in English",
         "descriptionEs": "Description in Spanish",
@@ -942,13 +944,11 @@
         "stockField": "Stock",
         "reservedNote": "Reserved by pending orders: {n}. Stock cannot drop below it.",
         "discipline": "Discipline",
-        "disciplineHint": "For example senderismo, montana, escalada, canonismo or trail-running.",
         "level": "Level",
         "levelChoose": "Choose a level",
         "brand": "Brand",
         "noBrand": "No brand",
         "shippingClass": "Shipping class",
-        "shippingHint": "estandar or voluminoso.",
         "weight": "Weight (g)",
         "length": "Length (mm)",
         "width": "Width (mm)",
@@ -959,7 +959,73 @@
         "create": "Create product",
         "creating": "Creating…",
         "cancel": "Cancel",
-        "gallery": "Gallery"
+        "gallery": "Gallery",
+        "fields": {
+          "sku": {
+            "description": "Unique code of the product; orders use it to name it. Capital letters, numbers and hyphens only. It cannot be changed later.",
+            "example": "TENIS-01"
+          },
+          "slug": {
+            "description": "Last part of the product’s web address. Lower-case letters, numbers and hyphens only. It cannot be changed later.",
+            "example": "tenis-trail"
+          },
+          "nameEs": {
+            "description": "The name the product shows in the Spanish store.",
+            "example": "Tenis para trail"
+          },
+          "nameEn": {
+            "description": "The name the product shows in the English store.",
+            "example": "Trail running shoes"
+          },
+          "descriptionEs": {
+            "description": "A short paragraph saying what it is and what it is for, in Spanish. You can leave it empty.",
+            "example": "Ligeros y con buen agarre para correr en montaña."
+          },
+          "descriptionEn": {
+            "description": "A short paragraph saying what it is and what it is for, in English. You can leave it empty.",
+            "example": "Light shoes with good grip for mountain running."
+          },
+          "priceMxn": {
+            "description": "What the person pays, VAT included, in Mexican pesos. Use a dot for the cents.",
+            "example": "4850.00"
+          },
+          "stockField": {
+            "description": "How many pieces are available to sell now.",
+            "example": "10"
+          },
+          "discipline": {
+            "description": "The activity the product belongs to. Type one of these: senderismo, montana, escalada, canonismo or trail-running.",
+            "example": "senderismo"
+          },
+          "level": {
+            "description": "The experience level the product is aimed at.",
+            "example": "Beginner"
+          },
+          "brand": {
+            "description": "The product’s brand. If it has none, leave “No brand”.",
+            "example": "Cumbre"
+          },
+          "shippingClass": {
+            "description": "How it ships: “estandar” for normal parcels or “voluminoso” for large or heavy ones.",
+            "example": "estandar"
+          },
+          "weight": {
+            "description": "Weight of the packed product, in grams (1 kg is 1000 g).",
+            "example": "800"
+          },
+          "length": {
+            "description": "The longest side of the parcel, in millimetres (1 cm is 10 mm).",
+            "example": "300"
+          },
+          "width": {
+            "description": "The width of the parcel, in millimetres.",
+            "example": "200"
+          },
+          "height": {
+            "description": "The height of the parcel, in millimetres.",
+            "example": "120"
+          }
+        }
       },
       "media": {
         "title": "Gallery of {name}",
@@ -1020,7 +1086,8 @@
         "MEDIA_UNSAFE_TYPE": "That image type is not accepted. Use a JPG, PNG or WebP photo.",
         "MEDIA_SIZE_EXCEEDED": "The photo is over 2 MB. Choose a smaller size.",
         "MEDIA_DIMENSIONS_INVALID": "The photo dimensions are not valid."
-      }
+      },
+      "exampleLabel": "Example"
     },
     "admins": {
       "loading": "Loading…",
@@ -1058,6 +1125,17 @@
         "offline": "You seem to be offline.",
         "timeout": "The server took too long. Try again.",
         "unknown": "Something went wrong. Try again."
+      },
+      "exampleLabel": "Example",
+      "fields": {
+        "name": {
+          "description": "How you want to see the person in the list of administrators.",
+          "example": "Ana López"
+        },
+        "email": {
+          "description": "The address the link to choose their password will be sent to.",
+          "example": "ana@example.com"
+        }
       }
     }
   }

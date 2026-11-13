@@ -10,6 +10,7 @@ import {
   updateAdminUser,
 } from '@/lib/api/adminUsersClient';
 import { fill } from '@/lib/catalog/format';
+import { Field } from '../ui/Field';
 
 /** `account.admins` texts. */
 export type AdminUsersTexts = Messages['account']['admins'];
@@ -114,28 +115,44 @@ export function AdminUsersConsole({
       >
         <h2 className="text-lg font-semibold">{texts.new}</h2>
         <p className="text-sm">{texts.explain}</p>
-        <label className="flex flex-col gap-1">
-          {texts.name}
-          <input
-            name="fullName"
-            required
-            minLength={2}
-            maxLength={150}
-            autoComplete="off"
-            className={FIELD}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {texts.email}
-          <input
-            name="email"
-            type="email"
-            required
-            maxLength={255}
-            autoComplete="off"
-            className={FIELD}
-          />
-        </label>
+        <Field
+          id="admin-fullName"
+          label={texts.name}
+          description={texts.fields.name.description}
+          example={texts.fields.name.example}
+          exampleLabel={texts.exampleLabel}
+        >
+          {(control) => (
+            <input
+              {...control}
+              name="fullName"
+              required
+              minLength={2}
+              maxLength={150}
+              autoComplete="off"
+              className={FIELD}
+            />
+          )}
+        </Field>
+        <Field
+          id="admin-email"
+          label={texts.email}
+          description={texts.fields.email.description}
+          example={texts.fields.email.example}
+          exampleLabel={texts.exampleLabel}
+        >
+          {(control) => (
+            <input
+              {...control}
+              name="email"
+              type="email"
+              required
+              maxLength={255}
+              autoComplete="off"
+              className={FIELD}
+            />
+          )}
+        </Field>
         <button
           type="submit"
           disabled={busy}

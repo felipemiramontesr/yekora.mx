@@ -404,6 +404,10 @@
     "names": {
       "es-MX": "Español",
       "en": "English"
+    },
+    "codes": {
+      "es-MX": "ES",
+      "en": "EN"
     }
   },
   "notFound": {
@@ -932,8 +936,6 @@
         "titleEdit": "Editar producto",
         "back": "Volver a la lista",
         "slug": "Identificador de la página",
-        "slugHint": "Minúsculas, números y guiones. No cambia después, porque forma la dirección publicada.",
-        "skuHint": "Mayúsculas, números y guiones. No cambia después.",
         "nameEs": "Nombre en español",
         "nameEn": "Nombre en inglés",
         "descriptionEs": "Descripción en español",
@@ -942,13 +944,11 @@
         "stockField": "Existencias",
         "reservedNote": "Apartadas por pedidos pendientes: {n}. Las existencias no pueden quedar por debajo.",
         "discipline": "Disciplina",
-        "disciplineHint": "Por ejemplo senderismo, montana, escalada, canonismo o trail-running.",
         "level": "Nivel",
         "levelChoose": "Elige un nivel",
         "brand": "Marca",
         "noBrand": "Sin marca",
         "shippingClass": "Clase de envío",
-        "shippingHint": "estandar o voluminoso.",
         "weight": "Peso (g)",
         "length": "Largo (mm)",
         "width": "Ancho (mm)",
@@ -959,7 +959,73 @@
         "create": "Crear producto",
         "creating": "Creando…",
         "cancel": "Cancelar",
-        "gallery": "Galería"
+        "gallery": "Galería",
+        "fields": {
+          "sku": {
+            "description": "Código único del producto; los pedidos lo usan para nombrarlo. Solo mayúsculas, números y guiones. No se puede cambiar después.",
+            "example": "TENIS-01"
+          },
+          "slug": {
+            "description": "Parte final de la dirección web del producto. Solo minúsculas, números y guiones. No se puede cambiar después.",
+            "example": "tenis-trail"
+          },
+          "nameEs": {
+            "description": "El nombre con el que el producto aparece en la tienda en español.",
+            "example": "Tenis para trail"
+          },
+          "nameEn": {
+            "description": "El nombre con el que el producto aparece en la tienda en inglés.",
+            "example": "Trail running shoes"
+          },
+          "descriptionEs": {
+            "description": "Un párrafo breve que explica qué es y para qué sirve, en español. Puedes dejarlo vacío.",
+            "example": "Ligeros y con buen agarre para correr en montaña."
+          },
+          "descriptionEn": {
+            "description": "Un párrafo breve que explica qué es y para qué sirve, en inglés. Puedes dejarlo vacío.",
+            "example": "Light shoes with good grip for mountain running."
+          },
+          "priceMxn": {
+            "description": "Lo que paga la persona, con IVA incluido, en pesos mexicanos. Usa punto para los centavos.",
+            "example": "4850.00"
+          },
+          "stockField": {
+            "description": "Cuántas piezas hay ahora para vender.",
+            "example": "10"
+          },
+          "discipline": {
+            "description": "La actividad a la que pertenece el producto. Escribe una de estas: senderismo, montana, escalada, canonismo o trail-running.",
+            "example": "senderismo"
+          },
+          "level": {
+            "description": "El nivel de experiencia al que está dirigido el producto.",
+            "example": "Principiante"
+          },
+          "brand": {
+            "description": "La marca del producto. Si no tiene marca, deja «Sin marca».",
+            "example": "Cumbre"
+          },
+          "shippingClass": {
+            "description": "Cómo se envía: «estandar» para paquetes normales o «voluminoso» para los grandes o pesados.",
+            "example": "estandar"
+          },
+          "weight": {
+            "description": "Peso del producto ya empacado, en gramos (1 kg son 1000 g).",
+            "example": "800"
+          },
+          "length": {
+            "description": "El lado más largo del paquete, en milímetros (1 cm son 10 mm).",
+            "example": "300"
+          },
+          "width": {
+            "description": "El ancho del paquete, en milímetros.",
+            "example": "200"
+          },
+          "height": {
+            "description": "El alto del paquete, en milímetros.",
+            "example": "120"
+          }
+        }
       },
       "media": {
         "title": "Galería de {name}",
@@ -1020,7 +1086,8 @@
         "MEDIA_UNSAFE_TYPE": "Ese tipo de imagen no se acepta. Usa una foto JPG, PNG o WebP.",
         "MEDIA_SIZE_EXCEEDED": "La foto pesa más de 2 MB. Elige un tamaño menor.",
         "MEDIA_DIMENSIONS_INVALID": "Las dimensiones de la foto no son válidas."
-      }
+      },
+      "exampleLabel": "Ejemplo"
     },
     "admins": {
       "loading": "Cargando…",
@@ -1058,6 +1125,17 @@
         "offline": "Parece que no tienes conexión.",
         "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
         "unknown": "Algo falló. Inténtalo de nuevo."
+      },
+      "exampleLabel": "Ejemplo",
+      "fields": {
+        "name": {
+          "description": "Cómo quieres ver a la persona en la lista de administradores.",
+          "example": "Ana López"
+        },
+        "email": {
+          "description": "El correo al que llegará el enlace para que elija su contraseña.",
+          "example": "ana@ejemplo.com"
+        }
       }
     }
   }

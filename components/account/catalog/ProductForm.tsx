@@ -11,6 +11,7 @@ import {
   updateProduct,
 } from '@/lib/api/catalogAdminClient';
 import { fill } from '@/lib/catalog/format';
+import { Field } from '../../ui/Field';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
 import { FIELD, textOf } from './formHelpers';
 
@@ -53,18 +54,30 @@ function fieldsOf(data: FormData) {
   };
 }
 
-/** One text or number field of the form, with its optional hint. */
-function Field({
-  label,
-  hint,
-  children,
-}: Readonly<{ label: string; hint?: string; children: ReactNode }>) {
+/**
+ * A guided field of the form: its label, and how to fill it in with the simplest example, from
+ * `account.catalog.products.fields` (FC 046 T2.4).
+ */
+function guided(
+  texts: CatalogTexts,
+  name: keyof CatalogTexts['products']['fields'],
+  label: string,
+  draw: (
+    control: Parameters<Parameters<typeof Field>[0]['children']>[0]
+  ) => ReactNode
+) {
+  const { description, example } = texts.products.fields[name];
   return (
-    <label className="flex flex-col gap-1">
-      {label}
-      {children}
-      {hint && <span className="text-sm">{hint}</span>}
-    </label>
+    <Field
+      key={name}
+      id={`product-${name}`}
+      label={label}
+      description={description}
+      example={example}
+      exampleLabel={texts.exampleLabel}
+    >
+      {draw}
+    </Field>
   );
 }
 
@@ -148,68 +161,75 @@ export function ProductForm({
         >
           {product === null ? (
             <>
-              <Field label={t.sku} hint={t.skuHint}>
+              {guided(texts, 'sku', t.sku, (control) => (
                 <input
+                  {...control}
                   name="sku"
                   required
                   maxLength={64}
                   pattern="[A-Z0-9][A-Z0-9\-]*"
                   className={FIELD}
                 />
-              </Field>
-              <Field label={t.slug} hint={t.slugHint}>
+              ))}
+              {guided(texts, 'slug', t.slug, (control) => (
                 <input
+                  {...control}
                   name="slug"
                   required
                   maxLength={160}
                   pattern="[a-z0-9]+(-[a-z0-9]+)*"
                   className={FIELD}
                 />
-              </Field>
+              ))}
             </>
           ) : (
             <p className="text-sm">
               {t.sku}: {product.sku} · {t.slug}: {product.slug}
             </p>
           )}
-          <Field label={t.nameEs}>
+          {guided(texts, 'nameEs', t.nameEs, (control) => (
             <input
+              {...control}
               name="nameEs"
               required
               maxLength={200}
               defaultValue={product?.nameEs}
               className={FIELD}
             />
-          </Field>
-          <Field label={t.nameEn}>
+          ))}
+          {guided(texts, 'nameEn', t.nameEn, (control) => (
             <input
+              {...control}
               name="nameEn"
               required
               maxLength={200}
               defaultValue={product?.nameEn}
               className={FIELD}
             />
-          </Field>
-          <Field label={t.descriptionEs}>
+          ))}
+          {guided(texts, 'descriptionEs', t.descriptionEs, (control) => (
             <textarea
+              {...control}
               name="descriptionEs"
               rows={4}
               maxLength={10000}
               defaultValue={product?.descriptionEs}
               className={FIELD}
             />
-          </Field>
-          <Field label={t.descriptionEn}>
+          ))}
+          {guided(texts, 'descriptionEn', t.descriptionEn, (control) => (
             <textarea
+              {...control}
               name="descriptionEn"
               rows={4}
               maxLength={10000}
               defaultValue={product?.descriptionEn}
               className={FIELD}
             />
-          </Field>
-          <Field label={t.priceMxn}>
+          ))}
+          {guided(texts, 'priceMxn', t.priceMxn, (control) => (
             <input
+              {...control}
               name="price"
               type="number"
               required
@@ -218,9 +238,10 @@ export function ProductForm({
               defaultValue={product ? product.priceMxnCents / 100 : undefined}
               className={FIELD}
             />
-          </Field>
-          <Field label={t.stockField}>
+          ))}
+          {guided(texts, 'stockField', t.stockField, (control) => (
             <input
+              {...control}
               name="stock"
               type="number"
               required
@@ -229,14 +250,15 @@ export function ProductForm({
               defaultValue={product?.stock ?? 0}
               className={FIELD}
             />
-          </Field>
+          ))}
           {product && (
             <p className="text-sm">
               {fill(t.reservedNote, { n: String(product.reservedStock) })}
             </p>
           )}
-          <Field label={t.discipline} hint={t.disciplineHint}>
+          {guided(texts, 'discipline', t.discipline, (control) => (
             <input
+              {...control}
               name="discipline"
               required
               maxLength={40}
@@ -244,14 +266,15 @@ export function ProductForm({
               defaultValue={product?.discipline}
               className={FIELD}
             />
-          </Field>
+          ))}
           <datalist id="product-disciplines">
             {DISCIPLINES.map((slug) => (
               <option key={slug} value={slug} />
             ))}
           </datalist>
-          <Field label={t.level}>
+          {guided(texts, 'level', t.level, (control) => (
             <select
+              {...control}
               name="level"
               required
               defaultValue={product?.level ?? ''}
@@ -267,9 +290,10 @@ export function ProductForm({
                   </option>
                 ))}
             </select>
-          </Field>
-          <Field label={t.brand}>
+          ))}
+          {guided(texts, 'brand', t.brand, (control) => (
             <select
+              {...control}
               name="brandId"
               defaultValue={product?.brandId ?? ''}
               className={FIELD}
@@ -285,9 +309,10 @@ export function ProductForm({
                   </option>
                 ))}
             </select>
-          </Field>
-          <Field label={t.shippingClass} hint={t.shippingHint}>
+          ))}
+          {guided(texts, 'shippingClass', t.shippingClass, (control) => (
             <input
+              {...control}
               name="shippingClass"
               required
               maxLength={40}
@@ -295,7 +320,7 @@ export function ProductForm({
               defaultValue={product?.shippingClass}
               className={FIELD}
             />
-          </Field>
+          ))}
           <datalist id="product-shipping-classes">
             {SHIPPING_CLASSES.map((slug) => (
               <option key={slug} value={slug} />
@@ -303,14 +328,15 @@ export function ProductForm({
           </datalist>
           {(
             [
-              ['weightGrams', t.weight],
-              ['lengthMm', t.length],
-              ['widthMm', t.width],
-              ['heightMm', t.height],
+              ['weightGrams', 'weight', t.weight],
+              ['lengthMm', 'length', t.length],
+              ['widthMm', 'width', t.width],
+              ['heightMm', 'height', t.height],
             ] as const
-          ).map(([name, label]) => (
-            <Field key={name} label={label}>
+          ).map(([name, key, label]) =>
+            guided(texts, key, label, (control) => (
               <input
+                {...control}
                 name={name}
                 type="number"
                 required
@@ -319,8 +345,8 @@ export function ProductForm({
                 defaultValue={product?.[name]}
                 className={FIELD}
               />
-            </Field>
-          ))}
+            ))
+          )}
           {options.groups
             .filter((group) => !group.isSystem && group.isActive)
             .map((group) => (
