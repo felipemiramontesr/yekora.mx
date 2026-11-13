@@ -1055,3 +1055,56 @@ describe('account area · the header hint (FC 046 T1.1, T2.2)', () => {
     ).toBeTruthy();
   });
 });
+
+describe('sidebar of the signed-in area (FC 046 T2.3)', () => {
+  const SIDEBAR_KEY = 'yekora_account_sidebar_open_v1';
+  afterEach(() => localStorage.removeItem(SIDEBAR_KEY));
+
+  it('starts folded, opens and folds by the tab, and remembers the choice', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    const toggle = await screen.findByRole('button', {
+      name: 'Desplegar la barra lateral',
+    });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(localStorage.getItem(SIDEBAR_KEY)).toBe('1');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Replegar la barra lateral' })
+    );
+    expect(localStorage.getItem(SIDEBAR_KEY)).toBeNull();
+  });
+
+  it('starts open when it was left open', async () => {
+    localStorage.setItem(SIDEBAR_KEY, '1');
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    expect(
+      await screen.findByRole('button', { name: 'Replegar la barra lateral' })
+    ).toBeTruthy();
+  });
+
+  it('opens the drawer from the menu button and gives the focus back when it closes', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    const opener = await screen.findByRole('button', {
+      name: 'Menú de la cuenta',
+    });
+    fireEvent.click(opener);
+    expect(opener.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(opener.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('closes the drawer when a section is chosen', async () => {
+    api.me.mockResolvedValue(ok(STAFF));
+    renderApp();
+    const opener = await screen.findByRole('button', {
+      name: 'Menú de la cuenta',
+    });
+    fireEvent.click(opener);
+    fireEvent.click(screen.getByRole('link', { name: 'Panel: pedidos' }));
+    expect(opener.getAttribute('aria-expanded')).toBe('false');
+  });
+});

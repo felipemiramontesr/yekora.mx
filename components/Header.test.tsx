@@ -79,10 +79,10 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
     count: 2,
     reason: 'legal texts open in a new tab (target="_blank")',
   },
-  'components/account/AccountApp.tsx': {
+  'components/account/AccountSidebar.tsx': {
     count: 1,
     reason:
-      'account tabs: the area routes its own paths (Apache fallback, no export)',
+      'sidebar sections: the area routes its own paths (Apache fallback, no export)',
   },
   'components/account/AccountOrders.tsx': {
     count: 1,

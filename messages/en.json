@@ -759,7 +759,12 @@
       "deviceForgotten": "Done. Next time you sign in from here we will ask for the code.",
       "catalog": "Catalog",
       "admins": "Administrators",
-      "ownerBadge": "Owner"
+      "ownerBadge": "Owner",
+      "sidebar": "Sidebar of your account",
+      "menu": "Account menu",
+      "closeMenu": "Close the menu",
+      "collapse": "Collapse the sidebar",
+      "expand": "Expand the sidebar"
     },
     "orders": {
       "loading": "Loading orders…",

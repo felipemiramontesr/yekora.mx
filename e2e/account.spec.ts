@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { E2E_CODE, E2E_ORDER, mockAccountApi } from './support/accountApi';
+import {
+  E2E_CODE,
+  E2E_ORDER,
+  mockAccountApi,
+  openAccountSidebar,
+} from './support/accountApi';
 
 /**
  * FC 028 F2 · The account area in a real browser, against the emulated account API
@@ -44,6 +49,7 @@ test('a buyer signs in with the mailed code and opens an order', async ({
   await page.goBack();
   await expect(page).toHaveURL(/\/cuenta\/$/);
   await expect(page.getByRole('table')).toBeVisible();
+  await openAccountSidebar(page);
   await page.getByRole('button', { name: 'Salir' }).click();
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
 });
@@ -65,11 +71,14 @@ test('a buyer remembers this device, signs in again without a code, then forgets
   await page.getByLabel('Código').fill(E2E_CODE);
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await openAccountSidebar(page);
   await page.getByRole('button', { name: 'Salir' }).click();
   await signIn();
   await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await openAccountSidebar(page);
   await page.getByRole('button', { name: 'Olvidar este dispositivo' }).click();
   await expect(page.getByText('te pediremos el código')).toBeVisible();
+  await openAccountSidebar(page);
   await page.getByRole('button', { name: 'Salir' }).click();
   await signIn();
   await expect(
@@ -81,6 +90,7 @@ test('staff see the panel’s orders, in English too', async ({ page }) => {
   await mockAccountApi(page, { signedIn: 'staff' });
   await page.goto('/en/account/');
   await expect(page.getByText('Hello, Luis E2E')).toBeVisible();
+  await openAccountSidebar(page);
   await page.getByRole('link', { name: 'Panel: orders' }).click();
   await expect(page).toHaveURL(/\/en\/account\/panel\/$/);
   await expect(page.getByLabel('Status')).toBeVisible();
@@ -166,4 +176,56 @@ test('a visitor without the hint never asks the API who is signed in (FC 046 T2.
     ).toBeVisible();
   }
   expect(asked).toEqual([]);
+});
+
+/**
+ * FC 046 F0 · The sidebar of the account area (T1.2, T2.3): folded to icons on a wide screen and
+ * remembered when opened; a drawer on a phone that closes with Escape; sections by role; no e-mail.
+ */
+test('on a wide screen the sidebar starts folded, opens, is remembered and shows only the name (FC 046 T2.3)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'staff' });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/cuenta/');
+  const sidebar = page.getByRole('complementary', {
+    name: 'Barra lateral de tu cuenta',
+  });
+  await expect(sidebar).toBeVisible();
+  expect((await sidebar.boundingBox())?.width).toBeLessThan(100);
+  await expect(
+    sidebar.getByRole('link', { name: 'Mis pedidos' })
+  ).toHaveAttribute('title', 'Mis pedidos');
+  await page
+    .getByRole('button', { name: 'Desplegar la barra lateral' })
+    .click();
+  expect((await sidebar.boundingBox())?.width).toBeGreaterThan(200);
+  await expect(sidebar.getByText('Luis E2E')).toBeVisible();
+  await expect(sidebar.getByText('luis@example.test')).toHaveCount(0);
+  await expect(
+    sidebar.getByRole('link', { name: 'Mis pedidos' })
+  ).toHaveAttribute('aria-current', 'page');
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Replegar la barra lateral' })
+  ).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('on a phone the sidebar is a drawer that closes with Escape and returns the focus (FC 046 T2.3)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer' });
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/cuenta/');
+  const sidebar = page.getByRole('complementary', {
+    name: 'Barra lateral de tu cuenta',
+  });
+  await expect(sidebar).toBeHidden();
+  const opener = page.getByRole('button', { name: 'Menú de la cuenta' });
+  await opener.click();
+  await expect(sidebar).toBeVisible();
+  expect((await sidebar.boundingBox())?.width).toBe(250);
+  await page.keyboard.press('Escape');
+  await expect(sidebar).toBeHidden();
+  await expect(opener).toBeFocused();
 });

@@ -490,3 +490,28 @@ export async function mockCatalogApi(
       () => (globalThis as { __uploads?: Upload[] }).__uploads ?? []
     );
 }
+
+/**
+ * Puts the sidebar of the account area within reach (FC 046 T2.3): on a phone it opens the drawer
+ * with «Menú de la cuenta»; on a wide screen it opens the folded sidebar so the names are on view.
+ *
+ * @param page - The page showing the signed-in area.
+ */
+export async function openAccountSidebar(page: Page): Promise<void> {
+  const menu = page.getByRole('button', {
+    name: /^(Menú de la cuenta|Account menu)$/,
+  });
+  const sidebar = page.getByRole('complementary', {
+    name: /^(Barra lateral de tu cuenta|Sidebar of your account)$/,
+  });
+  const unfold = page.getByRole('button', {
+    name: /^(Desplegar la barra lateral|Expand the sidebar)$/,
+  });
+  // The area hydrates and loads the session first: wait for whichever control shows up.
+  await menu.or(sidebar).or(unfold).first().waitFor();
+  if (await sidebar.isVisible()) {
+    if (await unfold.isVisible()) await unfold.click();
+    return;
+  }
+  await menu.click();
+}

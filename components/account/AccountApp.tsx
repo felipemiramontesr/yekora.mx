@@ -1,7 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { type MouseEvent, useCallback, useEffect, useState } from 'react';
+import { Menu } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import {
   type AccountView,
@@ -17,6 +18,10 @@ import {
   subscribeSessionHint,
 } from '@/lib/account/sessionHint';
 import { forgetDevice, logout, me } from '@/lib/api/accountClient';
+import {
+  readSidebarOpen,
+  saveSidebarOpen,
+} from '@/lib/account/sidebarPreference';
 import { fill } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import {
@@ -31,6 +36,7 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
+import { AccountSidebar } from './AccountSidebar';
 import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -319,99 +325,112 @@ function Dashboard({
   const tabs = (['orders', 'panel', 'catalog', 'admins'] as const).filter(
     (name) => TAB_ACCESS[name](user)
   );
-  const isOwner = TAB_ACCESS.admins(user);
+  const [expanded, setExpanded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => setExpanded(readSidebarOpen()), []);
   const tab = tabs.includes(view.tab) ? view.tab : 'orders';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
 
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    openerRef.current?.focus();
+  }, []);
+  const toggleExpanded = () => {
+    saveSidebarOpen(!expanded);
+    setExpanded(!expanded);
+  };
+  const forget = () => {
+    setForgetting(true);
+    void forgetDevice().then((result) => {
+      setForgetting(false);
+      setDeviceNote(
+        result.ok
+          ? dashboard.deviceForgotten
+          : failureText(texts.account, result.reason)
+      );
+    });
+  };
+  const sections = tabs.map((name) => ({
+    tab: name,
+    label: dashboard[name],
+    href: accountPath(area, { tab: name, orderNumber: null }),
+  }));
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="flex flex-wrap items-center gap-3 text-xl font-semibold">
-          {fill(dashboard.greeting, { name: user.fullName })}
-          {isOwner && (
-            <span className="rounded-full border border-petroleo px-3 py-0.5 text-sm font-medium">
-              {dashboard.ownerBadge}
-            </span>
-          )}
-        </p>
-        <button
-          type="button"
-          disabled={leaving}
-          onClick={() => {
-            setLeaving(true);
-            void onSignOut();
-          }}
-          className="tap-target underline underline-offset-4"
-        >
-          {leaving ? dashboard.signingOut : dashboard.signOut}
-        </button>
-      </div>
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          disabled={forgetting}
-          onClick={() => {
-            setForgetting(true);
-            void forgetDevice().then((result) => {
-              setForgetting(false);
-              setDeviceNote(
-                result.ok
-                  ? dashboard.deviceForgotten
-                  : failureText(texts.account, result.reason)
-              );
-            });
-          }}
-          className="tap-target self-start text-sm underline underline-offset-4"
-        >
-          {forgetting ? dashboard.forgettingDevice : dashboard.forgetDevice}
-        </button>
+    <div
+      className={`grid gap-6 md:items-start md:gap-8 ${
+        expanded
+          ? 'md:grid-cols-[220px_minmax(0,1fr)]'
+          : 'md:grid-cols-[80px_minmax(0,1fr)]'
+      }`}
+    >
+      <AccountSidebar
+        user={user}
+        texts={dashboard}
+        sections={sections}
+        active={tab}
+        expanded={expanded}
+        onToggleExpanded={toggleExpanded}
+        drawerOpen={drawerOpen}
+        onCloseDrawer={closeDrawer}
+        onSelect={(name) => {
+          setDrawerOpen(false);
+          onNavigate({ tab: name, orderNumber: null });
+        }}
+        onForgetDevice={forget}
+        forgetting={forgetting}
+        onSignOut={() => {
+          setLeaving(true);
+          void onSignOut();
+        }}
+        leaving={leaving}
+      />
+      <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <button
+            ref={openerRef}
+            type="button"
+            aria-expanded={drawerOpen}
+            aria-controls="account-sidebar"
+            onClick={() => setDrawerOpen(true)}
+            className="tap-target gap-2 rounded-md border border-petroleo px-3 md:hidden"
+          >
+            <Menu aria-hidden="true" size={20} />
+            {dashboard.menu}
+          </button>
+          <p className="text-xl font-semibold">
+            {fill(dashboard.greeting, { name: user.fullName })}
+          </p>
+        </div>
         {deviceNote && <output className="block text-sm">{deviceNote}</output>}
+        {tab === 'catalog' && (
+          <CatalogConsole texts={texts.account.catalog} locale={locale} />
+        )}
+        {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
+        {isOrders && view.orderNumber && (
+          <OrderDetailView
+            scope={scope}
+            orderNumber={view.orderNumber}
+            locale={locale}
+            texts={texts}
+            backHref={accountPath(area, { tab, orderNumber: null })}
+            onBack={() => open(null)}
+          />
+        )}
+        {isOrders && !view.orderNumber && (
+          <OrderList
+            key={scope}
+            scope={scope}
+            locale={locale}
+            texts={texts}
+            hrefOf={(orderNumber) => accountPath(area, { tab, orderNumber })}
+            onOpen={open}
+          />
+        )}
       </div>
-      <nav aria-label={dashboard.tabsLabel}>
-        <ul className="flex gap-6 border-b border-petroleo/20">
-          {tabs.map((name) => (
-            <li key={name}>
-              <a
-                href={accountPath(area, { tab: name, orderNumber: null })}
-                aria-current={tab === name ? 'page' : undefined}
-                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-                  event.preventDefault();
-                  onNavigate({ tab: name, orderNumber: null });
-                }}
-                className="tap-target font-medium aria-[current=page]:border-b-2 aria-[current=page]:border-petroleo"
-              >
-                {dashboard[name]}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      {tab === 'catalog' && (
-        <CatalogConsole texts={texts.account.catalog} locale={locale} />
-      )}
-      {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
-      {isOrders && view.orderNumber && (
-        <OrderDetailView
-          scope={scope}
-          orderNumber={view.orderNumber}
-          locale={locale}
-          texts={texts}
-          backHref={accountPath(area, { tab, orderNumber: null })}
-          onBack={() => open(null)}
-        />
-      )}
-      {isOrders && !view.orderNumber && (
-        <OrderList
-          key={scope}
-          scope={scope}
-          locale={locale}
-          texts={texts}
-          hrefOf={(orderNumber) => accountPath(area, { tab, orderNumber })}
-          onOpen={open}
-        />
-      )}
     </div>
   );
 }

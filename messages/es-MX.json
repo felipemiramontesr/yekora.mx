@@ -759,7 +759,12 @@
       "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código.",
       "catalog": "Catálogo",
       "admins": "Administradores",
-      "ownerBadge": "Owner"
+      "ownerBadge": "Owner",
+      "sidebar": "Barra lateral de tu cuenta",
+      "menu": "Menú de la cuenta",
+      "closeMenu": "Cerrar el menú",
+      "collapse": "Replegar la barra lateral",
+      "expand": "Desplegar la barra lateral"
     },
     "orders": {
       "loading": "Cargando pedidos…",
