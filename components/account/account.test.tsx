@@ -997,3 +997,61 @@ describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', ()
     await screen.findByText(t.errors.unknown);
   });
 });
+
+describe('account area · the header hint (FC 046 T1.1, T2.2)', () => {
+  const KEY = 'yekora_session_first_name_v1';
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('keeps only the first name when the session is confirmed, and erases it on sign-out', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    api.logout.mockResolvedValue(ok(null));
+    renderApp();
+    await screen.findByText('Hola, Ana Flores');
+    expect(localStorage.getItem(KEY)).toBe('Ana');
+    api.me.mockResolvedValue(no('SESSION_INVALID_OR_EXPIRED'));
+    press(account.dashboard.signOut);
+    await screen.findByRole('heading', { name: account.signIn.title });
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('erases a stale hint when there is no session', async () => {
+    localStorage.setItem(KEY, 'Ana');
+    api.me.mockResolvedValue(no('SESSION_INVALID_OR_EXPIRED'));
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('shows the sign-in form when the header, or another tab, erases the hint: the session is over', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    await screen.findByText('Hola, Ana Flores');
+    // A change that leaves a hint (another tab signed in as someone) does not end this session.
+    act(() => {
+      globalThis.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    });
+    expect(screen.getByText('Hola, Ana Flores')).toBeTruthy();
+    localStorage.removeItem(KEY);
+    act(() => {
+      globalThis.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    });
+    expect(
+      await screen.findByRole('heading', { name: account.signIn.title })
+    ).toBeTruthy();
+  });
+
+  it('leaves a form the person is filling in alone when the hint changes', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    press(account.signIn.toRegister);
+    act(() => {
+      globalThis.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    });
+    expect(
+      screen.getByRole('heading', { name: account.register.title })
+    ).toBeTruthy();
+  });
+});

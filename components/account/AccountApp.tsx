@@ -9,6 +9,13 @@ import {
   parseAccountPath,
 } from '@/lib/account/accountPaths';
 import type { MeResponse } from '@/lib/account/authTypes';
+import {
+  clearSessionFirstName,
+  firstNameOf,
+  readSessionFirstName,
+  saveSessionFirstName,
+  subscribeSessionHint,
+} from '@/lib/account/sessionHint';
 import { forgetDevice, logout, me } from '@/lib/api/accountClient';
 import { fill } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
@@ -145,11 +152,14 @@ export function AccountApp({
     async (behindForm = false) => {
       const result = await me();
       if (result.ok) {
+        // FC 046: the header greets by this first name; the API stays the proof.
+        saveSessionFirstName(firstNameOf(result.data.fullName));
         setStage({ kind: 'signedIn', user: result.data });
         return;
       }
       // Signed out is the usual answer; anything else is worth saying.
       const quiet = result.reason === 'SESSION_INVALID_OR_EXPIRED';
+      if (quiet) clearSessionFirstName();
       const next = signedOut(
         quiet ? null : failureText(messages, result.reason)
       );
@@ -174,7 +184,19 @@ export function AccountApp({
       setStage({ kind: 'reset', token });
     }
     globalThis.addEventListener('popstate', read);
-    return () => globalThis.removeEventListener('popstate', read);
+    // FC 046: signing out from the header, or from another tab, erases the hint; this area then
+    // shows the sign-in form instead of a session that no longer exists.
+    const unsubscribe = subscribeSessionHint(() => {
+      if (readSessionFirstName() === null) {
+        setStage((current) =>
+          current.kind === 'signedIn' ? signedOut() : current
+        );
+      }
+    });
+    return () => {
+      globalThis.removeEventListener('popstate', read);
+      unsubscribe();
+    };
   }, [area, loadSession]);
 
   const navigate = (next: AccountView) => {
@@ -184,6 +206,7 @@ export function AccountApp({
 
   async function signOut() {
     await logout();
+    clearSessionFirstName();
     navigate({ tab: 'orders', orderNumber: null });
     setStage(signedOut());
   }

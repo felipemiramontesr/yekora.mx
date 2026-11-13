@@ -329,7 +329,8 @@
     "menu": "Menú",
     "about": "Nosotros",
     "catalog": "Catálogo",
-    "account": "Mi cuenta"
+    "account": "Mi cuenta",
+    "signOut": "Salir"
   },
   "disciplines": {
     "senderismo": "Senderismo",

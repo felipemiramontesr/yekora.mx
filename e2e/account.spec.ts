@@ -100,3 +100,70 @@ test('the header leads to the account area in each language', async ({
   await expect(page).toHaveURL(/\/cuenta\/$/);
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
 });
+
+/**
+ * FC 046 F0 · The header knows who is signed in (T1.1, T2.2): its first name, kept as a local hint,
+ * shown from xl up with a menu, only the icon below, and never asked of the API without a hint.
+ */
+const HINT = 'yekora_session_first_name_v1';
+
+test('signing in makes the header greet by first name, and signing out from its menu ends the session (FC 046)', async ({
+  page,
+}) => {
+  await mockAccountApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/cuenta/');
+  await page.getByLabel('Correo electrónico').fill('ana@example.test');
+  await page
+    .getByLabel('Contraseña', { exact: true })
+    .fill('correct horse battery');
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByLabel('Código').fill(E2E_CODE);
+  await page.getByRole('button', { name: 'Confirmar' }).click();
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  const header = page.getByRole('banner');
+  // Only the first name: not the surname, not the e-mail.
+  await expect(header.getByText('Ana', { exact: true })).toBeVisible();
+  expect(await page.evaluate((key) => localStorage.getItem(key), HINT)).toBe(
+    'Ana'
+  );
+  await header.getByLabel('Mi cuenta: Ana').click();
+  await header.getByRole('button', { name: 'Salir' }).click();
+  // The area of the account reacts to the same change: no session is left to show.
+  await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Mi cuenta' })).toBeVisible();
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), HINT)
+  ).toBeNull();
+});
+
+test('below xl the header shows only the icon, named by its label (FC 046 T2.2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer' });
+  await page.addInitScript((key) => localStorage.setItem(key, 'Ana'), HINT);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  await expect(header.getByLabel('Mi cuenta: Ana')).toBeVisible();
+  await expect(header.getByText('Ana', { exact: true })).toBeHidden();
+});
+
+test('a visitor without the hint never asks the API who is signed in (FC 046 T2.2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page);
+  const asked: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/v1/account/me')) asked.push(request.url());
+  });
+  for (const path of ['/', '/catalogo/', '/en/']) {
+    await page.goto(path);
+    await expect(
+      page
+        .getByRole('banner')
+        .getByRole('link', { name: /Mi cuenta|My account/ })
+    ).toBeVisible();
+  }
+  expect(asked).toEqual([]);
+});

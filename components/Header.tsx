@@ -1,7 +1,8 @@
-import { Menu, UserRound } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
+import { AccountHeaderControl } from './AccountHeaderControl';
 import { CartButton } from './cart/CartButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { MenuDisclosure } from './MenuDisclosure';
@@ -50,7 +51,7 @@ function NavItems({ locale, messages }: Readonly<HeaderProps>) {
 
 /**
  * Site header: brand lockup linking home, the discipline anchors, About, the catalog, the
- * language switcher, the account link (FC 028) and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
+ * language switcher, the account control (FC 028, FC 046) and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
  * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
  * Internal links use `next/link` (FC 043 T2.3): the next page is prefetched and opens without a
  * full reload. The language switcher stays a plain link, since each language has its own root
@@ -96,13 +97,10 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
         </div>
         {/* FC 028: the account area, always visible next to the cart. On narrow phones the bar
             tightens its gaps and the menu shows only its icon, so the three icons fit 360 px. */}
-        <Link
+        <AccountHeaderControl
           href={routeFor('account', locale)}
-          aria-label={messages.header.account}
-          className="tap-target shrink-0 justify-center"
-        >
-          <UserRound aria-hidden="true" size={24} />
-        </Link>
+          messages={messages.header}
+        />
         {/* FC 009: always visible, on every screen size, outside the collapsible menu. */}
         <CartButton
           locale={locale}
