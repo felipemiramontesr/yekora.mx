@@ -28,6 +28,11 @@ export const registerRequestSchema = z.strictObject({
   email: emailField,
   password: newPasswordField,
   fullName: z.string().trim().min(2).max(150),
+  /**
+   * Delivery postal code (FC 047 T1.3): optional, five digits inside a Mexican block; a
+   * malformed one is a 400 INVALID_POSTAL_CODE, and an empty one is the same as none.
+   */
+  postalCode: z.string().trim().max(10).optional(),
   altcha: altchaField,
 });
 
@@ -149,6 +154,11 @@ export const meResponseSchema = z.object({
   fullName: z.string(),
   roles: z.array(z.string()),
   permissions: z.array(z.string()),
+  /** The delivery postal code of the account, only ever given back to its holder (FC 047 T2.3). */
+  postalCode: z
+    .string()
+    .regex(/^\d{5}$/)
+    .nullish(),
 });
 
 /** Who is signed in, as `GET /v1/account/me` answers. */

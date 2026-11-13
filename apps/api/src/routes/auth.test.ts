@@ -11,6 +11,7 @@ import { loadConfig } from '../config';
 import { createHash, createHmac } from 'node:crypto';
 import { sha1 } from 'hash-wasm';
 import { base32, decryptTotpSecret, tokenHash } from '../services/authCrypto';
+import { decryptPii, encryptPii } from '../services/checkoutCrypto';
 import type { Db, Transactional, TxQuery } from '../services/db';
 
 const NOW = new Date('2026-11-02T18:00:00Z');
@@ -39,6 +40,13 @@ const MAIL = {
   MAIL_FROM: 'YĒKORA <no-reply@example.test>',
 };
 const BASE = { DB_HOST: '127.0.0.1', DB_USER: 'root', DB_NAME: 'yekora_dev' };
+/** The checkout secrets: with them the account can keep a delivery postal code (FC 047). */
+const PII_KEY = Buffer.alloc(32, 9);
+const CHECKOUT = {
+  CHECKOUT_PII_KEY: PII_KEY.toString('base64'),
+  CUSTOMER_EMAIL_HMAC_PEPPER: 'e'.repeat(32),
+  ORDER_TOKEN_PEPPER: 't'.repeat(32),
+};
 
 /** Base32 back to bytes, to compute the code an authenticator app would show. */
 function fromBase32(text: string): Buffer {
@@ -229,10 +237,21 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
           email: p[1],
           password_hash: p[2],
           full_name: p[3],
+          shipping_postal_code_enc: p[4] ?? null,
+          shipping_state: p[5] ?? null,
           is_active: 1,
           email_verified_at: null,
         })
       ),
+  ],
+  [
+    'SELECT shipping_postal_code_enc FROM users',
+    (s, p) => [
+      {
+        shipping_postal_code_enc:
+          s.users.get(p[0] as string)?.shipping_postal_code_enc ?? null,
+      },
+    ],
   ],
   [
     'UPDATE users SET email_verified_at',
@@ -541,11 +560,16 @@ function cookieOf(response: LightMyRequestResponse): string {
   return header.split(';')[0];
 }
 
-async function register(email: string, fullName = 'Ana Prueba') {
+async function register(
+  email: string,
+  fullName = 'Ana Prueba',
+  postalCode?: string
+) {
   return post('/v1/auth/register', {
     email,
     password: PASSWORD,
     fullName,
+    ...(postalCode === undefined ? {} : { postalCode }),
     altcha: await solved(),
   });
 }
@@ -638,6 +662,53 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(user.email).toBe('ana@example.test');
     expect(String(user.password_hash)).toMatch(/^\$argon2id\$/);
     expect(store.userRoles).toEqual([[user.id, 'customer']]);
+  });
+
+  it('FC 047 T1.3 · keeps the postal code only as ciphertext bound to the account, and derives the state', async () => {
+    await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+    const response = await register('ana@example.test', 'Ana', ' 98612 ');
+    expect(response.statusCode).toBe(202);
+    const [user] = [...store.users.values()];
+    const stored = user.shipping_postal_code_enc as Buffer;
+    expect(Buffer.isBuffer(stored)).toBe(true);
+    expect(stored.includes(Buffer.from('98612'))).toBe(false);
+    expect(
+      decryptPii(PII_KEY, String(user.id), 'shipping_postal_code', stored)
+    ).toBe('98612');
+    expect(user.shipping_state).toBe('ZAC');
+  });
+
+  it('FC 047 T1.3 · an omitted or empty postal code is the sign-up of before: nothing is written', async () => {
+    await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+    await register('ana@example.test');
+    await register('luis@example.test', 'Luis', '');
+    for (const user of store.users.values()) {
+      expect(user.shipping_postal_code_enc).toBeNull();
+      expect(user.shipping_state).toBeNull();
+    }
+    expect(store.users.size).toBe(2);
+  });
+
+  it.each(['1234', 'abcde', '986123', '17000'])(
+    'FC 047 T1.3 · refuses the postal code %s with INVALID_POSTAL_CODE and creates nothing',
+    async (postalCode) => {
+      await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+      const response = await register('ana@example.test', 'Ana', postalCode);
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ detail: 'INVALID_POSTAL_CODE' });
+      expect(store.users.size).toBe(0);
+    }
+  );
+
+  it('FC 047 T2.3 · without the checkout secrets a postal code is refused (503) instead of stored in clear', async () => {
+    await start();
+    const response = await register('ana@example.test', 'Ana', '98612');
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      detail: 'POSTAL_CODE_UNAVAILABLE',
+    });
+    expect(store.users.size).toBe(0);
+    expect((await register('luis@example.test', 'Luis')).statusCode).toBe(202);
   });
 
   it('OWASP-A07 · refuses unknown fields (400), before any work', async () => {
@@ -897,6 +968,57 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
       (await app.inject({ url: '/v1/account/me', headers: { cookie } }))
         .statusCode
     ).toBe(401);
+  });
+
+  it('FC 047 T2.3 · gives the holder their own postal code back, and no one else', async () => {
+    await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+    await register('ana@example.test', 'Ana', '98612');
+    const { cookie } = await signedInBuyer('ana@example.test');
+    const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
+    expect(me.json()).toMatchObject({ postalCode: '98612' });
+    await register('luis@example.test', 'Luis');
+    const other = await signedInBuyer('luis@example.test');
+    const theirs = await app.inject({
+      url: '/v1/account/me',
+      headers: { cookie: other.cookie },
+    });
+    expect(theirs.json()).toMatchObject({ postalCode: null });
+  });
+
+  it('FC 047 T2.3 · a stored value that does not authenticate is left out and never breaks the account area', async () => {
+    await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+    await register('ana@example.test', 'Ana', '98612');
+    const { cookie } = await signedInBuyer('ana@example.test');
+    const [user] = [...store.users.values()];
+    // Moved to another account: the additional data no longer matches.
+    Object.assign(user, {
+      shipping_postal_code_enc: encryptPii(
+        PII_KEY,
+        'b0000000-0000-4000-8000-0000000000ff',
+        'shipping_postal_code',
+        '98612'
+      ),
+    });
+    const moved = await app.inject({
+      url: '/v1/account/me',
+      headers: { cookie },
+    });
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json()).toMatchObject({ postalCode: null });
+  });
+
+  it('FC 047 T2.3 · without the checkout secrets a stored postal code stays unread', async () => {
+    await start();
+    const { cookie } = await signedInBuyer('ana@example.test');
+    const [user] = [...store.users.values()];
+    user.shipping_postal_code_enc = encryptPii(
+      PII_KEY,
+      String(user.id),
+      'shipping_postal_code',
+      '98612'
+    );
+    const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
+    expect(me.json()).toMatchObject({ postalCode: null });
   });
 
   it('OWASP-A07 · refuses staff whose authenticator is off (403, T2.1a)', async () => {

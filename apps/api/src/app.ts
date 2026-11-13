@@ -220,8 +220,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     now,
     wait: deps.wait,
     breach: (password) => breachVerdict(password, deps.pwnedFetch),
+    piiKey: deps.config.payments.checkout?.piiKey ?? null,
   });
-  registerAccountRoutes(app, { db: deps.db, now });
+  registerAccountRoutes(app, {
+    db: deps.db,
+    now,
+    piiKey: deps.config.payments.checkout?.piiKey ?? null,
+  });
   registerAdminRoutes(app, { db: deps.db, now });
   // FC 044 F1: the owner's console of administrators.
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });

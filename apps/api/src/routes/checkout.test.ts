@@ -101,6 +101,37 @@ describe('POST /v1/checkout', () => {
     expect(outcome.mock.calls.map((call) => call[3])).toEqual([buyer, null]);
   });
 
+  it('FC 047 T2.3 · never reads the postal code or the state an account holds: shipping is priced from what the checkout is given', async () => {
+    outcome.mockResolvedValue({ ok: true, session: SESSION });
+    const buyer = 'b0000000-0000-4000-8000-000000000001';
+    const asked: string[] = [];
+    const signedIn: Db & Transactional = {
+      ...db,
+      query: async <Row>(sql: string) => {
+        asked.push(sql);
+        return (
+          sql.startsWith('SELECT s.id, s.user_id')
+            ? [{ id: 'x', user_id: buyer, email: 'a@b.mx', full_name: 'A' }]
+            : []
+        ) as Row[];
+      },
+    };
+    app = await buildApp({
+      config,
+      db: signedIn,
+      rate: async () => null,
+      logger: false,
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/v1/checkout',
+      payload: { method: 'CARD' },
+      headers: { cookie: `__Host-yekora_session=${'s'.repeat(43)}` },
+    });
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.join(' ')).not.toMatch(/shipping_state|shipping_postal_code/);
+  });
+
   it('defaults to Spanish return pages', async () => {
     outcome.mockResolvedValue({ ok: true, session: SESSION });
     await makeApp();

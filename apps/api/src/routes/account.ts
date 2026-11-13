@@ -29,7 +29,11 @@ import {
 } from '../lib/session';
 import { expireOverdueOrders } from '../services/checkout';
 import type { Db, Transactional } from '../services/db';
-import { closeSession, type SessionUser } from '../services/identity';
+import {
+  closeSession,
+  readPostalCode,
+  type SessionUser,
+} from '../services/identity';
 import { listOrders } from '../services/orderReads';
 import { forgetDevice } from '../services/trustedDevices';
 import { lookUpOrder } from './orders';
@@ -40,6 +44,8 @@ interface AccountDeps {
   db: Db & Transactional;
   /** Clock. */
   now: () => Date;
+  /** CHECKOUT_PII_KEY, or null when the checkout secrets are not configured (FC 047). */
+  piiKey: Buffer | null;
 }
 
 /**
@@ -52,8 +58,18 @@ export function registerAccountRoutes(
   app: FastifyInstance,
   deps: AccountDeps
 ): void {
-  app.get('/v1/account/me', (request, reply) => {
+  app.get('/v1/account/me', async (request, reply) => {
     const user = request.user as SessionUser;
+    // FC 047 T2.3: only the holder gets their own postal code back; a value that does not
+    // authenticate is logged and left out, so one bad row never closes the account area.
+    const postalCode = await readPostalCode(
+      deps.db,
+      deps.piiKey,
+      user.userId
+    ).catch((error: unknown) => {
+      request.log.error({ err: error }, 'postal code unreadable');
+      return null;
+    });
     return reply.send(
       meResponseSchema.parse({
         id: user.userId,
@@ -61,6 +77,7 @@ export function registerAccountRoutes(
         fullName: user.fullName,
         roles: user.roles,
         permissions: user.permissions,
+        postalCode,
       })
     );
   });

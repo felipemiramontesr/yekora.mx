@@ -1,6 +1,7 @@
 import { createDecipheriv, randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  decryptPii,
   emailHmac,
   encryptPii,
   newAccessToken,
@@ -82,6 +83,50 @@ describe('personal data at rest (T2: only AES-256-GCM ciphertext)', () => {
       altered[offset] ^= 0x01;
       expect(() => openPii(KEY, ORDER, 'customer_phone', altered)).toThrow();
     }
+  });
+});
+
+describe('decrypting what an account stored (FC 047 T2.3)', () => {
+  const ACCOUNT = 'b0000000-0000-4000-8000-000000000001';
+
+  it('gives back exactly what was encrypted for that account and column', () => {
+    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
+    expect(decryptPii(KEY, ACCOUNT, 'shipping_postal_code', stored)).toBe(
+      '98612'
+    );
+  });
+
+  it('refuses another account, another column, another key or an altered byte', () => {
+    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
+    expect(() =>
+      decryptPii(
+        KEY,
+        'b0000000-0000-4000-8000-000000000002',
+        'shipping_postal_code',
+        stored
+      )
+    ).toThrow();
+    expect(() => decryptPii(KEY, ACCOUNT, 'customer_phone', stored)).toThrow();
+    expect(() =>
+      decryptPii(randomBytes(32), ACCOUNT, 'shipping_postal_code', stored)
+    ).toThrow();
+    const altered = Buffer.from(stored);
+    altered[20] ^= 0x01;
+    expect(() =>
+      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', altered)
+    ).toThrow();
+  });
+
+  it('refuses a value that is too short or of another format version', () => {
+    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
+    expect(() =>
+      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', stored.subarray(0, 20))
+    ).toThrow('Unreadable personal data');
+    const foreign = Buffer.from(stored);
+    foreign[0] = 0x02;
+    expect(() =>
+      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', foreign)
+    ).toThrow('Unreadable personal data');
   });
 });
 

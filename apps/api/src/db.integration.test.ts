@@ -56,6 +56,7 @@ import {
   openChallenge,
   openSession,
   passEmailChallenge,
+  readPostalCode,
   savePendingTotp,
   sessionUser,
   totpOf,
@@ -1751,5 +1752,70 @@ describe('administrators managed by the owner on real SQL (adminUsers.ts, FC 044
     expect((await listAdmins(db)).map((account) => account.id)).toEqual([
       owner,
     ]);
+  });
+});
+
+describe('the delivery postal code of an account on real SQL (migration 009, identity.ts, FC 047 F0)', () => {
+  const KEY = Buffer.alloc(32, 5);
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const rowOf = async (email: string) =>
+    (
+      await db.query<{
+        id: string;
+        shipping_postal_code_enc: Buffer | null;
+        shipping_state: string | null;
+      }>(
+        'SELECT id, shipping_postal_code_enc, shipping_state FROM users WHERE email = ?',
+        [email]
+      )
+    )[0];
+
+  it('stores the code only as ciphertext, with its derived state, and gives it back to its holder (T1.3, T2.3)', async () => {
+    expect(
+      await createCustomer(db, {
+        email: 'postal@example.test',
+        passwordHash: ARGON,
+        fullName: 'Postal',
+        postal: { code: '98612', state: 'ZAC', key: KEY },
+      })
+    ).toBe(true);
+    const row = await rowOf('postal@example.test');
+    expect(row.shipping_state).toBe('ZAC');
+    expect(
+      Buffer.from(row.shipping_postal_code_enc ?? []).includes('98612')
+    ).toBe(false);
+    expect(await readPostalCode(db, KEY, row.id)).toBe('98612');
+    expect(await readPostalCode(db, null, row.id)).toBeNull();
+  });
+
+  it('leaves both columns empty for an account without a postal code, and reads none (T1.3)', async () => {
+    await createCustomer(db, {
+      email: 'nopostal@example.test',
+      passwordHash: ARGON,
+      fullName: 'Sin CP',
+    });
+    const row = await rowOf('nopostal@example.test');
+    expect(row.shipping_postal_code_enc).toBeNull();
+    expect(row.shipping_state).toBeNull();
+    expect(await readPostalCode(db, KEY, row.id)).toBeNull();
+  });
+
+  it('refuses a state without its ciphertext, a ciphertext without its state, and a state that is not a shipping zone (foreign key)', async () => {
+    const insert = (enc: Buffer | null, state: string | null, email: string) =>
+      db.query(
+        'INSERT INTO users (id, email, password_hash, full_name, shipping_postal_code_enc, shipping_state) VALUES (UUID(), ?, ?, ?, ?, ?)',
+        [email, ARGON, 'Prueba', enc, state]
+      );
+    await expect(insert(null, 'ZAC', 'a1@example.test')).rejects.toThrow();
+    await expect(
+      insert(Buffer.from('x'), null, 'a2@example.test')
+    ).rejects.toThrow();
+    await expect(
+      insert(Buffer.from('x'), 'zac', 'a3@example.test')
+    ).rejects.toThrow();
+    await expect(
+      insert(Buffer.from('x'), 'ZZZ', 'a4@example.test')
+    ).rejects.toThrow();
   });
 });

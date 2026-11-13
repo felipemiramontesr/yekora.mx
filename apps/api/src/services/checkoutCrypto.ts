@@ -1,16 +1,16 @@
 /**
  * Checkout cryptography (FC 012 F1 · YekoraALE · LFPDPPP · OWASP A02).
  *
- * Personal data (name, e-mail, phone, address) is stored only as AES-256-GCM ciphertext
- * produced with CHECKOUT_PII_KEY (32 random bytes, base64), never with the backup key. Each
- * value is bound to its order and column through the GCM additional data, so a ciphertext
- * copied into another order or column fails to decrypt instead of being read as someone
- * else's data. Stored format, versioned for a future key rotation:
+ * Personal data (name, e-mail, phone, address, and the delivery postal code of an account,
+ * FC 047) is stored only as AES-256-GCM ciphertext produced with CHECKOUT_PII_KEY (32 random
+ * bytes, base64), never with the backup key. Each value is bound to its subject (an order, or an
+ * account) and column through the GCM additional data, so a ciphertext copied into another row
+ * or column fails to decrypt instead of being read as someone else's data. Stored format, versioned for a future key rotation:
  *
  *   0x01 · IV (12 B) · ciphertext · tag (16 B)
  *
- * Only encryption ships for now: nothing in the API reads personal data back yet, so the
- * decryption arrives with its first reader (order fulfilment) instead of as dead code.
+ * Decryption arrived with its first reader: `GET /v1/account/me` gives the account holder back
+ * their own postal code (FC 047). Order data still has no reader.
  *
  * Lookups never need the plain e-mail: it is kept as HMAC-SHA256 under its own pepper
  * (CUSTOMER_EMAIL_HMAC_PEPPER), after trimming and lower-casing. The order access token is
@@ -21,6 +21,7 @@
  */
 import {
   createCipheriv,
+  createDecipheriv,
   createHmac,
   randomBytes,
   randomInt,
@@ -32,9 +33,13 @@ const TAG_BYTES = 16;
 const KEY_BYTES = 32;
 const ORDER_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-/** The personal-data columns of `orders`; the name is part of each value's additional data. */
+/** The personal-data columns of `orders` and `users`; the name is part of each value's additional data. */
 export type PiiField =
-  'customer_name' | 'customer_email' | 'customer_phone' | 'shipping_address';
+  | 'customer_name'
+  | 'customer_email'
+  | 'customer_phone'
+  | 'shipping_address'
+  | 'shipping_postal_code';
 
 /**
  * Decodes and checks CHECKOUT_PII_KEY: exactly 32 bytes in base64, or the API refuses to start.
@@ -50,22 +55,22 @@ export function parsePiiKey(base64: string): Buffer {
   return key;
 }
 
-function additionalData(orderNumber: string, field: PiiField): Buffer {
-  return Buffer.from(`${orderNumber}|${field}`, 'utf8');
+function additionalData(subject: string, field: PiiField): Buffer {
+  return Buffer.from(`${subject}|${field}`, 'utf8');
 }
 
 /**
- * Encrypts one personal-data value for one order and column.
+ * Encrypts one personal-data value for one subject and column.
  *
  * @param key - Key from {@link parsePiiKey}.
- * @param orderNumber - The order the value belongs to.
+ * @param subject - The order number, or the account id, the value belongs to.
  * @param field - The column it is stored in.
  * @param value - Plain text (UTF-8).
  * @returns The stored bytes: version, IV, ciphertext and tag.
  */
 export function encryptPii(
   key: Buffer,
-  orderNumber: string,
+  subject: string,
   field: PiiField,
   value: string
 ): Buffer {
@@ -73,7 +78,7 @@ export function encryptPii(
   const cipher = createCipheriv('aes-256-gcm', key, iv, {
     authTagLength: TAG_BYTES,
   });
-  cipher.setAAD(additionalData(orderNumber, field));
+  cipher.setAAD(additionalData(subject, field));
   const body = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
   return Buffer.concat([
     Buffer.from([FORMAT_V1]),
@@ -81,6 +86,38 @@ export function encryptPii(
     body,
     cipher.getAuthTag(),
   ]);
+}
+
+/**
+ * Decrypts a value stored by {@link encryptPii}. A value moved to another subject or column, cut
+ * short or altered fails authentication and throws, so it is never read as someone else's data.
+ *
+ * @param key - Key from {@link parsePiiKey}.
+ * @param subject - The order number, or the account id, the value belongs to.
+ * @param field - The column it is stored in.
+ * @param stored - The bytes: version, IV, ciphertext and tag.
+ * @returns The plain text (UTF-8).
+ */
+export function decryptPii(
+  key: Buffer,
+  subject: string,
+  field: PiiField,
+  stored: Buffer
+): string {
+  if (stored.length < 1 + IV_BYTES + TAG_BYTES || stored[0] !== FORMAT_V1) {
+    throw new Error('Unreadable personal data');
+  }
+  const iv = stored.subarray(1, 1 + IV_BYTES);
+  const tag = stored.subarray(stored.length - TAG_BYTES);
+  const body = stored.subarray(1 + IV_BYTES, stored.length - TAG_BYTES);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv, {
+    authTagLength: TAG_BYTES,
+  });
+  decipher.setAAD(additionalData(subject, field));
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(body), decipher.final()]).toString(
+    'utf8'
+  );
 }
 
 /**
