@@ -17,6 +17,7 @@
  * @module
  */
 import type { FastifyInstance } from 'fastify';
+import { SAFE_IMAGE_TYPES } from '../../../../lib/catalog/adminTypes';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { recordAudit } from '../services/audit';
 import { checkIdempotencyKey } from '../services/idempotency';
@@ -58,10 +59,18 @@ export function registerCatalogAdminRoutes(
     '/v1/admin/catalog/media',
     {
       bodyLimit: UPLOAD_READ_LIMIT,
-      errorHandler: (error, _request, reply) => {
+      errorHandler: (error, request, reply) => {
         if ((error as { code?: string }).code !== 'FST_ERR_CTP_BODY_TOO_LARGE')
           throw error;
-        return refuse(reply, 413, 'Image too large', 'MEDIA_SIZE_EXCEEDED');
+        // The body is never read past the cap, so only the declared type can be judged. T1.2
+        // ranks the type before the size: an unsafe type is refused as such (M = ⊥), a safe one
+        // as too large.
+        const safe = (SAFE_IMAGE_TYPES as readonly string[]).includes(
+          String(request.headers['content-type'])
+        );
+        const code = safe ? 'MEDIA_SIZE_EXCEEDED' : 'MEDIA_UNSAFE_TYPE';
+        const [status, title] = MEDIA_REFUSALS[code];
+        return refuse(reply, status, title, code);
       },
     },
     async (request, reply) => {

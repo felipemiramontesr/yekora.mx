@@ -363,6 +363,13 @@ describe('POST /v1/admin/catalog/media (FC 029 F2a)', () => {
       'MEDIA_SIZE_EXCEEDED',
     ],
     [
+      'an SVG over the read limit: the type is judged first (T1.2, M = ⊥ and S = ⊥)',
+      Buffer.alloc(4 * 1024 * 1024 + 1),
+      'image/svg+xml',
+      415,
+      'MEDIA_UNSAFE_TYPE',
+    ],
+    [
       'a width outside 1200, 600, 300',
       png(800, 600),
       'image/png',
