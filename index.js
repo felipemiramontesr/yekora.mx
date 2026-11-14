@@ -99444,6 +99444,9 @@ var itemSchema = external_exports.object({
   disciplineName: external_exports.string().min(1),
   level: slug,
   levelName: external_exports.string().min(1),
+  /** Its active brand (FC 047), or null; a snapshot made before this field existed has none. */
+  brand: slug.nullable().default(null),
+  brandName: external_exports.string().min(1).nullable().default(null),
   priceMxnCents: external_exports.number().int().positive(),
   priceUsdCents: external_exports.number().int().nonnegative().nullable(),
   inStock: external_exports.boolean()
@@ -100040,7 +100043,7 @@ async function listProducts(db, query) {
     filters
   );
   const items = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
     [
       ...filters,
       query.sort,
@@ -100060,7 +100063,7 @@ function findProductMedia(db, slug3) {
 }
 async function findProduct(db, slug3) {
   const [product] = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
     [slug3]
   );
   return product ?? null;
@@ -100088,6 +100091,8 @@ function present(row2, language, fix) {
     disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
     level: row2.level,
     levelName: english ? row2.level_name_en : row2.level_name_es,
+    brand: row2.brand,
+    brandName: row2.brand_name,
     priceMxnCents: Number(row2.price_mxn_cents),
     priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
     inStock: Number(row2.stock) > 0
@@ -117831,7 +117836,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "308aa215cee5b02b27d1c04c34638017cde33ac0" : void 0;
+var sha = true ? "10e21ac8809e2d11966f91a3a6bbc7d856fd4045" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
