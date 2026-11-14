@@ -5,6 +5,7 @@ import {
   productMetadata,
   productPath,
   routeFor,
+  searchIndexPath,
   siteMetadata,
   translatePath,
 } from './routes';
@@ -114,5 +115,12 @@ describe('routes', () => {
     const metadata = siteMetadata('en');
     expect(metadata.metadataBase?.toString()).toBe('https://yekora.mx/');
     expect(metadata.description).toContain('Mexican and international brands');
+  });
+});
+
+describe('search index path (FC 047 T0.2)', () => {
+  it('is one static file per language, next to the catalog', () => {
+    expect(searchIndexPath('es-MX')).toBe('/search-index.json');
+    expect(searchIndexPath('en')).toBe('/en/search-index.json');
   });
 });

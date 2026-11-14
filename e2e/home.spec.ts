@@ -4,14 +4,15 @@ import { expect, test, type Page } from '@playwright/test';
 // with translated slugs, no locale redirect and no language cookie.
 
 /**
- * FC 026: the header navigation the visitor can use now. From xl (1280 px) it is the bar; below,
- * on the iPhone and Android projects, it lives in the <details> menu, which is opened first.
+ * FC 047: the navigation that lives in the account menu of the header (the language, and the
+ * sections of the account), a <details> that is opened first. The disciplines are not here: they
+ * are the strip under the bar, always in view.
  */
 async function headerNav(page: Page, name: string | RegExp) {
   const menu = page.getByRole('banner').locator('details');
   const closed = await menu.evaluate((d) => !(d as HTMLDetailsElement).open);
-  // Opened only when shown and closed: a second click on the summary would fold it again.
-  if ((await menu.isVisible()) && closed) await menu.locator('summary').click();
+  // Opened only when closed: a second click on the summary would fold it again.
+  if (closed) await menu.locator('summary').click();
   return page
     .getByRole('navigation', { name })
     .filter({ visible: true })
@@ -52,20 +53,29 @@ test('the English home page lives under /en/ with its hreflang pair', async ({
   );
 });
 
-test('disciplines are anchors inside the current language', async ({
+test('each discipline of the strip leads to its products, in the current language (FC 047 T2.1)', async ({
   page,
 }) => {
   await page.goto('/');
-  const nav = await headerNav(page, 'Navegación principal');
-  await nav.getByRole('link', { name: 'Escalada' }).click();
-  await expect(page).toHaveURL(/\/#escalada$/);
-  await expect(page.locator('#escalada')).toBeVisible();
-  // FC 008: the catalog is a real page now, linked in the current language.
+  const strip = page.getByRole('navigation', { name: 'Disciplinas' }).first();
+  await expect(strip.getByRole('link', { name: 'Escalada' })).toHaveAttribute(
+    'href',
+    '/catalogo/?disciplina=escalada'
+  );
+  await strip.getByRole('link', { name: 'Escalada' }).click();
+  await expect(page).toHaveURL(/\/catalogo\/\?disciplina=escalada$/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.goto('/en/');
   await expect(
-    (await headerNav(page, 'Navegación principal')).getByRole('link', {
-      name: 'Catálogo',
-    })
-  ).toHaveAttribute('href', '/catalogo/');
+    page
+      .getByRole('navigation', { name: 'Disciplines' })
+      .first()
+      .getByRole('link', { name: 'Mountaineering' })
+  ).toHaveAttribute('href', '/en/catalog/?disciplina=montana');
+  // The header has no «Catálogo» link any more: the disciplines are the way in.
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: /^Catálogo$/ })
+  ).toHaveCount(0);
 });
 
 test('switching language opens the same page in the other language, with no cookie', async ({
@@ -74,7 +84,7 @@ test('switching language opens the same page in the other language, with no cook
 }) => {
   await page.goto('/nosotros/');
   const switcher = await headerNav(page, 'Idioma');
-  await switcher.getByRole('link', { name: 'English' }).click();
+  await switcher.getByRole('link', { name: 'EN, English' }).click();
   await expect(page).toHaveURL(/\/en\/about\/$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('About us');
@@ -82,7 +92,7 @@ test('switching language opens the same page in the other language, with no cook
   await (
     await headerNav(page, 'Language')
   )
-    .getByRole('link', { name: 'Español' })
+    .getByRole('link', { name: 'ES, Español' })
     .click();
   await expect(page).toHaveURL(/\/nosotros\/$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX');
@@ -150,23 +160,26 @@ test('internal links change page without reloading the document (FC 043 T2.3)', 
   await page.evaluate(() => {
     (window as Window & { sameDocument?: boolean }).sameDocument = true;
   });
-  const nav = await headerNav(page, 'Navegación principal');
-  await nav.getByRole('link', { name: 'Catálogo' }).click();
-  await expect(page).toHaveURL(/\/catalogo\/$/);
+  await page
+    .getByRole('navigation', { name: 'Disciplinas' })
+    .first()
+    .getByRole('link', { name: 'Escalada' })
+    .click();
+  await expect(page).toHaveURL(/\/catalogo\/\?disciplina=escalada$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(
     await page.evaluate(
       () => (window as Window & { sameDocument?: boolean }).sameDocument
     )
   ).toBe(true);
-  // The header stays mounted, so the phone menu must close itself after the click.
+  // The header stays mounted, so its menu is still closed after the click.
   const menu = page.getByRole('banner').locator('details');
   expect(await menu.evaluate((d) => (d as HTMLDetailsElement).open)).toBe(
     false
   );
 });
 
-test('the mobile menu opens without client JavaScript', async ({
+test('the account menu opens without client JavaScript and holds the language (FC 047 T2.4)', async ({
   browser,
   baseURL,
 }) => {
@@ -177,10 +190,16 @@ test('the mobile menu opens without client JavaScript', async ({
   });
   const page = await context.newPage();
   await page.goto('/');
-  // FC 028: below 640 px the menu shows only its icon; its name stays for assistive technology.
+  // Below xl the menu shows only its icon; its name stays for assistive technology.
   await page.getByRole('banner').locator('summary').click();
-  const menu = page.locator('details nav');
-  await expect(menu.getByRole('link', { name: 'Cañonismo' })).toBeVisible();
+  const menu = page.getByRole('banner').locator('details');
+  await expect(menu.getByRole('link', { name: 'Entrar' })).toBeVisible();
+  await expect(menu.getByRole('link', { name: 'Crear cuenta' })).toBeVisible();
+  await expect(menu.getByRole('link', { name: 'EN, English' })).toBeVisible();
+  // The strip of disciplines needs no menu at all.
+  await expect(
+    page.getByRole('link', { name: 'Cañonismo' }).first()
+  ).toBeVisible();
   await context.close();
 });
 

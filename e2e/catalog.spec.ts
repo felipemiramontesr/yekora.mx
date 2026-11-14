@@ -23,14 +23,15 @@ function cspViolations(page: Page): string[] {
 const cards = (page: Page) => page.locator('main li');
 
 /**
- * FC 026: the header navigation the visitor can use now. From xl (1280 px) it is the bar; below,
- * on the iPhone and Android projects, it lives in the <details> menu, which is opened first.
+ * FC 047: the navigation that lives in the account menu of the header (the language, and the
+ * sections of the account), a <details> that is opened first. The disciplines are not here: they
+ * are the strip under the bar, always in view.
  */
 async function headerNav(page: Page, name: string | RegExp) {
   const menu = page.getByRole('banner').locator('details');
   const closed = await menu.evaluate((d) => !(d as HTMLDetailsElement).open);
-  // Opened only when shown and closed: a second click on the summary would fold it again.
-  if ((await menu.isVisible()) && closed) await menu.locator('summary').click();
+  // Opened only when closed: a second click on the summary would fold it again.
+  if (closed) await menu.locator('summary').click();
   return page
     .getByRole('navigation', { name })
     .filter({ visible: true })
@@ -133,7 +134,7 @@ test('a card opens its product page, which switches language and leads back', as
   await (
     await headerNav(page, 'Idioma')
   )
-    .getByRole('link', { name: 'English' })
+    .getByRole('link', { name: 'EN, English' })
     .click();
   await expect(page).toHaveURL(/\/en\/catalog\/e2e-arnes-alpino\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
@@ -145,19 +146,54 @@ test('a card opens its product page, which switches language and leads back', as
   await expect(page).toHaveURL(/\/en\/catalog\/$/);
 });
 
-test('the header links the catalog in both languages', async ({ page }) => {
-  for (const [home, name, path] of [
-    ['/', 'Catálogo', /\/catalogo\/$/],
-    ['/en/', 'Catalog', /\/en\/catalog\/$/],
+test('the header searches the catalog of each language (FC 047 T1.2)', async ({
+  page,
+}) => {
+  for (const [home, label, path] of [
+    ['/', 'Buscar en la tienda', /\/catalogo\/\?q=arn/],
+    ['/en/', 'Search the store', /\/en\/catalog\/\?q=arn/],
   ] as const) {
     await page.goto(home);
-    await (
-      await headerNav(page, /Navegación principal|Main navigation/)
-    )
-      .getByRole('link', { name })
-      .click();
+    const box = page.getByRole('combobox', { name: label });
+    await box.fill('arn');
+    await box.press('Enter');
     await expect(page).toHaveURL(path);
   }
+});
+
+test('the search of the header suggests products and opens the one chosen with the keyboard (FC 047 T1.2, T2.2)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const box = page.getByRole('combobox', { name: 'Buscar en la tienda' });
+  // Nothing is fetched until the box takes the focus.
+  const asked = page.waitForRequest('**/search-index.json');
+  await box.focus();
+  await asked;
+  await box.fill('arnes');
+  await expect(page.getByRole('option')).toHaveCount(1);
+  await expect(box).toHaveAttribute('aria-expanded', 'true');
+  await box.press('ArrowDown');
+  await expect(page.getByRole('option').first()).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  await box.press('Enter');
+  await expect(page).toHaveURL(/\/catalogo\/e2e-arnes-alpino\/$/);
+});
+
+test('the catalog shows only the results of the search and of the discipline in the address (FC 047 T1.2, T2.1)', async ({
+  page,
+}) => {
+  await page.goto('/catalogo/?q=mochila');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Resultados para' })
+  ).toContainText('Resultados para «mochila» · 1 producto');
+  await page.getByRole('button', { name: 'Quitar la búsqueda' }).click();
+  await expect(page).toHaveURL(/\/catalogo\/$/);
+  await page.goto('/catalogo/?disciplina=escalada');
+  await expect(cards(page)).toHaveCount(1);
+  await expect(page.locator('main')).toContainText('Arnés alpino');
 });
 
 test('an unknown product is a 404', async ({ page }) => {

@@ -492,26 +492,15 @@ export async function mockCatalogApi(
 }
 
 /**
- * Puts the sidebar of the account area within reach (FC 046 T2.3): on a phone it opens the drawer
- * with «Menú de la cuenta»; on a wide screen it opens the folded sidebar so the names are on view.
+ * Opens the account menu of the header (FC 047 T2.4), where the sections of the account, the
+ * language, «Olvidar este dispositivo» and «Salir» live. It is a <details>, so it is opened only
+ * when closed: a second click on its summary would fold it again.
  *
- * @param page - The page showing the signed-in area.
+ * @param page - Any page of the site.
  */
-export async function openAccountSidebar(page: Page): Promise<void> {
-  const menu = page.getByRole('button', {
-    name: /^(Menú de la cuenta|Account menu)$/,
-  });
-  const sidebar = page.getByRole('complementary', {
-    name: /^(Barra lateral de tu cuenta|Sidebar of your account)$/,
-  });
-  const unfold = page.getByRole('button', {
-    name: /^(Desplegar la barra lateral|Expand the sidebar)$/,
-  });
-  // The area hydrates and loads the session first: wait for whichever control shows up.
-  await menu.or(sidebar).or(unfold).first().waitFor();
-  if (await sidebar.isVisible()) {
-    if (await unfold.isVisible()) await unfold.click();
-    return;
+export async function openAccountMenu(page: Page): Promise<void> {
+  const menu = page.getByRole('banner').locator('details');
+  if (await menu.evaluate((element) => !(element as HTMLDetailsElement).open)) {
+    await menu.locator('summary').click();
   }
-  await menu.click();
 }

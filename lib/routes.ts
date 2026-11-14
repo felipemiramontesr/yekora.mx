@@ -84,6 +84,19 @@ export function productPath(slug: string, locale: Locale): string {
 }
 
 /**
+ * Where the product search index of a language is served from (FC 047 T0.2): a static file written
+ * with the site, one per language, next to the catalog it describes.
+ *
+ * @param locale - Which language.
+ * @returns e.g. `/search-index.json` or `/en/search-index.json`.
+ */
+export function searchIndexPath(locale: Locale): string {
+  return locale === defaultLocale
+    ? '/search-index.json'
+    : `/${locale}/search-index.json`;
+}
+
+/**
  * The current page in another language, for the language switcher: a product page maps to the
  * same product, a path inside the account area to the same view (lib/account/accountPaths.ts),
  * any other path to its page in the route map.

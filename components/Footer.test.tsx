@@ -34,8 +34,9 @@ describe('Footer', () => {
     );
   });
 
-  it('anchors disciplines and credits Mexican makers without naming brands', () => {
-    expect(html).toContain('href="/#trail-running"');
+  it('links each discipline to its products, offers the language switch and credits Mexican makers without naming brands', () => {
+    expect(html).toContain('href="/catalogo/?disciplina=trail-running"');
+    expect(html).toContain('aria-label="ES, Español"');
     expect(html).toContain('Impulsamos a marcas y fabricantes mexicanos');
     expect(html).toContain(`© ${new Date().getFullYear()} YĒKORA.`);
   });

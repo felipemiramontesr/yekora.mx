@@ -1,8 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Menu } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useEffect, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import {
   type AccountView,
@@ -17,11 +16,8 @@ import {
   saveSessionFirstName,
   subscribeSessionHint,
 } from '@/lib/account/sessionHint';
-import { forgetDevice, logout, me } from '@/lib/api/accountClient';
-import {
-  readSidebarOpen,
-  saveSidebarOpen,
-} from '@/lib/account/sidebarPreference';
+import { me } from '@/lib/api/accountClient';
+import { sectionsOf } from '@/lib/account/sections';
 import { fill } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import {
@@ -36,7 +32,6 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
-import { AccountSidebar } from './AccountSidebar';
 import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -84,30 +79,16 @@ type Stage =
   | { kind: 'backup'; codes: string[] }
   | { kind: 'signedIn'; user: MeResponse };
 
-/** The permission that opens the panel's orders. */
-const PANEL_PERMISSION = 'orders:read';
-
-/** The permission that opens the catalog console (FC 029 F3). */
-const CATALOG_PERMISSION = 'catalog:write';
-
-/** The role that opens the administrators console (FC 044 T1.4): no permission grants it. */
-const OWNER_ROLE = 'owner';
-
-/** Who is offered each tab; the API would refuse the rest anyway. */
-const TAB_ACCESS: Readonly<
-  Record<AccountView['tab'], (user: MeResponse) => boolean>
-> = {
-  orders: () => true,
-  panel: (user) => user.permissions.includes(PANEL_PERMISSION),
-  catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
-  admins: (user) => user.roles.includes(OWNER_ROLE),
-};
-
 const signedOut = (notice: string | null = null): Stage => ({
   kind: 'signIn',
   email: '',
   notice,
 });
+
+/** Whether the address asks for the sign-up form (`?action=register`, FC 047): the header's «Crear cuenta». */
+function registerRequested(search: string): boolean {
+  return new URLSearchParams(search).get('action') === 'register';
+}
 
 /** The token of a mailed reset link (FC 042): `?action=reset-password&token=<64 hex>`. */
 const RESET_TOKEN = /^[0-9a-f]{64}$/;
@@ -177,8 +158,16 @@ export function AccountApp({
   );
 
   useEffect(() => {
-    const read = () =>
+    const read = () => {
       setView(parseAccountPath(globalThis.location.pathname, area));
+      // FC 047: «Crear cuenta» of the header, from inside the area, asks for the sign-up form.
+      if (registerRequested(globalThis.location.search)) {
+        globalThis.history.replaceState(null, '', area);
+        setStage((current) =>
+          current.kind === 'signIn' ? { kind: 'register' } : current
+        );
+      }
+    };
     read();
     // FC 042: a mailed reset link opens the new-password form. Its token leaves the address bar
     // at once, so it stays out of the history, of a shared screen and of any Referer.
@@ -209,13 +198,6 @@ export function AccountApp({
     globalThis.history.pushState(null, '', accountPath(area, next));
     setView(next);
   };
-
-  async function signOut() {
-    await logout();
-    clearSessionFirstName();
-    navigate({ tab: 'orders', orderNumber: null });
-    setStage(signedOut());
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -292,14 +274,18 @@ export function AccountApp({
           view={view}
           texts={{ account: messages, methods }}
           onNavigate={navigate}
-          onSignOut={signOut}
         />
       )}
     </div>
   );
 }
 
-/** The signed-in area: greeting, sign-out, the tabs and the open list or order. */
+/**
+ * The signed-in area (FC 047 T2.5): where the person is, and the open list or order. The sections
+ * themselves, with sign-out and the language, live in the account menu of the header, so the area
+ * has no navigation of its own; it only says where you are: the greeting, and a breadcrumb
+ * («Mi cuenta › section») whose first step returns to the orders.
+ */
 function Dashboard({
   locale,
   area,
@@ -307,7 +293,6 @@ function Dashboard({
   view,
   texts,
   onNavigate,
-  onSignOut,
 }: Readonly<{
   locale: Locale;
   area: string;
@@ -315,122 +300,66 @@ function Dashboard({
   view: AccountView;
   texts: { account: Messages['account']; methods: AccountAppProps['methods'] };
   onNavigate: (view: AccountView) => void;
-  onSignOut: () => Promise<void>;
 }>) {
   const { dashboard } = texts.account;
-  const [leaving, setLeaving] = useState(false);
-  const [forgetting, setForgetting] = useState(false);
-  const [deviceNote, setDeviceNote] = useState<string | null>(null);
   // A tab is offered only with its permission or role; the API would refuse it anyway.
-  const tabs = (['orders', 'panel', 'catalog', 'admins'] as const).filter(
-    (name) => TAB_ACCESS[name](user)
-  );
-  const [expanded, setExpanded] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const openerRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => setExpanded(readSidebarOpen()), []);
+  const tabs = sectionsOf(user);
   const tab = tabs.includes(view.tab) ? view.tab : 'orders';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
 
-  const closeDrawer = useCallback(() => {
-    setDrawerOpen(false);
-    openerRef.current?.focus();
-  }, []);
-  const toggleExpanded = () => {
-    saveSidebarOpen(!expanded);
-    setExpanded(!expanded);
-  };
-  const forget = () => {
-    setForgetting(true);
-    void forgetDevice().then((result) => {
-      setForgetting(false);
-      setDeviceNote(
-        result.ok
-          ? dashboard.deviceForgotten
-          : failureText(texts.account, result.reason)
-      );
-    });
-  };
-  const sections = tabs.map((name) => ({
-    tab: name,
-    label: dashboard[name],
-    href: accountPath(area, { tab: name, orderNumber: null }),
-  }));
-
   return (
-    <div
-      className={`grid gap-6 md:items-start md:gap-8 ${
-        expanded
-          ? 'md:grid-cols-[220px_minmax(0,1fr)]'
-          : 'md:grid-cols-[80px_minmax(0,1fr)]'
-      }`}
-    >
-      <AccountSidebar
-        user={user}
-        texts={dashboard}
-        sections={sections}
-        active={tab}
-        expanded={expanded}
-        onToggleExpanded={toggleExpanded}
-        drawerOpen={drawerOpen}
-        onCloseDrawer={closeDrawer}
-        onSelect={(name) => {
-          setDrawerOpen(false);
-          onNavigate({ tab: name, orderNumber: null });
-        }}
-        onForgetDevice={forget}
-        forgetting={forgetting}
-        onSignOut={() => {
-          setLeaving(true);
-          void onSignOut();
-        }}
-        leaving={leaving}
-      />
-      <div className="flex min-w-0 flex-col gap-6">
-        <div className="flex items-center gap-3">
-          <button
-            ref={openerRef}
-            type="button"
-            aria-expanded={drawerOpen}
-            aria-controls="account-sidebar"
-            onClick={() => setDrawerOpen(true)}
-            className="tap-target gap-2 rounded-md border border-petroleo px-3 md:hidden"
-          >
-            <Menu aria-hidden="true" size={20} />
-            {dashboard.menu}
-          </button>
-          <p className="text-xl font-semibold">
-            {fill(dashboard.greeting, { name: user.fullName })}
-          </p>
-        </div>
-        {deviceNote && <output className="block text-sm">{deviceNote}</output>}
-        {tab === 'catalog' && (
-          <CatalogConsole texts={texts.account.catalog} locale={locale} />
-        )}
-        {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
-        {isOrders && view.orderNumber && (
-          <OrderDetailView
-            scope={scope}
-            orderNumber={view.orderNumber}
-            locale={locale}
-            texts={texts}
-            backHref={accountPath(area, { tab, orderNumber: null })}
-            onBack={() => open(null)}
-          />
-        )}
-        {isOrders && !view.orderNumber && (
-          <OrderList
-            key={scope}
-            scope={scope}
-            locale={locale}
-            texts={texts}
-            hrefOf={(orderNumber) => accountPath(area, { tab, orderNumber })}
-            onOpen={open}
-          />
-        )}
+    <div className="flex min-w-0 flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <nav aria-label={dashboard.breadcrumb}>
+          <ol className="flex flex-wrap items-center gap-2 text-sm text-petroleo/80">
+            <li>
+              <a
+                href={accountPath(area, { tab: 'orders', orderNumber: null })}
+                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                  event.preventDefault();
+                  onNavigate({ tab: 'orders', orderNumber: null });
+                }}
+                className="tap-target underline underline-offset-4"
+              >
+                {texts.account.title}
+              </a>
+            </li>
+            <li aria-hidden="true">›</li>
+            <li aria-current="page" className="font-semibold text-petroleo">
+              {dashboard[tab]}
+            </li>
+          </ol>
+        </nav>
+        <p className="text-xl font-semibold">
+          {fill(dashboard.greeting, { name: user.fullName })}
+        </p>
       </div>
+      {tab === 'catalog' && (
+        <CatalogConsole texts={texts.account.catalog} locale={locale} />
+      )}
+      {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
+      {isOrders && view.orderNumber && (
+        <OrderDetailView
+          scope={scope}
+          orderNumber={view.orderNumber}
+          locale={locale}
+          texts={texts}
+          backHref={accountPath(area, { tab, orderNumber: null })}
+          onBack={() => open(null)}
+        />
+      )}
+      {isOrders && !view.orderNumber && (
+        <OrderList
+          key={scope}
+          scope={scope}
+          locale={locale}
+          texts={texts}
+          hrefOf={(orderNumber) => accountPath(area, { tab, orderNumber })}
+          onOpen={open}
+        />
+      )}
     </div>
   );
 }

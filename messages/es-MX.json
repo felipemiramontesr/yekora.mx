@@ -325,12 +325,34 @@
     "homeLink": "YĒKORA, ir al inicio"
   },
   "header": {
-    "navLabel": "Navegación principal",
-    "menu": "Menú",
     "about": "Nosotros",
-    "catalog": "Catálogo",
     "account": "Mi cuenta",
-    "signOut": "Salir"
+    "signOut": "Salir",
+    "disciplinesLabel": "Disciplinas",
+    "search": {
+      "label": "Buscar en la tienda",
+      "placeholder": "Buscar productos",
+      "submit": "Buscar",
+      "suggestions": "Sugerencias de productos",
+      "count": "{count} sugerencias",
+      "none": "Sin sugerencias para «{query}». Presiona Enter para buscar en toda la tienda.",
+      "loadFailed": "No pudimos cargar las sugerencias. Presiona Enter para buscar."
+    },
+    "delivery": {
+      "label": "Enviar a",
+      "guest": "Tu CP",
+      "guestHint": "Crea tu cuenta con tu código postal para ver a dónde enviamos",
+      "add": "Agregar CP",
+      "addHint": "Agrega tu código postal en tu cuenta",
+      "to": "Enviar al código postal {code}"
+    },
+    "accountMenu": {
+      "enter": "Entrar",
+      "createAccount": "Crear cuenta",
+      "greeting": "Hola, {name}",
+      "language": "Idioma",
+      "deviceFailed": "No pudimos olvidar este dispositivo. Intenta de nuevo."
+    }
   },
   "disciplines": {
     "senderismo": "Senderismo",
@@ -450,7 +472,9 @@
         "other": "{count} productos"
       },
       "empty": "Ningún producto coincide con estos filtros.",
-      "reset": "Quitar filtros"
+      "reset": "Quitar filtros",
+      "searching": "Resultados para «{query}»",
+      "clearSearch": "Quitar la búsqueda"
     },
     "product": {
       "back": "Volver al catálogo",
@@ -756,9 +780,7 @@
     },
     "dashboard": {
       "greeting": "Hola, {name}",
-      "signOut": "Salir",
       "signingOut": "Saliendo…",
-      "tabsLabel": "Secciones de tu cuenta",
       "orders": "Mis pedidos",
       "panel": "Panel: pedidos",
       "forgetDevice": "Olvidar este dispositivo",
@@ -767,11 +789,7 @@
       "catalog": "Catálogo",
       "admins": "Administradores",
       "ownerBadge": "Owner",
-      "sidebar": "Barra lateral de tu cuenta",
-      "menu": "Menú de la cuenta",
-      "closeMenu": "Cerrar el menú",
-      "collapse": "Replegar la barra lateral",
-      "expand": "Desplegar la barra lateral"
+      "breadcrumb": "Dónde estás en tu cuenta"
     },
     "orders": {
       "loading": "Cargando pedidos…",

@@ -149,13 +149,11 @@ describe('catalog tab of /cuenta (FC 029 F3)', () => {
     );
     expect(
       (
-        await screen.findByRole('link', { name: account.dashboard.catalog })
+        await screen.findByText(account.dashboard.catalog, { selector: 'li' })
       ).getAttribute('aria-current')
     ).toBe('page');
     expect(await screen.findByText('Cumbre')).toBeTruthy();
-    expect(
-      screen.queryByRole('link', { name: account.dashboard.panel })
-    ).toBeNull();
+    expect(screen.queryByText(account.dashboard.panel)).toBeNull();
   });
 
   it('never offers the console without catalog:write, even at its path', async () => {
@@ -168,10 +166,12 @@ describe('catalog tab of /cuenta (FC 029 F3)', () => {
         methods={checkout.method.options}
       />
     );
-    await screen.findByRole('link', { name: account.dashboard.orders });
     expect(
-      screen.queryByRole('link', { name: account.dashboard.catalog })
-    ).toBeNull();
+      (
+        await screen.findByText(account.dashboard.orders, { selector: 'li' })
+      ).getAttribute('aria-current')
+    ).toBe('page');
+    expect(screen.queryByText(account.dashboard.catalog)).toBeNull();
     expect(api.listBrands).not.toHaveBeenCalled();
   });
 });

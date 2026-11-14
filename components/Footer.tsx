@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 /** Props of {@link Footer}. */
 interface FooterProps {
@@ -11,7 +12,7 @@ interface FooterProps {
 }
 
 /**
- * Site footer: brand lockup and promise, discipline anchors, About, and the legal pages
+ * Site footer: brand lockup and promise, the disciplines (each one leads to its products), About, the language switch (a fallback of the account menu, FC 047 T2.4), and the legal pages
  * (privacy, cookies, terms, shipping and returns) in the current language.
  */
 export function Footer({ locale, messages }: Readonly<FooterProps>) {
@@ -59,7 +60,7 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
             {disciplines.map((discipline) => (
               <li key={discipline}>
                 <Link
-                  href={`${routeFor('home', locale)}#${discipline}`}
+                  href={`${routeFor('catalog', locale)}?disciplina=${discipline}`}
                   className="tap-target underline-offset-4 hover:underline"
                 >
                   {messages.disciplines[discipline]}
@@ -82,6 +83,12 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
               </Link>
             </li>
             <li className="text-marfil/90">{footer.mexicanTalent}</li>
+            <li className="mt-3">
+              <LanguageSwitcher
+                locale={locale}
+                messages={messages.languageSwitcher}
+              />
+            </li>
           </ul>
         </div>
         <nav aria-label={footer.legalTitle}>

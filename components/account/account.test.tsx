@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMessages } from '@/app/i18n';
@@ -478,7 +479,7 @@ describe('account area · trusted device (FC 028 Enmienda 1, E2)', () => {
     expect(screen.queryByLabelText(account.code.remember)).toBeNull();
   });
 
-  it('signs straight in on a remembered device (201), and forgets it on request', async () => {
+  it('signs straight in on a remembered device (201)', async () => {
     renderApp();
     await screen.findByRole('heading', { name: account.signIn.title });
     api.login.mockResolvedValueOnce(ok({ status: 'signed_in' }) as never);
@@ -488,13 +489,6 @@ describe('account area · trusted device (FC 028 Enmienda 1, E2)', () => {
     press(account.signIn.submit);
     await screen.findByText('Hola, Ana Flores');
     expect(api.verify).not.toHaveBeenCalled();
-    api.forgetDevice.mockResolvedValueOnce(no('offline'));
-    press(account.dashboard.forgetDevice);
-    expect(screen.getByText(account.dashboard.forgettingDevice)).toBeTruthy();
-    await screen.findByText(account.errors.offline);
-    api.forgetDevice.mockResolvedValueOnce(ok(null));
-    press(account.dashboard.forgetDevice);
-    await screen.findByText(account.dashboard.deviceForgotten);
   });
 });
 
@@ -507,10 +501,11 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     api.readOrder.mockResolvedValue(ok(DETAIL));
     renderApp();
     await screen.findByText('Hola, Luis Staff');
-    const tab = screen.getByRole('link', { name: account.dashboard.panel });
-    expect(tab.getAttribute('href')).toBe('/cuenta/panel/');
-    fireEvent.click(tab);
-    expect(globalThis.location.pathname).toBe('/cuenta/panel/');
+    // The account menu of the header (FC 047) pushes the address and tells the area.
+    globalThis.history.pushState(null, '', '/cuenta/panel/');
+    act(() => {
+      globalThis.dispatchEvent(new PopStateEvent('popstate'));
+    });
     await screen.findByLabelText(account.orders.filter);
     fireEvent.change(screen.getByLabelText(account.orders.filter), {
       target: { value: 'PAID' },
@@ -538,9 +533,7 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     expect(screen.getByText(/Sin cambio/)).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: account.orders.back }));
     expect(globalThis.location.pathname).toBe('/cuenta/panel/');
-    fireEvent.click(
-      screen.getByRole('link', { name: account.dashboard.orders })
-    );
+    fireEvent.click(screen.getByRole('link', { name: account.title }));
     expect(globalThis.location.pathname).toBe('/cuenta/');
   });
 
@@ -619,19 +612,38 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     expect(screen.queryByText(account.orders.alert)).toBeNull();
   });
 
-  it('signs out and returns to the sign-in form', async () => {
+  it('says where you are with a breadcrumb whose first step returns to the orders (FC 047 T2.5)', async () => {
     globalThis.history.replaceState(null, '', `/cuenta/${ORDER}/`);
     api.me.mockResolvedValue(ok(BUYER));
     api.readOrder.mockResolvedValue(ok(DETAIL));
-    api.logout.mockResolvedValue(ok(null));
     renderApp();
     await screen.findByText('Hola, Ana Flores');
-    api.me.mockResolvedValue(no('SESSION_INVALID_OR_EXPIRED'));
-    press(account.dashboard.signOut);
-    expect(screen.getByText(account.dashboard.signingOut)).toBeTruthy();
-    await screen.findByRole('heading', { name: account.signIn.title });
-    expect(api.logout).toHaveBeenCalled();
+    const crumbs = screen.getByRole('navigation', {
+      name: account.dashboard.breadcrumb,
+    });
+    expect(
+      within(crumbs)
+        .getByText(account.dashboard.orders)
+        .getAttribute('aria-current')
+    ).toBe('page');
+    fireEvent.click(within(crumbs).getByRole('link', { name: account.title }));
     expect(globalThis.location.pathname).toBe('/cuenta/');
+  });
+
+  it('names the section of the breadcrumb: the panel for staff, the console for the owner', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/panel/');
+    api.me.mockResolvedValue(ok(STAFF));
+    renderApp();
+    await screen.findByText(/Hola, /);
+    const crumbs = screen.getByRole('navigation', {
+      name: account.dashboard.breadcrumb,
+    });
+    expect(
+      within(crumbs)
+        .getByText(account.dashboard.panel)
+        .getAttribute('aria-current')
+    ).toBe('page');
+    expect(screen.queryByRole('button', { name: /Salir|Olvidar/ })).toBeNull();
   });
 });
 
@@ -907,12 +919,11 @@ describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', ()
     await screen.findByText(t.caption);
   }
 
-  it('ADMIN_LIST_GRANTED · shows the owner the badge, the tab and the accounts, the owner row without controls', async () => {
+  it('ADMIN_LIST_GRANTED · shows the owner the console and the accounts, the owner row without controls', async () => {
     await openConsole(OWNER_ROW, ZOE, LEO);
-    expect(screen.getByText(account.dashboard.ownerBadge)).toBeTruthy();
     expect(
       screen
-        .getByRole('link', { name: account.dashboard.admins })
+        .getByText(account.dashboard.admins, { selector: 'li' })
         .getAttribute('aria-current')
     ).toBe('page');
     const rows = screen.getAllByRole('row').map((row) => row.textContent);
@@ -935,15 +946,16 @@ describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', ()
     ).toBeTruthy();
   });
 
-  it('ADMIN_LIST_NOT_OWNER · offers an administrator neither the badge nor the console, even at its path', async () => {
+  it('ADMIN_LIST_NOT_OWNER · offers an administrator no console, even at its path: it falls back to the orders', async () => {
     globalThis.history.replaceState(null, '', '/cuenta/administradores/');
     api.me.mockResolvedValue(ok({ ...OWNER, roles: ['admin', 'customer'] }));
     renderApp();
-    await screen.findByRole('link', { name: account.dashboard.orders });
     expect(
-      screen.queryByRole('link', { name: account.dashboard.admins })
-    ).toBeNull();
-    expect(screen.queryByText(account.dashboard.ownerBadge)).toBeNull();
+      (
+        await screen.findByText(account.dashboard.orders, { selector: 'li' })
+      ).getAttribute('aria-current')
+    ).toBe('page');
+    expect(screen.queryByText(account.dashboard.admins)).toBeNull();
     expect(api.listAdminUsers).not.toHaveBeenCalled();
   });
 
@@ -1022,16 +1034,11 @@ describe('account area · the header hint (FC 046 T1.1, T2.2)', () => {
     localStorage.clear();
   });
 
-  it('keeps only the first name when the session is confirmed, and erases it on sign-out', async () => {
+  it('keeps only the first name when the session is confirmed', async () => {
     api.me.mockResolvedValue(ok(BUYER));
-    api.logout.mockResolvedValue(ok(null));
     renderApp();
     await screen.findByText('Hola, Ana Flores');
     expect(localStorage.getItem(KEY)).toBe('Ana');
-    api.me.mockResolvedValue(no('SESSION_INVALID_OR_EXPIRED'));
-    press(account.dashboard.signOut);
-    await screen.findByRole('heading', { name: account.signIn.title });
-    expect(localStorage.getItem(KEY)).toBeNull();
   });
 
   it('erases a stale hint when there is no session', async () => {
@@ -1073,55 +1080,41 @@ describe('account area · the header hint (FC 046 T1.1, T2.2)', () => {
   });
 });
 
-describe('sidebar of the signed-in area (FC 046 T2.3)', () => {
-  const SIDEBAR_KEY = 'yekora_account_sidebar_open_v1';
-  afterEach(() => localStorage.removeItem(SIDEBAR_KEY));
-
-  it('starts folded, opens and folds by the tab, and remembers the choice', async () => {
-    api.me.mockResolvedValue(ok(BUYER));
-    renderApp();
-    const toggle = await screen.findByRole('button', {
-      name: 'Desplegar la barra lateral',
-    });
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(toggle);
-    expect(localStorage.getItem(SIDEBAR_KEY)).toBe('1');
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Replegar la barra lateral' })
-    );
-    expect(localStorage.getItem(SIDEBAR_KEY)).toBeNull();
-  });
-
-  it('starts open when it was left open', async () => {
-    localStorage.setItem(SIDEBAR_KEY, '1');
-    api.me.mockResolvedValue(ok(BUYER));
+describe('account area · sign-up from the header (FC 047)', () => {
+  it('opens the sign-up form when the address asks for it, and takes the request out of the address', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/?action=register');
     renderApp();
     expect(
-      await screen.findByRole('button', { name: 'Replegar la barra lateral' })
+      await screen.findByRole('heading', { name: account.register.title })
     ).toBeTruthy();
+    expect(globalThis.location.search).toBe('');
+    expect(globalThis.location.pathname).toBe('/cuenta/');
   });
 
-  it('opens the drawer from the menu button and gives the focus back when it closes', async () => {
+  it('opens the sign-up form when the header asks for it from inside the area', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    globalThis.history.pushState(null, '', '/cuenta/?action=register');
+    act(() => {
+      globalThis.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(
+      await screen.findByRole('heading', { name: account.register.title })
+    ).toBeTruthy();
+    expect(globalThis.location.search).toBe('');
+  });
+
+  it('leaves a signed-in person where they are when the sign-up form is asked for', async () => {
     api.me.mockResolvedValue(ok(BUYER));
     renderApp();
-    const opener = await screen.findByRole('button', {
-      name: 'Menú de la cuenta',
+    await screen.findByText(/Hola, /);
+    globalThis.history.pushState(null, '', '/cuenta/?action=register');
+    act(() => {
+      globalThis.dispatchEvent(new PopStateEvent('popstate'));
     });
-    fireEvent.click(opener);
-    expect(opener.getAttribute('aria-expanded')).toBe('true');
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(opener.getAttribute('aria-expanded')).toBe('false');
-    expect(document.activeElement).toBe(opener);
-  });
-
-  it('closes the drawer when a section is chosen', async () => {
-    api.me.mockResolvedValue(ok(STAFF));
-    renderApp();
-    const opener = await screen.findByRole('button', {
-      name: 'Menú de la cuenta',
-    });
-    fireEvent.click(opener);
-    fireEvent.click(screen.getByRole('link', { name: 'Panel: pedidos' }));
-    expect(opener.getAttribute('aria-expanded')).toBe('false');
+    expect(
+      screen.queryByRole('heading', { name: account.register.title })
+    ).toBeNull();
+    expect(screen.getByText(/Hola, /)).toBeTruthy();
   });
 });

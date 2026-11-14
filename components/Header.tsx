@@ -1,11 +1,10 @@
-import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
-import { routeFor } from '@/lib/routes';
-import { AccountHeaderControl } from './AccountHeaderControl';
+import { routeFor, searchIndexPath } from '@/lib/routes';
+import { AccountMenu } from './AccountMenu';
 import { CartButton } from './cart/CartButton';
-import { LanguageSwitcher } from './LanguageSwitcher';
-import { MenuDisclosure } from './MenuDisclosure';
+import { DeliveryIndicator } from './DeliveryIndicator';
+import { SearchCombobox } from './SearchCombobox';
 
 /** Props of {@link Header}. */
 interface HeaderProps {
@@ -15,124 +14,101 @@ interface HeaderProps {
   messages: Messages;
 }
 
-// Disciplines, About and the catalog, shared by the desktop bar and the mobile menu.
-function NavItems({ locale, messages }: Readonly<HeaderProps>) {
+/**
+ * The strip of disciplines under the bar (FC 047 T2.1): each one leads to its products in the
+ * catalog (`?disciplina=`). On a phone it scrolls sideways and fades at its edge, so nothing is
+ * hidden and nothing wraps onto a second line.
+ */
+function DisciplineBar({ locale, messages }: Readonly<HeaderProps>) {
   return (
-    <>
-      {disciplines.map((discipline) => (
-        <li key={discipline}>
-          <Link
-            href={`${routeFor('home', locale)}#${discipline}`}
-            className="tap-target underline-offset-4 hover:underline"
-          >
-            {messages.disciplines[discipline]}
-          </Link>
-        </li>
-      ))}
-      <li>
-        <Link
-          href={routeFor('about', locale)}
-          className="tap-target underline-offset-4 hover:underline"
-        >
-          {messages.header.about}
-        </Link>
-      </li>
-      <li>
-        <Link
-          href={routeFor('catalog', locale)}
-          className="tap-target underline-offset-4 hover:underline"
-        >
-          {messages.header.catalog}
-        </Link>
-      </li>
-    </>
+    <nav
+      aria-label={messages.header.disciplinesLabel}
+      className="bg-petroleo text-marfil"
+    >
+      <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 text-sm [mask-image:linear-gradient(to_right,black_90%,transparent)] [scrollbar-width:none] md:[mask-image:none]">
+        {disciplines.map((discipline) => (
+          <li key={discipline} className="shrink-0">
+            <Link
+              href={`${routeFor('catalog', locale)}?disciplina=${discipline}`}
+              className="tap-target px-3 underline-offset-4 hover:underline"
+            >
+              {messages.disciplines[discipline]}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
 /**
- * Site header: brand lockup linking home, the discipline anchors, About, the catalog, the
- * language switcher, the account control (FC 028, FC 046) and the cart button (FC 009). From xl (1280 px) a single bar; below, a menu built on native
- * `<details>`, so it opens even without JavaScript. Every target is at least 44 px (FC 003 gate).
- * Internal links use `next/link` (FC 043 T2.3): the next page is prefetched and opens without a
- * full reload. The language switcher stays a plain link, since each language has its own root
- * layout (another document).
+ * Site header (FC 047), laid out like the big stores and dressed as Yekora: from left to right the
+ * logo, where we deliver (only the postal code of the account), the product search, the account
+ * menu (which also holds the language) and the cart; under the bar, the strip of disciplines. On a
+ * phone the bar becomes rows: logo, account and cart; the search at full width; the delivery code.
+ * No hamburger: everything a person needs has a place in view. The bar stays on screen while the
+ * page scrolls; the strip of disciplines does not, so it never eats the height of a phone.
+ * Every target is at least 44 px (FC 003 gate), and internal links use `next/link` (FC 043 T2.3).
  */
 export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
-    <header className="sticky top-0 z-40 bg-petroleo text-marfil">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-6">
-        <Link
-          href={routeFor('home', locale)}
-          aria-label={messages.brand.homeLink}
-          className="tap-target shrink-0 gap-3"
-        >
-          {/* Horizontal lockup from the client's individual elements; the name is never retyped.
-              The link's aria-label names it, so the images are decorative. */}
-          <img
-            src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"
-            alt=""
-            width={28}
-            height={32}
-          />
-          <img
-            src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"
-            alt=""
-            width={101}
-            height={18}
-          />
-        </Link>
-        <nav
-          aria-label={messages.header.navLabel}
-          className="hidden flex-1 xl:block"
-        >
-          <ul className="flex flex-wrap items-center gap-5 text-sm">
-            <NavItems locale={locale} messages={messages} />
-          </ul>
-        </nav>
-        <div className="hidden xl:block">
-          <LanguageSwitcher
-            locale={locale}
-            messages={messages.languageSwitcher}
-          />
-        </div>
-        {/* FC 028: the account area, always visible next to the cart. On narrow phones the bar
-            tightens its gaps and the menu shows only its icon, so the three icons fit 360 px. */}
-        <AccountHeaderControl
-          href={routeFor('account', locale)}
-          messages={messages.header}
-        />
-        {/* FC 009: always visible, on every screen size, outside the collapsible menu. */}
-        <CartButton
-          locale={locale}
-          messages={messages.cart}
-          priceMessages={messages.catalog.price}
-        />
-        {/* Phones and tablets: native <details>/<summary>, so the menu opens without JavaScript;
-            MenuDisclosure only closes it after a client navigation (FC 043 T2.3).
-            The full bar needs xl: below 1280 px it wraps onto two lines. */}
-        <MenuDisclosure className="relative xl:hidden">
-          <summary className="tap-target cursor-pointer list-none gap-2 px-1 text-sm">
-            <Menu aria-hidden="true" size={22} />
-            <span className="sr-only sm:not-sr-only">
-              {messages.header.menu}
-            </span>
-          </summary>
-          <nav
-            aria-label={messages.header.navLabel}
-            className="absolute right-0 mt-3 w-64 rounded-lg bg-petroleo p-4 shadow-lg"
+    <>
+      <header className="sticky top-0 z-40 bg-petroleo text-marfil">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 md:flex-nowrap md:gap-x-4">
+          <Link
+            href={routeFor('home', locale)}
+            aria-label={messages.brand.homeLink}
+            className="tap-target order-1 mr-auto shrink-0 gap-3 md:mr-0"
           >
-            <ul className="flex flex-col text-sm">
-              <NavItems locale={locale} messages={messages} />
-            </ul>
-            <div className="mt-4 border-t border-marfil/20 pt-4">
-              <LanguageSwitcher
-                locale={locale}
-                messages={messages.languageSwitcher}
-              />
-            </div>
-          </nav>
-        </MenuDisclosure>
-      </div>
-    </header>
+            {/* Horizontal lockup from the client's individual elements; the name is never retyped.
+                The link's aria-label names it, so the images are decorative. */}
+            <img
+              src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"
+              alt=""
+              width={28}
+              height={32}
+            />
+            <img
+              src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"
+              alt=""
+              width={101}
+              height={18}
+            />
+          </Link>
+          <div className="order-5 md:order-2">
+            <DeliveryIndicator
+              accountHref={routeFor('account', locale)}
+              registerHref={`${routeFor('account', locale)}?action=register`}
+              messages={messages.header.delivery}
+            />
+          </div>
+          <div className="order-4 w-full md:order-3 md:w-auto md:flex-1">
+            <SearchCombobox
+              locale={locale}
+              action={routeFor('catalog', locale)}
+              indexUrl={searchIndexPath(locale)}
+              messages={messages.header.search}
+            />
+          </div>
+          <div className="order-2 md:order-4">
+            <AccountMenu
+              locale={locale}
+              area={routeFor('account', locale)}
+              messages={messages.header}
+              dashboard={messages.account.dashboard}
+              languageMessages={messages.languageSwitcher}
+            />
+          </div>
+          <div className="order-3 md:order-5">
+            <CartButton
+              locale={locale}
+              messages={messages.cart}
+              priceMessages={messages.catalog.price}
+            />
+          </div>
+        </div>
+      </header>
+      <DisciplineBar locale={locale} messages={messages} />
+    </>
   );
 }

@@ -7,7 +7,10 @@ vi.mock('next/font/local', () => ({
     variable: options.variable.slice(2),
   }),
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/en/' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/en/',
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 import { SiteShell } from './SiteShell';
 

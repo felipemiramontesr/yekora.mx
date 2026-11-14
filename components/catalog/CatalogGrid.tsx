@@ -1,9 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { fill, type PriceText } from '@/lib/catalog/format';
+import { matchEntries } from '@/lib/catalog/search';
 import { ProductVisual } from './ProductVisual';
 
 /** A product card, prepared on the server (prices already formatted). */
@@ -97,6 +108,32 @@ function Filter({
   );
 }
 
+/**
+ * Reads the filters the address carries (FC 047 T2.1, T1.2): `?disciplina=` from the strip of
+ * disciplines and `?q=` from the search of the header. It renders nothing, so while the page is
+ * still the static HTML the full catalog is what shows; once the address is known it hands the
+ * filters up, and again whenever the address changes (the strip links are client navigations).
+ */
+function UrlFilters({
+  onChange,
+}: Readonly<{
+  onChange: (filters: { discipline: string; query: string }) => void;
+}>) {
+  const params = useSearchParams();
+  const discipline = params?.get('disciplina') ?? '';
+  const query = params?.get('q') ?? '';
+  const seen = useRef(false);
+  useEffect(() => {
+    // This renders after hydration, maybe after the person has already chosen something: an
+    // address with no filter says nothing about it, so only a filter, or the end of one, counts.
+    const first = !seen.current;
+    seen.current = true;
+    if (first && discipline === '' && query === '') return;
+    onChange({ discipline, query });
+  }, [discipline, query, onChange]);
+  return null;
+}
+
 function ProductCard({
   item,
   messages,
@@ -151,6 +188,7 @@ export function CatalogGrid({
 }: Readonly<CatalogGridProps>) {
   const [discipline, setDiscipline] = useState('');
   const [level, setLevel] = useState('');
+  const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('name');
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
@@ -176,21 +214,42 @@ export function CatalogGrid({
       ),
     [items, locale]
   );
+  // The slugs that answer the search of the header, or null when there is none.
+  const found = useMemo(
+    () =>
+      query.trim() === ''
+        ? null
+        : new Set(matchEntries(items, query).map((entry) => entry.slug)),
+    [items, query]
+  );
   const visible = useMemo(
     () =>
       items
         .filter(
           (item) =>
             (discipline === '' || item.discipline === discipline) &&
-            (level === '' || item.level === level)
+            (level === '' || item.level === level) &&
+            (found === null || found.has(item.slug))
         )
         .sort(comparator(sort, locale)),
-    [items, discipline, level, sort, locale]
+    [items, discipline, level, found, sort, locale]
   );
   const plural = new Intl.PluralRules(locale).select(visible.length);
 
+  // Stable, so the address is read again only when it changes, never after a choice of the person.
+  const setFilters = useCallback(
+    (next: { discipline: string; query: string }) => {
+      setDiscipline(next.discipline);
+      setQuery(next.query);
+    },
+    []
+  );
+
   return (
     <>
+      <Suspense fallback={null}>
+        <UrlFilters onChange={setFilters} />
+      </Suspense>
       <fieldset className="mt-8 grid gap-4 sm:grid-cols-3">
         <legend className="sr-only">{filters.label}</legend>
         <Filter
@@ -233,10 +292,29 @@ export function CatalogGrid({
 
       {/* <output> carries the status role natively, so the count is announced when it changes. */}
       <output className="mt-6 block text-sm text-petroleo/80">
+        {query.trim() !== '' &&
+          `${fill(filters.searching, { query: query.trim() })} · `}
         {fill(plural === 'one' ? filters.results.one : filters.results.other, {
           count: visible.length,
         })}
       </output>
+      {query.trim() !== '' && (
+        <button
+          type="button"
+          onClick={() => {
+            // Drops `?q=` from the address too, so a reload does not bring the search back.
+            globalThis.history.replaceState(
+              null,
+              '',
+              globalThis.location.pathname
+            );
+            setQuery('');
+          }}
+          className="tap-target mt-2 text-sm underline underline-offset-4"
+        >
+          {filters.clearSearch}
+        </button>
+      )}
 
       {visible.length === 0 ? (
         <div className="mt-6 flex flex-col items-start gap-4">
@@ -246,6 +324,7 @@ export function CatalogGrid({
             onClick={() => {
               setDiscipline('');
               setLevel('');
+              setQuery('');
             }}
             className="min-h-11 rounded-md border border-petroleo px-5 font-semibold"
           >

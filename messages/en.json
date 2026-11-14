@@ -325,12 +325,34 @@
     "homeLink": "YĒKORA, go to home"
   },
   "header": {
-    "navLabel": "Main navigation",
-    "menu": "Menu",
-    "about": "About us",
-    "catalog": "Catalog",
+    "about": "About",
     "account": "My account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "disciplinesLabel": "Disciplines",
+    "search": {
+      "label": "Search the store",
+      "placeholder": "Search products",
+      "submit": "Search",
+      "suggestions": "Product suggestions",
+      "count": "{count} suggestions",
+      "none": "No suggestions for “{query}”. Press Enter to search the whole store.",
+      "loadFailed": "We could not load the suggestions. Press Enter to search."
+    },
+    "delivery": {
+      "label": "Deliver to",
+      "guest": "Your ZIP",
+      "guestHint": "Create your account with your postal code to see where we deliver",
+      "add": "Add postal code",
+      "addHint": "Add your postal code in your account",
+      "to": "Deliver to postal code {code}"
+    },
+    "accountMenu": {
+      "enter": "Sign in",
+      "createAccount": "Create account",
+      "greeting": "Hello, {name}",
+      "language": "Language",
+      "deviceFailed": "We could not forget this device. Try again."
+    }
   },
   "disciplines": {
     "senderismo": "Hiking",
@@ -450,7 +472,9 @@
         "other": "{count} products"
       },
       "empty": "No product matches these filters.",
-      "reset": "Clear filters"
+      "reset": "Clear filters",
+      "searching": "Results for “{query}”",
+      "clearSearch": "Clear the search"
     },
     "product": {
       "back": "Back to the catalog",
@@ -756,9 +780,7 @@
     },
     "dashboard": {
       "greeting": "Hello, {name}",
-      "signOut": "Sign out",
       "signingOut": "Signing out…",
-      "tabsLabel": "Sections of your account",
       "orders": "My orders",
       "panel": "Panel: orders",
       "forgetDevice": "Forget this device",
@@ -767,11 +789,7 @@
       "catalog": "Catalog",
       "admins": "Administrators",
       "ownerBadge": "Owner",
-      "sidebar": "Sidebar of your account",
-      "menu": "Account menu",
-      "closeMenu": "Close the menu",
-      "collapse": "Collapse the sidebar",
-      "expand": "Expand the sidebar"
+      "breadcrumb": "Where you are in your account"
     },
     "orders": {
       "loading": "Loading orders…",

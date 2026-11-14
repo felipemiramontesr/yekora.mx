@@ -7,7 +7,10 @@ vi.mock('next/font/local', () => ({
     variable: options.variable.slice(2),
   }),
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => null }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => null,
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 import GlobalNotFound, { metadata } from './global-not-found';
 

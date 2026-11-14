@@ -3,7 +3,7 @@ import {
   E2E_RESET_TOKEN,
   mockAccountApi,
   mockCatalogApi,
-  openAccountSidebar,
+  openAccountMenu,
 } from './support/accountApi';
 import { solidPng } from './support/imageFixtures';
 
@@ -178,10 +178,12 @@ test('the owner invites, switches off and withdraws administrators; the owner ro
 }) => {
   await mockAccountApi(page, { signedIn: 'owner' });
   await page.goto('/cuenta/');
-  await expect(page.getByText('Hola, GrayMan')).toBeVisible();
-  await openAccountSidebar(page);
-  await expect(page.getByText('Owner', { exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Administradores' }).click();
+  await expect(page.getByRole('main').getByText('Hola, GrayMan')).toBeVisible();
+  // FC 047: the badge and the sections of the owner are in the account menu of the header.
+  const header = page.getByRole('banner');
+  await header.locator('summary').click();
+  await expect(header.getByText('Owner', { exact: true })).toBeVisible();
+  await header.getByRole('link', { name: 'Administradores' }).click();
   await expect(page).toHaveURL(/\/cuenta\/administradores\/$/);
   const row = (name: string) => page.getByRole('row').filter({ hasText: name });
   await expect(row('GrayMan')).toContainText(
@@ -216,10 +218,10 @@ test('the administrators console has its own address in English, and only the ow
 }) => {
   await mockAccountApi(page, { signedIn: 'owner' });
   await page.goto('/en/account/');
-  await openAccountSidebar(page);
+  await openAccountMenu(page);
   await page.getByRole('link', { name: 'Administrators' }).click();
   await expect(page).toHaveURL(/\/en\/account\/administradores\/$/);
-  await openAccountSidebar(page);
+  await openAccountMenu(page);
   await expect(
     page.getByRole('link', { name: 'Administrators' })
   ).toHaveAttribute('aria-current', 'page');
@@ -246,10 +248,9 @@ test('the owner crops a photo in the browser Canvas and uploads it at the chosen
   await mockAccountApi(page, { signedIn: 'owner' });
   const uploadsSoFar = await mockCatalogApi(page);
   await page.goto('/cuenta/');
-  // The header also has a «Catálogo» link, to the shop: the tab is the one of the account.
-  await openAccountSidebar(page);
+  await openAccountMenu(page);
   await page
-    .getByRole('navigation', { name: 'Secciones de tu cuenta' })
+    .getByRole('banner')
     .getByRole('link', { name: 'Catálogo' })
     .click();
   await page.getByRole('tab', { name: 'Productos' }).click();

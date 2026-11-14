@@ -7,7 +7,10 @@ vi.mock('next/font/local', () => ({
     variable: options.variable.slice(2),
   }),
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => null }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => null,
+  useRouter: () => ({ push: vi.fn() }),
+}));
 // The real snapshot depends on the last local build; pages here render the empty catalog.
 vi.mock('@/lib/catalog/snapshot', async (importOriginal) => {
   const actual =
