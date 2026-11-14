@@ -170,6 +170,17 @@ describe('header search combobox (FC 047 T1.2, T2.2)', () => {
     expect(push).toHaveBeenCalledWith('/catalogo/arnes-alpino/');
   });
 
+  it('opens a product with Enter on its suggestion too, for any device that puts the focus there', async () => {
+    const box = renderBox();
+    fireEvent.focus(box);
+    typeInto(box, 'arnes');
+    const [first, second] = await screen.findAllByRole('option');
+    fireEvent.keyDown(first, { key: 'Tab' });
+    expect(push).not.toHaveBeenCalled();
+    fireEvent.keyDown(second, { key: 'Enter' });
+    expect(push).toHaveBeenCalledWith('/catalogo/arnes-cascada/');
+  });
+
   it('closes with Escape, when the focus leaves, or on a click elsewhere, and reopens by typing', async () => {
     const box = renderBox();
     fireEvent.focus(box);

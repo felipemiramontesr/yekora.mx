@@ -63,7 +63,7 @@ export function AccountMenu({
   // them; the static export has no page per path), so they are plain anchors. Inside the area a
   // click changes the view without reloading it: the address is pushed and the area, which reads
   // the address, is told. Anywhere else, or with a modifier key, it is an ordinary navigation.
-  const inArea = pathname !== null && pathname.startsWith(area);
+  const inArea = pathname?.startsWith(area) ?? false;
   function follow(event: MouseEvent<HTMLAnchorElement>, href: string) {
     const modified =
       event.button !== 0 ||
@@ -185,9 +185,10 @@ export function AccountMenu({
               <LogOut aria-hidden="true" size={18} />
               {busy === 'leaving' ? dashboard.signingOut : messages.signOut}
             </button>
-            <p role="status" className="px-3 text-xs text-marfil/90">
+            {/* <output> carries the status role natively: the note is announced when it appears. */}
+            <output className="block px-3 text-xs text-marfil/90">
               {note}
-            </p>
+            </output>
           </div>
         )}
       </div>

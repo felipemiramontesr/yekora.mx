@@ -178,9 +178,8 @@ export function SearchCombobox({
           <Search aria-hidden="true" size={22} />
         </button>
       </form>
-      <p role="status" className="sr-only">
-        {status}
-      </p>
+      {/* <output> carries the status role natively: the count is announced as it changes. */}
+      <output className="sr-only">{status}</output>
       {listed && (
         <ul
           id={listId}
@@ -196,6 +195,9 @@ export function SearchCombobox({
               aria-selected={index === active}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => go(entry)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') go(entry);
+              }}
               className={`flex cursor-pointer flex-col px-4 py-2 ${
                 index === active ? 'bg-petroleo/10' : 'hover:bg-petroleo/5'
               }`}
