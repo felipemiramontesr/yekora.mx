@@ -34,7 +34,8 @@ const indexSchema = z.array(
  * The product search of the header (FC 047 T1.2, T2.2): a WAI-ARIA combobox with a listbox of
  * suggestions, over an index of the catalog that is fetched the first time the box takes the
  * focus, never before, so the pages carry none of it. The arrows move through the suggestions,
- * Enter opens the product that is highlighted, Escape closes the list, and a polite status says
+ * Home and End jump to the first and the last, Enter opens the product that is highlighted,
+ * Escape closes the list, and a polite status says
  * how many there are. Anything else sent with Enter, or with the button, is the same form
  * submitted to the catalog page (`?q=`), so the search also works without JavaScript and when the
  * index cannot be loaded.
@@ -117,6 +118,10 @@ export function SearchCombobox({
           ? matches.length - 1
           : (current + step + matches.length) % matches.length
       );
+    } else if ((event.key === 'Home' || event.key === 'End') && listed) {
+      // With the list open they move through it; without it they keep moving the caret.
+      event.preventDefault();
+      setActive(event.key === 'Home' ? 0 : matches.length - 1);
     } else if (event.key === 'Escape') {
       setOpen(false);
       setActive(-1);

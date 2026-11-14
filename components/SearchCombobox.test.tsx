@@ -138,6 +138,20 @@ describe('header search combobox (FC 047 T1.2, T2.2)', () => {
     expect(box.getAttribute('aria-activedescendant')).toBe(options[1].id);
   });
 
+  it('jumps to the first and the last suggestion with Home and End, and leaves them to the caret when the list is closed', async () => {
+    const box = renderBox();
+    fireEvent.focus(box);
+    expect(fireEvent.keyDown(box, { key: 'Home' })).toBe(true);
+    typeInto(box, 'arnes');
+    const options = await screen.findAllByRole('option');
+    expect(fireEvent.keyDown(box, { key: 'End' })).toBe(false);
+    expect(box.getAttribute('aria-activedescendant')).toBe(options[1].id);
+    expect(fireEvent.keyDown(box, { key: 'Home' })).toBe(false);
+    expect(box.getAttribute('aria-activedescendant')).toBe(options[0].id);
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(fireEvent.keyDown(box, { key: 'End' })).toBe(true);
+  });
+
   it('starts from the last suggestion with the up arrow', async () => {
     const box = renderBox();
     fireEvent.focus(box);
