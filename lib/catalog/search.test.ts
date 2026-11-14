@@ -8,24 +8,28 @@ const ENTRIES = [
     name: 'Arnés alpino',
     discipline: 'escalada',
     disciplineName: 'Escalada',
+    brandName: null,
   },
   {
     slug: 'b',
     name: 'Mochila ligera 28 L',
     discipline: 'senderismo',
     disciplineName: 'Senderismo',
+    brandName: null,
   },
   {
     slug: 'c',
     name: 'Casco de montaña',
     discipline: 'montana',
     disciplineName: 'Montaña',
+    brandName: 'Petzl',
   },
   {
     slug: 'd',
     name: 'Tenis de trail',
     discipline: 'trail-running',
     disciplineName: 'Trail running',
+    brandName: null,
   },
 ];
 
@@ -36,11 +40,18 @@ describe('product search (FC 047 T0.2, T1.2)', () => {
       name: 'X',
       discipline: 'd',
       disciplineName: 'D',
+      brandName: 'B',
       priceMxnCents: 100,
       inStock: true,
     } as unknown as Product;
     expect(searchIndexOf([product])).toEqual([
-      { slug: 'x', name: 'X', discipline: 'd', disciplineName: 'D' },
+      {
+        slug: 'x',
+        name: 'X',
+        discipline: 'd',
+        disciplineName: 'D',
+        brandName: 'B',
+      },
     ]);
   });
 
@@ -69,21 +80,36 @@ describe('product search (FC 047 T0.2, T1.2)', () => {
         name: 'Bastón de trekking',
         discipline: 'x',
         disciplineName: 'Montaña',
+        brandName: null,
       },
       {
         slug: '2',
         name: 'Guantes',
         discipline: 'x',
         disciplineName: 'Trekking',
+        brandName: null,
       },
-      { slug: '3', name: 'Trekking pro', discipline: 'x', disciplineName: 'X' },
+      {
+        slug: '3',
+        name: 'Trekking pro',
+        discipline: 'x',
+        disciplineName: 'X',
+        brandName: null,
+      },
       {
         slug: '4',
         name: 'Mini trekking',
         discipline: 'x',
         disciplineName: 'X',
+        brandName: null,
       },
-      { slug: '5', name: 'Camiseta', discipline: 'x', disciplineName: 'X' },
+      {
+        slug: '5',
+        name: 'Camiseta',
+        discipline: 'x',
+        disciplineName: 'X',
+        brandName: null,
+      },
     ];
     expect(matchEntries(entries, 'trek').map((e) => e.slug)).toEqual([
       '3',
@@ -97,6 +123,14 @@ describe('product search (FC 047 T0.2, T1.2)', () => {
       '4',
       '3',
     ]);
+  });
+
+  it('finds a product by its brand alone, and an absent brand adds no word to the search (FC 047 T1.2)', () => {
+    expect(matchEntries(ENTRIES, 'petzl').map((e) => e.slug)).toEqual(['c']);
+    expect(matchEntries(ENTRIES, 'PETZL casco').map((e) => e.slug)).toEqual([
+      'c',
+    ]);
+    expect(matchEntries(ENTRIES, 'null')).toEqual([]);
   });
 
   it('gives nothing for an empty query and respects the limit', () => {

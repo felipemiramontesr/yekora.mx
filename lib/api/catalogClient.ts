@@ -36,6 +36,9 @@ const itemSchema = z.object({
   disciplineName: z.string().min(1),
   level: slug,
   levelName: z.string().min(1),
+  /** Its active brand (FC 047), or null; a snapshot made before this field existed has none. */
+  brand: slug.nullable().default(null),
+  brandName: z.string().min(1).nullable().default(null),
   priceMxnCents: z.number().int().positive(),
   priceUsdCents: z.number().int().nonnegative().nullable(),
   inStock: z.boolean(),

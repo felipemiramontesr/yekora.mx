@@ -21,7 +21,8 @@ function item(
   slug: string,
   name: string,
   discipline: string,
-  disciplineName: string
+  disciplineName: string,
+  brandName: string | null = null
 ): GridItem {
   return {
     slug,
@@ -31,6 +32,7 @@ function item(
     disciplineName,
     level: 'avanzado',
     levelName: 'Avanzado',
+    brandName,
     priceMxnCents: 100000,
     price: { mxn: '$1,000.00 MXN', usd: null },
     inStock: true,
@@ -41,7 +43,7 @@ function item(
 const ITEMS = [
   item('arnes', 'Arnés alpino', 'escalada', 'Escalada'),
   item('mochila', 'Mochila ligera', 'senderismo', 'Senderismo'),
-  item('tenis', 'Tenis de trail', 'trail-running', 'Trail running'),
+  item('tenis', 'Tenis de trail', 'trail-running', 'Trail running', 'Cumbre'),
 ];
 
 const names = () =>
@@ -88,6 +90,12 @@ describe('catalog grid filters from the address (FC 047 T2.1, T1.2)', () => {
     expect(
       screen.queryByRole('button', { name: messages.filters.clearSearch })
     ).toBeNull();
+  });
+
+  it('finds a product by the name of its brand alone (FC 047 T1.2)', () => {
+    search = 'q=cumbre';
+    renderGrid();
+    expect(names()).toEqual(['Tenis de trail']);
   });
 
   it('combines the search with the discipline, and «Limpiar» drops both', () => {

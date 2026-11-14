@@ -22,6 +22,8 @@ const tent: ProductRow = {
   level: 'expedicion',
   level_name_es: 'Expedición',
   level_name_en: 'Expedition',
+  brand: 'cumbre',
+  brand_name: 'Cumbre',
 };
 
 /** Db port that answers each statement from a queue and records what it received. */
@@ -92,6 +94,21 @@ describe('findProduct', () => {
     await expect(findProduct(db, 'tienda-expedicion')).resolves.toEqual(tent);
     expect(calls.map((call) => call.params)).toEqual([['tienda-expedicion']]);
     expect(calls[0].sql).not.toContain('product_images');
+  });
+
+  it('reads the brand only while it is active, and a product without one has none (FC 047)', async () => {
+    const { db, calls } = scriptedDb([
+      { ...tent, brand: null, brand_name: null },
+    ]);
+    await expect(findProduct(db, 'tienda-expedicion')).resolves.toMatchObject({
+      brand: null,
+      brand_name: null,
+    });
+    // A LEFT JOIN: a product without a brand, or whose brand is retired, still shows.
+    expect(calls[0].sql).toContain(
+      'LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1'
+    );
+    expect(calls[0].sql).toContain('b.slug AS brand, b.name AS brand_name');
   });
 
   it('returns null for an unknown or inactive product', async () => {

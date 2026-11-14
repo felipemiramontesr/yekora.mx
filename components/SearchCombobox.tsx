@@ -27,6 +27,7 @@ const indexSchema = z.array(
     name: z.string(),
     discipline: z.string(),
     disciplineName: z.string(),
+    brandName: z.string().nullable(),
   })
 );
 
@@ -209,7 +210,9 @@ export function SearchCombobox({
             >
               <span className="font-semibold">{entry.name}</span>
               <span className="text-xs text-petroleo/80">
-                {entry.disciplineName}
+                {entry.brandName
+                  ? `${entry.brandName} · ${entry.disciplineName}`
+                  : entry.disciplineName}
               </span>
             </li>
           ))}

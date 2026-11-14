@@ -17,6 +17,8 @@ export interface SearchEntry {
   discipline: string;
   /** Name of the discipline, in the language of the index. */
   disciplineName: string;
+  /** Name of its brand, or null (FC 047): a search that names only the brand finds it. */
+  brandName: string | null;
 }
 
 /**
@@ -26,12 +28,15 @@ export interface SearchEntry {
  * @returns One entry per product, in the same order.
  */
 export function searchIndexOf(products: readonly Product[]): SearchEntry[] {
-  return products.map(({ slug, name, discipline, disciplineName }) => ({
-    slug,
-    name,
-    discipline,
-    disciplineName,
-  }));
+  return products.map(
+    ({ slug, name, discipline, disciplineName, brandName }) => ({
+      slug,
+      name,
+      discipline,
+      disciplineName,
+      brandName,
+    })
+  );
 }
 
 /**
@@ -45,12 +50,12 @@ function normalizeText(text: string): string {
 
 /**
  * How well an entry answers a query: 0 when the name starts with it, 1 when a word of the name
- * does, 2 when it is somewhere in the name or the discipline; null when some word of the query is
+ * does, 2 when it is somewhere in the name, the discipline or the brand; null when some word of the query is
  * nowhere (every word must be found).
  */
 function rank(entry: SearchEntry, words: readonly string[]): number | null {
   const name = normalizeText(entry.name);
-  const haystack = `${name} ${normalizeText(entry.disciplineName)}`;
+  const haystack = `${name} ${normalizeText(entry.disciplineName)} ${normalizeText(entry.brandName ?? '')}`;
   if (!words.every((word) => haystack.includes(word))) return null;
   const query = words.join(' ');
   if (name.startsWith(query)) return 0;

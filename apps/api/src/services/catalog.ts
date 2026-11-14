@@ -1,5 +1,5 @@
 /**
- * Catalog queries (FC 008): active products with their discipline, level and images.
+ * Catalog queries (FC 008): active products with their discipline, level, brand and images.
  *
  * Every statement is static SQL with `?` placeholders (T1.1). Optional filters use the
  * `(? IS NULL OR col = ?)` pattern, and sorting uses CASE expressions over a bound sort key, so
@@ -52,6 +52,9 @@ export interface ProductRow {
   level: string;
   level_name_es: string;
   level_name_en: string;
+  /** Slug and name of its brand: null without one, or when the brand is retired (FC 047). */
+  brand: string | null;
+  brand_name: string | null;
 }
 
 /**
@@ -76,7 +79,7 @@ export async function listProducts(
     filters
   );
   const items = await db.query<ProductRow>(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
     [
       ...filters,
       query.sort,
@@ -125,7 +128,7 @@ export async function findProduct(
   slug: string
 ): Promise<ProductRow | null> {
   const [product] = await db.query<ProductRow>(
-    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
+    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
     [slug]
   );
   return product ?? null;

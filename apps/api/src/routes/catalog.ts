@@ -65,6 +65,8 @@ function present(
     disciplineName: english ? row.discipline_name_en : row.discipline_name_es,
     level: row.level,
     levelName: english ? row.level_name_en : row.level_name_es,
+    brand: row.brand,
+    brandName: row.brand_name,
     priceMxnCents: Number(row.price_mxn_cents),
     priceUsdCents: usdCents(Number(row.price_mxn_cents), fix),
     inStock: Number(row.stock) > 0,

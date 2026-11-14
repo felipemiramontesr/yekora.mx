@@ -32,6 +32,8 @@ const tent: ProductRow = {
   level: 'expedicion',
   level_name_es: 'Expedición',
   level_name_en: 'Expedition',
+  brand: 'cumbre',
+  brand_name: 'Cumbre',
 };
 const SIDE = 'a'.repeat(64);
 const SOLE = 'b'.repeat(64);
@@ -172,6 +174,8 @@ describe('GET /v1/catalog', () => {
           disciplineName: 'Montaña',
           level: 'expedicion',
           levelName: 'Expedición',
+          brand: 'cumbre',
+          brandName: 'Cumbre',
           priceMxnCents: 485000,
           priceUsdCents: 26216,
           inStock: false,

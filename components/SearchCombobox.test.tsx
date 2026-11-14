@@ -23,18 +23,21 @@ const INDEX = [
     name: 'Arnés alpino',
     discipline: 'escalada',
     disciplineName: 'Escalada',
+    brandName: 'Petzl',
   },
   {
     slug: 'arnes-cascada',
     name: 'Arnés de cañonismo',
     discipline: 'canonismo',
     disciplineName: 'Cañonismo',
+    brandName: null,
   },
   {
     slug: 'mochila',
     name: 'Mochila ligera',
     discipline: 'senderismo',
     disciplineName: 'Senderismo',
+    brandName: null,
   },
 ];
 const fetchIndex = vi.fn();
@@ -120,7 +123,7 @@ describe('header search combobox (FC 047 T1.2, T2.2)', () => {
     typeInto(box, 'arnes');
     const options = await screen.findAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual([
-      'Arnés alpinoEscalada',
+      'Arnés alpinoPetzl · Escalada',
       'Arnés de cañonismoCañonismo',
     ]);
     expect(box.getAttribute('aria-expanded')).toBe('true');

@@ -182,6 +182,22 @@ test('the search of the header suggests products and opens the one chosen with t
   await expect(page).toHaveURL(/\/catalogo\/e2e-arnes-alpino\/$/);
 });
 
+test('the search of the header finds a product by its brand alone, and says the brand (FC 047 T1.2)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const box = page.getByRole('combobox', { name: 'Buscar en la tienda' });
+  await box.focus();
+  await box.fill('marca e2e');
+  const option = page.getByRole('option');
+  await expect(option).toHaveCount(1);
+  await expect(option).toContainText('Tenis de trail');
+  await expect(option).toContainText('Marca E2E · Trail running');
+  await page.goto('/catalogo/?q=marca');
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('Tenis de trail');
+});
+
 test('the catalog shows only the results of the search and of the discipline in the address (FC 047 T1.2, T2.1)', async ({
   page,
 }) => {

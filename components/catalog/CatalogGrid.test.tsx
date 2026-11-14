@@ -22,6 +22,7 @@ function item(overrides: Partial<GridItem> & Pick<GridItem, 'slug'>): GridItem {
     disciplineName: 'Climbing',
     level: 'avanzado',
     levelName: 'Advanced',
+    brandName: null,
     priceMxnCents: 100000,
     price: { mxn: '$1,000.00 MXN', usd: null },
     inStock: true,

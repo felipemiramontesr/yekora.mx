@@ -46,7 +46,9 @@
         "priceMxnCents": 259900,
         "priceUsdCents": 14049,
         "inStock": false,
-        "images": []
+        "images": [],
+        "brand": "marca-e2e",
+        "brandName": "Marca E2E"
       }
     ],
     "en": [
@@ -90,7 +92,9 @@
         "priceMxnCents": 259900,
         "priceUsdCents": 14049,
         "inStock": false,
-        "images": []
+        "images": [],
+        "brand": "marca-e2e",
+        "brandName": "Marca E2E"
       }
     ]
   }

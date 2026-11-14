@@ -31,6 +31,8 @@ export interface GridItem {
   /** Experience level slug (filter value) and its localized name. */
   level: string;
   levelName: string;
+  /** Name of its brand, or null: the search finds a product by it too. */
+  brandName: string | null;
   /** Price in MXN cents, for sorting. */
   priceMxnCents: number;
   /** Formatted prices. */

@@ -16,6 +16,7 @@ function gridItem(product: Product, locale: Locale): GridItem {
     disciplineName: product.disciplineName,
     level: product.level,
     levelName: product.levelName,
+    brandName: product.brandName,
     priceMxnCents: product.priceMxnCents,
     price: priceText(product, locale),
     inStock: product.inStock,

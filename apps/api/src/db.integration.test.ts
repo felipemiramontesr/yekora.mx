@@ -244,6 +244,56 @@ describe('catalog (catalog.ts)', () => {
   });
 });
 
+describe('the brand in the public catalog on real SQL (catalog.ts, FC 047 T0.2)', () => {
+  const BRAND_QUERY = {
+    discipline: 'senderismo',
+    level: null,
+    sort: 'name',
+    lang: 'es-MX',
+    page: 1,
+    pageSize: 50,
+  } as const;
+  const brandOf = async (slug: string) =>
+    (await findProduct(db, slug))?.brand_name;
+
+  beforeAll(async () => {
+    await db.query(
+      "INSERT INTO brands (slug, name, is_active) VALUES ('itest-pub-activa', 'Activa ITEST', 1), ('itest-pub-retirada', 'Retirada ITEST', 0)"
+    );
+    await addProduct('ITEST-BRAND', 'itest-brand', 1);
+    await addProduct('ITEST-OLD', 'itest-old', 1);
+    await db.query(
+      "UPDATE products SET brand_id = (SELECT id FROM brands WHERE slug = 'itest-pub-activa') WHERE sku = 'ITEST-BRAND'"
+    );
+    await db.query(
+      "UPDATE products SET brand_id = (SELECT id FROM brands WHERE slug = 'itest-pub-retirada') WHERE sku = 'ITEST-OLD'"
+    );
+  });
+
+  it('gives a product its active brand, in the listing and in its own page', async () => {
+    const page = await listProducts(db, BRAND_QUERY);
+    expect(page.items.find((p) => p.sku === 'ITEST-BRAND')).toMatchObject({
+      brand: 'itest-pub-activa',
+      brand_name: 'Activa ITEST',
+    });
+    expect(await findProduct(db, 'itest-brand')).toMatchObject({
+      brand: 'itest-pub-activa',
+      brand_name: 'Activa ITEST',
+    });
+  });
+
+  it('still shows a product without a brand, or whose brand is retired, with none', async () => {
+    const page = await listProducts(db, BRAND_QUERY);
+    expect(page.items.find((p) => p.sku === 'ITEST-PACK')).toMatchObject({
+      brand: null,
+      brand_name: null,
+    });
+    expect(page.items.some((p) => p.sku === 'ITEST-OLD')).toBe(true);
+    expect(await brandOf('itest-old')).toBeNull();
+    expect(page.total).toBeGreaterThanOrEqual(4);
+  });
+});
+
 describe('checkout (checkout.ts, cartQuote.ts, shippingRates.ts)', () => {
   it('quotes with the real shipping rule, reserves the unit and writes the order and its line', async () => {
     const orderNumber = await checkout('ITEST-PACK');
