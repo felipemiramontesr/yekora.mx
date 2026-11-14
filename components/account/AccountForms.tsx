@@ -25,8 +25,10 @@ import {
   resetPassword,
   verify,
 } from '@/lib/api/accountClient';
+import { stateOfPostalCode } from '@/lib/cart/postalRanges';
 import { fill } from '@/lib/catalog/format';
 import { Field } from '../checkout/CheckoutFields';
+import { Field as GuidedField } from '../ui/Field';
 import {
   NewPasswordFields,
   newPasswordReady,
@@ -207,6 +209,8 @@ export function RegisterForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [repeated, setRepeated] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [postalError, setPostalError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const context = { email, fullName };
@@ -218,8 +222,21 @@ export function RegisterForm({
       setError(messages.errors.required);
       return;
     }
+    // FC 047 T1.3: the postal code of the delivery address is given with the account.
+    const code = postalCode.trim();
+    if (stateOfPostalCode(code) === null) {
+      setError(null);
+      setPostalError(messages.register.postalCode.error);
+      return;
+    }
+    setPostalError(undefined);
     setBusy(true);
-    const result = await register({ email, password, fullName });
+    const result = await register({
+      email,
+      password,
+      fullName,
+      postalCode: code,
+    });
     setBusy(false);
     if (result.ok) {
       onRegistered(email.trim());
@@ -252,6 +269,27 @@ export function RegisterForm({
         onChange={setEmail}
         input={{ type: 'email', autoComplete: 'email', maxLength: 255 }}
       />
+      <GuidedField
+        id={`${base}-postal`}
+        label={messages.register.postalCode.label}
+        description={messages.register.postalCode.description}
+        example={messages.register.postalCode.example}
+        exampleLabel={messages.register.exampleLabel}
+        error={postalError}
+      >
+        {(control) => (
+          <input
+            {...control}
+            name="postalCode"
+            value={postalCode}
+            onChange={(event) => setPostalCode(event.target.value)}
+            inputMode="numeric"
+            autoComplete="postal-code"
+            maxLength={5}
+            className="min-h-11 w-full rounded-md border border-petroleo/40 bg-white px-3"
+          />
+        )}
+      </GuidedField>
       <NewPasswordFields
         id={base}
         labels={{

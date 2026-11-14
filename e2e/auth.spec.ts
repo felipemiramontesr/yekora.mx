@@ -83,12 +83,22 @@ test('sign-up turns its button on only when every rule is met and both match; th
   await page.getByLabel('Repetir contraseña').fill(STRONG);
   expect(await met(page, 'Las dos contraseñas coinciden')).toBe(true);
   await expect(submit).toBeEnabled();
+  // FC 047 T1.3: the postal code of the delivery address, guided and checked before sending.
+  const postal = page.getByLabel('Código postal de entrega');
+  await expect(postal).toHaveAccessibleDescription(/Ejemplo: 98000/);
+  await postal.fill('17000');
+  await submit.click();
+  await expect(
+    page.getByText('Escribe los 5 dígitos de un código postal de México.')
+  ).toBeVisible();
+  await postal.fill('98000');
   const sent = page.waitForRequest('**/v1/auth/register');
   await submit.click();
   expect((await sent).postDataJSON()).toEqual({
     email: 'ana@example.test',
     password: STRONG,
     fullName: 'Ana Prueba',
+    postalCode: '98000',
     altcha: expect.any(String),
   });
   await expect(

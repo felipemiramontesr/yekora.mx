@@ -675,7 +675,14 @@
       "submit": "Crear cuenta",
       "submitting": "Creando tu cuenta… puede tardar unos segundos",
       "toSignIn": "¿Ya tienes cuenta? Entra",
-      "accepted": "Listo. Si el correo no tenía cuenta, ya la tiene: entra con él y tu contraseña."
+      "accepted": "Listo. Si el correo no tenía cuenta, ya la tiene: entra con él y tu contraseña.",
+      "postalCode": {
+        "label": "Código postal de entrega",
+        "description": "Los 5 dígitos del código postal de tu domicilio. Lo guardamos cifrado y lo usamos para mostrarte a dónde enviamos.",
+        "example": "98000",
+        "error": "Escribe los 5 dígitos de un código postal de México."
+      },
+      "exampleLabel": "Ejemplo"
     },
     "password": {
       "show": "Mostrar contraseña",
@@ -844,7 +851,9 @@
       "PASSWORD_PERSONAL": "La contraseña no puede incluir tu correo ni tu nombre.",
       "PASSWORD_COMMON": "Esa contraseña es demasiado común. Elige otra.",
       "PASSWORD_BREACHED": "Esa contraseña aparece en filtraciones de datos conocidas. Elige otra.",
-      "RESET_TOKEN_INVALID": "El enlace venció o ya se usó. Pide otro."
+      "RESET_TOKEN_INVALID": "El enlace venció o ya se usó. Pide otro.",
+      "INVALID_POSTAL_CODE": "Revisa el código postal: deben ser 5 dígitos de una zona de México.",
+      "POSTAL_CODE_UNAVAILABLE": "No podemos guardar tu código postal en este momento. Intenta más tarde."
     },
     "catalog": {
       "sectionsLabel": "Secciones del catálogo",

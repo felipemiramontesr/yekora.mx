@@ -80,7 +80,12 @@ afterEach(() => {
 describe('account client (FC 028 F2)', () => {
   it('signs up with the session cookie allowed and a solved challenge, and reads the acceptance', async () => {
     const fetchImpl = proved(202, { status: 'accepted' });
-    const body = { email: 'a@b.mx', password: 'x'.repeat(12), fullName: 'A' };
+    const body = {
+      email: 'a@b.mx',
+      password: 'x'.repeat(12),
+      fullName: 'A',
+      postalCode: '98000',
+    };
     expect(await register(body, { fetchImpl })).toEqual({
       ok: true,
       data: { status: 'accepted' },

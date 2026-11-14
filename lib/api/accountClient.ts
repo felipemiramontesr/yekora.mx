@@ -66,6 +66,8 @@ const CODES = [
   'PASSWORD_PERSONAL',
   'PASSWORD_COMMON',
   'PASSWORD_BREACHED',
+  'INVALID_POSTAL_CODE',
+  'POSTAL_CODE_UNAVAILABLE',
   'RESET_TOKEN_INVALID',
 ] as const;
 
@@ -159,7 +161,12 @@ async function withProof<T>(
  * @returns Accepted, or why not.
  */
 export function register(
-  body: { email: string; password: string; fullName: string },
+  body: {
+    email: string;
+    password: string;
+    fullName: string;
+    postalCode?: string;
+  },
   options: ClientOptions = {}
 ) {
   return withProof('/v1/auth/register', registeredSchema, body, options);

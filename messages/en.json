@@ -675,7 +675,14 @@
       "submit": "Create account",
       "submitting": "Creating your account… this can take a few seconds",
       "toSignIn": "Already have an account? Sign in",
-      "accepted": "Done. If that e-mail had no account, it has one now: sign in with it and your password."
+      "accepted": "Done. If that e-mail had no account, it has one now: sign in with it and your password.",
+      "postalCode": {
+        "label": "Delivery postal code",
+        "description": "The 5 digits of your home postal code. We store it encrypted and use it to show where we deliver.",
+        "example": "98000",
+        "error": "Enter the 5 digits of a Mexican postal code."
+      },
+      "exampleLabel": "Example"
     },
     "password": {
       "show": "Show password",
@@ -844,7 +851,9 @@
       "PASSWORD_PERSONAL": "The password cannot contain your e-mail or name.",
       "PASSWORD_COMMON": "That password is too common. Choose another.",
       "PASSWORD_BREACHED": "That password appears in known data breaches. Choose another.",
-      "RESET_TOKEN_INVALID": "The link expired or was already used. Ask for another."
+      "RESET_TOKEN_INVALID": "The link expired or was already used. Ask for another.",
+      "INVALID_POSTAL_CODE": "Check the postal code: it must be 5 digits from an area of Mexico.",
+      "POSTAL_CODE_UNAVAILABLE": "We cannot save your postal code right now. Try again later."
     },
     "catalog": {
       "sectionsLabel": "Catalog sections",
