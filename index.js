@@ -99326,7 +99326,6 @@ var facetGroupSchema = external_exports.object({
   isOrdered: external_exports.boolean(),
   isFilterable: external_exports.boolean(),
   showOnLanding: external_exports.boolean(),
-  isSystem: external_exports.boolean(),
   isActive: external_exports.boolean(),
   sortOrder: external_exports.number().int(),
   values: external_exports.array(facetValueSchema)
@@ -99344,7 +99343,6 @@ var fields = {
   priceMxnCents: positive,
   stock: quantity,
   discipline: productSlug(40),
-  level: productSlug(40),
   brandId: external_exports.number().int().positive().nullable(),
   shippingClass: productSlug(40),
   weightGrams: positive,
@@ -99395,7 +99393,6 @@ var adminProductSchema = external_exports.object({
   stock: external_exports.number().int().nonnegative(),
   reservedStock: external_exports.number().int().nonnegative(),
   discipline: external_exports.string(),
-  level: external_exports.string(),
   brandId: external_exports.number().int().positive().nullable(),
   shippingClass: external_exports.string(),
   weightGrams: external_exports.number().int().positive(),
@@ -99442,11 +99439,22 @@ var itemSchema = external_exports.object({
   description: external_exports.string(),
   discipline: slug,
   disciplineName: external_exports.string().min(1),
-  level: slug,
-  levelName: external_exports.string().min(1),
   /** Its active brand (FC 047), or null; a snapshot made before this field existed has none. */
   brand: slug.nullable().default(null),
   brandName: external_exports.string().min(1).nullable().default(null),
+  /**
+   * Its properties (FC 048): the values of its active groups, in the language of the read. A
+   * snapshot made before this field existed has none.
+   */
+  properties: external_exports.array(
+    external_exports.object({
+      groupCode: slug,
+      groupName: external_exports.string().min(1),
+      valueCode: slug,
+      valueName: external_exports.string().min(1),
+      isFilterable: external_exports.boolean()
+    })
+  ).default([]),
   priceMxnCents: external_exports.number().int().positive(),
   priceUsdCents: external_exports.number().int().nonnegative().nullable(),
   inStock: external_exports.boolean()
@@ -99928,7 +99936,7 @@ function buildQuote(lines, rows, rate, lang, shipping = null) {
 async function readProducts(db, lines) {
   if (lines.length === 0) return [];
   return db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1",
     [lines.map((line) => line.sku)]
   );
 }
@@ -100032,18 +100040,13 @@ function registerCartRoutes(app, deps) {
 // src/services/catalog.ts
 var SORTS = ["name", "price_asc", "price_desc"];
 async function listProducts(db, query) {
-  const filters = [
-    query.discipline,
-    query.discipline,
-    query.level,
-    query.level
-  ];
+  const filters = [query.discipline, query.discipline];
   const [{ total }] = await db.query(
-    "SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?)",
+    "SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?)",
     filters
   );
   const items = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
     [
       ...filters,
       query.sort,
@@ -100061,9 +100064,15 @@ function findProductMedia(db, slug3) {
     [slug3]
   );
 }
+function findProductProperties(db, slug3) {
+  return db.query(
+    "SELECT g.code AS group_code, g.name_es AS group_name_es, g.name_en AS group_name_en, g.is_filterable, v.code AS value_code, v.value_es, v.value_en FROM products p JOIN product_facet_links k ON k.product_id = p.id JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE p.slug = ? AND g.is_active = 1 ORDER BY g.sort_order ASC, g.id ASC, v.sort_order ASC, v.id ASC",
+    [slug3]
+  );
+}
 async function findProduct(db, slug3) {
   const [product] = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1",
     [slug3]
   );
   return product ?? null;
@@ -100073,14 +100082,23 @@ async function findProduct(db, slug3) {
 var slug2 = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160);
 var catalogListQuery = external_exports.object({
   discipline: slug2.max(40).optional(),
-  level: slug2.max(40).optional(),
   sort: external_exports.enum(SORTS).default("name"),
   lang: languageSchema,
   page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
   pageSize: external_exports.coerce.number().int().min(1).max(48).default(24)
 });
 var catalogItemParams = external_exports.object({ slug: slug2 });
-function present(row2, language, fix) {
+function presentProperties(rows, language) {
+  const english = language === "en";
+  return rows.map((row2) => ({
+    groupCode: row2.group_code,
+    groupName: english ? row2.group_name_en : row2.group_name_es,
+    valueCode: row2.value_code,
+    valueName: english ? row2.value_en : row2.value_es,
+    isFilterable: Number(row2.is_filterable) === 1
+  }));
+}
+function present(row2, language, fix, properties) {
   const english = language === "en";
   return {
     sku: row2.sku,
@@ -100089,10 +100107,9 @@ function present(row2, language, fix) {
     description: english ? row2.description_en : row2.description_es,
     discipline: row2.discipline,
     disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
-    level: row2.level,
-    levelName: english ? row2.level_name_en : row2.level_name_es,
     brand: row2.brand,
     brandName: row2.brand_name,
+    properties: presentProperties(properties, language),
     priceMxnCents: Number(row2.price_mxn_cents),
     priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
     inStock: Number(row2.stock) > 0
@@ -100108,14 +100125,18 @@ function registerCatalogRoutes(app, deps) {
     const [{ items, total }, rate] = await Promise.all([
       listProducts(deps.db, {
         ...query,
-        discipline: query.discipline ?? null,
-        level: query.level ?? null
+        discipline: query.discipline ?? null
       }),
       deps.rate()
     ]);
     const fix = rate ? Number(rate.rate) : null;
+    const properties = await Promise.all(
+      items.map((row2) => findProductProperties(deps.db, row2.slug))
+    );
     return {
-      items: items.map((row2) => present(row2, query.lang, fix)),
+      items: items.map(
+        (row2, index) => present(row2, query.lang, fix, properties[index])
+      ),
       page: query.page,
       pageSize: query.pageSize,
       total,
@@ -100130,9 +100151,10 @@ function registerCatalogRoutes(app, deps) {
     if (!params.success || !language.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
     }
-    const [found, media, rate] = await Promise.all([
+    const [found, media, properties, rate] = await Promise.all([
       findProduct(deps.db, params.data.slug),
       findProductMedia(deps.db, params.data.slug),
+      findProductProperties(deps.db, params.data.slug),
       deps.rate()
     ]);
     if (!found) {
@@ -100141,7 +100163,8 @@ function registerCatalogRoutes(app, deps) {
     const product = present(
       found,
       language.data,
-      rate ? Number(rate.rate) : null
+      rate ? Number(rate.rate) : null,
+      properties
     );
     const english = language.data === "en";
     return {
@@ -100282,7 +100305,6 @@ var mutationHeaders = external_exports.object({
 var idParams = external_exports.object({ id: external_exports.coerce.number().int().positive() });
 var REFUSALS = {
   CAT_NOT_FOUND: [404, "Not found"],
-  CAT_SYSTEM_GROUP_LOCKED: [409, "System facet group is locked"],
   CAT_VALIDATION_ERROR: [400, "Invalid catalog data"],
   CAT_REFERENCE_INVALID: [422, "Unknown or retired reference"],
   CAT_STOCK_BELOW_RESERVED: [409, "Stock below reserved units"]
@@ -101395,13 +101417,13 @@ var ROUTE_CONTRACTS = [
   catalogWrite(
     "POST",
     "/v1/admin/catalog/products",
-    "Create a product; its level links the system group Nivel (T2.6)",
+    "Create a product with its property values (FC 048: no level)",
     { body: productCreate, answer: adminProductSchema, references: true }
   ),
   catalogWrite(
     "PATCH",
     "/v1/admin/catalog/products/:id",
-    "Edit or retire a product; SKU and slug are fixed, level and Nivel move together",
+    "Edit or retire a product; SKU and slug are fixed; a list of property values replaces its own",
     {
       params: idParams,
       body: productPatch,
@@ -102898,7 +102920,6 @@ var groupOf = (row2, values = []) => ({
   isOrdered: flag(row2.is_ordered),
   isFilterable: flag(row2.is_filterable),
   showOnLanding: flag(row2.show_on_landing),
-  isSystem: flag(row2.is_system),
   isActive: flag(row2.is_active),
   sortOrder: Number(row2.sort_order),
   values
@@ -102912,7 +102933,7 @@ var valueOf = (row2) => ({
 });
 async function listFacets(db) {
   const groups = await db.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC"
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC"
   );
   const values = await db.query(
     "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values ORDER BY sort_order ASC, id ASC"
@@ -102926,7 +102947,7 @@ async function listFacets(db) {
 }
 async function lockGroup(tx, id) {
   const [row2] = await tx.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
     [id]
   );
   return row2 ? groupOf(row2) : null;
@@ -102946,7 +102967,7 @@ async function createFacetGroup(tx, input2) {
     ]
   );
   const [row2] = await tx.query(
-    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code = ?",
+    "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE code = ?",
     [input2.code]
   );
   return { before: null, after: groupOf(row2) };
@@ -102954,8 +102975,6 @@ async function createFacetGroup(tx, input2) {
 async function updateFacetGroup(tx, id, patch) {
   const before = await lockGroup(tx, id);
   if (before === null) return "CAT_NOT_FOUND";
-  if (before.isSystem && patch.isActive === false)
-    return "CAT_SYSTEM_GROUP_LOCKED";
   const after = { ...before, ...patch };
   await tx.query(
     "UPDATE product_facet_groups SET name_es = ?, name_en = ?, is_required = ?, is_ordered = ?, is_filterable = ?, show_on_landing = ?, is_active = ?, sort_order = ? WHERE id = ?",
@@ -102976,7 +102995,6 @@ async function updateFacetGroup(tx, id, patch) {
 async function createFacetValue(tx, groupId, input2) {
   const group = await lockGroup(tx, groupId);
   if (group === null) return "CAT_NOT_FOUND";
-  if (group.isSystem) return "CAT_SYSTEM_GROUP_LOCKED";
   await tx.query(
     "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
     [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
@@ -102989,11 +103007,10 @@ async function createFacetValue(tx, groupId, input2) {
 }
 async function updateFacetValue(tx, id, patch) {
   const [row2] = await tx.query(
-    "SELECT v.id, v.group_id, v.code, v.value_es, v.value_en, v.sort_order, g.is_system FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ? FOR UPDATE",
+    "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE id = ? FOR UPDATE",
     [id]
   );
   if (!row2) return "CAT_NOT_FOUND";
-  if (flag(row2.is_system)) return "CAT_SYSTEM_GROUP_LOCKED";
   const before = valueOf(row2);
   const after = { ...before, ...patch };
   await tx.query(
@@ -103068,7 +103085,6 @@ var productOf = (row2, facetValueIds = [], gallery = []) => ({
   stock: Number(row2.stock),
   reservedStock: Number(row2.reserved_stock),
   discipline: row2.discipline,
-  level: row2.level,
   brandId: row2.brand_id === null ? null : Number(row2.brand_id),
   shippingClass: row2.shipping_class,
   weightGrams: Number(row2.weight_grams),
@@ -103085,14 +103101,14 @@ async function listAdminProducts(db, paging2) {
     "SELECT COUNT(*) AS total FROM products"
   );
   const rows = await db.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
     [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
   );
   return { items: rows.map((row2) => productOf(row2)), total: Number(total) };
 }
 async function productRow(tx, id) {
   const [row2] = await tx.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
     [id]
   );
   return row2;
@@ -103106,7 +103122,7 @@ async function lockedProduct(tx, id) {
 }
 async function fullProduct(tx, row2) {
   const values = await tx.query(
-    "SELECT k.value_id FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0 ORDER BY k.value_id ASC",
+    "SELECT value_id FROM product_facet_links WHERE product_id = ? ORDER BY value_id ASC",
     [row2.id]
   );
   const images = await tx.query(
@@ -103134,10 +103150,6 @@ async function references(tx, fields2) {
     "SELECT id FROM categories WHERE slug = ? AND is_active = 1",
     [fields2.discipline]
   );
-  const [level] = await tx.query(
-    "SELECT id FROM experience_levels WHERE slug = ? AND is_active = 1",
-    [fields2.level]
-  );
   const [shipping] = await tx.query(
     "SELECT id FROM shipping_classes WHERE slug = ? AND is_active = 1",
     [fields2.shippingClass]
@@ -103146,41 +103158,28 @@ async function references(tx, fields2) {
     "SELECT id FROM brands WHERE id = ? AND is_active = 1",
     [fields2.brandId]
   )).length === 1;
-  if (!category || !level || !shipping || !brandOk) return null;
-  return { category: category.id, level: level.id, shipping: shipping.id };
+  if (!category || !shipping || !brandOk) return null;
+  return { category: category.id, shipping: shipping.id };
 }
-async function facetChoice(tx, ids) {
+async function checkedFacets(tx, ids) {
   const unique = [...new Set(ids)];
   const found = await Promise.all(
     unique.map(async (id) => {
       const [value] = await tx.query(
-        "SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?",
+        "SELECT g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?",
         [id]
       );
-      return { id, value };
+      return value;
     })
   );
-  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
+  if (found.some((value) => !value || Number(value.is_active) !== 1))
     return "CAT_REFERENCE_INVALID";
-  const ordinary = found.filter(({ value }) => Number(value.is_system) !== 1).map(({ id }) => id);
-  const level = found.find(({ value }) => Number(value.is_system) === 1)?.value.code ?? null;
-  return { ordinary, level };
-}
-async function relinkLevel(tx, productId, level) {
-  await tx.query(
-    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1 AND g.code = 'nivel'",
-    [productId]
-  );
-  await tx.query(
-    "INSERT INTO product_facet_links (product_id, value_id) SELECT ?, v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.is_system = 1 AND g.code = 'nivel' AND v.code = ?",
-    [productId, level]
-  );
+  return unique;
 }
 async function relinkFacets(tx, productId, ids) {
-  await tx.query(
-    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0",
-    [productId]
-  );
+  await tx.query("DELETE FROM product_facet_links WHERE product_id = ?", [
+    productId
+  ]);
   await Promise.all(
     ids.map(
       (id) => tx.query(
@@ -103190,26 +103189,18 @@ async function relinkFacets(tx, productId, ids) {
     )
   );
 }
-function settledLevel(given, fromFacets, current) {
-  if (given !== void 0 && fromFacets !== null && given !== fromFacets)
-    return null;
-  return given ?? fromFacets ?? current;
-}
 async function createProduct(tx, input2) {
-  const facets = await facetChoice(tx, input2.facetValueIds);
+  const facets = await checkedFacets(tx, input2.facetValueIds);
   if (facets === "CAT_REFERENCE_INVALID") return facets;
-  const level = settledLevel(input2.level, facets.level, input2.level);
-  if (level === null) return "CAT_VALIDATION_ERROR";
   const refs = await references(tx, input2);
   if (refs === null) return "CAT_REFERENCE_INVALID";
   await tx.query(
-    "INSERT INTO products (sku, slug, category_id, brand_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
       input2.sku,
       input2.slug,
       refs.category,
       input2.brandId,
-      refs.level,
       input2.nameEs,
       input2.nameEn,
       input2.descriptionEs,
@@ -103227,8 +103218,7 @@ async function createProduct(tx, input2) {
     "SELECT id FROM products WHERE sku = ?",
     [input2.sku]
   );
-  await relinkLevel(tx, id, level);
-  await relinkFacets(tx, id, facets.ordinary);
+  await relinkFacets(tx, id, facets);
   const row2 = await productRow(tx, id);
   return { before: null, after: await fullProduct(tx, row2) };
 }
@@ -103236,26 +103226,22 @@ async function updateProduct(tx, id, patch) {
   const row2 = await lockedProduct(tx, id);
   if (!row2) return "CAT_NOT_FOUND";
   const before = await fullProduct(tx, row2);
-  const facets = await facetChoice(tx, patch.facetValueIds ?? []);
+  const facets = await checkedFacets(tx, patch.facetValueIds ?? []);
   if (facets === "CAT_REFERENCE_INVALID") return facets;
-  const level = settledLevel(patch.level, facets.level, before.level);
-  if (level === null) return "CAT_VALIDATION_ERROR";
   const { facetValueIds, isActive, ...fields2 } = patch;
   const next = {
     ...before,
     ...fields2,
-    level,
     isActive: isActive ?? before.isActive
   };
   if (next.stock < before.reservedStock) return "CAT_STOCK_BELOW_RESERVED";
   const refs = await references(tx, next);
   if (refs === null) return "CAT_REFERENCE_INVALID";
   await tx.query(
-    "UPDATE products SET category_id = ?, brand_id = ?, experience_level_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
+    "UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
     [
       refs.category,
       next.brandId,
-      refs.level,
       next.nameEs,
       next.nameEn,
       next.descriptionEs,
@@ -103271,8 +103257,7 @@ async function updateProduct(tx, id, patch) {
       id
     ]
   );
-  if (level !== before.level) await relinkLevel(tx, id, level);
-  if (facetValueIds !== void 0) await relinkFacets(tx, id, facets.ordinary);
+  if (facetValueIds !== void 0) await relinkFacets(tx, id, facets);
   const after = await fullProduct(tx, await productRow(tx, id));
   return { before, after };
 }
@@ -117836,7 +117821,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "10e21ac8809e2d11966f91a3a6bbc7d856fd4045" : void 0;
+var sha = true ? "df9d6a859ac0ecf5e74dbbc72d872209844f2125" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
