@@ -40,7 +40,7 @@ describe('checkGuidedFields (F: every control draws from a Field)', () => {
     ]);
   });
 
-  it('does not ask a Field of what is not typed text: checkbox, radio, range, search, combobox', () => {
+  it('does not ask a Field of what is not typed text: checkbox, radio, range, search', () => {
     const report = check(
       [
         'const A = () => (',
@@ -49,12 +49,11 @@ describe('checkGuidedFields (F: every control draws from a Field)', () => {
         '    <input type="radio" />',
         '    <input type="range" />',
         '    <input type="search" />',
-        '    <input type="text" role="combobox" />',
         '  </>',
         ');',
       ].join('\n')
     );
-    expect(report.controls).toBe(5);
+    expect(report.controls).toBe(4);
     expect(report.unguided).toEqual([]);
   });
 
@@ -67,12 +66,13 @@ describe('checkGuidedFields (F: every control draws from a Field)', () => {
         '    <input type={shown ? "text" : "password"} />',
         '    <input type="file" />',
         '    <input />',
+        '    <input type="text" role="combobox" />',
         '  </>',
         ');',
       ].join('\n')
     );
     expect(report.unguided.map((finding) => finding.line)).toEqual([
-      3, 4, 5, 6,
+      3, 4, 5, 6, 7,
     ]);
   });
 

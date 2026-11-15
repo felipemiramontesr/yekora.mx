@@ -152,7 +152,7 @@ export function SearchCombobox({
         <input
           ref={field}
           name="q"
-          type="text"
+          type="search"
           role="combobox"
           aria-label={messages.label}
           aria-autocomplete="list"
@@ -174,7 +174,7 @@ export function SearchCombobox({
             setOpen(true);
           }}
           onKeyDown={onKeyDown}
-          className="h-11 min-w-0 flex-1 bg-marfil px-4 text-petroleo placeholder:text-petroleo/60"
+          className="h-11 min-w-0 flex-1 bg-marfil px-4 text-petroleo placeholder:text-petroleo/60 [&::-webkit-search-cancel-button]:appearance-none"
         />
         <button
           type="submit"

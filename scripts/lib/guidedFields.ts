@@ -4,8 +4,8 @@
  * - F: every `<input>`, `<select>` and `<textarea>` of a component draws from the `control` that
  *   `components/ui/Field.tsx` hands out (a `{...control}` spread), so its label, its hint with the
  *   simplest example and its error are tied to it. The exceptions are the controls that are not
- *   typed text: `checkbox`, `radio`, `range` and `search` inputs, the combobox of the header, and
- *   the files of the {@link ALLOWLIST}.
+ *   typed text: `checkbox`, `radio`, `range` and `search` inputs (the search box of the header is
+ *   one), and the files of the {@link ALLOWLIST}.
  * - D: no other component named `Field` is declared: `components/ui/Field.tsx` is the only one.
  * - S: every file of the {@link ALLOWLIST} still holds a control that needs it, so the list never
  *   keeps a name that has stopped being true.
@@ -70,7 +70,6 @@ function isExempt(tag: string, attributes: ts.JsxAttributes): boolean {
     if (ts.isJsxAttribute(attribute))
       named.set(attribute.name.getText(), literalOf(attribute));
   }
-  if (named.get('role') === 'combobox') return true;
   const type = named.get('type');
   return (
     tag === 'input' && type !== undefined && UNGUIDED_INPUT_TYPES.has(type)
