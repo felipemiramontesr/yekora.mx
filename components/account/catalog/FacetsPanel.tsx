@@ -55,6 +55,9 @@ function PanelField({
 /** A write that either worked or says why not. */
 type Outcome = { ok: true } | { ok: false; reason: CatalogFailure };
 
+/** What a code of a group or a value looks like: lowercase, digits, hyphens and underscores. */
+const CODE_PATTERN = String.raw`[a-z0-9]+([\-_][a-z0-9]+)*`;
+
 /** The yes/no flags of a group: its field name, the text key that names it, and its default. */
 const FLAGS = [
   ['isRequired', 'required', false],
@@ -217,7 +220,7 @@ export function FacetsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
             name: 'code',
             required: true,
             maxLength: 50,
-            pattern: '[a-z0-9]+([\\-_][a-z0-9]+)*',
+            pattern: CODE_PATTERN,
           }}
         />
         <GroupFields texts={t} idBase={`${base}-new`} />
@@ -405,7 +408,7 @@ function GroupCard({
             name: 'code',
             required: true,
             maxLength: 50,
-            pattern: '[a-z0-9]+([\\-_][a-z0-9]+)*',
+            pattern: CODE_PATTERN,
           }}
         />
         <PanelField
