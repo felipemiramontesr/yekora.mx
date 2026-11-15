@@ -1056,6 +1056,10 @@
         "shippingClassNames": {
           "estandar": "Standard: regular parcels",
           "voluminoso": "Bulky: large or heavy parcels"
+        },
+        "photos": {
+          "title": "Photos (1 to 5)",
+          "help": "Every product has from 1 to 5 square photos. The first one is the primary. Crop it, upload it and give it its alt text."
         }
       },
       "media": {
@@ -1069,7 +1073,7 @@
         "altEs": "Alt text in Spanish",
         "altEn": "Alt text in English",
         "addPhoto": "Add photo",
-        "full": "The gallery already has 12 photos.",
+        "full": "The gallery already has 5 photos.",
         "duplicate": "That photo is already in the gallery.",
         "save": "Save gallery",
         "saving": "Saving…",
@@ -1111,7 +1115,7 @@
         "offline": "You seem to be offline.",
         "timeout": "The server took too long. Try again.",
         "unknown": "Something went wrong. Try again.",
-        "CAT_REFERENCE_INVALID": "The discipline, the shipping class, the brand or a property does not exist or is retired.",
+        "CAT_REFERENCE_INVALID": "The discipline, the shipping class, the brand, a property or a photo does not exist or is retired.",
         "CAT_STOCK_BELOW_RESERVED": "Stock cannot drop below what pending orders have already reserved.",
         "MEDIA_UNSAFE_TYPE": "That image type is not accepted. Use a JPG, PNG or WebP photo.",
         "MEDIA_SIZE_EXCEEDED": "The photo is over 2 MB. Choose a smaller size.",

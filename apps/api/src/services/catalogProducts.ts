@@ -11,6 +11,8 @@
  * - A product's properties are the values of the groups it is linked to; each must belong to an
  *   active group (CAT_REFERENCE_INVALID). There is no level (FC 048): it is not a field, nor a
  *   group of its own.
+ * - A product is born with its gallery (FC 049): 1 to 5 photos, already uploaded, in the same
+ *   transaction as the product; one that is not in `media_blobs` refuses the whole creation.
  *
  * Every statement is static SQL with `?` placeholders (A03); lists of ids are walked one
  * statement at a time instead of building an `IN (…)`.
@@ -26,6 +28,13 @@ export type ProductRefusal =
   | 'CAT_VALIDATION_ERROR'
   | 'CAT_REFERENCE_INVALID'
   | 'CAT_STOCK_BELOW_RESERVED';
+
+/** One image to place in a gallery: an uploaded digest and its alt texts. */
+interface GalleryInput {
+  sha256: string;
+  altEs: string | null;
+  altEn: string | null;
+}
 
 /** One image of a gallery. */
 interface GalleryImage {
@@ -84,6 +93,7 @@ type ProductCreate = ProductFields & {
   sku: string;
   slug: string;
   facetValueIds: number[];
+  images: readonly GalleryInput[];
 };
 
 /** What editing a product may change. */
@@ -160,7 +170,10 @@ export async function listAdminProducts(
     'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
     [paging.pageSize, (paging.page - 1) * paging.pageSize]
   );
-  return { items: rows.map((row) => productOf(row)), total: Number(total) };
+  // Each product comes with its properties and its stored gallery, so «Edit» and «Gallery»
+  // open on what it has (FC 049 T2.2); older products need no migration to have them.
+  const items = await Promise.all(rows.map((row) => fullProduct(db, row)));
+  return { items, total: Number(total) };
 }
 
 /** The product row, with its references by slug. */
@@ -300,10 +313,11 @@ async function relinkFacets(
 }
 
 /**
- * Creates a product (active) and links its property values.
+ * Creates a product (active) with its property values and its gallery of 1 to 5 photos, the
+ * first one primary, all or nothing.
  *
  * @param tx - The transaction of the request.
- * @param input - Every field, the SKU, the slug and the property values.
+ * @param input - Every field, the SKU, the slug, the property values and the photos.
  * @returns The new product, or the refusal.
  * @throws The driver's ER_DUP_ENTRY when the SKU or the slug is taken.
  */
@@ -314,7 +328,8 @@ export async function createProduct(
   const facets = await checkedFacets(tx, input.facetValueIds);
   if (facets === 'CAT_REFERENCE_INVALID') return facets;
   const refs = await references(tx, input);
-  if (refs === null) return 'CAT_REFERENCE_INVALID';
+  if (refs === null || !(await checkedBlobs(tx, input.images)))
+    return 'CAT_REFERENCE_INVALID';
   await tx.query(
     'INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
@@ -340,6 +355,9 @@ export async function createProduct(
     [input.sku]
   );
   await relinkFacets(tx, id, facets);
+  await Promise.all(
+    input.images.map((image, index) => placeImage(tx, id, image, index))
+  );
   const row = (await productRow(tx, id)) as ProductRow;
   return { before: null, after: await fullProduct(tx, row) };
 }
@@ -397,6 +415,22 @@ export async function updateProduct(
   return { before, after };
 }
 
+/** Whether every image of a gallery was uploaded (its digest is in `media_blobs`). */
+async function checkedBlobs(
+  tx: TxQuery,
+  images: readonly GalleryInput[]
+): Promise<boolean> {
+  const blobs = await Promise.all(
+    images.map((image) =>
+      tx.query<{ sha256: string }>(
+        'SELECT sha256 FROM media_blobs WHERE sha256 = ?',
+        [image.sha256]
+      )
+    )
+  );
+  return blobs.every((rows) => rows.length > 0);
+}
+
 /**
  * Puts one image at its place in a product's gallery: its retired row comes back when the
  * product had it before, else a new row (rows are never deleted, T2.3c).
@@ -404,7 +438,7 @@ export async function updateProduct(
 async function placeImage(
   tx: TxQuery,
   productId: number,
-  image: { sha256: string; altEs: string | null; altEn: string | null },
+  image: GalleryInput,
   index: number
 ): Promise<void> {
   const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
@@ -437,23 +471,11 @@ async function placeImage(
 export async function replaceGallery(
   tx: TxQuery,
   id: number,
-  images: readonly {
-    sha256: string;
-    altEs: string | null;
-    altEn: string | null;
-  }[]
+  images: readonly GalleryInput[]
 ): Promise<Change<AdminProduct> | ProductRefusal> {
   const row = await lockedProduct(tx, id);
   if (!row) return 'CAT_NOT_FOUND';
-  const blobs = await Promise.all(
-    images.map((image) =>
-      tx.query<{ sha256: string }>(
-        'SELECT sha256 FROM media_blobs WHERE sha256 = ?',
-        [image.sha256]
-      )
-    )
-  );
-  if (blobs.some((rows) => rows.length === 0)) return 'CAT_REFERENCE_INVALID';
+  if (!(await checkedBlobs(tx, images))) return 'CAT_REFERENCE_INVALID';
   const before = await fullProduct(tx, row);
   await tx.query(
     'UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?',

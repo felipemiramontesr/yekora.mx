@@ -1304,6 +1304,10 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
         sku: 'ITEST-ARNES',
         slug: 'itest-arnes',
         facetValueIds: [nylon.after.id],
+        images: [
+          { sha256: sha('a'), altEs: 'Frente', altEn: null },
+          { sha256: sha('b'), altEs: null, altEn: null },
+        ],
       })
     );
     if (typeof created === 'string') throw new Error(created);
@@ -1312,7 +1316,30 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
       discipline: 'escalada',
       shippingClass: 'estandar',
       facetValueIds: [nylon.after.id],
+      gallery: [
+        { sha256: sha('a'), isPrimary: true, sortOrder: 0, altEs: 'Frente' },
+        { sha256: sha('b'), isPrimary: false, sortOrder: 1 },
+      ],
     });
+
+    // A photo never uploaded refuses the whole creation: no product, no link, no media (FC 049).
+    await expect(
+      db.transaction((tx) =>
+        createProduct(tx, {
+          ...fields,
+          sku: 'ITEST-SINFOTO',
+          slug: 'itest-sinfoto',
+          facetValueIds: [],
+          images: [
+            { sha256: sha('a'), altEs: null, altEn: null },
+            { sha256: sha('e'), altEs: null, altEn: null },
+          ],
+        })
+      )
+    ).resolves.toBe('CAT_REFERENCE_INVALID');
+    await expect(
+      db.query("SELECT id FROM products WHERE sku = 'ITEST-SINFOTO'")
+    ).resolves.toEqual([]);
     expect(created.after).not.toHaveProperty('level');
 
     const moved = await db.transaction((tx) =>
@@ -1334,13 +1361,17 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
           sku: 'ITEST-ARNES',
           slug: 'otro',
           facetValueIds: [],
+          images: [{ sha256: sha('a'), altEs: null, altEn: null }],
         })
       )
     ).rejects.toMatchObject({ code: 'ER_DUP_ENTRY' });
 
     const page = await listAdminProducts(db, { page: 1, pageSize: 100 });
+    // The list carries the stored gallery and the property values of each product (FC 049 T2.2).
     expect(page.items.find((p) => p.id === id)).toMatchObject({
       isActive: false,
+      facetValueIds: [],
+      gallery: [{ sha256: sha('a') }, { sha256: sha('b') }],
     });
     expect(page.total).toBeGreaterThanOrEqual(3);
     await expect(readAdminProduct(db, id)).resolves.toMatchObject({

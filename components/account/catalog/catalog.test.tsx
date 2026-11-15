@@ -115,6 +115,33 @@ const renderConsole = () => render(<CatalogConsole texts={t} locale="es-MX" />);
 const press = (name: string) =>
   fireEvent.click(screen.getByRole('button', { name }));
 
+/** Crops and uploads one photo through the crop panel; the API answers with `sha256`. */
+async function addPhoto(sha256: string) {
+  api.openImage.mockResolvedValue({ width: 2000, height: 1000 } as ImageBitmap);
+  api.drawSquare.mockReturnValue(true);
+  api.canvasBlob.mockResolvedValue(new Blob(['w'], { type: 'image/webp' }));
+  api.uploadMedia.mockResolvedValue(
+    ok({
+      code: 'MEDIA_ACCEPTED',
+      created: true,
+      sha256,
+      mimeType: 'image/webp',
+      width: 600,
+      height: 600,
+      sizeBytes: 4,
+    } as const)
+  );
+  fireEvent.click(screen.getByRole('button', { name: t.media.addPhoto }));
+  fireEvent.change(screen.getByLabelText(t.media.choose), {
+    target: { files: [new File(['x'], 'foto.png', { type: 'image/png' })] },
+  });
+  await screen.findByText(t.media.preview);
+  fireEvent.click(screen.getByRole('button', { name: t.media.upload }));
+  await waitFor(() =>
+    expect(document.querySelector(`ol img[src$="${sha256}"]`)).not.toBeNull()
+  );
+}
+
 /** jsdom has no <dialog> methods: showModal only has to open it, as the browser does. */
 const showModal = vi.fn(function (this: HTMLDialogElement) {
   this.setAttribute('open', '');
@@ -780,6 +807,7 @@ describe('products (FC 029 F3c)', () => {
     type(p.width, '200');
     type(p.height, '120');
     fireEvent.click(screen.getByLabelText('Nailon'));
+    await addPhoto('a'.repeat(64));
     fireEvent.submit(screen.getByRole('form', { name: p.titleNew }));
     expect(await screen.findByText(p.created)).toBeTruthy();
     expect(api.createProduct).toHaveBeenCalledWith({
@@ -799,8 +827,52 @@ describe('products (FC 029 F3c)', () => {
       widthMm: 200,
       heightMm: 120,
       facetValueIds: [10],
+      images: [{ sha256: 'a'.repeat(64), altEs: null, altEn: null }],
     });
     expect(api.listProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks for the photos of a new product, 1 to 5, and keeps Create off outside that (FC 049 T2.3)', async () => {
+    api.createProduct.mockResolvedValue(ok(TRAIL));
+    await openProducts();
+    fireEvent.click(screen.getByRole('button', { name: p.new }));
+    await screen.findByRole('form', { name: p.titleNew });
+    expect(screen.getByText(p.photos.title)).toBeTruthy();
+    expect(screen.getByText(p.photos.help)).toBeTruthy();
+    const create = screen.getByRole('button', {
+      name: p.create,
+    }) as HTMLButtonElement;
+    expect(create.disabled).toBe(true);
+    await addPhoto('a'.repeat(64));
+    expect(create.disabled).toBe(false);
+    // Up to five, and then no more.
+    for (const letter of ['b', 'c', 'd', 'e'])
+      await addPhoto(letter.repeat(64));
+    expect(
+      (screen.getByRole('button', { name: t.media.full }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    // The last photo cannot be removed: take four away and the fifth stays.
+    for (let left = 4; left > 0; left -= 1)
+      fireEvent.click(
+        screen.getAllByRole('button', { name: t.media.remove })[0]
+      );
+    expect(
+      (
+        screen.getByRole('button', {
+          name: t.media.remove,
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+  });
+
+  it('shows no photo section when a product is edited: its gallery has its own editor', async () => {
+    await openProducts(TRAIL);
+    fireEvent.click(
+      screen.getByRole('button', { name: `${p.edit}: Tenis trail` })
+    );
+    await screen.findByRole('form', { name: p.titleEdit });
+    expect(screen.queryByText(p.photos.title)).toBeNull();
   });
 
   it('offers the discipline and the shipping class as guided lists, with names and what each means (FC 048 T2.3)', async () => {
@@ -876,6 +948,7 @@ describe('products (FC 029 F3c)', () => {
     ]) {
       type(label, value);
     }
+    await addPhoto('b'.repeat(64));
     fireEvent.submit(screen.getByRole('form', { name: p.titleNew }));
     await screen.findByText(p.created);
     expect(api.createProduct).toHaveBeenCalledWith(
@@ -1219,10 +1292,47 @@ describe('product gallery (FC 029 F3d)', () => {
     expect(screen.queryByRole('dialog', { name: g.cropTitle })).toBeNull();
   });
 
-  it('stops offering photos at twelve', async () => {
+  it('keeps the last photo, and Save off while the gallery has none (FC 049 T2.4)', async () => {
+    await openGallery(WITH_PHOTOS);
+    fireEvent.click(screen.getAllByRole('button', { name: g.remove })[0]);
+    expect(
+      (screen.getByRole('button', { name: g.remove }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: g.save }) as HTMLButtonElement)
+        .disabled
+    ).toBe(false);
+  });
+
+  it('keeps Save off for a gallery with no photo or with more than five from before FC 049', async () => {
+    await openGallery(TRAIL);
+    expect(
+      (screen.getByRole('button', { name: g.save }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    cleanup();
+    const crowded = {
+      ...TRAIL,
+      gallery: Array.from({ length: 6 }, (_, index) => ({
+        sha256: index.toString(16).padStart(64, '0'),
+        altEs: null,
+        altEn: null,
+        sortOrder: index,
+        isPrimary: index === 0,
+      })),
+    };
+    await openGallery(crowded);
+    expect(
+      (screen.getByRole('button', { name: g.save }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+  });
+
+  it('stops offering photos at five', async () => {
     const full = {
       ...TRAIL,
-      gallery: Array.from({ length: 12 }, (_, index) => ({
+      gallery: Array.from({ length: 5 }, (_, index) => ({
         sha256: index.toString(16).padStart(64, '0'),
         altEs: null,
         altEn: null,

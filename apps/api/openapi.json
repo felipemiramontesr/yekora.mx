@@ -8735,6 +8735,46 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "images": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "altEs": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 255
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "altEn": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 255
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["sha256"],
+                      "additionalProperties": false
+                    }
                   }
                 },
                 "required": [
@@ -8751,7 +8791,8 @@
                   "weightGrams",
                   "lengthMm",
                   "widthMm",
-                  "heightMm"
+                  "heightMm",
+                  "images"
                 ],
                 "additionalProperties": false
               }
@@ -9949,7 +9990,8 @@
                 "type": "object",
                 "properties": {
                   "images": {
-                    "maxItems": 12,
+                    "minItems": 1,
+                    "maxItems": 5,
                     "type": "array",
                     "items": {
                       "type": "object",

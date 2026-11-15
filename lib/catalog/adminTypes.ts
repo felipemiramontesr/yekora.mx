@@ -180,6 +180,31 @@ const fields = {
   heightMm: positive,
 };
 
+const altText = z.string().trim().max(255).nullable().default(null);
+
+/** Most photos a product's gallery holds (FC 049). */
+export const MAX_GALLERY_PHOTOS = 5;
+
+/**
+ * A product's gallery, in order, the first one primary: from 1 to {@link MAX_GALLERY_PHOTOS}
+ * photos, none twice (FC 049 T0.1). The same rule gates the creation and the replacement.
+ */
+const galleryImages = z
+  .array(
+    z.strictObject({
+      sha256: z.string().regex(SHA256_HEX),
+      altEs: altText,
+      altEn: altText,
+    })
+  )
+  .min(1)
+  .max(MAX_GALLERY_PHOTOS)
+  .refine(
+    (images) =>
+      new Set(images.map((image) => image.sha256)).size === images.length,
+    'An image appears twice'
+  );
+
 /** Body of `POST /v1/admin/catalog/products`; SKU and slug are fixed from then on. */
 export const productCreate = z.strictObject({
   sku: z
@@ -190,6 +215,7 @@ export const productCreate = z.strictObject({
   ...fields,
   brandId: fields.brandId.default(null),
   facetValueIds: facetIds.default([]),
+  images: galleryImages,
 });
 
 /** Body of `PATCH /v1/admin/catalog/products/:id`: any field, `isActive`, the facet list. */
@@ -206,25 +232,8 @@ export const productPatch = z.strictObject({
   }
 >;
 
-const altText = z.string().trim().max(255).nullable().default(null);
-
 /** Body of `PATCH /v1/admin/catalog/products/:id/media`: the gallery, in order, first primary. */
-export const galleryPatch = z.strictObject({
-  images: z
-    .array(
-      z.strictObject({
-        sha256: z.string().regex(SHA256_HEX),
-        altEs: altText,
-        altEn: altText,
-      })
-    )
-    .max(12)
-    .refine(
-      (images) =>
-        new Set(images.map((image) => image.sha256)).size === images.length,
-      'An image appears twice'
-    ),
-});
+export const galleryPatch = z.strictObject({ images: galleryImages });
 
 /** Paging of the product list. */
 export const productListQuery = z.object({

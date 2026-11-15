@@ -20,6 +20,7 @@ import { fill } from '@/lib/catalog/format';
 import { Field } from '../../ui/Field';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
 import { FIELD, textOf } from './formHelpers';
+import { imagesOf, type Photo, PhotoList, photosInRange } from './PhotoList';
 
 /** Disciplines and shipping classes seeded by migrations 001 and 002: what the lists offer. */
 const DISCIPLINES = [
@@ -133,7 +134,8 @@ function guided(
  * The form of one product, to create it or to edit it (FC 029 F3, T1.1). SKU and slug are typed
  * once: orders and published addresses name them, so an existing product shows them read-only.
  * The price is typed in pesos and sent in cents; the properties are the values of the groups of
- * product properties. The gallery is arranged in the media section.
+ * product properties. A new product is created with its photos (FC 049 T2.3): from 1 to 5,
+ * cropped and uploaded here; an existing one keeps arranging them in its gallery editor.
  *
  * @param texts - `account.catalog` texts.
  * @param product - The product to edit, or null for a new one.
@@ -159,6 +161,7 @@ export function ProductForm({
   const [options, setOptions] = useState<Options | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
 
   useEffect(() => {
     void Promise.all([listBrands(), listFacets()]).then(([brands, facets]) => {
@@ -179,6 +182,7 @@ export function ProductForm({
             sku: textOf(data, 'sku'),
             slug: textOf(data, 'slug'),
             ...fields,
+            images: imagesOf(photos),
           })
         : await updateProduct(product.id, fields);
     setBusy(false);
@@ -382,9 +386,16 @@ export function ProductForm({
                 ))}
               </fieldset>
             ))}
+          {product === null && (
+            <fieldset className="flex flex-col gap-2">
+              <legend>{t.photos.title}</legend>
+              <p>{t.photos.help}</p>
+              <PhotoList texts={texts} photos={photos} onChange={setPhotos} />
+            </fieldset>
+          )}
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || (product === null && !photosInRange(photos))}
             className="tap-target self-start rounded-lg bg-petroleo px-5 font-semibold text-marfil disabled:opacity-60"
           >
             {busy ? submitText.busy : submitText.idle}

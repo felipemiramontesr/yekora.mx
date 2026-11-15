@@ -278,6 +278,7 @@ describe('product console client (FC 029 F3c)', () => {
         lengthMm: 300,
         widthMm: 200,
         heightMm: 120,
+        images: [{ sha256: 'a'.repeat(64), altEs: 'Frente' }],
       },
       create
     );

@@ -1,6 +1,7 @@
 /**
- * FC 029 F2b2 evidence: products of the backoffice. Creating, editing, retiring and arranging
- * a gallery run through the mutation pipeline (catalog:write, Idempotency-Key, payload, audit);
+ * FC 029 F2b2 and FC 049 evidence: products of the backoffice. Creating, editing, retiring and
+ * arranging a gallery run through the mutation pipeline (catalog:write, Idempotency-Key, payload,
+ * audit); a product is born with 1 to 5 photos or not at all (FC 049 T1.1, T1.2, T2.1, T2.2);
  * a product has no level (FC 048) and its property values are exactly the list given (T2.6);
  * nothing is deleted (T2.3c); the stock never drops below the reserved units; every reference
  * must exist and be active.
@@ -374,6 +375,7 @@ const pack = {
   lengthMm: 500,
   widthMm: 300,
   heightMm: 200,
+  images: [{ sha256: sha('a'), altEs: 'Frente' }],
 };
 const create = (overrides: Record<string, unknown> = {}) =>
   write('POST', '/v1/admin/catalog/products', { ...pack, ...overrides });
@@ -389,7 +391,15 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
       brandId: 5,
       isActive: true,
       facetValueIds: [20],
-      gallery: [],
+      gallery: [
+        {
+          sha256: sha('a'),
+          altEs: 'Frente',
+          altEn: null,
+          sortOrder: 0,
+          isPrimary: true,
+        },
+      ],
     });
     // FC 048: a product has no level, nor a «Nivel» value of its own.
     expect(created).not.toHaveProperty('level');
@@ -401,6 +411,54 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
     expect(JSON.parse(entry?.[5] as string)).toMatchObject({
       nameEs: 'Mochila 30 L',
     });
+  });
+
+  it('is born with its photos in order, the first primary, in one go (T1.1, T2.2)', async () => {
+    const res = await create({
+      images: [
+        { sha256: sha('c') },
+        { sha256: sha('a'), altEn: 'Front' },
+        { sha256: sha('b') },
+      ],
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().gallery.map((g: { sha256: string }) => g.sha256)).toEqual(
+      [sha('c'), sha('a'), sha('b')]
+    );
+    expect(res.json().gallery[0].isPrimary).toBe(true);
+    expect(model.media.map((m) => m.sort_order)).toEqual([0, 1, 2]);
+  });
+
+  it('refuses a photo never uploaded with 422 and creates nothing (T2.1)', async () => {
+    const res = await create({
+      images: [{ sha256: sha('a') }, { sha256: sha('f') }],
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({ detail: 'CAT_REFERENCE_INVALID' });
+    expect(model.products).toHaveLength(0);
+    expect(model.media).toHaveLength(0);
+  });
+
+  it.each([
+    ['no images field', undefined],
+    ['no photos', []],
+    [
+      'six photos',
+      ['a', 'b', 'c', 'd', 'e', 'f'].map((letter) => ({ sha256: sha(letter) })),
+    ],
+    ['the same photo twice', [{ sha256: sha('a') }, { sha256: sha('a') }]],
+    ['a malformed digest', [{ sha256: 'xyz' }]],
+  ])('refuses a product with %s (400, T0.1)', async (_case, images) => {
+    const without: Record<string, unknown> = { ...pack };
+    delete without.images;
+    const res = await write(
+      'POST',
+      '/v1/admin/catalog/products',
+      images === undefined ? without : { ...without, images }
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ detail: 'CAT_VALIDATION_ERROR' });
+    expect(model.products).toHaveLength(0);
   });
 
   it('refuses a level: it is no field of a product any more (400)', async () => {
@@ -491,7 +549,9 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
       const res = await write(
         'PATCH',
         url,
-        url.endsWith('media') ? { images: [] } : { stock: 1 }
+        url.endsWith('media')
+          ? { images: [{ sha256: sha('a') }] }
+          : { stock: 1 }
       );
       expect(res.json()).toMatchObject({ detail: 'CAT_NOT_FOUND' });
     }
@@ -549,6 +609,24 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
     expect(twice.json()).toMatchObject({ detail: 'CAT_VALIDATION_ERROR' });
   });
 
+  it.each([
+    ['none', []],
+    [
+      'six',
+      ['a', 'b', 'c', 'd', 'e', 'f'].map((letter) => ({ sha256: sha(letter) })),
+    ],
+  ])('refuses a gallery of %s photos (400, T1.2)', async (_case, images) => {
+    await create();
+    const res = await write('PATCH', '/v1/admin/catalog/products/1/media', {
+      images,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ detail: 'CAT_VALIDATION_ERROR' });
+    expect(
+      model.media.filter((m) => m.is_active === 1).map((m) => m.media_sha256)
+    ).toEqual([sha('a')]);
+  });
+
   it('lists every product, active or not, by page', async () => {
     await create();
     await create({ sku: 'PACK-40', slug: 'mochila-40' });
@@ -564,6 +642,28 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
     expect(restocked.json()).toMatchObject({ stock: 9, isActive: true });
     const detail = await read('/v1/admin/catalog/products/1');
     expect(detail.json()).toMatchObject({ sku: 'PACK-30', facetValueIds: [] });
+    // The list carries each product's properties and stored gallery too (T2.2).
+    const listed = await read('/v1/admin/catalog/products');
+    expect(
+      listed.json().items.map((p: { gallery: unknown[] }) => p.gallery.length)
+    ).toEqual([1, 1]);
+  });
+
+  it('lists each product with its property values and its stored gallery (T2.2)', async () => {
+    await create({
+      facetValueIds: [20, 22],
+      images: [{ sha256: sha('b') }, { sha256: sha('c') }],
+    });
+    // A product older than FC 049 may have no photo: it lists as it is, with no migration.
+    model.products.push({ ...model.products[0], id: 2, sku: 'OLD-1' });
+    const res = await read('/v1/admin/catalog/products');
+    const [first, old] = res.json().items;
+    expect(first.facetValueIds).toEqual([20, 22]);
+    expect(first.gallery.map((g: { sha256: string }) => g.sha256)).toEqual([
+      sha('b'),
+      sha('c'),
+    ]);
+    expect(old).toMatchObject({ sku: 'OLD-1', facetValueIds: [], gallery: [] });
     expect(
       (await read('/v1/admin/catalog/products?pageSize=500')).statusCode
     ).toBe(400);
