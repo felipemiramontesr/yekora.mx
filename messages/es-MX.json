@@ -466,7 +466,8 @@
       "empty": "Ningún producto coincide con estos filtros.",
       "reset": "Quitar filtros",
       "searching": "Resultados para «{query}»",
-      "clearSearch": "Quitar la búsqueda"
+      "clearSearch": "Quitar la búsqueda",
+      "any": "Cualquiera"
     },
     "product": {
       "back": "Volver al catálogo",
@@ -1015,16 +1016,16 @@
             "example": "10"
           },
           "discipline": {
-            "description": "La actividad a la que pertenece el producto. Escribe una de estas: senderismo, montana, escalada, canonismo o trail-running.",
-            "example": "senderismo"
+            "description": "La actividad a la que pertenece el producto. Elígela de la lista.",
+            "example": "Senderismo"
           },
           "brand": {
             "description": "La marca del producto. Si no tiene marca, deja «Sin marca».",
             "example": "Cumbre"
           },
           "shippingClass": {
-            "description": "Cómo se envía: «estandar» para paquetes normales o «voluminoso» para los grandes o pesados.",
-            "example": "estandar"
+            "description": "Cómo se envía. «Estándar» es para paquetes normales; «Voluminoso», para los grandes o pesados. Elígela de la lista.",
+            "example": "Estándar"
           },
           "weight": {
             "description": "Peso del producto ya empacado, en gramos (1 kg son 1000 g).",
@@ -1042,6 +1043,19 @@
             "description": "El alto del paquete, en milímetros.",
             "example": "120"
           }
+        },
+        "chooseDiscipline": "Elige una disciplina",
+        "chooseShippingClass": "Elige una clase de envío",
+        "disciplineNames": {
+          "senderismo": "Senderismo",
+          "montana": "Montaña",
+          "escalada": "Escalada",
+          "canonismo": "Cañonismo",
+          "trail-running": "Trail running"
+        },
+        "shippingClassNames": {
+          "estandar": "Estándar: paquetes normales",
+          "voluminoso": "Voluminoso: paquetes grandes o pesados"
         }
       },
       "media": {

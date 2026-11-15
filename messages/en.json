@@ -466,7 +466,8 @@
       "empty": "No product matches these filters.",
       "reset": "Clear filters",
       "searching": "Results for “{query}”",
-      "clearSearch": "Clear the search"
+      "clearSearch": "Clear the search",
+      "any": "Any"
     },
     "product": {
       "back": "Back to the catalog",
@@ -1015,16 +1016,16 @@
             "example": "10"
           },
           "discipline": {
-            "description": "The activity the product belongs to. Type one of these: senderismo, montana, escalada, canonismo or trail-running.",
-            "example": "senderismo"
+            "description": "The activity the product belongs to. Choose it from the list.",
+            "example": "Hiking"
           },
           "brand": {
             "description": "The product’s brand. If it has none, leave “No brand”.",
             "example": "Cumbre"
           },
           "shippingClass": {
-            "description": "How it ships: “estandar” for normal parcels or “voluminoso” for large or heavy ones.",
-            "example": "estandar"
+            "description": "How it ships. “Standard” is for regular parcels; “Bulky”, for large or heavy ones. Choose it from the list.",
+            "example": "Standard"
           },
           "weight": {
             "description": "Weight of the packed product, in grams (1 kg is 1000 g).",
@@ -1042,6 +1043,19 @@
             "description": "The height of the parcel, in millimetres.",
             "example": "120"
           }
+        },
+        "chooseDiscipline": "Choose a discipline",
+        "chooseShippingClass": "Choose a shipping class",
+        "disciplineNames": {
+          "senderismo": "Hiking",
+          "montana": "Mountaineering",
+          "escalada": "Climbing",
+          "canonismo": "Canyoning",
+          "trail-running": "Trail running"
+        },
+        "shippingClassNames": {
+          "estandar": "Standard: regular parcels",
+          "voluminoso": "Bulky: large or heavy parcels"
         }
       },
       "media": {

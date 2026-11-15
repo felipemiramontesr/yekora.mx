@@ -30,6 +30,8 @@ export interface GridItem {
   disciplineName: string;
   /** Name of its brand, or null: the search finds a product by it too. */
   brandName: string | null;
+  /** Its properties (FC 048): the filterable ones become filters of the grid. */
+  properties: readonly GridProperty[];
   /** Price in MXN cents, for sorting. */
   priceMxnCents: number;
   /** Formatted prices. */
@@ -38,6 +40,55 @@ export interface GridItem {
   inStock: boolean;
   /** First photo, or null for the pictogram. */
   image: { path: string; alt: string } | null;
+}
+
+/** One property of a product, as the page shows it. */
+interface GridProperty {
+  groupCode: string;
+  groupName: string;
+  valueCode: string;
+  valueName: string;
+  isFilterable: boolean;
+}
+
+/** A filter built from the properties the products really carry (FC 048 T1.2). */
+interface PropertyFilter {
+  /** Code of the group of properties. */
+  code: string;
+  /** Its name, in the language of the page. */
+  name: string;
+  /** The values some product has, sorted by name. */
+  values: { code: string; name: string }[];
+}
+
+/**
+ * The filters of the properties: one per filterable group some product has, in the order the
+ * products give them (the store's), each with only the values present. A group or a value added
+ * in the console shows up with no change to the code (ADR 0007).
+ */
+function propertyFilters(items: readonly GridItem[], locale: Locale) {
+  const groups = new Map<
+    string,
+    { name: string; values: Map<string, string> }
+  >();
+  for (const item of items) {
+    for (const property of item.properties) {
+      if (!property.isFilterable) continue;
+      const group = groups.get(property.groupCode) ?? {
+        name: property.groupName,
+        values: new Map<string, string>(),
+      };
+      group.values.set(property.valueCode, property.valueName);
+      groups.set(property.groupCode, group);
+    }
+  }
+  return [...groups].map(([code, group]): PropertyFilter => ({
+    code,
+    name: group.name,
+    values: [...group.values]
+      .map(([valueCode, name]) => ({ code: valueCode, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, locale)),
+  }));
 }
 
 /** Props of {@link CatalogGrid}. */
@@ -187,6 +238,8 @@ export function CatalogGrid({
 }: Readonly<CatalogGridProps>) {
   const [discipline, setDiscipline] = useState('');
   const [query, setQuery] = useState('');
+  // The value chosen in each property filter, by group code; empty or absent is «any».
+  const [chosen, setChosen] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<Sort>('name');
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
@@ -200,6 +253,10 @@ export function CatalogGrid({
         (item) => item.disciplineName,
         locale
       ),
+    [items, locale]
+  );
+  const propertyFilterList = useMemo(
+    () => propertyFilters(items, locale),
     [items, locale]
   );
   // The slugs that answer the search of the header, or null when there is none.
@@ -216,10 +273,18 @@ export function CatalogGrid({
         .filter(
           (item) =>
             (discipline === '' || item.discipline === discipline) &&
+            Object.entries(chosen).every(
+              ([group, value]) =>
+                value === '' ||
+                item.properties.some(
+                  (property) =>
+                    property.groupCode === group && property.valueCode === value
+                )
+            ) &&
             (found === null || found.has(item.slug))
         )
         .sort(comparator(sort, locale)),
-    [items, discipline, found, sort, locale]
+    [items, discipline, chosen, found, sort, locale]
   );
   const plural = new Intl.PluralRules(locale).select(visible.length);
 
@@ -237,7 +302,7 @@ export function CatalogGrid({
       <Suspense fallback={null}>
         <UrlFilters onChange={setFilters} />
       </Suspense>
-      <fieldset className="mt-8 grid gap-4 sm:grid-cols-2">
+      <fieldset className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <legend className="sr-only">{filters.label}</legend>
         <Filter
           label={filters.discipline}
@@ -252,6 +317,24 @@ export function CatalogGrid({
             </option>
           ))}
         </Filter>
+        {propertyFilterList.map((filter) => (
+          <Filter
+            key={filter.code}
+            label={filter.name}
+            value={chosen[filter.code] ?? ''}
+            onChange={(value) =>
+              setChosen((current) => ({ ...current, [filter.code]: value }))
+            }
+            disabled={!isMounted}
+          >
+            <option value="">{filters.any}</option>
+            {filter.values.map((value) => (
+              <option key={value.code} value={value.code}>
+                {value.name}
+              </option>
+            ))}
+          </Filter>
+        ))}
         <Filter
           label={filters.sort}
           value={sort}
@@ -297,6 +380,7 @@ export function CatalogGrid({
             type="button"
             onClick={() => {
               setDiscipline('');
+              setChosen({});
               setQuery('');
             }}
             className="min-h-11 rounded-md border border-petroleo px-5 font-semibold"

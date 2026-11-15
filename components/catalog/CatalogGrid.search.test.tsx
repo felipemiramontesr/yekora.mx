@@ -31,6 +31,7 @@ function item(
     discipline,
     disciplineName,
     brandName,
+    properties: [],
     priceMxnCents: 100000,
     price: { mxn: '$1,000.00 MXN', usd: null },
     inStock: true,

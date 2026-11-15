@@ -1,6 +1,12 @@
 'use client';
 
-import { type ReactNode, type SubmitEvent, useEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  type SubmitEvent,
+  useEffect,
+  useState,
+} from 'react';
 import {
   type AdminProduct,
   type Brand,
@@ -15,7 +21,7 @@ import { Field } from '../../ui/Field';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
 import { FIELD, textOf } from './formHelpers';
 
-/** Disciplines and shipping classes seeded by migrations 001 and 002: suggestions, not a limit. */
+/** Disciplines and shipping classes seeded by migrations 001 and 002: what the lists offer. */
 const DISCIPLINES = [
   'senderismo',
   'montana',
@@ -24,6 +30,49 @@ const DISCIPLINES = [
   'trail-running',
 ];
 const SHIPPING_CLASSES = ['estandar', 'voluminoso'];
+
+/**
+ * A guided list of references by slug (FC 048 T2.3): the ones the store has, each with its name
+ * and, for the shipping classes, what it means. The reference the product already has is always
+ * offered, even when it is not among them (a discipline added in the database), so saving never
+ * changes it by surprise.
+ */
+function SlugSelect({
+  control,
+  name,
+  placeholder,
+  slugs,
+  labels,
+  current,
+}: Readonly<{
+  control: ComponentProps<'select'>;
+  name: string;
+  placeholder: string;
+  slugs: readonly string[];
+  labels: Record<string, string>;
+  current: string | undefined;
+}>) {
+  const offered =
+    current === undefined || slugs.includes(current)
+      ? slugs
+      : [...slugs, current];
+  return (
+    <select
+      {...control}
+      name={name}
+      required
+      defaultValue={current ?? ''}
+      className={FIELD}
+    >
+      <option value="">{placeholder}</option>
+      {offered.map((slug) => (
+        <option key={slug} value={slug}>
+          {labels[slug] ?? slug}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 /** The brands and facet groups a product form offers. */
 interface Options {
@@ -256,21 +305,15 @@ export function ProductForm({
             </p>
           )}
           {guided(texts, 'discipline', t.discipline, (control) => (
-            <input
-              {...control}
+            <SlugSelect
+              control={control}
               name="discipline"
-              required
-              maxLength={40}
-              list="product-disciplines"
-              defaultValue={product?.discipline}
-              className={FIELD}
+              placeholder={t.chooseDiscipline}
+              slugs={DISCIPLINES}
+              labels={t.disciplineNames}
+              current={product?.discipline}
             />
           ))}
-          <datalist id="product-disciplines">
-            {DISCIPLINES.map((slug) => (
-              <option key={slug} value={slug} />
-            ))}
-          </datalist>
           {guided(texts, 'brand', t.brand, (control) => (
             <select
               {...control}
@@ -291,21 +334,15 @@ export function ProductForm({
             </select>
           ))}
           {guided(texts, 'shippingClass', t.shippingClass, (control) => (
-            <input
-              {...control}
+            <SlugSelect
+              control={control}
               name="shippingClass"
-              required
-              maxLength={40}
-              list="product-shipping-classes"
-              defaultValue={product?.shippingClass}
-              className={FIELD}
+              placeholder={t.chooseShippingClass}
+              slugs={SHIPPING_CLASSES}
+              labels={t.shippingClassNames}
+              current={product?.shippingClass}
             />
           ))}
-          <datalist id="product-shipping-classes">
-            {SHIPPING_CLASSES.map((slug) => (
-              <option key={slug} value={slug} />
-            ))}
-          </datalist>
           {(
             [
               ['weightGrams', 'weight', t.weight],

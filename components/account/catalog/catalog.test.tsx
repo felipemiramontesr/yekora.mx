@@ -803,6 +803,59 @@ describe('products (FC 029 F3c)', () => {
     expect(api.listProducts).toHaveBeenCalledTimes(2);
   });
 
+  it('offers the discipline and the shipping class as guided lists, with names and what each means (FC 048 T2.3)', async () => {
+    await openProducts();
+    fireEvent.click(screen.getByRole('button', { name: p.new }));
+    await screen.findByRole('form', { name: p.titleNew });
+    const options = (label: string) =>
+      [
+        ...(screen.getByLabelText(label, { exact: false }) as HTMLSelectElement)
+          .options,
+      ].map((option) => [option.value, option.textContent]);
+    expect(options(p.discipline)).toEqual([
+      ['', p.chooseDiscipline],
+      ['senderismo', 'Senderismo'],
+      ['montana', 'Montaña'],
+      ['escalada', 'Escalada'],
+      ['canonismo', 'Cañonismo'],
+      ['trail-running', 'Trail running'],
+    ]);
+    expect(options(p.shippingClass)).toEqual([
+      ['', p.chooseShippingClass],
+      ['estandar', p.shippingClassNames.estandar],
+      ['voluminoso', p.shippingClassNames.voluminoso],
+    ]);
+    expect(
+      (
+        screen.getByLabelText(p.discipline, {
+          exact: false,
+        }) as HTMLSelectElement
+      ).required
+    ).toBe(true);
+  });
+
+  it('keeps offering the reference a product already has when the store added it, so saving never changes it', async () => {
+    await openProducts({
+      ...TRAIL,
+      discipline: 'buceo',
+      shippingClass: 'flete',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: `${p.edit}: Tenis trail` })
+    );
+    await screen.findByRole('form', { name: p.titleEdit });
+    for (const [label, slug] of [
+      [p.discipline, 'buceo'],
+      [p.shippingClass, 'flete'],
+    ]) {
+      const select = screen.getByLabelText(label, {
+        exact: false,
+      }) as HTMLSelectElement;
+      expect(select.value).toBe(slug);
+      expect([...select.options].map((option) => option.value)).toContain(slug);
+    }
+  });
+
   it('creates a product without a brand', async () => {
     api.createProduct.mockResolvedValue(ok(TRAIL));
     await openProducts();

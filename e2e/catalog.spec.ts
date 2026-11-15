@@ -187,6 +187,26 @@ test('the search of the header suggests products and opens the one chosen with t
   await expect(page).toHaveURL(/\/catalogo\/e2e-arnes-alpino\/$/);
 });
 
+test('the properties of the products become filters, one per filterable group (FC 048 T1.2, T2.4)', async ({
+  page,
+}) => {
+  await page.goto('/catalogo/');
+  await expect(filter(page, 'Color')).toBeVisible();
+  await filter(page, 'Color').selectOption({ label: 'Rojo' });
+  await expect(cards(page)).toHaveCount(2);
+  await filter(page, 'Material').selectOption({ label: 'Nailon' });
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('Arnés alpino');
+  await filter(page, 'Material').selectOption({ label: 'Cualquiera' });
+  await filter(page, 'Color').selectOption({ label: 'Cualquiera' });
+  await expect(cards(page)).toHaveCount(3);
+  // In English, with the names the store gave in that language.
+  await page.goto('/en/catalog/');
+  await filter(page, 'Color').selectOption({ label: 'Blue' });
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('Light backpack');
+});
+
 test('the search of the header finds a product by its brand alone, and says the brand (FC 047 T1.2)', async ({
   page,
 }) => {
