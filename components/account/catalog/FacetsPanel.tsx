@@ -1,6 +1,13 @@
 'use client';
 
-import { type SubmitEvent, useCallback, useEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type SubmitEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import {
   type CatalogFailure,
   createFacetGroup,
@@ -10,11 +17,40 @@ import {
   updateFacetGroup,
   updateFacetValue,
 } from '@/lib/api/catalogAdminClient';
+import { TextField } from '../../ui/TextField';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
-import { FIELD, type Note, textOf } from './formHelpers';
+import { type Note, textOf } from './formHelpers';
 
-/** `account.catalog.facets` texts. */
-type Texts = CatalogTexts['facets'];
+/** `account.catalog.facets` texts, with the word that introduces an example. */
+type Texts = CatalogTexts['facets'] & { exampleLabel: string };
+
+/**
+ * A guided text field of this panel (FC 050 T2.1): its label, how to fill it in with the simplest
+ * example, from `account.catalog.facets.fields`, and the attributes of its input.
+ */
+function PanelField({
+  texts,
+  id,
+  name,
+  label,
+  input,
+}: Readonly<{
+  texts: Texts;
+  id: string;
+  name: keyof Texts['fields'];
+  label: string;
+  input: ComponentProps<typeof TextField>['input'];
+}>) {
+  return (
+    <TextField
+      id={id}
+      label={label}
+      {...texts.fields[name]}
+      exampleLabel={texts.exampleLabel}
+      input={input}
+    />
+  );
+}
 
 /** A write that either worked or says why not. */
 type Outcome = { ok: true } | { ok: false; reason: CatalogFailure };
@@ -60,7 +96,8 @@ function valueFieldsOf(form: HTMLFormElement) {
  * @param texts - `account.catalog` texts.
  */
 export function FacetsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
-  const t = texts.facets;
+  const t: Texts = { ...texts.facets, exampleLabel: texts.exampleLabel };
+  const base = useId();
   const [groups, setGroups] = useState<FacetGroup[] | null>(null);
   const [note, setNote] = useState<Note>(null);
   const [editingGroup, setEditingGroup] = useState<number | null>(null);
@@ -171,21 +208,19 @@ export function FacetsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
         className="flex max-w-xl flex-col gap-3"
       >
         <h2 className="text-lg font-semibold">{t.newGroup}</h2>
-        <label className="flex flex-col gap-1">
-          {t.code}
-          <input
-            name="code"
-            required
-            maxLength={50}
-            pattern="[a-z0-9]+([\-_][a-z0-9]+)*"
-            aria-describedby="facet-code-hint"
-            className={FIELD}
-          />
-          <span id="facet-code-hint" className="text-sm">
-            {t.codeHint}
-          </span>
-        </label>
-        <GroupFields texts={t} />
+        <PanelField
+          texts={t}
+          id={`${base}-code`}
+          name="code"
+          label={t.code}
+          input={{
+            name: 'code',
+            required: true,
+            maxLength: 50,
+            pattern: '[a-z0-9]+([\\-_][a-z0-9]+)*',
+          }}
+        />
+        <GroupFields texts={t} idBase={`${base}-new`} />
         <button
           type="submit"
           disabled={busy}
@@ -202,41 +237,48 @@ export function FacetsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
 function GroupFields({
   texts,
   group,
-}: Readonly<{ texts: Texts; group?: FacetGroup }>) {
+  idBase,
+}: Readonly<{ texts: Texts; group?: FacetGroup; idBase: string }>) {
   return (
     <>
-      <label className="flex flex-col gap-1">
-        {texts.nameEs}
-        <input
-          name="nameEs"
-          required
-          maxLength={100}
-          defaultValue={group?.nameEs}
-          className={FIELD}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        {texts.nameEn}
-        <input
-          name="nameEn"
-          required
-          maxLength={100}
-          defaultValue={group?.nameEn}
-          className={FIELD}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        {texts.order}
-        <input
-          name="sortOrder"
-          type="number"
-          required
-          min={-1000}
-          max={1000}
-          defaultValue={group?.sortOrder ?? 0}
-          className={FIELD}
-        />
-      </label>
+      <PanelField
+        texts={texts}
+        id={`${idBase}-nameEs`}
+        name="nameEs"
+        label={texts.nameEs}
+        input={{
+          name: 'nameEs',
+          required: true,
+          maxLength: 100,
+          defaultValue: group?.nameEs,
+        }}
+      />
+      <PanelField
+        texts={texts}
+        id={`${idBase}-nameEn`}
+        name="nameEn"
+        label={texts.nameEn}
+        input={{
+          name: 'nameEn',
+          required: true,
+          maxLength: 100,
+          defaultValue: group?.nameEn,
+        }}
+      />
+      <PanelField
+        texts={texts}
+        id={`${idBase}-order`}
+        name="order"
+        label={texts.order}
+        input={{
+          name: 'sortOrder',
+          type: 'number',
+          required: true,
+          min: -1000,
+          max: 1000,
+          defaultValue: group?.sortOrder ?? 0,
+        }}
+      />
       <div className="flex flex-wrap gap-4">
         {FLAGS.map(([field, key, initial]) => (
           <label key={field} className="flex items-center gap-2">
@@ -279,6 +321,7 @@ function GroupCard({
   onSaveValue: (event: SubmitEvent<HTMLFormElement>, id: number) => void;
   onAddValue: (event: SubmitEvent<HTMLFormElement>) => void;
 }>) {
+  const base = useId();
   const flags = FLAGS.filter(([field]) => group[field]).map(
     ([, key]) => texts.flags[key]
   );
@@ -300,7 +343,7 @@ function GroupCard({
           aria-label={`${texts.edit}: ${group.nameEs}`}
           className="flex max-w-xl flex-col gap-3"
         >
-          <GroupFields texts={texts} group={group} />
+          <GroupFields texts={texts} group={group} idBase={`${base}-edit`} />
           <div className="flex gap-3">
             <button
               type="submit"
@@ -353,36 +396,46 @@ function GroupCard({
         aria-label={`${texts.newValue}: ${group.nameEs}`}
         className="flex flex-wrap items-end gap-3"
       >
-        <label className="flex flex-col gap-1">
-          {texts.code}
-          <input
-            name="code"
-            required
-            maxLength={50}
-            pattern="[a-z0-9]+([\-_][a-z0-9]+)*"
-            className={FIELD}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {texts.valueEs}
-          <input name="valueEs" required maxLength={100} className={FIELD} />
-        </label>
-        <label className="flex flex-col gap-1">
-          {texts.valueEn}
-          <input name="valueEn" required maxLength={100} className={FIELD} />
-        </label>
-        <label className="flex flex-col gap-1">
-          {texts.order}
-          <input
-            name="sortOrder"
-            type="number"
-            required
-            min={-1000}
-            max={1000}
-            defaultValue={0}
-            className={FIELD}
-          />
-        </label>
+        <PanelField
+          texts={texts}
+          id={`${base}-value-code`}
+          name="valueCode"
+          label={texts.code}
+          input={{
+            name: 'code',
+            required: true,
+            maxLength: 50,
+            pattern: '[a-z0-9]+([\\-_][a-z0-9]+)*',
+          }}
+        />
+        <PanelField
+          texts={texts}
+          id={`${base}-value-es`}
+          name="valueEs"
+          label={texts.valueEs}
+          input={{ name: 'valueEs', required: true, maxLength: 100 }}
+        />
+        <PanelField
+          texts={texts}
+          id={`${base}-value-en`}
+          name="valueEn"
+          label={texts.valueEn}
+          input={{ name: 'valueEn', required: true, maxLength: 100 }}
+        />
+        <PanelField
+          texts={texts}
+          id={`${base}-value-order`}
+          name="valueOrder"
+          label={texts.order}
+          input={{
+            name: 'sortOrder',
+            type: 'number',
+            required: true,
+            min: -1000,
+            max: 1000,
+            defaultValue: 0,
+          }}
+        />
         <button type="submit" disabled={busy} className="tap-target underline">
           {busy ? texts.adding : texts.addValue}
         </button>
@@ -407,6 +460,7 @@ function ValuesTable({
   onEditValue: (id: number | null) => void;
   onSaveValue: (event: SubmitEvent<HTMLFormElement>, id: number) => void;
 }>) {
+  const base = useId();
   if (group.values.length === 0) return <p>{texts.noValues}</p>;
   return (
     <div className="overflow-x-auto">
@@ -431,38 +485,44 @@ function ValuesTable({
                     aria-label={`${texts.edit}: ${value.valueEs}`}
                     className="flex flex-wrap items-end gap-3 py-2"
                   >
-                    <label className="flex flex-col gap-1">
-                      {texts.valueEs}
-                      <input
-                        name="valueEs"
-                        required
-                        maxLength={100}
-                        defaultValue={value.valueEs}
-                        className={FIELD}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      {texts.valueEn}
-                      <input
-                        name="valueEn"
-                        required
-                        maxLength={100}
-                        defaultValue={value.valueEn}
-                        className={FIELD}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      {texts.order}
-                      <input
-                        name="sortOrder"
-                        type="number"
-                        required
-                        min={-1000}
-                        max={1000}
-                        defaultValue={value.sortOrder}
-                        className={FIELD}
-                      />
-                    </label>
+                    <PanelField
+                      texts={texts}
+                      id={`${base}-edit-es`}
+                      name="valueEs"
+                      label={texts.valueEs}
+                      input={{
+                        name: 'valueEs',
+                        required: true,
+                        maxLength: 100,
+                        defaultValue: value.valueEs,
+                      }}
+                    />
+                    <PanelField
+                      texts={texts}
+                      id={`${base}-edit-en`}
+                      name="valueEn"
+                      label={texts.valueEn}
+                      input={{
+                        name: 'valueEn',
+                        required: true,
+                        maxLength: 100,
+                        defaultValue: value.valueEn,
+                      }}
+                    />
+                    <PanelField
+                      texts={texts}
+                      id={`${base}-edit-order`}
+                      name="valueOrder"
+                      label={texts.order}
+                      input={{
+                        name: 'sortOrder',
+                        type: 'number',
+                        required: true,
+                        min: -1000,
+                        max: 1000,
+                        defaultValue: value.sortOrder,
+                      }}
+                    />
                     <button
                       type="submit"
                       disabled={busy}

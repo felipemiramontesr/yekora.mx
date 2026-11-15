@@ -558,9 +558,7 @@
       "legend": "Datos de contacto",
       "name": "Nombre completo",
       "email": "Correo electrónico",
-      "emailHint": "Lo usamos solo para contactarte sobre este pedido.",
-      "phone": "Teléfono",
-      "phoneHint": "10 dígitos, sin espacios."
+      "phone": "Teléfono"
     },
     "address": {
       "legend": "Dirección de entrega",
@@ -667,6 +665,53 @@
       "retry": "Consultar de nuevo",
       "toCatalog": "Seguir explorando",
       "toCart": "Volver a tu mochila"
+    },
+    "fields": {
+      "exampleLabel": "Ejemplo",
+      "name": {
+        "description": "Quien recibirá el pedido: nombre y apellidos.",
+        "example": "Ana Pérez López"
+      },
+      "email": {
+        "description": "Lo usamos solo para contactarte sobre este pedido.",
+        "example": "ana@correo.com"
+      },
+      "phone": {
+        "description": "10 dígitos, sin espacios ni guiones.",
+        "example": "9981234567"
+      },
+      "street": {
+        "description": "El nombre de la calle de entrega, sin el número.",
+        "example": "Avenida Reforma"
+      },
+      "exteriorNumber": {
+        "description": "El número de la puerta o del edificio.",
+        "example": "123"
+      },
+      "interiorNumber": {
+        "description": "Opcional. Departamento, piso o local, si lo hay.",
+        "example": "4B"
+      },
+      "neighborhood": {
+        "description": "La colonia o el fraccionamiento.",
+        "example": "Centro"
+      },
+      "municipality": {
+        "description": "El municipio o la alcaldía donde está la dirección.",
+        "example": "Benito Juárez"
+      },
+      "postalCode": {
+        "description": "Los 5 dígitos del código postal de la entrega.",
+        "example": "98000"
+      },
+      "stateCode": {
+        "description": "El estado donde está la dirección de entrega.",
+        "example": "Zacatecas"
+      },
+      "references": {
+        "description": "Opcional. Algo que ayude a encontrar el lugar: el color de la casa, entre qué calles.",
+        "example": "Portón negro, entre Hidalgo y Juárez"
+      }
     }
   },
   "account": {
@@ -698,8 +743,7 @@
         "description": "Los 5 dígitos del código postal de tu domicilio. Lo guardamos cifrado y lo usamos para mostrarte a dónde enviamos.",
         "example": "98000",
         "error": "Escribe los 5 dígitos de un código postal de México."
-      },
-      "exampleLabel": "Ejemplo"
+      }
     },
     "password": {
       "show": "Mostrar contraseña",
@@ -718,7 +762,21 @@
         "personal": "No incluir tu correo ni tu nombre",
         "common": "No ser una contraseña común (como Password123!)"
       },
-      "match": "Las dos contraseñas coinciden"
+      "match": "Las dos contraseñas coinciden",
+      "fields": {
+        "current": {
+          "description": "La contraseña de tu cuenta. Con el ojo puedes ver lo que escribes.",
+          "example": "Cumbre-Azul-2026"
+        },
+        "new": {
+          "description": "Elige una que cumpla todo lo de la lista de abajo.",
+          "example": "Cumbre-Azul-2026"
+        },
+        "repeat": {
+          "description": "Escríbela otra vez, idéntica a la anterior.",
+          "example": "Cumbre-Azul-2026"
+        }
+      }
     },
     "forgot": {
       "title": "Restablecer tu contraseña",
@@ -886,8 +944,6 @@
         "retired": "Retirada",
         "empty": "Aún no hay marcas.",
         "new": "Nueva marca",
-        "slugHint": "Minúsculas, números y guiones, por ejemplo «cumbre-mx». No cambia después.",
-        "websiteHint": "Opcional. Debe empezar con https://",
         "create": "Crear marca",
         "creating": "Creando…",
         "created": "Marca creada.",
@@ -897,7 +953,21 @@
         "saved": "Cambios guardados.",
         "cancel": "Cancelar",
         "retire": "Retirar",
-        "reactivate": "Reactivar"
+        "reactivate": "Reactivar",
+        "fields": {
+          "name": {
+            "description": "El nombre de la marca, como lo verán tus clientes.",
+            "example": "Cumbre"
+          },
+          "slug": {
+            "description": "Parte final de la dirección de la marca. Solo minúsculas, números y guiones. No cambia después.",
+            "example": "cumbre-mx"
+          },
+          "website": {
+            "description": "Opcional. Debe empezar con https://",
+            "example": "https://cumbre.example"
+          }
+        }
       },
       "facets": {
         "caption": "Grupos de propiedades con sus valores",
@@ -910,7 +980,6 @@
           "landing": "En la portada"
         },
         "code": "Identificador",
-        "codeHint": "Minúsculas, números y guiones, por ejemplo «talla» o «color». No cambia después.",
         "nameEs": "Nombre en español",
         "nameEn": "Nombre en inglés",
         "order": "Orden",
@@ -932,7 +1001,41 @@
         "newValue": "Nuevo valor",
         "addValue": "Agregar valor",
         "adding": "Agregando…",
-        "valueAdded": "Valor agregado."
+        "valueAdded": "Valor agregado.",
+        "fields": {
+          "code": {
+            "description": "Identificador del grupo: minúsculas, números y guiones. No cambia después.",
+            "example": "talla"
+          },
+          "nameEs": {
+            "description": "El nombre del grupo en español, como lo ve el cliente.",
+            "example": "Material"
+          },
+          "nameEn": {
+            "description": "El nombre del grupo en inglés, como lo ve el cliente.",
+            "example": "Material"
+          },
+          "order": {
+            "description": "Un número que ordena los grupos: el menor va primero.",
+            "example": "0"
+          },
+          "valueCode": {
+            "description": "Identificador del valor: minúsculas, números y guiones. No cambia después.",
+            "example": "nailon"
+          },
+          "valueEs": {
+            "description": "El valor en español, como lo ve el cliente.",
+            "example": "Nailon"
+          },
+          "valueEn": {
+            "description": "El valor en inglés, como lo ve el cliente.",
+            "example": "Nylon"
+          },
+          "valueOrder": {
+            "description": "Un número que ordena los valores del grupo: el menor va primero.",
+            "example": "0"
+          }
+        }
       },
       "products": {
         "caption": "Productos, activos y retirados",
@@ -1094,7 +1197,25 @@
         "preview": "Vista previa del recorte cuadrado",
         "upload": "Usar esta foto",
         "uploading": "Subiendo…",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "fields": {
+          "altEs": {
+            "description": "Describe la foto, en español, para quien no puede verla.",
+            "example": "Mochila azul vista de frente"
+          },
+          "altEn": {
+            "description": "Describe la foto, en inglés, para quien no puede verla.",
+            "example": "Blue backpack, front view"
+          },
+          "choose": {
+            "description": "Una imagen de tu equipo; en el paso siguiente la recortas en cuadrado.",
+            "example": "mochila.jpg"
+          },
+          "size": {
+            "description": "Más grande se ve más nítida, pero pesa más. Para el catálogo basta con 600 px.",
+            "example": "Catálogo (600 px)"
+          }
+        }
       },
       "publish": {
         "title": "Publicar cambios",
@@ -1170,6 +1291,21 @@
           "description": "El correo al que llegará el enlace para que elija su contraseña.",
           "example": "ana@ejemplo.com"
         }
+      }
+    },
+    "exampleLabel": "Ejemplo",
+    "fields": {
+      "email": {
+        "description": "El correo de tu cuenta. Ahí te enviamos los códigos y los avisos de tus pedidos.",
+        "example": "ana@correo.com"
+      },
+      "fullName": {
+        "description": "Tu nombre y apellidos, como quieres que aparezcan en tus pedidos.",
+        "example": "Ana Pérez López"
+      },
+      "code": {
+        "description": "El código de 6 dígitos que recibiste. Con tu app de autenticación también sirve uno de tus códigos de respaldo de 8 dígitos.",
+        "example": "123456"
       }
     }
   }

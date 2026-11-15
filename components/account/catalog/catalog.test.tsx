@@ -230,6 +230,26 @@ describe('brands (FC 029 F3a)', () => {
     ).toBeTruthy();
   });
 
+  it('guides each field of the brand forms with how to fill it in and its example (FC 050 T2.1)', async () => {
+    api.listBrands.mockResolvedValue(ok([CUMBRE]));
+    renderConsole();
+    await screen.findByText('Cumbre');
+    const said = (field: { description: string; example: string }) =>
+      `${field.description} ${t.exampleLabel}: ${field.example}`;
+    const hint = (label: string) => {
+      const control = screen.getByLabelText(label, { exact: false });
+      return document.getElementById(`${control.id}-hint`)?.textContent;
+    };
+    expect(hint(t.brands.name)).toBe(said(t.brands.fields.name));
+    expect(hint(t.brands.slug)).toBe(said(t.brands.fields.slug));
+    expect(hint(t.brands.website)).toBe(said(t.brands.fields.website));
+    // The edit form of a row guides its own fields too, with ids of its own.
+    fireEvent.click(screen.getByRole('button', { name: t.brands.edit }));
+    expect(
+      screen.getAllByText(t.brands.fields.name.description, { exact: false })
+    ).toHaveLength(2);
+  });
+
   it('creates a brand, with no website when the field is empty, and reloads the list', async () => {
     api.createBrand.mockResolvedValue(ok(CUMBRE));
     renderConsole();

@@ -1,68 +1,7 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { Messages } from '@/app/i18n';
 import type { PaymentMethodCode } from '@/lib/checkout/checkoutForm';
 import { PAYMENT_METHOD_CODES } from '@/lib/checkout/checkoutTypes';
-
-/** Props of {@link Field}. */
-interface FieldProps {
-  /** Input id; the hint and the error derive theirs from it. */
-  id: string;
-  /** Visible label. */
-  label: string;
-  /** Help under the field, or none. */
-  hint?: string;
-  /** Error text when invalid, or none. */
-  error?: string;
-  /** Current value. */
-  value: string;
-  /** Called with the new value. */
-  onChange: (value: string) => void;
-  /** Type, autocomplete, input mode, length and the like. */
-  input?: Omit<
-    InputHTMLAttributes<HTMLInputElement>,
-    'id' | 'value' | 'onChange'
-  >;
-}
-
-/**
- * One labelled text input with its hint and its error, wired for assistive technology:
- * `aria-invalid` and `aria-describedby` point at the texts the field shows.
- */
-export function Field({
-  id,
-  label,
-  hint,
-  error,
-  value,
-  onChange,
-  input,
-}: Readonly<FieldProps>) {
-  const describedBy =
-    [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') ||
-    undefined;
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      <input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3 aria-invalid:border-red-700"
-        {...input}
-      />
-      {hint && (
-        <p id={`${id}-hint`} className="text-xs text-petroleo/80">
-          {hint}
-        </p>
-      )}
-      {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
-    </div>
-  );
-}
 
 /**
  * Error text of a field.

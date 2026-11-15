@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type SubmitEvent, useId, useState } from 'react';
+import { type ComponentProps, type SubmitEvent, useId, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import { type CheckoutFailure, submitCheckout } from '@/lib/api/checkoutClient';
 import {
@@ -20,7 +20,9 @@ import { fill, formatMoney } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import { CartSummary, StateSelect } from '../cart/CartSummary';
 import { useCartLines, useCartQuote, useDeliveryState } from '../cart/useCart';
-import { Field, FieldError, PaymentMethodPicker } from './CheckoutFields';
+import { Field } from '../ui/Field';
+import { TextField } from '../ui/TextField';
+import { FieldError, PaymentMethodPicker } from './CheckoutFields';
 
 /** Props of {@link CheckoutForm}. */
 interface CheckoutFormProps {
@@ -51,7 +53,7 @@ type Phase =
 const TEXT_FIELDS: {
   name: keyof CheckoutValues;
   group: 'contact' | 'address';
-  input: Parameters<typeof Field>[0]['input'];
+  input: ComponentProps<typeof TextField>['input'];
 }[] = [
   {
     name: 'name',
@@ -213,48 +215,44 @@ export function CheckoutForm({
             </legend>
             {TEXT_FIELDS.filter((field) => field.group === group).map(
               ({ name, input }) => (
-                <Field
+                <TextField
                   key={name}
                   id={`${base}-${name}`}
                   label={(messages[group] as Record<string, string>)[name]}
-                  hint={
-                    (messages.contact as Record<string, string>)[`${name}Hint`]
-                  }
+                  {...messages.fields[name]}
+                  exampleLabel={messages.fields.exampleLabel}
                   error={errorText(name)}
-                  value={values[name]}
-                  onChange={update(name)}
-                  input={input}
+                  input={{
+                    ...input,
+                    value: values[name],
+                    onChange: (event) => update(name)(event.target.value),
+                  }}
                 />
               )
             )}
             {group === 'address' && (
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor={`${base}-stateCode`}
-                  className="text-sm font-medium"
-                >
-                  {messages.address.state}
-                </label>
-                <StateSelect
-                  id={`${base}-stateCode`}
-                  locale={locale}
-                  value={stateCode}
-                  onChange={setStateCode}
-                  placeholder={cartMessages.shipping.choose}
-                  extra={{
-                    autoComplete: 'address-level1',
-                    'aria-invalid': errors.stateCode ? true : undefined,
-                    'aria-describedby': errors.stateCode
-                      ? `${base}-stateCode-error`
-                      : undefined,
-                  }}
-                />
-                {errors.stateCode && (
-                  <FieldError id={`${base}-stateCode-error`}>
-                    {errorText('stateCode')}
-                  </FieldError>
+              <Field
+                id={`${base}-stateCode`}
+                label={messages.address.state}
+                {...messages.fields.stateCode}
+                exampleLabel={messages.fields.exampleLabel}
+                error={errorText('stateCode')}
+              >
+                {(control) => (
+                  <StateSelect
+                    id={control.id}
+                    locale={locale}
+                    value={stateCode}
+                    onChange={setStateCode}
+                    placeholder={cartMessages.shipping.choose}
+                    extra={{
+                      autoComplete: 'address-level1',
+                      'aria-invalid': control['aria-invalid'],
+                      'aria-describedby': control['aria-describedby'],
+                    }}
+                  />
                 )}
-              </div>
+              </Field>
             )}
           </fieldset>
         ))}

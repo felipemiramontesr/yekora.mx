@@ -170,7 +170,8 @@ describe('CheckoutForm', () => {
   it('shows every missing field, marks it invalid and focuses the first one', () => {
     renderForm();
     fireEvent.click(payButton());
-    expect(screen.getByRole('alert').textContent).toBe(
+    // The summary alert stays, first, besides the alert of each field (FC 050 T2.3).
+    expect(screen.getAllByRole('alert')[0].textContent).toBe(
       'Revisa los campos marcados.'
     );
     const name = screen.getByLabelText('Nombre completo');
@@ -184,6 +185,40 @@ describe('CheckoutForm', () => {
       )
     ).toBeTruthy();
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('guides every field with how to fill it in and its simplest example, tied to the control (FC 050 T1.1, T2.3)', () => {
+    renderForm();
+    const { contact, address, fields } = messagesOf('es-MX').checkout;
+    const guided = [
+      [contact.name, fields.name],
+      [contact.email, fields.email],
+      [contact.phone, fields.phone],
+      [address.street, fields.street],
+      [address.exteriorNumber, fields.exteriorNumber],
+      [address.interiorNumber, fields.interiorNumber],
+      [address.neighborhood, fields.neighborhood],
+      [address.municipality, fields.municipality],
+      [address.postalCode, fields.postalCode],
+      [address.references, fields.references],
+      [address.state, fields.stateCode],
+    ] as const;
+    for (const [label, field] of guided) {
+      const control = screen.getByLabelText(label);
+      expect(control.getAttribute('aria-describedby')).toBe(
+        `${control.id}-hint`
+      );
+      expect(document.getElementById(`${control.id}-hint`)?.textContent).toBe(
+        `${field.description} ${fields.exampleLabel}: ${field.example}`
+      );
+    }
+    // A refused field points at its hint and its error, and the hint stays (T1.1 E).
+    fireEvent.click(payButton());
+    const name = screen.getByLabelText(contact.name);
+    expect(name.getAttribute('aria-describedby')).toBe(
+      `${name.id}-hint ${name.id}-error`
+    );
+    expect(document.getElementById(`${name.id}-hint`)).not.toBeNull();
   });
 
   it('focuses the payment methods when only the method is missing', () => {
@@ -235,8 +270,11 @@ describe('CheckoutForm', () => {
     renderForm();
     fillForm();
     fireEvent.submit(payButton().closest('form') as HTMLFormElement);
-    expect(screen.getByLabelText('Estado').getAttribute('aria-invalid')).toBe(
-      'true'
+    const state = screen.getByLabelText('Estado');
+    expect(state.getAttribute('aria-invalid')).toBe('true');
+    // The select keeps its hint beside its error (FC 050 T1.1 E).
+    expect(state.getAttribute('aria-describedby')).toBe(
+      `${state.id}-hint ${state.id}-error`
     );
     expect(screen.getByText('Elige tu estado.')).toBeTruthy();
   });

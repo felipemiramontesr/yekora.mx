@@ -1,14 +1,21 @@
 'use client';
 
-import { type SubmitEvent, useCallback, useEffect, useState } from 'react';
+import {
+  type SubmitEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import {
   type Brand,
   createBrand,
   listBrands,
   updateBrand,
 } from '@/lib/api/catalogAdminClient';
+import { TextField } from '../../ui/TextField';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
-import { FIELD, type Note, textOf } from './formHelpers';
+import { type Note, textOf } from './formHelpers';
 
 /** An empty website field is "no website". */
 const websiteOf = (data: FormData) => textOf(data, 'website') || null;
@@ -22,6 +29,7 @@ const websiteOf = (data: FormData) => textOf(data, 'website') || null;
  */
 export function BrandsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
   const t = texts.brands;
+  const base = useId();
   const [brands, setBrands] = useState<Brand[] | null>(null);
   const [note, setNote] = useState<Note>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -123,37 +131,32 @@ export function BrandsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
         className="flex max-w-xl flex-col gap-3"
       >
         <h2 className="text-lg font-semibold">{t.new}</h2>
-        <label className="flex flex-col gap-1">
-          {t.name}
-          <input name="name" required maxLength={150} className={FIELD} />
-        </label>
-        <label className="flex flex-col gap-1">
-          {t.slug}
-          <input
-            name="slug"
-            required
-            maxLength={100}
-            pattern="[a-z0-9]+(-[a-z0-9]+)*"
-            aria-describedby="brand-slug-hint"
-            className={FIELD}
-          />
-          <span id="brand-slug-hint" className="text-sm">
-            {t.slugHint}
-          </span>
-        </label>
-        <label className="flex flex-col gap-1">
-          {t.website}
-          <input
-            name="website"
-            type="url"
-            maxLength={255}
-            aria-describedby="brand-website-hint"
-            className={FIELD}
-          />
-          <span id="brand-website-hint" className="text-sm">
-            {t.websiteHint}
-          </span>
-        </label>
+        <TextField
+          id={`${base}-name`}
+          label={t.name}
+          {...t.fields.name}
+          exampleLabel={texts.exampleLabel}
+          input={{ name: 'name', required: true, maxLength: 150 }}
+        />
+        <TextField
+          id={`${base}-slug`}
+          label={t.slug}
+          {...t.fields.slug}
+          exampleLabel={texts.exampleLabel}
+          input={{
+            name: 'slug',
+            required: true,
+            maxLength: 100,
+            pattern: '[a-z0-9]+(-[a-z0-9]+)*',
+          }}
+        />
+        <TextField
+          id={`${base}-website`}
+          label={t.website}
+          {...t.fields.website}
+          exampleLabel={texts.exampleLabel}
+          input={{ name: 'website', type: 'url', maxLength: 255 }}
+        />
         <button
           type="submit"
           disabled={busy}
@@ -185,6 +188,7 @@ function BrandTable({
   onToggle: (brand: Brand) => void;
 }>) {
   const t = texts.brands;
+  const base = useId();
   if (brands.length === 0) return <p>{t.empty}</p>;
   return (
     <div className="overflow-x-auto">
@@ -208,26 +212,30 @@ function BrandTable({
                     onSubmit={(event) => void onSave(event, brand.id)}
                     className="flex flex-wrap items-end gap-3 py-2"
                   >
-                    <label className="flex flex-col gap-1">
-                      {t.name}
-                      <input
-                        name="name"
-                        required
-                        maxLength={150}
-                        defaultValue={brand.name}
-                        className={FIELD}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      {t.website}
-                      <input
-                        name="website"
-                        type="url"
-                        maxLength={255}
-                        defaultValue={brand.website ?? ''}
-                        className={FIELD}
-                      />
-                    </label>
+                    <TextField
+                      id={`${base}-edit-name`}
+                      label={t.name}
+                      {...t.fields.name}
+                      exampleLabel={texts.exampleLabel}
+                      input={{
+                        name: 'name',
+                        required: true,
+                        maxLength: 150,
+                        defaultValue: brand.name,
+                      }}
+                    />
+                    <TextField
+                      id={`${base}-edit-website`}
+                      label={t.website}
+                      {...t.fields.website}
+                      exampleLabel={texts.exampleLabel}
+                      input={{
+                        name: 'website',
+                        type: 'url',
+                        maxLength: 255,
+                        defaultValue: brand.website ?? '',
+                      }}
+                    />
                     <button
                       type="submit"
                       disabled={busy}

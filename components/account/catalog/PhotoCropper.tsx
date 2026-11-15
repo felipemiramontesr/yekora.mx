@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { uploadMedia } from '@/lib/api/catalogAdminClient';
 import {
   canvasBlob,
@@ -9,6 +9,7 @@ import {
   openImage,
   OUTPUT_WIDTHS,
 } from '@/lib/catalog/imageCrop';
+import { Field } from '../../ui/Field';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
 
 /** Side of the live preview, in pixels. */
@@ -38,6 +39,7 @@ export function PhotoCropper({
   onCancel: () => void;
 }>) {
   const t = texts.media;
+  const base = useId();
   const [image, setImage] = useState<ImageBitmap | null>(null);
   const [crop, setCrop] = useState<Crop>(WHOLE);
   const [width, setWidth] = useState<(typeof OUTPUT_WIDTHS)[number]>(1200);
@@ -110,14 +112,21 @@ export function PhotoCropper({
       className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl flex-col gap-3 overflow-y-auto rounded-lg border border-petroleo/20 bg-marfil p-4 text-petroleo open:flex backdrop:bg-black/60"
     >
       <h3 className="text-lg font-semibold">{t.cropTitle}</h3>
-      <label className="flex flex-col gap-1">
-        {t.choose}
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => void choose(event)}
-        />
-      </label>
+      <Field
+        id={`${base}-choose`}
+        label={t.choose}
+        {...t.fields.choose}
+        exampleLabel={texts.exampleLabel}
+      >
+        {(control) => (
+          <input
+            {...control}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => void choose(event)}
+          />
+        )}
+      </Field>
       {error && <output className="block text-red-800">{error}</output>}
       {image && (
         <>
@@ -133,22 +142,29 @@ export function PhotoCropper({
           {slider(t.zoom, 'zoom', 1, 4, 0.05)}
           {slider(t.horizontal, 'x', 0, 1, 0.01)}
           {slider(t.vertical, 'y', 0, 1, 0.01)}
-          <label className="flex flex-col gap-1">
-            {t.size}
-            <select
-              value={width}
-              onChange={(event) =>
-                setWidth(Number(event.target.value) as typeof width)
-              }
-              className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
-            >
-              {OUTPUT_WIDTHS.map((option) => (
-                <option key={option} value={option}>
-                  {t.sizes[String(option) as keyof typeof t.sizes]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Field
+            id={`${base}-size`}
+            label={t.size}
+            {...t.fields.size}
+            exampleLabel={texts.exampleLabel}
+          >
+            {(control) => (
+              <select
+                {...control}
+                value={width}
+                onChange={(event) =>
+                  setWidth(Number(event.target.value) as typeof width)
+                }
+                className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
+              >
+                {OUTPUT_WIDTHS.map((option) => (
+                  <option key={option} value={option}>
+                    {t.sizes[String(option) as keyof typeof t.sizes]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
           <button
             type="button"
             disabled={busy}

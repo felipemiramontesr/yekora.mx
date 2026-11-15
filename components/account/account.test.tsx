@@ -696,6 +696,33 @@ describe('account area · passwords (FC 042 F2)', () => {
     ).toBe('text');
   });
 
+  it('guides the e-mail and the password fields, and ties the live rules to the new ones (FC 050 T2.2)', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    const hint = (control: HTMLElement) =>
+      document.getElementById(`${control.id}-hint`)?.textContent;
+    const said = (field: { description: string; example: string }) =>
+      `${field.description} ${account.exampleLabel}: ${field.example}`;
+    const email = screen.getByLabelText(account.signIn.email);
+    expect(hint(email)).toBe(said(account.fields.email));
+    const current = screen.getByLabelText(account.signIn.password);
+    expect(hint(current)).toBe(said(account.password.fields.current));
+    expect(current.getAttribute('aria-describedby')).toBe(`${current.id}-hint`);
+    press(account.signIn.toRegister);
+    const fullName = screen.getByLabelText(account.register.fullName);
+    expect(hint(fullName)).toBe(said(account.fields.fullName));
+    const fresh = screen.getByLabelText(account.register.password);
+    expect(hint(fresh)).toBe(said(account.password.fields.new));
+    expect(fresh.getAttribute('aria-describedby')).toMatch(
+      /^\S+-password-hint \S+-rules$/
+    );
+    const repeat = screen.getByLabelText(account.register.confirm);
+    expect(hint(repeat)).toBe(said(account.password.fields.repeat));
+    expect(repeat.getAttribute('aria-describedby')).toMatch(
+      /^\S+-confirm-hint \S+-rules$/
+    );
+  });
+
   it('marks each rule met or missing as the person types, in words and with the icon (T1.4)', async () => {
     renderApp();
     await screen.findByRole('heading', { name: account.signIn.title });

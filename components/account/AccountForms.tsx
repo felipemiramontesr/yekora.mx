@@ -27,8 +27,8 @@ import {
 } from '@/lib/api/accountClient';
 import { stateOfPostalCode } from '@/lib/cart/postalRanges';
 import { fill } from '@/lib/catalog/format';
-import { Field } from '../checkout/CheckoutFields';
-import { Field as GuidedField } from '../ui/Field';
+import { Field } from '../ui/Field';
+import { TextField } from '../ui/TextField';
 import {
   NewPasswordFields,
   newPasswordReady,
@@ -145,12 +145,18 @@ export function SignInForm({
       <p className="text-petroleo/80">{messages.signIn.intro}</p>
       <FormAlert text={error} />
       <fieldset disabled={!hydrated} className="contents">
-        <Field
+        <TextField
           id={`${base}-email`}
           label={messages.signIn.email}
-          value={email}
-          onChange={setEmail}
-          input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
+          {...messages.fields.email}
+          exampleLabel={messages.exampleLabel}
+          input={{
+            type: 'email',
+            autoComplete: 'username',
+            maxLength: 255,
+            value: email,
+            onChange: (event) => setEmail(event.target.value),
+          }}
         />
         <PasswordField
           id={`${base}-password`}
@@ -159,6 +165,8 @@ export function SignInForm({
           onChange={setPassword}
           autoComplete="current-password"
           toggle={messages.password}
+          hint={messages.password.fields.current}
+          exampleLabel={messages.exampleLabel}
         />
         <button type="submit" disabled={busy} className={BUTTON}>
           {busy ? messages.signIn.submitting : messages.signIn.submit}
@@ -255,26 +263,37 @@ export function RegisterForm({
       <h2 className="text-2xl font-semibold">{messages.register.title}</h2>
       <p className="text-petroleo/80">{messages.register.intro}</p>
       <FormAlert text={error} />
-      <Field
+      <TextField
         id={`${base}-name`}
         label={messages.register.fullName}
-        value={fullName}
-        onChange={setFullName}
-        input={{ autoComplete: 'name', maxLength: 150 }}
+        {...messages.fields.fullName}
+        exampleLabel={messages.exampleLabel}
+        input={{
+          autoComplete: 'name',
+          maxLength: 150,
+          value: fullName,
+          onChange: (event) => setFullName(event.target.value),
+        }}
       />
-      <Field
+      <TextField
         id={`${base}-email`}
         label={messages.register.email}
-        value={email}
-        onChange={setEmail}
-        input={{ type: 'email', autoComplete: 'email', maxLength: 255 }}
+        {...messages.fields.email}
+        exampleLabel={messages.exampleLabel}
+        input={{
+          type: 'email',
+          autoComplete: 'email',
+          maxLength: 255,
+          value: email,
+          onChange: (event) => setEmail(event.target.value),
+        }}
       />
-      <GuidedField
+      <Field
         id={`${base}-postal`}
         label={messages.register.postalCode.label}
         description={messages.register.postalCode.description}
         example={messages.register.postalCode.example}
-        exampleLabel={messages.register.exampleLabel}
+        exampleLabel={messages.exampleLabel}
         error={postalError}
       >
         {(control) => (
@@ -289,7 +308,7 @@ export function RegisterForm({
             className="min-h-11 w-full rounded-md border border-petroleo/40 bg-white px-3"
           />
         )}
-      </GuidedField>
+      </Field>
       <NewPasswordFields
         id={base}
         labels={{
@@ -303,6 +322,7 @@ export function RegisterForm({
         context={context}
         rules={ALL_RULES}
         texts={messages.password}
+        exampleLabel={messages.exampleLabel}
       />
       <button type="submit" disabled={busy || !ready} className={BUTTON}>
         {busy ? messages.register.submitting : messages.register.submit}
@@ -361,12 +381,18 @@ export function ForgotForm({
       <p className="text-petroleo/80">{messages.forgot.intro}</p>
       <FormAlert text={error} />
       {sent && <output className="block">{messages.forgot.sent}</output>}
-      <Field
+      <TextField
         id={`${base}-email`}
         label={messages.forgot.email}
-        value={email}
-        onChange={setEmail}
-        input={{ type: 'email', autoComplete: 'username', maxLength: 255 }}
+        {...messages.fields.email}
+        exampleLabel={messages.exampleLabel}
+        input={{
+          type: 'email',
+          autoComplete: 'username',
+          maxLength: 255,
+          value: email,
+          onChange: (event) => setEmail(event.target.value),
+        }}
       />
       <button type="submit" disabled={busy} className={BUTTON}>
         {busy ? messages.forgot.submitting : messages.forgot.submit}
@@ -462,6 +488,7 @@ export function ResetForm({
             context={account}
             rules={ALL_RULES}
             texts={messages.password}
+            exampleLabel={messages.exampleLabel}
           />
           <button type="submit" disabled={busy || !ready} className={BUTTON}>
             {busy ? messages.reset.submitting : messages.reset.submit}
@@ -481,6 +508,7 @@ export function ResetForm({
 function CodeInput({
   id,
   label,
+  messages,
   value,
   onChange,
   busy,
@@ -490,6 +518,7 @@ function CodeInput({
 }: Readonly<{
   id: string;
   label: string;
+  messages: AccountMessages;
   value: string;
   onChange: (value: string) => void;
   busy: boolean;
@@ -500,15 +529,18 @@ function CodeInput({
 }>) {
   return (
     <>
-      <Field
+      <TextField
         id={id}
         label={label}
-        value={value}
-        onChange={(typed) => onChange(typed.replaceAll(/\D/g, ''))}
+        {...messages.fields.code}
+        exampleLabel={messages.exampleLabel}
         input={{
           inputMode: 'numeric',
           autoComplete: 'one-time-code',
           maxLength: 8,
+          value,
+          onChange: (event) =>
+            onChange(event.target.value.replaceAll(/\D/g, '')),
         }}
       />
       {before}
@@ -581,6 +613,7 @@ export function CodeForm({
       <CodeInput
         id={`${base}-code`}
         label={messages.code.label}
+        messages={messages}
         value={code}
         onChange={setCode}
         busy={busy}
@@ -703,6 +736,7 @@ export function EnrollForm({
           <CodeInput
             id={`${base}-code`}
             label={messages.enroll.label}
+            messages={messages}
             value={code}
             onChange={setCode}
             busy={busy}

@@ -9,6 +9,7 @@ import {
   type PasswordRule,
   passwordChecks,
 } from '@/lib/account/passwordPolicy';
+import { Field } from '../ui/Field';
 
 /** The `account.password` texts. */
 type PasswordTexts = Messages['account']['password'];
@@ -27,6 +28,10 @@ interface PasswordFieldProps {
   autoComplete: 'current-password' | 'new-password';
   /** Name of the eye button while the password is hidden, and while it is shown. */
   toggle: { show: string; hide: string };
+  /** How to fill it in, and the simplest example (FC 050 T2.2). */
+  hint: { description: string; example: string };
+  /** The word that introduces the example in the page's language. */
+  exampleLabel: string;
   /** Id of the live list of rules that describes this field, if any. */
   describedBy?: string;
 }
@@ -34,7 +39,9 @@ interface PasswordFieldProps {
 /**
  * A password input with its eye button (FC 042 T1.3, T2.5): every password field of the site has
  * its own. The button is a real `type="button"`, so it never submits the form; it swaps the input
- * between `password` and `text`, and its `aria-pressed` and `aria-label` follow the state.
+ * between `password` and `text`, and its `aria-pressed` and `aria-label` follow the state. The
+ * field is guided (FC 050 T2.2): below it, how to fill it in and the simplest example, and the
+ * input points at that hint and, when there is one, at the live list of rules.
  */
 export function PasswordField({
   id,
@@ -43,43 +50,48 @@ export function PasswordField({
   onChange,
   autoComplete,
   toggle,
+  hint,
+  exampleLabel,
   describedBy,
 }: Readonly<PasswordFieldProps>) {
   const [visible, setVisible] = useState(false);
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          id={id}
-          type={visible ? 'text' : 'password'}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          autoComplete={autoComplete}
-          autoCapitalize="none"
-          spellCheck={false}
-          maxLength={PASSWORD_MAX}
-          aria-describedby={describedBy}
-          className="min-h-11 w-full rounded-md border border-petroleo/30 bg-white pl-3 pr-12"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible((shown) => !shown)}
-          aria-pressed={visible}
-          aria-label={visible ? toggle.hide : toggle.show}
-          aria-controls={id}
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-petroleo"
-        >
-          {visible ? (
-            <EyeOff aria-hidden="true" size={20} />
-          ) : (
-            <Eye aria-hidden="true" size={20} />
-          )}
-        </button>
-      </div>
-    </div>
+    <Field id={id} label={label} {...hint} exampleLabel={exampleLabel}>
+      {(control) => (
+        <div className="relative">
+          <input
+            {...control}
+            type={visible ? 'text' : 'password'}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            autoComplete={autoComplete}
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={PASSWORD_MAX}
+            aria-describedby={
+              describedBy
+                ? `${control['aria-describedby']} ${describedBy}`
+                : control['aria-describedby']
+            }
+            className="min-h-11 w-full rounded-md border border-petroleo/30 bg-white pl-3 pr-12"
+          />
+          <button
+            type="button"
+            onClick={() => setVisible((shown) => !shown)}
+            aria-pressed={visible}
+            aria-label={visible ? toggle.hide : toggle.show}
+            aria-controls={id}
+            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-petroleo"
+          >
+            {visible ? (
+              <EyeOff aria-hidden="true" size={20} />
+            ) : (
+              <Eye aria-hidden="true" size={20} />
+            )}
+          </button>
+        </div>
+      )}
+    </Field>
   );
 }
 
@@ -129,6 +141,8 @@ interface NewPasswordFieldsProps {
   rules: readonly PasswordRule[];
   /** `account.password` texts. */
   texts: PasswordTexts;
+  /** The word that introduces an example, in the page's language. */
+  exampleLabel: string;
 }
 
 /**
@@ -167,6 +181,7 @@ export function NewPasswordFields({
   context,
   rules,
   texts,
+  exampleLabel,
 }: Readonly<NewPasswordFieldsProps>) {
   const checks = passwordChecks(password, context);
   const list = `${id}-rules`;
@@ -179,6 +194,8 @@ export function NewPasswordFields({
         onChange={onPassword}
         autoComplete="new-password"
         toggle={{ show: texts.show, hide: texts.hide }}
+        hint={texts.fields.new}
+        exampleLabel={exampleLabel}
         describedBy={list}
       />
       <PasswordField
@@ -188,6 +205,8 @@ export function NewPasswordFields({
         onChange={onConfirm}
         autoComplete="new-password"
         toggle={{ show: texts.showRepeat, hide: texts.hideRepeat }}
+        hint={texts.fields.repeat}
+        exampleLabel={exampleLabel}
         describedBy={list}
       />
       <div id={list} aria-live="polite" className="flex flex-col gap-1">

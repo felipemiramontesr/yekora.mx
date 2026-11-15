@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { API_URL } from '@/lib/api/http';
 import { MAX_GALLERY_PHOTOS } from '@/lib/catalog/adminTypes';
+import { TextField } from '../../ui/TextField';
 import type { CatalogTexts } from './catalogTexts';
-import { FIELD } from './formHelpers';
 import { PhotoCropper } from './PhotoCropper';
 
 /** One photo of a gallery as the forms hold it: its digest and its alt texts as typed. */
@@ -106,28 +106,30 @@ export function PhotoList({
             />
             <div className="flex flex-col gap-2">
               {index === 0 && <strong>{t.primary}</strong>}
-              <label className="flex flex-col gap-1">
-                {t.altEs}
-                <input
-                  value={photo.altEs}
-                  maxLength={255}
-                  onChange={(event) =>
-                    change(index, { altEs: event.target.value })
-                  }
-                  className={FIELD}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                {t.altEn}
-                <input
-                  value={photo.altEn}
-                  maxLength={255}
-                  onChange={(event) =>
-                    change(index, { altEn: event.target.value })
-                  }
-                  className={FIELD}
-                />
-              </label>
+              <TextField
+                id={`photo-${photo.sha256}-alt-es`}
+                label={t.altEs}
+                {...t.fields.altEs}
+                exampleLabel={texts.exampleLabel}
+                input={{
+                  value: photo.altEs,
+                  maxLength: 255,
+                  onChange: (event) =>
+                    change(index, { altEs: event.target.value }),
+                }}
+              />
+              <TextField
+                id={`photo-${photo.sha256}-alt-en`}
+                label={t.altEn}
+                {...t.fields.altEn}
+                exampleLabel={texts.exampleLabel}
+                input={{
+                  value: photo.altEn,
+                  maxLength: 255,
+                  onChange: (event) =>
+                    change(index, { altEn: event.target.value }),
+                }}
+              />
               <div className="flex gap-3">
                 <button
                   type="button"

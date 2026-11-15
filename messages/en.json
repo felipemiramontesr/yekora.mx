@@ -558,9 +558,7 @@
       "legend": "Contact details",
       "name": "Full name",
       "email": "Email",
-      "emailHint": "We use it only to contact you about this order.",
-      "phone": "Phone",
-      "phoneHint": "10 digits, no spaces."
+      "phone": "Phone"
     },
     "address": {
       "legend": "Delivery address",
@@ -667,6 +665,53 @@
       "retry": "Check again",
       "toCatalog": "Keep exploring",
       "toCart": "Back to your pack"
+    },
+    "fields": {
+      "exampleLabel": "Example",
+      "name": {
+        "description": "Who will receive the order: first and last name.",
+        "example": "Ana Pérez López"
+      },
+      "email": {
+        "description": "We use it only to contact you about this order.",
+        "example": "ana@example.com"
+      },
+      "phone": {
+        "description": "10 digits, no spaces or hyphens.",
+        "example": "9981234567"
+      },
+      "street": {
+        "description": "The name of the delivery street, without the number.",
+        "example": "Avenida Reforma"
+      },
+      "exteriorNumber": {
+        "description": "The number of the door or the building.",
+        "example": "123"
+      },
+      "interiorNumber": {
+        "description": "Optional. Apartment, floor or unit, if there is one.",
+        "example": "4B"
+      },
+      "neighborhood": {
+        "description": "The neighborhood or the housing development.",
+        "example": "Centro"
+      },
+      "municipality": {
+        "description": "The municipality or borough where the address is.",
+        "example": "Benito Juárez"
+      },
+      "postalCode": {
+        "description": "The 5 digits of the delivery postal code.",
+        "example": "98000"
+      },
+      "stateCode": {
+        "description": "The state where the delivery address is.",
+        "example": "Zacatecas"
+      },
+      "references": {
+        "description": "Optional. Something that helps find the place: the color of the house, between which streets.",
+        "example": "Black gate, between Hidalgo and Juárez"
+      }
     }
   },
   "account": {
@@ -698,8 +743,7 @@
         "description": "The 5 digits of your home postal code. We store it encrypted and use it to show where we deliver.",
         "example": "98000",
         "error": "Enter the 5 digits of a Mexican postal code."
-      },
-      "exampleLabel": "Example"
+      }
     },
     "password": {
       "show": "Show password",
@@ -718,7 +762,21 @@
         "personal": "Not to contain your e-mail or name",
         "common": "Not to be a common password (like Password123!)"
       },
-      "match": "Both passwords match"
+      "match": "Both passwords match",
+      "fields": {
+        "current": {
+          "description": "The password of your account. Use the eye to see what you type.",
+          "example": "Cumbre-Azul-2026"
+        },
+        "new": {
+          "description": "Choose one that meets everything in the list below.",
+          "example": "Cumbre-Azul-2026"
+        },
+        "repeat": {
+          "description": "Type it again, identical to the one above.",
+          "example": "Cumbre-Azul-2026"
+        }
+      }
     },
     "forgot": {
       "title": "Reset your password",
@@ -886,8 +944,6 @@
         "retired": "Retired",
         "empty": "No brands yet.",
         "new": "New brand",
-        "slugHint": "Lowercase letters, numbers and hyphens, e.g. \"cumbre-mx\". It does not change later.",
-        "websiteHint": "Optional. Must start with https://",
         "create": "Create brand",
         "creating": "Creating…",
         "created": "Brand created.",
@@ -897,7 +953,21 @@
         "saved": "Changes saved.",
         "cancel": "Cancel",
         "retire": "Retire",
-        "reactivate": "Reactivate"
+        "reactivate": "Reactivate",
+        "fields": {
+          "name": {
+            "description": "The brand's name, as your customers will see it.",
+            "example": "Cumbre"
+          },
+          "slug": {
+            "description": "The last part of the brand's address. Lowercase letters, numbers and hyphens only. It never changes.",
+            "example": "cumbre-mx"
+          },
+          "website": {
+            "description": "Optional. It must start with https://",
+            "example": "https://cumbre.example"
+          }
+        }
       },
       "facets": {
         "caption": "Property groups with their values",
@@ -910,7 +980,6 @@
           "landing": "On the landing page"
         },
         "code": "Identifier",
-        "codeHint": "Lowercase letters, digits and hyphens, for example “size” or “color”. It does not change later.",
         "nameEs": "Name in Spanish",
         "nameEn": "Name in English",
         "order": "Order",
@@ -932,7 +1001,41 @@
         "newValue": "New value",
         "addValue": "Add value",
         "adding": "Adding…",
-        "valueAdded": "Value added."
+        "valueAdded": "Value added.",
+        "fields": {
+          "code": {
+            "description": "The group's identifier: lowercase letters, numbers and hyphens. It never changes.",
+            "example": "size"
+          },
+          "nameEs": {
+            "description": "The group's name in Spanish, as the customer sees it.",
+            "example": "Material"
+          },
+          "nameEn": {
+            "description": "The group's name in English, as the customer sees it.",
+            "example": "Material"
+          },
+          "order": {
+            "description": "A number that orders the groups: the lowest goes first.",
+            "example": "0"
+          },
+          "valueCode": {
+            "description": "The value's identifier: lowercase letters, numbers and hyphens. It never changes.",
+            "example": "nylon"
+          },
+          "valueEs": {
+            "description": "The value in Spanish, as the customer sees it.",
+            "example": "Nailon"
+          },
+          "valueEn": {
+            "description": "The value in English, as the customer sees it.",
+            "example": "Nylon"
+          },
+          "valueOrder": {
+            "description": "A number that orders the group's values: the lowest goes first.",
+            "example": "0"
+          }
+        }
       },
       "products": {
         "caption": "Products, active and retired",
@@ -1094,7 +1197,25 @@
         "preview": "Preview of the square crop",
         "upload": "Use this photo",
         "uploading": "Uploading…",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "fields": {
+          "altEn": {
+            "description": "Describe the photo, in English, for those who cannot see it.",
+            "example": "Blue backpack, front view"
+          },
+          "altEs": {
+            "description": "Describe the photo, in Spanish, for those who cannot see it.",
+            "example": "Mochila azul vista de frente"
+          },
+          "choose": {
+            "description": "An image from your device; in the next step you crop it to a square.",
+            "example": "backpack.jpg"
+          },
+          "size": {
+            "description": "Larger looks sharper but weighs more. 600 px is enough for the catalog.",
+            "example": "Catalog (600 px)"
+          }
+        }
       },
       "publish": {
         "title": "Publish changes",
@@ -1170,6 +1291,21 @@
           "description": "The address the link to choose their password will be sent to.",
           "example": "ana@example.com"
         }
+      }
+    },
+    "exampleLabel": "Example",
+    "fields": {
+      "email": {
+        "description": "The e-mail of your account. We send your codes and order updates there.",
+        "example": "ana@example.com"
+      },
+      "fullName": {
+        "description": "Your first and last name, as you want them on your orders.",
+        "example": "Ana Pérez López"
+      },
+      "code": {
+        "description": "The 6-digit code you received. With your authenticator app, one of your 8-digit backup codes works too.",
+        "example": "123456"
       }
     }
   }
