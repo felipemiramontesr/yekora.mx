@@ -244,9 +244,8 @@ describe('quoteCart', () => {
     expect(query).toHaveBeenCalledOnce();
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toContain('WHERE p.sku IN (?)');
-    expect(sql).toContain(
-      'p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1'
-    );
+    expect(sql).toContain('p.is_active = 1 AND c.is_active = 1');
+    expect(sql).not.toContain('experience_levels');
     expect(sql).not.toContain('OR 1=1');
     expect(params).toEqual([['A', "B' OR 1=1 --"]]);
     expect(result.items[1].stockStatus).toBe('unavailable');

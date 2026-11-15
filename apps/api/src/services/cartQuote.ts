@@ -258,14 +258,14 @@ async function readProducts(
 ): Promise<QuoteRow[]> {
   if (lines.length === 0) return [];
   return db.query<QuoteRow>(
-    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
+    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.price_mxn_cents, p.stock - p.reserved_stock AS stock, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.shipping_class_id FROM products p JOIN categories c ON c.id = p.category_id WHERE p.sku IN (?) AND p.is_active = 1 AND c.is_active = 1',
     [lines.map((line) => line.sku)]
   );
 }
 
 /**
  * Quotes a cart against the catalog, products only (no destination: shipping null). Inactive
- * products, or products whose discipline or level is retired, read as unavailable, exactly as
+ * products, or products whose discipline is retired, read as unavailable, exactly as
  * the catalog hides them.
  *
  * @param db - Database port.

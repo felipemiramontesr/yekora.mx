@@ -16,6 +16,8 @@ import { problem, PROBLEM_TYPE } from '../lib/problem';
 import {
   findProduct,
   findProductMedia,
+  findProductProperties,
+  type PropertyRow,
   listProducts,
   SORTS,
   type ProductRow,
@@ -31,7 +33,6 @@ const slug = z
 /** Query of `GET /v1/catalog`; also the request of the API contract (contract.ts). */
 export const catalogListQuery = z.object({
   discipline: slug.max(40).optional(),
-  level: slug.max(40).optional(),
   sort: z.enum(SORTS).default('name'),
   lang: languageSchema,
   page: z.coerce.number().int().min(1).max(1000).default(1),
@@ -49,11 +50,27 @@ interface CatalogDeps {
   rate: () => Promise<CurrentRate | null>;
 }
 
+/** The properties of a product as the API returns them, in one language (FC 048 T0.2). */
+function presentProperties(
+  rows: readonly PropertyRow[],
+  language: 'es-MX' | 'en'
+) {
+  const english = language === 'en';
+  return rows.map((row) => ({
+    groupCode: row.group_code,
+    groupName: english ? row.group_name_en : row.group_name_es,
+    valueCode: row.value_code,
+    valueName: english ? row.value_en : row.value_es,
+    isFilterable: Number(row.is_filterable) === 1,
+  }));
+}
+
 /** Product as the API returns it, in one language. */
 function present(
   row: ProductRow,
   language: 'es-MX' | 'en',
-  fix: number | null
+  fix: number | null,
+  properties: readonly PropertyRow[]
 ) {
   const english = language === 'en';
   return {
@@ -63,10 +80,9 @@ function present(
     description: english ? row.description_en : row.description_es,
     discipline: row.discipline,
     disciplineName: english ? row.discipline_name_en : row.discipline_name_es,
-    level: row.level,
-    levelName: english ? row.level_name_en : row.level_name_es,
     brand: row.brand,
     brandName: row.brand_name,
+    properties: presentProperties(properties, language),
     priceMxnCents: Number(row.price_mxn_cents),
     priceUsdCents: usdCents(Number(row.price_mxn_cents), fix),
     inStock: Number(row.stock) > 0,
@@ -96,13 +112,18 @@ export function registerCatalogRoutes(
       listProducts(deps.db, {
         ...query,
         discipline: query.discipline ?? null,
-        level: query.level ?? null,
       }),
       deps.rate(),
     ]);
     const fix = rate ? Number(rate.rate) : null;
+    // One short statement per product of the page (at most 48): no `IN (…)` is ever built (A03).
+    const properties = await Promise.all(
+      items.map((row) => findProductProperties(deps.db, row.slug))
+    );
     return {
-      items: items.map((row) => present(row, query.lang, fix)),
+      items: items.map((row, index) =>
+        present(row, query.lang, fix, properties[index])
+      ),
       page: query.page,
       pageSize: query.pageSize,
       total,
@@ -121,9 +142,10 @@ export function registerCatalogRoutes(
         .type(PROBLEM_TYPE)
         .send(problem(400, 'Invalid request'));
     }
-    const [found, media, rate] = await Promise.all([
+    const [found, media, properties, rate] = await Promise.all([
       findProduct(deps.db, params.data.slug),
       findProductMedia(deps.db, params.data.slug),
+      findProductProperties(deps.db, params.data.slug),
       deps.rate(),
     ]);
     if (!found) {
@@ -135,7 +157,8 @@ export function registerCatalogRoutes(
     const product = present(
       found,
       language.data,
-      rate ? Number(rate.rate) : null
+      rate ? Number(rate.rate) : null,
+      properties
     );
     const english = language.data === 'en';
     return {

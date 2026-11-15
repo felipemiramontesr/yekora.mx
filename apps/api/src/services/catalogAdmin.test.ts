@@ -49,7 +49,6 @@ const groupRow = (overrides: Record<string, unknown> = {}) => ({
   is_ordered: 0,
   is_filterable: 1,
   show_on_landing: 0,
-  is_system: 0,
   is_active: 1,
   sort_order: 5,
   ...overrides,
@@ -115,23 +114,23 @@ describe('brands (FC 029 F2b)', () => {
   });
 });
 
-describe('facets (FC 029 F2b, T2.1b)', () => {
+describe('product properties (FC 029 F2b; FC 048: no group is locked)', () => {
   it('lists every group with its own values', async () => {
     const { db } = scriptedDb(
-      [groupRow(), groupRow({ id: 1, code: 'nivel', is_system: 1 })],
-      [valueRow, { ...valueRow, id: 10, group_id: 1, code: 'experto' }]
+      [groupRow(), groupRow({ id: 1, code: 'color' })],
+      [valueRow, { ...valueRow, id: 10, group_id: 1, code: 'rojo' }]
     );
     const groups = await listFacets(db);
     expect(groups[0]).toMatchObject({
       code: 'material',
       isFilterable: true,
-      isSystem: false,
       values: [value],
     });
-    expect(groups[1].values.map((v) => v.code)).toEqual(['experto']);
+    expect(groups[0]).not.toHaveProperty('isSystem');
+    expect(groups[1].values.map((v) => v.code)).toEqual(['rojo']);
   });
 
-  it('creates a group, never a system one, with its flags as 0 or 1', async () => {
+  it('creates a group with its flags as 0 or 1, and names no system flag', async () => {
     const { db, calls } = scriptedDb([], [groupRow()]);
     const change = await createFacetGroup(db, {
       code: 'material',
@@ -144,7 +143,7 @@ describe('facets (FC 029 F2b, T2.1b)', () => {
       sortOrder: 5,
     });
     expect(change.before).toBeNull();
-    expect(change.after).toMatchObject({ code: 'material', isSystem: false });
+    expect(change.after).toMatchObject({ code: 'material' });
     expect(calls[0].sql).not.toContain('is_system');
     const inverted = scriptedDb([], [groupRow()]);
     await createFacetGroup(inverted.db, {
@@ -189,22 +188,16 @@ describe('facets (FC 029 F2b, T2.1b)', () => {
     ]);
   });
 
-  it('never retires the system group Nivel, but lets it be renamed (T2.1b)', async () => {
-    const nivel = groupRow({
-      id: 1,
-      code: 'nivel',
-      is_system: 1,
-      is_filterable: 0,
-    });
-    const locked = scriptedDb([nivel]);
+  it('retires and renames any group: none is locked', async () => {
+    const color = groupRow({ id: 1, code: 'color', is_filterable: 0 });
+    const retired = scriptedDb([color]);
     await expect(
-      updateFacetGroup(locked.db, 1, { isActive: false })
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
-    expect(locked.calls).toHaveLength(1);
-    const renamed = scriptedDb([nivel]);
+      updateFacetGroup(retired.db, 1, { isActive: false })
+    ).resolves.toMatchObject({ after: { isActive: false } });
+    const renamed = scriptedDb([color]);
     await expect(
-      updateFacetGroup(renamed.db, 1, { nameEn: 'Level' })
-    ).resolves.toMatchObject({ after: { nameEn: 'Level', isActive: true } });
+      updateFacetGroup(renamed.db, 1, { nameEn: 'Colour' })
+    ).resolves.toMatchObject({ after: { nameEn: 'Colour', isActive: true } });
   });
 
   it('names an unknown group CAT_NOT_FOUND', async () => {
@@ -213,7 +206,7 @@ describe('facets (FC 029 F2b, T2.1b)', () => {
     ).resolves.toBe('CAT_NOT_FOUND');
   });
 
-  it('adds a value to an ordinary group, never to the system group (T2.6)', async () => {
+  it('adds a value to a group, and names an unknown group CAT_NOT_FOUND', async () => {
     const added = scriptedDb([groupRow()], [], [valueRow]);
     await expect(
       createFacetValue(added.db, 2, {
@@ -225,16 +218,13 @@ describe('facets (FC 029 F2b, T2.1b)', () => {
     ).resolves.toEqual({ before: null, after: value });
     expect(added.calls[1].params).toEqual([2, 'nylon', 'Nailon', 'Nylon', 1]);
     const input = { code: 'x', valueEs: 'X', valueEn: 'X', sortOrder: 0 };
-    await expect(
-      createFacetValue(scriptedDb([groupRow({ is_system: 1 })]).db, 1, input)
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
     await expect(createFacetValue(scriptedDb([]).db, 99, input)).resolves.toBe(
       'CAT_NOT_FOUND'
     );
   });
 
-  it('relabels a value of an ordinary group; the system group’s stay locked', async () => {
-    const edited = scriptedDb([{ ...valueRow, is_system: 0 }]);
+  it('relabels a value of any group, and names an unknown value CAT_NOT_FOUND', async () => {
+    const edited = scriptedDb([valueRow]);
     await expect(
       updateFacetValue(edited.db, 9, { valueEn: 'Nylon 6' })
     ).resolves.toEqual({
@@ -242,11 +232,6 @@ describe('facets (FC 029 F2b, T2.1b)', () => {
       after: { ...value, valueEn: 'Nylon 6' },
     });
     expect(edited.calls[1].params).toEqual(['Nailon', 'Nylon 6', 1, 9]);
-    await expect(
-      updateFacetValue(scriptedDb([{ ...valueRow, is_system: 1 }]).db, 9, {
-        sortOrder: 2,
-      })
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
     await expect(
       updateFacetValue(scriptedDb([]).db, 9, { sortOrder: 2 })
     ).resolves.toBe('CAT_NOT_FOUND');

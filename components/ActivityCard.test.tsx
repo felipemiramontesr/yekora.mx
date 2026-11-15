@@ -4,20 +4,18 @@ import { getMessages } from '@/app/i18n';
 import { ActivityCard } from './ActivityCard';
 
 describe('ActivityCard', () => {
-  it('renders the discipline as an anchor target with its level and description', () => {
+  it('renders the discipline as an anchor target with its description, and no level (FC 048)', () => {
     const { activities, disciplines } = getMessages('es-MX');
     const html = renderToStaticMarkup(
       <ActivityCard
         discipline="escalada"
         name={disciplines.escalada}
-        levelLabel={activities.levelLabel}
         activity={activities.items.escalada}
       />
     );
     expect(html).toContain('id="escalada"');
     expect(html).toContain('Escalada');
-    expect(html).toContain('Nivel:');
-    expect(html).toContain('Todos los niveles, con formación');
+    expect(html).not.toContain('Nivel');
     expect(html).toContain('para qué no');
   });
 
@@ -27,7 +25,6 @@ describe('ActivityCard', () => {
       <ActivityCard
         discipline="canonismo"
         name={disciplines.canonismo}
-        levelLabel={activities.levelLabel}
         activity={activities.items.canonismo}
       />
     );

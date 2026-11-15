@@ -202,7 +202,7 @@ async function checkout(sku: string, over: Parameters<typeof deps>[0] = {}) {
 
 async function addProduct(sku: string, slug: string, stock: number) {
   await db.query(
-    "INSERT INTO products (sku, slug, category_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) SELECT ?, ?, c.id, l.id, 'Mochila de prueba', 'Test backpack', 'Producto de la suite de SQL real.', 'Real-SQL suite product.', ?, ?, 1200, 500, 300, 200, k.id FROM categories c JOIN experience_levels l ON l.slug = 'principiante' JOIN shipping_classes k ON k.slug = 'estandar' WHERE c.slug = 'senderismo'",
+    "INSERT INTO products (sku, slug, category_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) SELECT ?, ?, c.id, 'Mochila de prueba', 'Test backpack', 'Producto de la suite de SQL real.', 'Real-SQL suite product.', ?, ?, 1200, 500, 300, 200, k.id FROM categories c JOIN shipping_classes k ON k.slug = 'estandar' WHERE c.slug = 'senderismo'",
     [sku, slug, PRICE, stock]
   );
 }
@@ -223,10 +223,9 @@ afterAll(async () => {
 });
 
 describe('catalog (catalog.ts)', () => {
-  it('lists and finds the active products through their category and level joins', async () => {
+  it('lists and finds the active products through their category join, with no level (FC 048)', async () => {
     const page = await listProducts(db, {
       discipline: 'senderismo',
-      level: null,
       sort: 'name',
       lang: 'es-MX',
       page: 1,
@@ -237,17 +236,14 @@ describe('catalog (catalog.ts)', () => {
     );
     expect(page.total).toBeGreaterThanOrEqual(2);
     const found = await findProduct(db, 'itest-pack');
-    expect(found).toMatchObject({
-      sku: 'ITEST-PACK',
-      level: 'principiante',
-    });
+    expect(found).toMatchObject({ sku: 'ITEST-PACK' });
+    expect(found).not.toHaveProperty('level');
   });
 });
 
 describe('the brand in the public catalog on real SQL (catalog.ts, FC 047 T0.2)', () => {
   const BRAND_QUERY = {
     discipline: 'senderismo',
-    level: null,
     sort: 'name',
     lang: 'es-MX',
     page: 1,
@@ -944,25 +940,43 @@ describe('unified catalog, media and idempotency of migration 006 (FC 029 F0)', 
     );
   });
 
-  it('seeds the system group Nivel with one value per experience level, and never lets it be retired (T2.1b)', async () => {
+  it('has no level: neither its table, nor its reference, nor the group «Nivel», nor the system flag (FC 048 T2.1)', async () => {
     expect(
       await count(
-        "SELECT COUNT(*) AS n FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id JOIN experience_levels l ON l.slug = v.code WHERE g.code = 'nivel' AND g.is_system = 1"
+        "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'experience_levels'"
       )
-    ).toBe(await count('SELECT COUNT(*) AS n FROM experience_levels'));
-    await expect(
-      db.query(
-        "UPDATE product_facet_groups SET is_active = 0 WHERE code = 'nivel'"
+    ).toBe(0);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'products' AND COLUMN_NAME = 'experience_level_id') OR (TABLE_NAME = 'product_facet_groups' AND COLUMN_NAME = 'is_system'))"
       )
-    ).rejects.toThrow('ck_product_facet_groups_system_active');
+    ).toBe(0);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM product_facet_groups WHERE code = 'nivel'"
+      )
+    ).toBe(0);
+    // Any group can be retired now: no CHECK locks one.
+    await db.query(
+      "INSERT INTO product_facet_groups (code, name_es, name_en, is_active) VALUES ('itest-libre', 'Libre', 'Free', 1)"
+    );
+    await db.query(
+      "UPDATE product_facet_groups SET is_active = 0 WHERE code = 'itest-libre'"
+    );
   });
 
   it('links a facet only to an existing product and value, and drops the link with either (T2.1c)', async () => {
     const [{ id: productId }] = await db.query<{ id: number }>(
       "SELECT id FROM products WHERE sku = 'ITEST-PACK'"
     );
+    await db.query(
+      "INSERT INTO product_facet_groups (code, name_es, name_en) VALUES ('itest-base', 'Base', 'Base')"
+    );
+    await db.query(
+      "INSERT INTO product_facet_values (group_id, code, value_es, value_en) SELECT id, 'uno', 'Uno', 'One' FROM product_facet_groups WHERE code = 'itest-base'"
+    );
     const [{ id: valueId }] = await db.query<{ id: number }>(
-      "SELECT v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.code = 'nivel' AND v.code = 'principiante'"
+      "SELECT v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.code = 'itest-base' AND v.code = 'uno'"
     );
     await db.query(
       'INSERT IGNORE INTO product_facet_links (product_id, value_id) VALUES (?, ?)',
@@ -1206,7 +1220,7 @@ describe('brands and facets on real SQL (FC 029 F2b)', () => {
     ).resolves.toBe('CAT_NOT_FOUND');
   });
 
-  it('creates a group with values, retires it, and keeps Nivel and its values locked', async () => {
+  it('creates a group with values, edits them and retires the group: no group is locked (FC 048)', async () => {
     const group = await db.transaction((tx) =>
       createFacetGroup(tx, {
         code: 'itest-material',
@@ -1242,34 +1256,6 @@ describe('brands and facets on real SQL (FC 029 F2b)', () => {
       isActive: false,
       values: [{ code: 'nylon' }],
     });
-
-    const nivel = (await listFacets(db)).find((g) => g.code === 'nivel');
-    if (!nivel) throw new Error('Nivel missing');
-    await expect(
-      db.transaction((tx) =>
-        updateFacetGroup(tx, nivel.id, { isActive: false })
-      )
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
-    await expect(
-      db.transaction((tx) =>
-        createFacetValue(tx, nivel.id, {
-          code: 'x',
-          valueEs: 'X',
-          valueEn: 'X',
-          sortOrder: 0,
-        })
-      )
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
-    await expect(
-      db.transaction((tx) =>
-        updateFacetValue(tx, nivel.values[0].id, { sortOrder: 9 })
-      )
-    ).resolves.toBe('CAT_SYSTEM_GROUP_LOCKED');
-    await expect(
-      db.transaction((tx) =>
-        updateFacetGroup(tx, nivel.id, { nameEn: 'Level' })
-      )
-    ).resolves.toMatchObject({ after: { nameEn: 'Level', isActive: true } });
   });
 });
 
@@ -1283,7 +1269,6 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
     priceMxnCents: 210000,
     stock: 3,
     discipline: 'escalada',
-    level: 'principiante',
     brandId: null,
     shippingClass: 'estandar',
     weightGrams: 400,
@@ -1291,16 +1276,7 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
     widthMm: 200,
     heightMm: 100,
   };
-  /** The Nivel value codes a product is linked to. */
-  const nivelCodes = async (productId: number) =>
-    (
-      await db.query<{ code: string }>(
-        "SELECT v.code FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.code = 'nivel'",
-        [productId]
-      )
-    ).map((row) => row.code);
-
-  it('creates a product with its Nivel link and facets, moves both with the level, and retires it (T2.6, T2.3c)', async () => {
+  it('creates a product with its property values, replaces them, and retires it (T2.6, T2.3c)', async () => {
     const material = await db.transaction((tx) =>
       createFacetGroup(tx, {
         code: 'itest-tela',
@@ -1334,23 +1310,17 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
     const id = created.after.id;
     expect(created.after).toMatchObject({
       discipline: 'escalada',
-      level: 'principiante',
       shippingClass: 'estandar',
       facetValueIds: [nylon.after.id],
     });
-    expect(await nivelCodes(id)).toEqual(['principiante']);
+    expect(created.after).not.toHaveProperty('level');
 
     const moved = await db.transaction((tx) =>
-      updateProduct(tx, id, {
-        level: 'avanzado',
-        facetValueIds: [],
-        isActive: false,
-      })
+      updateProduct(tx, id, { facetValueIds: [], isActive: false })
     );
     expect(moved).toMatchObject({
-      after: { level: 'avanzado', facetValueIds: [], isActive: false },
+      after: { facetValueIds: [], isActive: false },
     });
-    expect(await nivelCodes(id)).toEqual(['avanzado']);
     await expect(
       db.transaction((tx) => updateProduct(tx, id, { stock: 0 }))
     ).resolves.toMatchObject({ after: { stock: 0 } });

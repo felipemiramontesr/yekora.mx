@@ -1,8 +1,9 @@
 /**
  * FC 029 F2b2 evidence: products of the backoffice. Creating, editing, retiring and arranging
  * a gallery run through the mutation pipeline (catalog:write, Idempotency-Key, payload, audit);
- * the level and the system group Nivel move together (T2.6); nothing is deleted (T2.3c); the
- * stock never drops below the reserved units; every reference must exist and be active.
+ * a product has no level (FC 048) and its property values are exactly the list given (T2.6);
+ * nothing is deleted (T2.3c); the stock never drops below the reserved units; every reference
+ * must exist and be active.
  *
  * The database is a small in-memory model answering each statement by its text, so the real
  * guard, routes and services run unchanged.
@@ -23,15 +24,13 @@ const sha = (letter: string) => letter.repeat(64);
 /* ---------- the in-memory model ---------- */
 
 const CATEGORIES: Record<string, number> = { montana: 1, retirada: 9 };
-const LEVELS: Record<string, number> = { principiante: 1, experto: 2 };
 const SHIPPING: Record<string, number> = { estandar: 1 };
 const BRANDS: Record<number, number> = { 5: 1, 6: 0 };
-/** Facet values: id → [code, isSystem, groupActive]. */
-const VALUES: Record<number, [string, number, number]> = {
-  10: ['principiante', 1, 1],
-  11: ['experto', 1, 1],
-  20: ['nylon', 0, 1],
-  21: ['viejo', 0, 0],
+/** Property values: id → [code, groupActive]. */
+const VALUES: Record<number, [string, number]> = {
+  20: ['nylon', 1],
+  22: ['algodon', 1],
+  21: ['viejo', 0],
 };
 const slugOf = (table: Record<string, number>, id: unknown) =>
   Object.keys(table).find((key) => table[key] === id);
@@ -42,7 +41,6 @@ interface Row {
   slug: string;
   category_id: number;
   brand_id: number | null;
-  experience_level_id: number;
   shipping_class_id: number;
   fields: unknown[];
   stock: number;
@@ -83,7 +81,6 @@ const rowOut = (row: Row) => {
     stock: row.stock,
     reserved_stock: row.reserved_stock,
     discipline: slugOf(CATEGORIES, row.category_id),
-    level: slugOf(LEVELS, row.experience_level_id),
     brand_id: row.brand_id,
     shipping_class: slugOf(SHIPPING, row.shipping_class_id),
     weight_grams: weight,
@@ -96,13 +93,6 @@ const rowOut = (row: Row) => {
 };
 
 type Handler = (p: readonly unknown[]) => unknown[];
-const nivelValue = (code: unknown) =>
-  Number(
-    Object.keys(VALUES).find(
-      (id) => VALUES[Number(id)][0] === code && VALUES[Number(id)][1] === 1
-    )
-  );
-
 const HANDLERS: [string, Handler][] = [
   [
     'SELECT s.id, s.user_id',
@@ -162,10 +152,6 @@ const HANDLERS: [string, Handler][] = [
     },
   ],
   [
-    'SELECT id FROM experience_levels',
-    (p) => (LEVELS[p[0] as string] ? [{ id: LEVELS[p[0] as string] }] : []),
-  ],
-  [
     'SELECT id FROM shipping_classes',
     (p) => (SHIPPING[p[0] as string] ? [{ id: 1 }] : []),
   ],
@@ -174,12 +160,10 @@ const HANDLERS: [string, Handler][] = [
     (p) => (BRANDS[p[0] as number] === 1 ? [{ id: p[0] }] : []),
   ],
   [
-    'SELECT v.code, g.is_system, g.is_active',
+    'SELECT g.is_active FROM product_facet_values v',
     (p) => {
       const value = VALUES[p[0] as number];
-      return value
-        ? [{ code: value[0], is_system: value[1], is_active: value[2] }]
-        : [];
+      return value ? [{ is_active: value[1] }] : [];
     },
   ],
   [
@@ -195,11 +179,10 @@ const HANDLERS: [string, Handler][] = [
         slug: p[1] as string,
         category_id: p[2] as number,
         brand_id: p[3] as number | null,
-        experience_level_id: p[4] as number,
-        fields: [p[5], p[6], p[7], p[8], p[9], p[11], p[12], p[13], p[14]],
-        stock: p[10] as number,
+        fields: [p[4], p[5], p[6], p[7], p[8], p[10], p[11], p[12], p[13]],
+        stock: p[9] as number,
         reserved_stock: 0,
-        shipping_class_id: p[15] as number,
+        shipping_class_id: p[14] as number,
         is_active: 1,
       });
       return [];
@@ -228,41 +211,22 @@ const HANDLERS: [string, Handler][] = [
   [
     'UPDATE products SET',
     (p) => {
-      const row = model.products.find((r) => r.id === p[15]) as Row;
+      const row = model.products.find((r) => r.id === p[14]) as Row;
       Object.assign(row, {
         category_id: p[0],
         brand_id: p[1],
-        experience_level_id: p[2],
-        fields: [p[3], p[4], p[5], p[6], p[7], p[9], p[10], p[11], p[12]],
-        stock: p[8],
-        shipping_class_id: p[13],
-        is_active: p[14],
+        fields: [p[2], p[3], p[4], p[5], p[6], p[8], p[9], p[10], p[11]],
+        stock: p[7],
+        shipping_class_id: p[12],
+        is_active: p[13],
       });
       return [];
     },
   ],
   [
-    'DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1',
+    'DELETE FROM product_facet_links WHERE product_id = ?',
     (p) => {
-      model.links = model.links.filter(
-        ([pid, vid]) => pid !== p[0] || VALUES[vid][1] !== 1
-      );
-      return [];
-    },
-  ],
-  [
-    'DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0',
-    (p) => {
-      model.links = model.links.filter(
-        ([pid, vid]) => pid !== p[0] || VALUES[vid][1] !== 0
-      );
-      return [];
-    },
-  ],
-  [
-    'INSERT INTO product_facet_links (product_id, value_id) SELECT',
-    (p) => {
-      model.links.push([p[0] as number, nivelValue(p[1])]);
+      model.links = model.links.filter(([pid]) => pid !== p[0]);
       return [];
     },
   ],
@@ -274,10 +238,10 @@ const HANDLERS: [string, Handler][] = [
     },
   ],
   [
-    'SELECT k.value_id',
+    'SELECT value_id FROM product_facet_links',
     (p) =>
       model.links
-        .filter(([pid, vid]) => pid === p[0] && VALUES[vid][1] === 0)
+        .filter(([pid]) => pid === p[0])
         .map(([, vid]) => ({ value_id: vid })),
   ],
   [
@@ -405,7 +369,6 @@ const pack = {
   priceMxnCents: 185000,
   stock: 4,
   discipline: 'montana',
-  level: 'principiante',
   shippingClass: 'estandar',
   weightGrams: 900,
   lengthMm: 500,
@@ -414,59 +377,40 @@ const pack = {
 };
 const create = (overrides: Record<string, unknown> = {}) =>
   write('POST', '/v1/admin/catalog/products', { ...pack, ...overrides });
-const nivelOf = (id: number) =>
-  model.links
-    .filter(([pid, vid]) => pid === id && VALUES[vid][1] === 1)
-    .map(([, vid]) => vid);
 
 describe('products of the backoffice (FC 029 F2b2)', () => {
-  it('creates a product (201) linked to its level’s Nivel value, with its facets and audit (T2.6, T2.4)', async () => {
+  it('creates a product (201) with its brand and property values, and its audit (T2.6, T2.4)', async () => {
     const res = await create({ brandId: 5, facetValueIds: [20] });
     expect(res.statusCode).toBe(201);
-    expect(res.json()).toMatchObject({
+    const created = res.json();
+    expect(created).toMatchObject({
       id: 1,
       sku: 'PACK-30',
-      level: 'principiante',
       brandId: 5,
       isActive: true,
       facetValueIds: [20],
       gallery: [],
     });
-    expect(nivelOf(1)).toEqual([10]);
+    // FC 048: a product has no level, nor a «Nivel» value of its own.
+    expect(created).not.toHaveProperty('level');
     const route = ROUTE_CONTRACTS.find(
       (r) => r.method === 'POST' && r.path === '/v1/admin/catalog/products'
     );
-    expect(route?.responses[201].safeParse(res.json()).success).toBe(true);
+    expect(route?.responses[201].safeParse(created).success).toBe(true);
     const entry = model.audit.find((row) => row[2] === 'products');
     expect(JSON.parse(entry?.[5] as string)).toMatchObject({
       nameEs: 'Mochila 30 L',
     });
   });
 
-  it('T2.6: requires the level on create, accepts its own Nivel value among the facets, refuses one that disagrees', async () => {
-    const withoutLevel = await create({
-      facetValueIds: [11],
-      level: undefined,
-    });
-    expect(withoutLevel.statusCode).toBe(400);
-    const agreeing = await create({ facetValueIds: [10] });
-    expect(agreeing.json()).toMatchObject({
-      level: 'principiante',
-      facetValueIds: [],
-    });
-    const disagreeing = await create({
-      sku: 'PACK-31',
-      slug: 'mochila-31',
-      facetValueIds: [11],
-    });
-    expect(disagreeing.json()).toMatchObject({
-      detail: 'CAT_VALIDATION_ERROR',
-    });
+  it('refuses a level: it is no field of a product any more (400)', async () => {
+    const res = await create({ level: 'principiante' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ detail: 'CAT_VALIDATION_ERROR' });
   });
 
   it.each([
     ['a retired discipline', { discipline: 'retirada' }],
-    ['an unknown level', { level: 'leyenda' }],
     ['an unknown shipping class', { shippingClass: 'flete' }],
     ['a retired brand', { brandId: 6 }],
     ['a value of a retired group', { facetValueIds: [21] }],
@@ -494,34 +438,29 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
     expect(res.json()).toMatchObject({ detail: 'CAT_VALIDATION_ERROR' });
   });
 
-  it('edits a product, moves Nivel with its level (T2.6), and retires it with isActive false (T2.3c)', async () => {
+  it('edits a product, replaces its property values, and retires it with isActive false (T2.3c)', async () => {
     await create({ facetValueIds: [20] });
     const res = await write('PATCH', '/v1/admin/catalog/products/1', {
-      level: 'experto',
       priceMxnCents: 199000,
       isActive: false,
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
-      level: 'experto',
       priceMxnCents: 199000,
       isActive: false,
       facetValueIds: [20],
     });
-    expect(nivelOf(1)).toEqual([11]);
     const replaced = await write('PATCH', '/v1/admin/catalog/products/1', {
-      facetValueIds: [],
+      facetValueIds: [22, 22],
     });
     expect(replaced.json()).toMatchObject({
-      facetValueIds: [],
-      level: 'experto',
+      facetValueIds: [22],
       isActive: false,
     });
-    const viaFacet = await write('PATCH', '/v1/admin/catalog/products/1', {
-      facetValueIds: [10],
+    const cleared = await write('PATCH', '/v1/admin/catalog/products/1', {
+      facetValueIds: [],
     });
-    expect(viaFacet.json()).toMatchObject({ level: 'principiante' });
-    expect(nivelOf(1)).toEqual([10]);
+    expect(cleared.json()).toMatchObject({ facetValueIds: [] });
   });
 
   it('keeps the stock at or above the reserved units (409 CAT_STOCK_BELOW_RESERVED)', async () => {
@@ -535,7 +474,7 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
   });
 
   it.each([
-    [{ level: 'experto', facetValueIds: [10] }, 'CAT_VALIDATION_ERROR'],
+    [{ level: 'experto' }, 'CAT_VALIDATION_ERROR'],
     [{ facetValueIds: [99] }, 'CAT_REFERENCE_INVALID'],
     [{ brandId: 6 }, 'CAT_REFERENCE_INVALID'],
   ])('refuses the edit %j with %s', async (patch, code) => {

@@ -28,9 +28,6 @@ export interface GridItem {
   /** Discipline slug (filter value) and its localized name. */
   discipline: string;
   disciplineName: string;
-  /** Experience level slug (filter value) and its localized name. */
-  level: string;
-  levelName: string;
   /** Name of its brand, or null: the search finds a product by it too. */
   brandName: string | null;
   /** Price in MXN cents, for sorting. */
@@ -148,7 +145,7 @@ function ProductCard({
       <ProductVisual image={item.image} discipline={item.discipline} />
       <div className="flex flex-1 flex-col gap-2">
         <p className="text-xs uppercase tracking-wider text-petroleo/80">
-          {item.disciplineName} · {item.levelName}
+          {item.disciplineName}
         </p>
         <h2 className="text-lg font-semibold group-hover:underline">
           {item.name}
@@ -175,10 +172,10 @@ function ProductCard({
 }
 
 /**
- * The catalog grid with its filters (discipline, level) and sort. Filtering runs in the browser
+ * The catalog grid with its filters (discipline) and sort. Filtering runs in the browser
  * over the prerendered catalog, so the static export needs no page per filter; without
  * JavaScript the full catalog still shows. Filter options come from the products themselves,
- * so a level added in the database (ADR 0007) appears without a code change.
+ * so a discipline added in the database (ADR 0007) appears without a code change.
  *
  * FC 035 (256_AN): the selects stay disabled until React has hydrated them. A choice made on the
  * static HTML before that would be reset to the initial state and lost, so it cannot be made.
@@ -189,7 +186,6 @@ export function CatalogGrid({
   messages,
 }: Readonly<CatalogGridProps>) {
   const [discipline, setDiscipline] = useState('');
-  const [level, setLevel] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('name');
   const [isMounted, setIsMounted] = useState(false);
@@ -202,16 +198,6 @@ export function CatalogGrid({
         items,
         (item) => item.discipline,
         (item) => item.disciplineName,
-        locale
-      ),
-    [items, locale]
-  );
-  const levelOptions = useMemo(
-    () =>
-      optionsOf(
-        items,
-        (item) => item.level,
-        (item) => item.levelName,
         locale
       ),
     [items, locale]
@@ -230,11 +216,10 @@ export function CatalogGrid({
         .filter(
           (item) =>
             (discipline === '' || item.discipline === discipline) &&
-            (level === '' || item.level === level) &&
             (found === null || found.has(item.slug))
         )
         .sort(comparator(sort, locale)),
-    [items, discipline, level, found, sort, locale]
+    [items, discipline, found, sort, locale]
   );
   const plural = new Intl.PluralRules(locale).select(visible.length);
 
@@ -252,7 +237,7 @@ export function CatalogGrid({
       <Suspense fallback={null}>
         <UrlFilters onChange={setFilters} />
       </Suspense>
-      <fieldset className="mt-8 grid gap-4 sm:grid-cols-3">
+      <fieldset className="mt-8 grid gap-4 sm:grid-cols-2">
         <legend className="sr-only">{filters.label}</legend>
         <Filter
           label={filters.discipline}
@@ -262,19 +247,6 @@ export function CatalogGrid({
         >
           <option value="">{filters.allDisciplines}</option>
           {disciplineOptions.map((option) => (
-            <option key={option.slug} value={option.slug}>
-              {option.name}
-            </option>
-          ))}
-        </Filter>
-        <Filter
-          label={filters.level}
-          value={level}
-          onChange={setLevel}
-          disabled={!isMounted}
-        >
-          <option value="">{filters.allLevels}</option>
-          {levelOptions.map((option) => (
             <option key={option.slug} value={option.slug}>
               {option.name}
             </option>
@@ -325,7 +297,6 @@ export function CatalogGrid({
             type="button"
             onClick={() => {
               setDiscipline('');
-              setLevel('');
               setQuery('');
             }}
             className="min-h-11 rounded-md border border-petroleo px-5 font-semibold"

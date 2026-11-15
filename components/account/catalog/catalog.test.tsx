@@ -358,25 +358,24 @@ describe('publish (FC 029 T2.5)', () => {
   });
 });
 
-/** The system group Nivel (migration 006): its values mirror the experience levels. */
-const NIVEL = {
+/** A group of properties: Color (FC 048: every group is the store's, none is a system one). */
+const COLOR = {
   id: 1,
-  code: 'nivel',
-  nameEs: 'Nivel',
-  nameEn: 'Level',
+  code: 'color',
+  nameEs: 'Color',
+  nameEn: 'Colour',
   isRequired: true,
   isOrdered: true,
   isFilterable: true,
   showOnLanding: true,
-  isSystem: true,
   isActive: true,
   sortOrder: 0,
   values: [
     {
       id: 1,
-      code: 'iniciacion',
-      valueEs: 'Iniciación',
-      valueEn: 'Beginner',
+      code: 'rojo',
+      valueEs: 'Rojo',
+      valueEn: 'Red',
       sortOrder: 1,
     },
   ],
@@ -390,7 +389,6 @@ const MATERIAL = {
   isOrdered: false,
   isFilterable: true,
   showOnLanding: false,
-  isSystem: false,
   isActive: true,
   sortOrder: 5,
   values: [
@@ -423,42 +421,34 @@ describe('facets (FC 029 F3b)', () => {
       target: { value },
     });
 
-  async function openFacets(...groups: (typeof NIVEL)[]) {
+  async function openFacets(...groups: (typeof COLOR)[]) {
     api.listFacets.mockResolvedValue(ok(groups));
     renderConsole();
     fireEvent.click(screen.getByRole('tab', { name: t.sections.facets }));
     await screen.findByRole('form', { name: f.newGroup });
   }
 
-  it('lists each group with its flags, status and values; the system group is read-only and cannot be retired', async () => {
-    await openFacets(NIVEL, MATERIAL, VACIA);
-    const nivel = group('Nivel');
-    expect(within(nivel).getByText(f.system)).toBeTruthy();
+  it('lists each group with its flags, status and values; no group is locked', async () => {
+    await openFacets(COLOR, MATERIAL, VACIA);
+    const color = group('Color');
     expect(
-      within(nivel).getByText(
+      within(color).getByText(
         `${f.flags.required} · ${f.flags.ordered} · ${f.flags.filterable} · ${f.flags.landing}`
       )
     ).toBeTruthy();
-    expect(within(nivel).getByText('Iniciación')).toBeTruthy();
-    expect(within(nivel).getByText(f.systemValues)).toBeTruthy();
-    // T2.1b: it can be renamed, never retired, and its values are neither edited nor added.
+    expect(within(color).getByText('Rojo')).toBeTruthy();
+    // FC 048: every group can be renamed and retired, and its values edited and added.
     expect(
-      within(nivel).getByRole('button', { name: `${f.edit}: Nivel` })
+      within(color).getByRole('button', { name: `${f.edit}: Color` })
     ).toBeTruthy();
     expect(
-      within(nivel).queryByRole('button', { name: new RegExp(f.retire) })
-    ).toBeNull();
+      within(color).getByRole('button', { name: `${f.retire}: Color` })
+    ).toBeTruthy();
     expect(
-      within(nivel).queryByRole('button', { name: `${f.edit}: Iniciación` })
-    ).toBeNull();
+      within(color).getByRole('button', { name: `${f.edit}: Rojo` })
+    ).toBeTruthy();
     expect(
-      screen.queryByRole('form', { name: `${f.newValue}: Nivel` })
-    ).toBeNull();
-    const material = group('Material');
-    expect(within(material).queryByText(f.system)).toBeNull();
-    expect(within(material).getByText(f.flags.filterable)).toBeTruthy();
-    expect(
-      within(material).getByRole('button', { name: `${f.retire}: Material` })
+      screen.getByRole('form', { name: `${f.newValue}: Color` })
     ).toBeTruthy();
     const vacia = group('Vacía');
     expect(within(vacia).getByText(f.retired)).toBeTruthy();
@@ -483,7 +473,7 @@ describe('facets (FC 029 F3b)', () => {
 
   it('creates a group with its flags, reloads the list and clears the form', async () => {
     api.createFacetGroup.mockResolvedValue(ok(MATERIAL));
-    await openFacets(NIVEL);
+    await openFacets(COLOR);
     const create = form(f.newGroup);
     type(create, f.code, 'peso');
     type(create, f.nameEs, ' Peso ');
@@ -513,7 +503,7 @@ describe('facets (FC 029 F3b)', () => {
 
   it('names a refused creation and keeps what was typed', async () => {
     api.createFacetGroup.mockResolvedValue(no('CAT_CONFLICT'));
-    await openFacets(NIVEL);
+    await openFacets(COLOR);
     const create = form(f.newGroup);
     type(create, f.code, 'nivel');
     type(create, f.nameEs, 'Otro');
@@ -527,7 +517,7 @@ describe('facets (FC 029 F3b)', () => {
 
   it('edits a group’s names, order and flags, or cancels', async () => {
     api.updateFacetGroup.mockResolvedValue(ok(MATERIAL));
-    await openFacets(NIVEL, MATERIAL);
+    await openFacets(COLOR, MATERIAL);
     fireEvent.click(
       screen.getByRole('button', { name: `${f.edit}: Material` })
     );
@@ -620,22 +610,22 @@ describe('facets (FC 029 F3b)', () => {
   });
 });
 
-/** The levels of the system group Nivel, as the product form offers them. */
-const LEVELS = {
-  ...NIVEL,
+/** A group with a few values, as the product form offers them. */
+const COLORS = {
+  ...COLOR,
   values: [
     {
       id: 1,
-      code: 'principiante',
-      valueEs: 'Principiante',
-      valueEn: 'Beginner',
+      code: 'azul',
+      valueEs: 'Azul',
+      valueEn: 'Blue',
       sortOrder: 1,
     },
     {
       id: 2,
-      code: 'intermedio',
-      valueEs: 'Intermedio',
-      valueEn: 'Intermediate',
+      code: 'verde',
+      valueEs: 'Verde',
+      valueEn: 'Green',
       sortOrder: 2,
     },
   ],
@@ -659,7 +649,6 @@ const TRAIL: AdminProduct = {
   stock: 10,
   reservedStock: 2,
   discipline: 'trail-running',
-  level: 'intermedio',
   brandId: 1,
   shippingClass: 'estandar',
   weightGrams: 800,
@@ -696,7 +685,7 @@ describe('products (FC 029 F3c)', () => {
   async function openProducts(...items: AdminProduct[]) {
     api.listProducts.mockResolvedValue(pageOf(items));
     api.listBrands.mockResolvedValue(ok([CUMBRE, OLD_BRAND]));
-    api.listFacets.mockResolvedValue(ok([LEVELS, MATERIAL, VACIA]));
+    api.listFacets.mockResolvedValue(ok([COLORS, MATERIAL, VACIA]));
     renderConsole();
     fireEvent.click(screen.getByRole('tab', { name: t.sections.products }));
     await screen.findByRole('button', { name: p.new });
@@ -768,7 +757,7 @@ describe('products (FC 029 F3c)', () => {
     ).toBeTruthy();
   });
 
-  it('creates a product: pesos become cents, the level, brand and facets come from the lists', async () => {
+  it('creates a product: pesos become cents, the brand and the properties come from the lists, and there is no level', async () => {
     api.createProduct.mockResolvedValue(ok(TRAIL));
     await openProducts();
     fireEvent.click(screen.getByRole('button', { name: p.new }));
@@ -784,7 +773,6 @@ describe('products (FC 029 F3c)', () => {
     type(p.priceMxn, '4850.10');
     type(p.stockField, '10');
     type(p.discipline, 'trail-running');
-    type(p.level, 'intermedio');
     type(p.brand, '1');
     type(p.shippingClass, 'estandar');
     type(p.weight, '800');
@@ -804,7 +792,6 @@ describe('products (FC 029 F3c)', () => {
       priceMxnCents: 485010,
       stock: 10,
       discipline: 'trail-running',
-      level: 'intermedio',
       brandId: 1,
       shippingClass: 'estandar',
       weightGrams: 800,
@@ -828,7 +815,6 @@ describe('products (FC 029 F3c)', () => {
       [p.nameEn, 'X'],
       [p.priceMxn, '10'],
       [p.discipline, 'escalada'],
-      [p.level, 'principiante'],
       [p.shippingClass, 'estandar'],
       [p.weight, '1'],
       [p.length, '1'],
@@ -862,10 +848,7 @@ describe('products (FC 029 F3c)', () => {
       (screen.getByLabelText(p.priceMxn, { exact: false }) as HTMLInputElement)
         .value
     ).toBe('4850');
-    expect(
-      (screen.getByLabelText(p.level, { exact: false }) as HTMLSelectElement)
-        .value
-    ).toBe('intermedio');
+    expect(screen.queryByLabelText('Nivel')).toBeNull();
     // A retired brand stays offered to the product that has it, so saving does not drop it.
     expect(
       (screen.getByLabelText(p.brand, { exact: false }) as HTMLSelectElement)

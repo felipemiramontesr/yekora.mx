@@ -8,7 +8,7 @@
  *    (T1.1 V).
  * 4. The mutation, at most once per key (T2.3a, T2.3d, T2.3e), with its `audit_log` entry in the
  *    same transaction (T2.4). A taken slug or code is a 409 CAT_CONFLICT, an unknown id a 404
- *    CAT_NOT_FOUND, a write on the system group a 409 CAT_SYSTEM_GROUP_LOCKED (T2.1b).
+ *    CAT_NOT_FOUND.
  *
  * @module
  */
@@ -49,7 +49,6 @@ export const idParams = z.object({ id: z.coerce.number().int().positive() });
 /** Status and title of each refusal a mutation may name. */
 const REFUSALS: Readonly<Record<ProductRefusal, readonly [number, string]>> = {
   CAT_NOT_FOUND: [404, 'Not found'],
-  CAT_SYSTEM_GROUP_LOCKED: [409, 'System facet group is locked'],
   CAT_VALIDATION_ERROR: [400, 'Invalid catalog data'],
   CAT_REFERENCE_INVALID: [422, 'Unknown or retired reference'],
   CAT_STOCK_BELOW_RESERVED: [409, 'Stock below reserved units'],

@@ -1,5 +1,5 @@
 /**
- * Catalog queries (FC 008): active products with their discipline, level, brand and images.
+ * Catalog queries (FC 008): active products with their discipline, brand, properties and images.
  *
  * Every statement is static SQL with `?` placeholders (T1.1). Optional filters use the
  * `(? IS NULL OR col = ?)` pattern, and sorting uses CASE expressions over a bound sort key, so
@@ -20,8 +20,6 @@ type Sort = (typeof SORTS)[number];
 interface CatalogQuery {
   /** Category slug, or null for all disciplines. */
   discipline: string | null;
-  /** Experience level slug, or null for all levels. */
-  level: string | null;
   /** Ordering. */
   sort: Sort;
   /** `en` sorts by English names; anything else by Spanish. */
@@ -33,9 +31,8 @@ interface CatalogQuery {
 }
 
 /**
- * A product row with both languages and its references. Discipline and level names come from
- * their reference tables (ADR 0007), so a new level shows up on the site without a frontend
- * change.
+ * A product row with both languages and its references. The discipline name comes from its
+ * reference table (ADR 0007), so a new discipline shows up on the site without a frontend change.
  */
 export interface ProductRow {
   sku: string;
@@ -49,9 +46,6 @@ export interface ProductRow {
   discipline: string;
   discipline_name_es: string;
   discipline_name_en: string;
-  level: string;
-  level_name_es: string;
-  level_name_en: string;
   /** Slug and name of its brand: null without one, or when the brand is retired (FC 047). */
   brand: string | null;
   brand_name: string | null;
@@ -68,18 +62,13 @@ export async function listProducts(
   db: Db,
   query: CatalogQuery
 ): Promise<{ items: ProductRow[]; total: number }> {
-  const filters = [
-    query.discipline,
-    query.discipline,
-    query.level,
-    query.level,
-  ];
+  const filters = [query.discipline, query.discipline];
   const [{ total }] = await db.query<{ total: number }>(
-    'SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?)',
+    'SELECT COUNT(*) AS total FROM products p JOIN categories c ON c.id = p.category_id WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?)',
     filters
   );
   const items = await db.query<ProductRow>(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1 AND (? IS NULL OR c.slug = ?) AND (? IS NULL OR l.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
     [
       ...filters,
       query.sort,
@@ -116,6 +105,35 @@ export function findProductMedia(db: Db, slug: string): Promise<MediaRow[]> {
   );
 }
 
+/** One property of a product: a value of an active group, with both languages. */
+export interface PropertyRow {
+  group_code: string;
+  group_name_es: string;
+  group_name_en: string;
+  is_filterable: number;
+  value_code: string;
+  value_es: string;
+  value_en: string;
+}
+
+/**
+ * The properties of a product (FC 048 T0.2): the values of its active groups, in the order the
+ * store set (group order, then value order). A retired group does not show.
+ *
+ * @param db - Database port.
+ * @param slug - Product slug (already validated by the route).
+ * @returns The properties, possibly none.
+ */
+export function findProductProperties(
+  db: Db,
+  slug: string
+): Promise<PropertyRow[]> {
+  return db.query<PropertyRow>(
+    'SELECT g.code AS group_code, g.name_es AS group_name_es, g.name_en AS group_name_en, g.is_filterable, v.code AS value_code, v.value_es, v.value_en FROM products p JOIN product_facet_links k ON k.product_id = p.id JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE p.slug = ? AND g.is_active = 1 ORDER BY g.sort_order ASC, g.id ASC, v.sort_order ASC, v.id ASC',
+    [slug]
+  );
+}
+
 /**
  * One active product by slug; its gallery comes from {@link findProductMedia}.
  *
@@ -128,7 +146,7 @@ export async function findProduct(
   slug: string
 ): Promise<ProductRow | null> {
   const [product] = await db.query<ProductRow>(
-    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, l.slug AS level, l.name_es AS level_name_es, l.name_en AS level_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1',
+    'SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1',
     [slug]
   );
   return product ?? null;

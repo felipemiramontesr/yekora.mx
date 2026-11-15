@@ -19,7 +19,7 @@ interface ProductViewProps {
 
 /**
  * Product page body, shared by `/catalogo/<slug>/` and `/en/catalog/<slug>/`: gallery (or the
- * discipline pictogram), name, discipline and level, price in MXN (plus the USD reference in
+ * discipline pictogram), name, discipline, brand and properties, price in MXN (plus the USD reference in
  * English), availability and description.
  */
 export function ProductView({
@@ -57,14 +57,22 @@ export function ProductView({
               <dt className="font-semibold">{catalog.product.discipline}:</dt>
               <dd>{product.disciplineName}</dd>
             </div>
-            <div className="flex gap-2">
-              <dt className="font-semibold">{catalog.product.level}:</dt>
-              <dd>
-                <span className="rounded-full border border-ocre px-2 py-0.5">
-                  {product.levelName}
-                </span>
-              </dd>
-            </div>
+            {product.brandName && (
+              <div className="flex gap-2">
+                <dt className="font-semibold">{catalog.product.brand}:</dt>
+                <dd>{product.brandName}</dd>
+              </div>
+            )}
+            {/* The properties of the product, as the store set them (FC 048): «group: value». */}
+            {product.properties.map((property) => (
+              <div
+                key={`${property.groupCode}-${property.valueCode}`}
+                className="flex gap-2"
+              >
+                <dt className="font-semibold">{property.groupName}:</dt>
+                <dd>{property.valueName}</dd>
+              </div>
+            ))}
           </dl>
           <p className="mt-8 text-3xl font-semibold">{price.mxn}</p>
           {/* LFPC 7 Bis: the stored price is the net price, VAT included (Ω, 073_AN). */}

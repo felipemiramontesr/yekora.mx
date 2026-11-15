@@ -52,11 +52,10 @@ function valueFieldsOf(form: HTMLFormElement) {
 }
 
 /**
- * Facet groups of the catalog (FC 029 F2b, F3): every group, active or retired, with its values;
- * a form to create a group; per group, editing its names, flags and order and retiring or
- * reactivating it; per value, relabelling it and adding new ones. The code of a group or a value
- * is fixed once created, because published pages may name it. The system group Nivel can be
- * renamed and reordered but never retired, and its values are not added or edited (T2.1b).
+ * Product properties of the catalog (FC 029 F2b, F3; FC 048): every group, active or retired, with
+ * its values; a form to create a group; per group, editing its names, flags and order and
+ * retiring or reactivating it; per value, relabelling it and adding new ones. The code of a group
+ * or a value is fixed once created, because published pages may name it. No group is locked.
  *
  * @param texts - `account.catalog` texts.
  */
@@ -293,7 +292,6 @@ function GroupCard({
         <span className="text-sm">
           {group.nameEn} · {group.code}
         </span>
-        {group.isSystem && <span className="text-sm">{texts.system}</span>}
         {!group.isActive && <span className="text-sm">{texts.retired}</span>}
       </header>
       {editingGroup ? (
@@ -331,17 +329,15 @@ function GroupCard({
           >
             {texts.edit}
           </button>
-          {!group.isSystem && (
-            <button
-              type="button"
-              disabled={busy}
-              aria-label={`${group.isActive ? texts.retire : texts.reactivate}: ${group.nameEs}`}
-              onClick={onToggle}
-              className="tap-target underline"
-            >
-              {group.isActive ? texts.retire : texts.reactivate}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={busy}
+            aria-label={`${group.isActive ? texts.retire : texts.reactivate}: ${group.nameEs}`}
+            onClick={onToggle}
+            className="tap-target underline"
+          >
+            {group.isActive ? texts.retire : texts.reactivate}
+          </button>
         </div>
       )}
       <ValuesTable
@@ -352,56 +348,50 @@ function GroupCard({
         onEditValue={onEditValue}
         onSaveValue={onSaveValue}
       />
-      {!group.isSystem && (
-        <form
-          onSubmit={onAddValue}
-          aria-label={`${texts.newValue}: ${group.nameEs}`}
-          className="flex flex-wrap items-end gap-3"
-        >
-          <label className="flex flex-col gap-1">
-            {texts.code}
-            <input
-              name="code"
-              required
-              maxLength={50}
-              pattern="[a-z0-9]+([\-_][a-z0-9]+)*"
-              className={FIELD}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            {texts.valueEs}
-            <input name="valueEs" required maxLength={100} className={FIELD} />
-          </label>
-          <label className="flex flex-col gap-1">
-            {texts.valueEn}
-            <input name="valueEn" required maxLength={100} className={FIELD} />
-          </label>
-          <label className="flex flex-col gap-1">
-            {texts.order}
-            <input
-              name="sortOrder"
-              type="number"
-              required
-              min={-1000}
-              max={1000}
-              defaultValue={0}
-              className={FIELD}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="tap-target underline"
-          >
-            {busy ? texts.adding : texts.addValue}
-          </button>
-        </form>
-      )}
+      <form
+        onSubmit={onAddValue}
+        aria-label={`${texts.newValue}: ${group.nameEs}`}
+        className="flex flex-wrap items-end gap-3"
+      >
+        <label className="flex flex-col gap-1">
+          {texts.code}
+          <input
+            name="code"
+            required
+            maxLength={50}
+            pattern="[a-z0-9]+([\-_][a-z0-9]+)*"
+            className={FIELD}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          {texts.valueEs}
+          <input name="valueEs" required maxLength={100} className={FIELD} />
+        </label>
+        <label className="flex flex-col gap-1">
+          {texts.valueEn}
+          <input name="valueEn" required maxLength={100} className={FIELD} />
+        </label>
+        <label className="flex flex-col gap-1">
+          {texts.order}
+          <input
+            name="sortOrder"
+            type="number"
+            required
+            min={-1000}
+            max={1000}
+            defaultValue={0}
+            className={FIELD}
+          />
+        </label>
+        <button type="submit" disabled={busy} className="tap-target underline">
+          {busy ? texts.adding : texts.addValue}
+        </button>
+      </form>
     </article>
   );
 }
 
-/** The values of a group; a system group's are read-only. */
+/** The values of a group, each one editable. */
 function ValuesTable({
   texts,
   group,
@@ -428,7 +418,7 @@ function ValuesTable({
             <th scope="col">{texts.valueEs}</th>
             <th scope="col">{texts.valueEn}</th>
             <th scope="col">{texts.order}</th>
-            {!group.isSystem && <td />}
+            <td />
           </tr>
         </thead>
         <tbody>
@@ -496,24 +486,21 @@ function ValuesTable({
                 <td>{value.valueEs}</td>
                 <td>{value.valueEn}</td>
                 <td>{value.sortOrder}</td>
-                {!group.isSystem && (
-                  <td>
-                    <button
-                      type="button"
-                      aria-label={`${texts.edit}: ${value.valueEs}`}
-                      onClick={() => onEditValue(value.id)}
-                      className="tap-target underline"
-                    >
-                      {texts.edit}
-                    </button>
-                  </td>
-                )}
+                <td>
+                  <button
+                    type="button"
+                    aria-label={`${texts.edit}: ${value.valueEs}`}
+                    onClick={() => onEditValue(value.id)}
+                    className="tap-target underline"
+                  >
+                    {texts.edit}
+                  </button>
+                </td>
               </tr>
             )
           )}
         </tbody>
       </table>
-      {group.isSystem && <p className="text-sm">{texts.systemValues}</p>}
     </div>
   );
 }

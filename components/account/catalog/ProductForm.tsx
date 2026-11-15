@@ -43,7 +43,6 @@ function fieldsOf(data: FormData) {
     priceMxnCents: Math.round(Number(textOf(data, 'price')) * 100),
     stock: Number(textOf(data, 'stock')),
     discipline: textOf(data, 'discipline'),
-    level: textOf(data, 'level'),
     brandId: brand === '' ? null : Number(brand),
     shippingClass: textOf(data, 'shippingClass'),
     weightGrams: Number(textOf(data, 'weightGrams')),
@@ -84,8 +83,8 @@ function guided(
 /**
  * The form of one product, to create it or to edit it (FC 029 F3, T1.1). SKU and slug are typed
  * once: orders and published addresses name them, so an existing product shows them read-only.
- * The price is typed in pesos and sent in cents; the level is one of the system group Nivel; the
- * facets are the values of the ordinary groups. The gallery is arranged in the media section.
+ * The price is typed in pesos and sent in cents; the properties are the values of the groups of
+ * product properties. The gallery is arranged in the media section.
  *
  * @param texts - `account.catalog` texts.
  * @param product - The product to edit, or null for a new one.
@@ -272,25 +271,6 @@ export function ProductForm({
               <option key={slug} value={slug} />
             ))}
           </datalist>
-          {guided(texts, 'level', t.level, (control) => (
-            <select
-              {...control}
-              name="level"
-              required
-              defaultValue={product?.level ?? ''}
-              className={FIELD}
-            >
-              <option value="">{t.levelChoose}</option>
-              {options.groups
-                .filter((group) => group.isSystem)
-                .flatMap((group) => group.values)
-                .map((value) => (
-                  <option key={value.id} value={value.code}>
-                    {value.valueEs}
-                  </option>
-                ))}
-            </select>
-          ))}
           {guided(texts, 'brand', t.brand, (control) => (
             <select
               {...control}
@@ -348,7 +328,7 @@ export function ProductForm({
             ))
           )}
           {options.groups
-            .filter((group) => !group.isSystem && group.isActive)
+            .filter((group) => group.isActive)
             .map((group) => (
               <fieldset key={group.id} className="flex flex-col gap-2">
                 <legend>{`${t.facets}: ${group.nameEs}`}</legend>

@@ -7,20 +7,17 @@ interface ActivityCardProps {
   discipline: Discipline;
   /** Localized discipline name, the card's heading. */
   name: string;
-  /** Localized label shown before the level, e.g. "Nivel". */
-  levelLabel: string;
-  /** Localized level and description of the discipline. */
+  /** Localized description of the discipline. */
   activity: Messages['activities']['items'][Discipline];
 }
 
 /**
- * One discipline on the home page: its pictogram, name, level and what it involves.
+ * One discipline on the home page: its pictogram, name and what it involves.
  * The pictogram is decorative; the heading names the card.
  */
 export function ActivityCard({
   discipline,
   name,
-  levelLabel,
   activity,
 }: Readonly<ActivityCardProps>) {
   return (
@@ -32,12 +29,6 @@ export function ActivityCard({
         <DisciplineIcon discipline={discipline} size={30} />
       </span>
       <h3 className="text-xl font-semibold text-petroleo">{name}</h3>
-      <p className="text-sm">
-        <span className="font-semibold">{levelLabel}:</span>{' '}
-        <span className="rounded-full border border-ocre px-2 py-0.5">
-          {activity.level}
-        </span>
-      </p>
       <p className="text-petroleo/80">{activity.description}</p>
     </article>
   );

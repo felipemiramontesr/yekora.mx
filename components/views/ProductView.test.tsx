@@ -19,7 +19,11 @@ describe('ProductView', () => {
     expect(html).toContain('<h1');
     expect(html).toContain('Alpine harness (E2E test)');
     expect(html).toContain('Climbing');
-    expect(html).toContain('Advanced');
+    expect(html).not.toContain('Advanced');
+    // Its properties, as the store set them (FC 048): «group: value».
+    expect(html).toContain('Material:');
+    expect(html).toContain('Nylon');
+    expect(html).toContain('Color:');
     expect(html).toContain('$4,850.00 MXN');
     expect(html).toContain('≈ $262.16 USD');
     expect(html).toContain('18.5000 MXN per USD');

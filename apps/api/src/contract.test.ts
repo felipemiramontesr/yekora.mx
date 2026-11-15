@@ -23,9 +23,8 @@ const product = {
   discipline: 'senderismo',
   discipline_name_es: 'Senderismo',
   discipline_name_en: 'Hiking',
-  level: 'principiante',
-  level_name_es: 'Principiante',
-  level_name_en: 'Beginner',
+  brand: null,
+  brand_name: null,
 };
 
 /** One product with one image in its gallery, behind the Db port. */
@@ -35,6 +34,19 @@ const db: Db & Transactional = {
     if (sql.startsWith('SELECT m.media_sha256')) {
       return [
         { sha256: 'a'.repeat(64), alt_text_es: 'Mochila', alt_text_en: 'Pack' },
+      ] as Row[];
+    }
+    if (sql.includes('FROM products p JOIN product_facet_links')) {
+      return [
+        {
+          group_code: 'material',
+          group_name_es: 'Material',
+          group_name_en: 'Material',
+          is_filterable: 1,
+          value_code: 'nylon',
+          value_es: 'Nailon',
+          value_en: 'Nylon',
+        },
       ] as Row[];
     }
     return [product] as Row[];

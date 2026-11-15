@@ -124,7 +124,6 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
               key={discipline}
               discipline={discipline}
               name={messages.disciplines[discipline]}
-              levelLabel={messages.activities.levelLabel}
               activity={messages.activities.items[discipline]}
             />
           ))}

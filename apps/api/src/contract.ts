@@ -623,13 +623,13 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   catalogWrite(
     'POST',
     '/v1/admin/catalog/products',
-    'Create a product; its level links the system group Nivel (T2.6)',
+    'Create a product with its property values (FC 048: no level)',
     { body: productCreate, answer: adminProductSchema, references: true }
   ),
   catalogWrite(
     'PATCH',
     '/v1/admin/catalog/products/:id',
-    'Edit or retire a product; SKU and slug are fixed, level and Nivel move together',
+    'Edit or retire a product; SKU and slug are fixed; a list of property values replaces its own',
     {
       params: idParams,
       body: productPatch,

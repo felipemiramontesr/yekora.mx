@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app';
 import { loadConfig } from './config';
-import type { ProductRow } from './services/catalog';
+import type { ProductRow, PropertyRow } from './services/catalog';
 import type { Db, Transactional } from './services/db';
 import type { CurrentRate } from './services/exchangeRate';
 
@@ -29,9 +29,6 @@ const tent: ProductRow = {
   discipline: 'montana',
   discipline_name_es: 'Montaña',
   discipline_name_en: 'Mountaineering',
-  level: 'expedicion',
-  level_name_es: 'Expedición',
-  level_name_en: 'Expedition',
   brand: 'cumbre',
   brand_name: 'Cumbre',
 };
@@ -43,16 +40,30 @@ const gallery = [
   { sha256: SOLE, alt_text_es: null, alt_text_en: null },
 ];
 
-/** In-memory catalog behind the Db port: one product and its gallery. */
+/** A property of the tent: one value of an active group (FC 048). */
+const material: PropertyRow = {
+  group_code: 'material',
+  group_name_es: 'Material',
+  group_name_en: 'Material',
+  is_filterable: 1,
+  value_code: 'nylon',
+  value_es: 'Nailon',
+  value_en: 'Nylon',
+};
+
+/** In-memory catalog behind the Db port: one product, its gallery and its properties. */
 function catalogDb(
   products: ProductRow[] = [tent],
-  media: typeof gallery = []
+  media: typeof gallery = [],
+  properties: PropertyRow[] = [material]
 ): Db & Transactional {
   return {
     async query<Row>(sql: string, params: readonly unknown[] = []) {
       if (sql.startsWith('SELECT COUNT'))
         return [{ total: products.length }] as Row[];
       if (sql.startsWith('SELECT m.media_sha256')) return media as Row[];
+      if (sql.includes('FROM products p JOIN product_facet_links'))
+        return (params[0] === tent.slug ? properties : []) as Row[];
       if (sql.includes('WHERE p.slug = ?')) {
         return products.filter((row) => row.slug === params[0]) as Row[];
       }
@@ -172,10 +183,17 @@ describe('GET /v1/catalog', () => {
           description: 'Cuatro estaciones.',
           discipline: 'montana',
           disciplineName: 'Montaña',
-          level: 'expedicion',
-          levelName: 'Expedición',
           brand: 'cumbre',
           brandName: 'Cumbre',
+          properties: [
+            {
+              groupCode: 'material',
+              groupName: 'Material',
+              valueCode: 'nylon',
+              valueName: 'Nailon',
+              isFilterable: true,
+            },
+          ],
           priceMxnCents: 485000,
           priceUsdCents: 26216,
           inStock: false,
@@ -192,7 +210,7 @@ describe('GET /v1/catalog', () => {
     const res = await (
       await makeApp()
     ).inject(
-      '/v1/catalog?lang=en&discipline=montana&level=expedicion&sort=price_asc&page=2&pageSize=12'
+      '/v1/catalog?lang=en&discipline=montana&sort=price_asc&page=2&pageSize=12'
     );
     expect(res.json()).toMatchObject({
       items: [
@@ -200,7 +218,7 @@ describe('GET /v1/catalog', () => {
           name: 'Expedition tent',
           description: 'Four seasons.',
           disciplineName: 'Mountaineering',
-          levelName: 'Expedition',
+          properties: [{ groupName: 'Material', valueName: 'Nylon' }],
         },
       ],
       page: 2,

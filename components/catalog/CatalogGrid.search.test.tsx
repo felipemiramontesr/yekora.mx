@@ -30,8 +30,6 @@ function item(
     name,
     discipline,
     disciplineName,
-    level: 'avanzado',
-    levelName: 'Avanzado',
     brandName,
     priceMxnCents: 100000,
     price: { mxn: '$1,000.00 MXN', usd: null },

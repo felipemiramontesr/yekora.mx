@@ -399,7 +399,6 @@ const CATALOG_PRODUCT = {
   stock: 10,
   reservedStock: 0,
   discipline: 'trail-running',
-  level: 'intermedio',
   brandId: null,
   shippingClass: 'estandar',
   weightGrams: 800,

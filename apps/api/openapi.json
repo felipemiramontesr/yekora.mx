@@ -86,16 +86,6 @@
             }
           },
           {
-            "name": "level",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 40,
-              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-            }
-          },
-          {
             "name": "sort",
             "in": "query",
             "required": false,
@@ -174,14 +164,6 @@
                             "type": "string",
                             "minLength": 1
                           },
-                          "level": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                          },
-                          "levelName": {
-                            "type": "string",
-                            "minLength": 1
-                          },
                           "brand": {
                             "default": null,
                             "anyOf": [
@@ -205,6 +187,42 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "properties": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "groupCode": {
+                                  "type": "string",
+                                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                                },
+                                "groupName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "valueCode": {
+                                  "type": "string",
+                                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                                },
+                                "valueName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "isFilterable": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "groupCode",
+                                "groupName",
+                                "valueCode",
+                                "valueName",
+                                "isFilterable"
+                              ],
+                              "additionalProperties": false
+                            }
                           },
                           "priceMxnCents": {
                             "type": "integer",
@@ -234,10 +252,9 @@
                           "description",
                           "discipline",
                           "disciplineName",
-                          "level",
-                          "levelName",
                           "brand",
                           "brandName",
+                          "properties",
                           "priceMxnCents",
                           "priceUsdCents",
                           "inStock"
@@ -386,14 +403,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "level": {
-                      "type": "string",
-                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                    },
-                    "levelName": {
-                      "type": "string",
-                      "minLength": 1
-                    },
                     "brand": {
                       "default": null,
                       "anyOf": [
@@ -417,6 +426,42 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "properties": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "groupCode": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                          },
+                          "groupName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "valueCode": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                          },
+                          "valueName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "isFilterable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "groupCode",
+                          "groupName",
+                          "valueCode",
+                          "valueName",
+                          "isFilterable"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
                     "priceMxnCents": {
                       "type": "integer",
@@ -488,10 +533,9 @@
                     "description",
                     "discipline",
                     "disciplineName",
-                    "level",
-                    "levelName",
                     "brand",
                     "brandName",
+                    "properties",
                     "priceMxnCents",
                     "priceUsdCents",
                     "inStock",
@@ -6650,9 +6694,6 @@
                       "showOnLanding": {
                         "type": "boolean"
                       },
-                      "isSystem": {
-                        "type": "boolean"
-                      },
                       "isActive": {
                         "type": "boolean"
                       },
@@ -6706,7 +6747,6 @@
                       "isOrdered",
                       "isFilterable",
                       "showOnLanding",
-                      "isSystem",
                       "isActive",
                       "sortOrder",
                       "values"
@@ -7165,9 +7205,6 @@
                     "showOnLanding": {
                       "type": "boolean"
                     },
-                    "isSystem": {
-                      "type": "boolean"
-                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -7221,7 +7258,6 @@
                     "isOrdered",
                     "isFilterable",
                     "showOnLanding",
-                    "isSystem",
                     "isActive",
                     "sortOrder",
                     "values"
@@ -7504,9 +7540,6 @@
                     "showOnLanding": {
                       "type": "boolean"
                     },
-                    "isSystem": {
-                      "type": "boolean"
-                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -7560,7 +7593,6 @@
                     "isOrdered",
                     "isFilterable",
                     "showOnLanding",
-                    "isSystem",
                     "isActive",
                     "sortOrder",
                     "values"
@@ -8346,9 +8378,6 @@
                           "discipline": {
                             "type": "string"
                           },
-                          "level": {
-                            "type": "string"
-                          },
                           "brandId": {
                             "anyOf": [
                               {
@@ -8445,7 +8474,6 @@
                           "stock",
                           "reservedStock",
                           "discipline",
-                          "level",
                           "brandId",
                           "shippingClass",
                           "weightGrams",
@@ -8597,7 +8625,7 @@
         }
       },
       "post": {
-        "summary": "Create a product; its level links the system group Nivel (T2.6)",
+        "summary": "Create a product with its property values (FC 048: no level)",
         "x-permission": "catalog:write",
         "parameters": [
           {
@@ -8656,11 +8684,6 @@
                     "maximum": 1000000
                   },
                   "discipline": {
-                    "type": "string",
-                    "maxLength": 40,
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                  },
-                  "level": {
                     "type": "string",
                     "maxLength": 40,
                     "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -8724,7 +8747,6 @@
                   "priceMxnCents",
                   "stock",
                   "discipline",
-                  "level",
                   "shippingClass",
                   "weightGrams",
                   "lengthMm",
@@ -8783,9 +8805,6 @@
                       "maximum": 9007199254740991
                     },
                     "discipline": {
-                      "type": "string"
-                    },
-                    "level": {
                       "type": "string"
                     },
                     "brandId": {
@@ -8884,7 +8903,6 @@
                     "stock",
                     "reservedStock",
                     "discipline",
-                    "level",
                     "brandId",
                     "shippingClass",
                     "weightGrams",
@@ -9165,9 +9183,6 @@
                     "discipline": {
                       "type": "string"
                     },
-                    "level": {
-                      "type": "string"
-                    },
                     "brandId": {
                       "anyOf": [
                         {
@@ -9264,7 +9279,6 @@
                     "stock",
                     "reservedStock",
                     "discipline",
-                    "level",
                     "brandId",
                     "shippingClass",
                     "weightGrams",
@@ -9424,7 +9438,7 @@
         }
       },
       "patch": {
-        "summary": "Edit or retire a product; SKU and slug are fixed, level and Nivel move together",
+        "summary": "Edit or retire a product; SKU and slug are fixed; a list of property values replaces its own",
         "x-permission": "catalog:write",
         "parameters": [
           {
@@ -9483,11 +9497,6 @@
                     "maximum": 1000000
                   },
                   "discipline": {
-                    "type": "string",
-                    "maxLength": 40,
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                  },
-                  "level": {
                     "type": "string",
                     "maxLength": 40,
                     "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -9596,9 +9605,6 @@
                     "discipline": {
                       "type": "string"
                     },
-                    "level": {
-                      "type": "string"
-                    },
                     "brandId": {
                       "anyOf": [
                         {
@@ -9695,7 +9701,6 @@
                     "stock",
                     "reservedStock",
                     "discipline",
-                    "level",
                     "brandId",
                     "shippingClass",
                     "weightGrams",
@@ -10038,9 +10043,6 @@
                     "discipline": {
                       "type": "string"
                     },
-                    "level": {
-                      "type": "string"
-                    },
                     "brandId": {
                       "anyOf": [
                         {
@@ -10137,7 +10139,6 @@
                     "stock",
                     "reservedStock",
                     "discipline",
-                    "level",
                     "brandId",
                     "shippingClass",
                     "weightGrams",

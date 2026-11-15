@@ -20,8 +20,6 @@ function item(overrides: Partial<GridItem> & Pick<GridItem, 'slug'>): GridItem {
     name: overrides.slug,
     discipline: 'escalada',
     disciplineName: 'Climbing',
-    level: 'avanzado',
-    levelName: 'Advanced',
     brandName: null,
     priceMxnCents: 100000,
     price: { mxn: '$1,000.00 MXN', usd: null },
@@ -47,8 +45,6 @@ const ITEMS = [
     name: 'Backpack',
     discipline: 'senderismo',
     disciplineName: 'Hiking',
-    level: 'principiante',
-    levelName: 'Beginner',
     priceMxnCents: 185000,
   }),
   item({
@@ -56,8 +52,6 @@ const ITEMS = [
     name: 'Shoes',
     discipline: 'trail-running',
     disciplineName: 'Trail running',
-    level: 'intermedio',
-    levelName: 'Intermediate',
     priceMxnCents: 259900,
     inStock: false,
   }),
@@ -94,12 +88,12 @@ describe('CatalogGrid', () => {
 
   it('names each select exactly by its label, not by the selected option', () => {
     show();
-    for (const name of ['Discipline', 'Level', 'Sort by']) {
+    for (const name of ['Discipline', 'Sort by']) {
       expect(screen.getByRole('combobox', { name })).toBeTruthy();
     }
   });
 
-  it('offers only the disciplines and levels present, sorted by name', () => {
+  it('offers only the disciplines present, sorted by name, and no level (FC 048)', () => {
     show();
     const options = (label: string) =>
       [...screen.getByLabelText(label).querySelectorAll('option')].map(
@@ -111,21 +105,15 @@ describe('CatalogGrid', () => {
       'Hiking',
       'Trail running',
     ]);
-    expect(options('Level')).toEqual([
-      'All levels',
-      'Advanced',
-      'Beginner',
-      'Intermediate',
-    ]);
+    expect(screen.queryByLabelText('Level')).toBeNull();
   });
 
-  it('filters by discipline and by level, with a singular count', () => {
+  it('filters by discipline, with a singular count', () => {
     show();
     choose('Discipline', 'senderismo');
     expect(names()).toEqual(['Backpack']);
     expect(screen.getByRole('status').textContent).toBe('1 product');
-    choose('Discipline', '');
-    choose('Level', 'intermedio');
+    choose('Discipline', 'trail-running');
     expect(names()).toEqual(['Shoes']);
   });
 
@@ -137,16 +125,6 @@ describe('CatalogGrid', () => {
     expect(names()).toEqual(['Harness', 'Shoes', 'Backpack']);
     choose('Sort by', 'name');
     expect(names()).toEqual(['Backpack', 'Harness', 'Shoes']);
-  });
-
-  it('explains an empty result and clears the filters', () => {
-    show();
-    choose('Discipline', 'escalada');
-    choose('Level', 'principiante');
-    expect(screen.getByText('No product matches these filters.')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toBe('0 products');
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(names()).toHaveLength(3);
   });
 
   it('speaks Spanish on Spanish pages', () => {
@@ -170,7 +148,7 @@ describe('CatalogGrid hydration guard (FC 035 T1.1, 256_AN)', () => {
     const host = document.createElement('div');
     host.innerHTML = renderToString(element);
     const selects = [...host.querySelectorAll('select')];
-    expect(selects).toHaveLength(3);
+    expect(selects).toHaveLength(2);
     expect(selects.every((select) => select.disabled)).toBe(true);
   });
 

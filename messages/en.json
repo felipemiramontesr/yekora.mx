@@ -362,26 +362,20 @@
     "trail-running": "Trail running"
   },
   "activities": {
-    "levelLabel": "Level",
     "items": {
       "senderismo": {
-        "level": "From beginner",
         "description": "Footwear, packs and layers to walk at your own pace, from your first trail to long treks."
       },
       "montana": {
-        "level": "Intermediate to advanced",
         "description": "Gear for cold, altitude and changing weather, chosen for what it really does and its limits."
       },
       "escalada": {
-        "level": "All levels, with training",
         "description": "Protection and progression gear. We tell you what each piece is for, and what it is not for."
       },
       "canonismo": {
-        "level": "Intermediate, guided",
         "description": "Wetsuits, ropes and accessories to descend canyons safely and with good judgment."
       },
       "trail-running": {
-        "level": "From beginner",
         "description": "Light footwear and gear for mountain running, matched to your terrain and distance."
       }
     }
@@ -450,7 +444,7 @@
   "catalog": {
     "metaTitle": "Catalog | YĒKORA",
     "title": "Catalog",
-    "lede": "Outdoor gear chosen for what it really does, for every discipline and every level.",
+    "lede": "Outdoor gear chosen for what it really does, for every discipline.",
     "comingSoon": {
       "badge": "Coming soon",
       "title": "We are preparing the catalog",
@@ -460,9 +454,7 @@
     "filters": {
       "label": "Filter and sort",
       "discipline": "Discipline",
-      "level": "Level",
       "allDisciplines": "All disciplines",
-      "allLevels": "All levels",
       "sort": "Sort by",
       "sortName": "Name",
       "sortPriceAsc": "Price: low to high",
@@ -479,11 +471,11 @@
     "product": {
       "back": "Back to the catalog",
       "discipline": "Discipline",
-      "level": "Level",
       "inStock": "In stock",
       "outOfStock": "Out of stock",
       "addToCart": "Add to pack",
-      "sku": "SKU"
+      "sku": "SKU",
+      "brand": "Brand"
     },
     "price": {
       "vatIncluded": "VAT included",
@@ -877,7 +869,7 @@
       "sectionsLabel": "Catalog sections",
       "sections": {
         "brands": "Brands",
-        "facets": "Facets",
+        "facets": "Product properties",
         "products": "Products",
         "publish": "Publish"
       },
@@ -907,9 +899,8 @@
         "reactivate": "Reactivate"
       },
       "facets": {
-        "caption": "Facet groups with their values",
-        "empty": "There are no facet groups yet.",
-        "system": "System",
+        "caption": "Property groups with their values",
+        "empty": "There are no property groups yet.",
         "retired": "Retired",
         "flags": {
           "required": "Required",
@@ -918,7 +909,7 @@
           "landing": "On the landing page"
         },
         "code": "Identifier",
-        "codeHint": "Lower-case letters, numbers and hyphens, e.g. “material”. It does not change later.",
+        "codeHint": "Lowercase letters, digits and hyphens, for example “size” or “color”. It does not change later.",
         "nameEs": "Name in Spanish",
         "nameEn": "Name in English",
         "order": "Order",
@@ -935,7 +926,6 @@
         "reactivate": "Reactivate",
         "values": "Values",
         "noValues": "This group has no values yet.",
-        "systemValues": "The values of the Level group are system values: they are not added or edited.",
         "valueEs": "Value in Spanish",
         "valueEn": "Value in English",
         "newValue": "New value",
@@ -977,8 +967,6 @@
         "stockField": "Stock",
         "reservedNote": "Reserved by pending orders: {n}. Stock cannot drop below it.",
         "discipline": "Discipline",
-        "level": "Level",
-        "levelChoose": "Choose a level",
         "brand": "Brand",
         "noBrand": "No brand",
         "shippingClass": "Shipping class",
@@ -986,7 +974,7 @@
         "length": "Length (mm)",
         "width": "Width (mm)",
         "height": "Height (mm)",
-        "facets": "Facets",
+        "facets": "Properties",
         "save": "Save",
         "saving": "Saving…",
         "create": "Create product",
@@ -1029,10 +1017,6 @@
           "discipline": {
             "description": "The activity the product belongs to. Type one of these: senderismo, montana, escalada, canonismo or trail-running.",
             "example": "senderismo"
-          },
-          "level": {
-            "description": "The experience level the product is aimed at.",
-            "example": "Beginner"
           },
           "brand": {
             "description": "The product’s brand. If it has none, leave “No brand”.",
@@ -1106,7 +1090,6 @@
         "CAT_CONFLICT": "That identifier already exists. Choose another.",
         "CAT_NOT_FOUND": "That record no longer exists. Reload the page.",
         "CAT_FORBIDDEN": "Your account has no permission for the catalog.",
-        "CAT_SYSTEM_GROUP_LOCKED": "The Level group belongs to the system: it cannot be retired nor its values changed.",
         "CAT_PUBLISH_UNAVAILABLE": "Publishing is not configured on the server yet.",
         "CAT_PUBLISH_FAILED": "GitHub did not accept the publication. Try again in a few minutes.",
         "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
@@ -1114,7 +1097,7 @@
         "offline": "You seem to be offline.",
         "timeout": "The server took too long. Try again.",
         "unknown": "Something went wrong. Try again.",
-        "CAT_REFERENCE_INVALID": "The discipline, level, shipping class or brand does not exist or is retired.",
+        "CAT_REFERENCE_INVALID": "The discipline, the shipping class, the brand or a property does not exist or is retired.",
         "CAT_STOCK_BELOW_RESERVED": "Stock cannot drop below what pending orders have already reserved.",
         "MEDIA_UNSAFE_TYPE": "That image type is not accepted. Use a JPG, PNG or WebP photo.",
         "MEDIA_SIZE_EXCEEDED": "The photo is over 2 MB. Choose a smaller size.",

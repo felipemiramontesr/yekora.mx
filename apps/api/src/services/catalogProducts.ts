@@ -5,12 +5,12 @@
  * - Nothing is deleted: a product is retired with `is_active = 0` and an image leaves a gallery
  *   with `is_active = 0` (T2.3c). The SKU and the slug never change once created: orders and
  *   published URLs name them.
- * - Discipline, level, shipping class and brand must exist and be active
- *   (CAT_REFERENCE_INVALID); the stock never drops below what pending orders reserved
- *   (CAT_STOCK_BELOW_RESERVED, the CHECK of migration 003).
- * - T2.6: `products.experience_level_id` and the product's value of the system group Nivel move
- *   together. A new level relinks Nivel; a Nivel value among the facets sets the level; both
- *   given and different is CAT_VALIDATION_ERROR.
+ * - Discipline, shipping class and brand must exist and be active (CAT_REFERENCE_INVALID); the
+ *   stock never drops below what pending orders reserved (CAT_STOCK_BELOW_RESERVED, the CHECK of
+ *   migration 003).
+ * - A product's properties are the values of the groups it is linked to; each must belong to an
+ *   active group (CAT_REFERENCE_INVALID). There is no level (FC 048): it is not a field, nor a
+ *   group of its own.
  *
  * Every statement is static SQL with `?` placeholders (A03); lists of ids are walked one
  * statement at a time instead of building an `IN (…)`.
@@ -49,7 +49,6 @@ interface AdminProduct {
   stock: number;
   reservedStock: number;
   discipline: string;
-  level: string;
   brandId: number | null;
   shippingClass: string;
   weightGrams: number;
@@ -58,7 +57,7 @@ interface AdminProduct {
   heightMm: number;
   isActive: boolean;
   isTest: boolean;
-  /** Values of the ordinary facet groups (Nivel is `level`). */
+  /** Values of the product's properties. */
   facetValueIds: number[];
   gallery: GalleryImage[];
 }
@@ -72,7 +71,6 @@ interface ProductFields {
   priceMxnCents: number;
   stock: number;
   discipline: string;
-  level: string;
   brandId: number | null;
   shippingClass: string;
   weightGrams: number;
@@ -106,7 +104,6 @@ interface ProductRow {
   stock: number;
   reserved_stock: number;
   discipline: string;
-  level: string;
   brand_id: number | null;
   shipping_class: string;
   weight_grams: number;
@@ -133,7 +130,6 @@ const productOf = (
   stock: Number(row.stock),
   reservedStock: Number(row.reserved_stock),
   discipline: row.discipline,
-  level: row.level,
   brandId: row.brand_id === null ? null : Number(row.brand_id),
   shippingClass: row.shipping_class,
   weightGrams: Number(row.weight_grams),
@@ -161,7 +157,7 @@ export async function listAdminProducts(
     'SELECT COUNT(*) AS total FROM products'
   );
   const rows = await db.query<ProductRow>(
-    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
+    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
     [paging.pageSize, (paging.page - 1) * paging.pageSize]
   );
   return { items: rows.map((row) => productOf(row)), total: Number(total) };
@@ -173,7 +169,7 @@ async function productRow(
   id: number
 ): Promise<ProductRow | undefined> {
   const [row] = await tx.query<ProductRow>(
-    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, l.slug AS level, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN experience_levels l ON l.id = p.experience_level_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?',
+    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?',
     [id]
   );
   return row;
@@ -191,13 +187,13 @@ async function lockedProduct(
   return found ? productRow(tx, id) : undefined;
 }
 
-/** The product with its ordinary facet values and its active gallery. */
+/** The product with its property values and its active gallery. */
 async function fullProduct(
   tx: TxQuery,
   row: ProductRow
 ): Promise<AdminProduct> {
   const values = await tx.query<{ value_id: number }>(
-    'SELECT k.value_id FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0 ORDER BY k.value_id ASC',
+    'SELECT value_id FROM product_facet_links WHERE product_id = ? ORDER BY value_id ASC',
     [row.id]
   );
   const images = await tx.query<{
@@ -241,18 +237,11 @@ export async function readAdminProduct(
 /** Ids of the active references a product points to, or null when one is missing or retired. */
 async function references(
   tx: TxQuery,
-  fields: Pick<
-    ProductFields,
-    'discipline' | 'level' | 'shippingClass' | 'brandId'
-  >
-): Promise<{ category: number; level: number; shipping: number } | null> {
+  fields: Pick<ProductFields, 'discipline' | 'shippingClass' | 'brandId'>
+): Promise<{ category: number; shipping: number } | null> {
   const [category] = await tx.query<{ id: number }>(
     'SELECT id FROM categories WHERE slug = ? AND is_active = 1',
     [fields.discipline]
-  );
-  const [level] = await tx.query<{ id: number }>(
-    'SELECT id FROM experience_levels WHERE slug = ? AND is_active = 1',
-    [fields.level]
   );
   const [shipping] = await tx.query<{ id: number }>(
     'SELECT id FROM shipping_classes WHERE slug = ? AND is_active = 1',
@@ -266,68 +255,39 @@ async function references(
         [fields.brandId]
       )
     ).length === 1;
-  if (!category || !level || !shipping || !brandOk) return null;
-  return { category: category.id, level: level.id, shipping: shipping.id };
+  if (!category || !shipping || !brandOk) return null;
+  return { category: category.id, shipping: shipping.id };
 }
 
-/** The facet values asked for, split into ordinary ones and the Nivel code they may carry. */
-async function facetChoice(
+/** The property values asked for, once each; every one must belong to an active group. */
+async function checkedFacets(
   tx: TxQuery,
   ids: readonly number[]
-): Promise<
-  { ordinary: number[]; level: string | null } | 'CAT_REFERENCE_INVALID'
-> {
+): Promise<number[] | 'CAT_REFERENCE_INVALID'> {
   const unique = [...new Set(ids)];
   const found = await Promise.all(
     unique.map(async (id) => {
-      const [value] = await tx.query<{
-        code: string;
-        is_system: number;
-        is_active: number;
-      }>(
-        'SELECT v.code, g.is_system, g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?',
+      const [value] = await tx.query<{ is_active: number }>(
+        'SELECT g.is_active FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ?',
         [id]
       );
-      return { id, value };
+      return value;
     })
   );
-  if (found.some(({ value }) => !value || Number(value.is_active) !== 1))
+  if (found.some((value) => !value || Number(value.is_active) !== 1))
     return 'CAT_REFERENCE_INVALID';
-  const ordinary = found
-    .filter(({ value }) => Number(value.is_system) !== 1)
-    .map(({ id }) => id);
-  const level =
-    found.find(({ value }) => Number(value.is_system) === 1)?.value.code ??
-    null;
-  return { ordinary, level };
+  return unique;
 }
 
-/** T2.6: the product's Nivel value is exactly the one of its level. */
-async function relinkLevel(
-  tx: TxQuery,
-  productId: number,
-  level: string
-): Promise<void> {
-  await tx.query(
-    "DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 1 AND g.code = 'nivel'",
-    [productId]
-  );
-  await tx.query(
-    "INSERT INTO product_facet_links (product_id, value_id) SELECT ?, v.id FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE g.is_system = 1 AND g.code = 'nivel' AND v.code = ?",
-    [productId, level]
-  );
-}
-
-/** The product's ordinary facet values are exactly `ids`. */
+/** The product's property values are exactly `ids`. */
 async function relinkFacets(
   tx: TxQuery,
   productId: number,
   ids: readonly number[]
 ): Promise<void> {
-  await tx.query(
-    'DELETE k FROM product_facet_links k JOIN product_facet_values v ON v.id = k.value_id JOIN product_facet_groups g ON g.id = v.group_id WHERE k.product_id = ? AND g.is_system = 0',
-    [productId]
-  );
+  await tx.query('DELETE FROM product_facet_links WHERE product_id = ?', [
+    productId,
+  ]);
   // One connection runs these in order; Promise.all only stops waiting between them.
   await Promise.all(
     ids.map((id) =>
@@ -340,24 +300,10 @@ async function relinkFacets(
 }
 
 /**
- * The level a write ends with (T2.6): the one given, else the Nivel value among the facets,
- * else the current one; null when the two given disagree.
- */
-function settledLevel(
-  given: string | undefined,
-  fromFacets: string | null,
-  current: string
-): string | null {
-  if (given !== undefined && fromFacets !== null && given !== fromFacets)
-    return null;
-  return given ?? fromFacets ?? current;
-}
-
-/**
- * Creates a product (active), links its level's Nivel value and its facets.
+ * Creates a product (active) and links its property values.
  *
  * @param tx - The transaction of the request.
- * @param input - Every field, the SKU, the slug and the facet values.
+ * @param input - Every field, the SKU, the slug and the property values.
  * @returns The new product, or the refusal.
  * @throws The driver's ER_DUP_ENTRY when the SKU or the slug is taken.
  */
@@ -365,20 +311,17 @@ export async function createProduct(
   tx: TxQuery,
   input: ProductCreate
 ): Promise<Change<AdminProduct> | ProductRefusal> {
-  const facets = await facetChoice(tx, input.facetValueIds);
+  const facets = await checkedFacets(tx, input.facetValueIds);
   if (facets === 'CAT_REFERENCE_INVALID') return facets;
-  const level = settledLevel(input.level, facets.level, input.level);
-  if (level === null) return 'CAT_VALIDATION_ERROR';
   const refs = await references(tx, input);
   if (refs === null) return 'CAT_REFERENCE_INVALID';
   await tx.query(
-    'INSERT INTO products (sku, slug, category_id, brand_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       input.sku,
       input.slug,
       refs.category,
       input.brandId,
-      refs.level,
       input.nameEs,
       input.nameEn,
       input.descriptionEs,
@@ -396,15 +339,14 @@ export async function createProduct(
     'SELECT id FROM products WHERE sku = ?',
     [input.sku]
   );
-  await relinkLevel(tx, id, level);
-  await relinkFacets(tx, id, facets.ordinary);
+  await relinkFacets(tx, id, facets);
   const row = (await productRow(tx, id)) as ProductRow;
   return { before: null, after: await fullProduct(tx, row) };
 }
 
 /**
- * Edits or retires a product; the SKU and the slug stay. A new level relinks Nivel (T2.6); a
- * facet list replaces the product's ordinary values.
+ * Edits or retires a product; the SKU and the slug stay. A list of property values replaces the
+ * product's own.
  *
  * @param tx - The transaction of the request.
  * @param id - The product.
@@ -419,26 +361,22 @@ export async function updateProduct(
   const row = await lockedProduct(tx, id);
   if (!row) return 'CAT_NOT_FOUND';
   const before = await fullProduct(tx, row);
-  const facets = await facetChoice(tx, patch.facetValueIds ?? []);
+  const facets = await checkedFacets(tx, patch.facetValueIds ?? []);
   if (facets === 'CAT_REFERENCE_INVALID') return facets;
-  const level = settledLevel(patch.level, facets.level, before.level);
-  if (level === null) return 'CAT_VALIDATION_ERROR';
   const { facetValueIds, isActive, ...fields } = patch;
   const next = {
     ...before,
     ...fields,
-    level,
     isActive: isActive ?? before.isActive,
   };
   if (next.stock < before.reservedStock) return 'CAT_STOCK_BELOW_RESERVED';
   const refs = await references(tx, next);
   if (refs === null) return 'CAT_REFERENCE_INVALID';
   await tx.query(
-    'UPDATE products SET category_id = ?, brand_id = ?, experience_level_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?',
+    'UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?',
     [
       refs.category,
       next.brandId,
-      refs.level,
       next.nameEs,
       next.nameEn,
       next.descriptionEs,
@@ -454,8 +392,7 @@ export async function updateProduct(
       id,
     ]
   );
-  if (level !== before.level) await relinkLevel(tx, id, level);
-  if (facetValueIds !== undefined) await relinkFacets(tx, id, facets.ordinary);
+  if (facetValueIds !== undefined) await relinkFacets(tx, id, facets);
   const after = await fullProduct(tx, (await productRow(tx, id)) as ProductRow);
   return { before, after };
 }

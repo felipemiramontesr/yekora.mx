@@ -14,7 +14,6 @@ interface FixtureProduct {
   name: string;
   description: string;
   discipline: string;
-  level: string;
   priceMxnCents: number;
 }
 
@@ -87,7 +86,7 @@ export function e2eStackSeed(fixture: E2eFixture): SeedStatement[] {
     if (en === undefined) throw new Error(`${es.sku} has no English entry`);
     if (stock === undefined) throw new Error(`${es.sku} has no E2E stock`);
     statements.push({
-      sql: "INSERT INTO products (sku, slug, category_id, experience_level_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) SELECT ?, ?, c.id, l.id, ?, ?, ?, ?, ?, ?, 1000, 400, 300, 200, k.id FROM categories c JOIN experience_levels l ON l.slug = ? JOIN shipping_classes k ON k.slug = 'estandar' WHERE c.slug = ? ON DUPLICATE KEY UPDATE stock = VALUES(stock), reserved_stock = 0, price_mxn_cents = VALUES(price_mxn_cents), is_active = 1",
+      sql: "INSERT INTO products (sku, slug, category_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) SELECT ?, ?, c.id, ?, ?, ?, ?, ?, ?, 1000, 400, 300, 200, k.id FROM categories c JOIN shipping_classes k ON k.slug = 'estandar' WHERE c.slug = ? ON DUPLICATE KEY UPDATE stock = VALUES(stock), reserved_stock = 0, price_mxn_cents = VALUES(price_mxn_cents), is_active = 1",
       params: [
         es.sku,
         es.slug,
@@ -97,7 +96,6 @@ export function e2eStackSeed(fixture: E2eFixture): SeedStatement[] {
         en.description,
         es.priceMxnCents,
         stock,
-        es.level,
         es.discipline,
       ],
     });

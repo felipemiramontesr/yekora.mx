@@ -54,8 +54,8 @@ const tables = {
   groups: [] as Record<string, unknown>[],
 };
 
-/** A facet group row; Nivel is the system group of migration 006. */
-const groupRow = (id: number, code: string, isSystem: number) => ({
+/** A group-of-properties row (FC 048: no group is a system one). */
+const groupRow = (id: number, code: string) => ({
   id,
   code,
   name_es: code,
@@ -64,7 +64,6 @@ const groupRow = (id: number, code: string, isSystem: number) => ({
   is_ordered: 0,
   is_filterable: 1,
   show_on_landing: 0,
-  is_system: isSystem,
   is_active: 1,
   sort_order: id,
 });
@@ -176,16 +175,30 @@ const HANDLERS: [string, Handler][] = [
     },
   ],
   [
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id',
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE id',
     (p) => tables.groups.filter((g) => g.id === p[0]),
   ],
   [
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER',
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups ORDER',
     () => tables.groups,
   ],
+  ['INSERT INTO product_facet_values', () => []],
   [
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code',
-    (p) => [groupRow(3, p[0] as string, 0)],
+    'SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id',
+    (p) => [
+      {
+        id: 40,
+        group_id: p[0],
+        code: p[1],
+        value_es: 'Leyenda',
+        value_en: 'Legend',
+        sort_order: 0,
+      },
+    ],
+  ],
+  [
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE code',
+    (p) => [groupRow(3, p[0] as string)],
   ],
 ];
 
@@ -235,7 +248,7 @@ beforeEach(() => {
   tables.keys.clear();
   tables.audit.length = 0;
   tables.brands.length = 0;
-  tables.groups = [groupRow(1, 'nivel', 1), groupRow(2, 'material', 0)];
+  tables.groups = [groupRow(1, 'color'), groupRow(2, 'material')];
 });
 
 /** Uploads bytes as the editor (or another session), with a key unless told otherwise. */
@@ -587,33 +600,35 @@ describe('brands and facets (FC 029 F2b, through the mutation pipeline)', () => 
     expect(tables.keys.size).toBe(0);
   });
 
-  it('T2.1b: refuses to retire the system group Nivel with 409 CAT_SYSTEM_GROUP_LOCKED', async () => {
+  it('retires any group: none is locked (FC 048), and the change is audited', async () => {
     const res = await write('PATCH', '/v1/admin/catalog/facet-groups/1', {
       isActive: false,
     });
-    expect(res.statusCode).toBe(409);
-    expect(res.json()).toMatchObject({ detail: 'CAT_SYSTEM_GROUP_LOCKED' });
-    expect(auditOf('facet_groups')).toHaveLength(0);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ code: 'color' });
+    expect(auditOf('facet_groups')).toHaveLength(1);
   });
 
-  it('creates a facet group (201); adds no value to Nivel; answers an unknown value 404', async () => {
+  it('creates a facet group (201) with no system flag, and answers an unknown value 404', async () => {
     const group = await write('POST', '/v1/admin/catalog/facet-groups', {
       code: 'peso',
       nameEs: 'Peso',
       nameEn: 'Weight',
     });
     expect(group.statusCode).toBe(201);
-    expect(group.json()).toMatchObject({ code: 'peso', isSystem: false });
-    const onNivel = await write(
+    expect(group.json()).toMatchObject({ code: 'peso' });
+    expect(group.json()).not.toHaveProperty('isSystem');
+    // Any group takes a value (FC 048: «Nivel» no longer locks one).
+    const onColor = await write(
       'POST',
       '/v1/admin/catalog/facet-groups/1/values',
-      {
-        code: 'leyenda',
-        valueEs: 'Leyenda',
-        valueEn: 'Legend',
-      }
+      { code: 'leyenda', valueEs: 'Leyenda', valueEn: 'Legend' }
     );
-    expect(onNivel.json()).toMatchObject({ detail: 'CAT_SYSTEM_GROUP_LOCKED' });
+    expect(onColor.statusCode).toBe(201);
+    expect(onColor.json()).toMatchObject({
+      code: 'leyenda',
+      valueEn: 'Legend',
+    });
     const value = await write('PATCH', '/v1/admin/catalog/facet-values/77', {
       valueEs: 'X',
     });
@@ -626,7 +641,7 @@ describe('brands and facets (FC 029 F2b, through the mutation pipeline)', () => 
       headers: { cookie: session('e') },
     });
     expect(res.json().map((g: { code: string }) => g.code)).toEqual([
-      'nivel',
+      'color',
       'material',
     ]);
   });

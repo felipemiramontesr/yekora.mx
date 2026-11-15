@@ -2,10 +2,10 @@
  * Catalog backoffice data (FC 029 F2b): brands and facets, read and written by the routes of
  * `/v1/admin/catalog/*` inside the transaction of their Idempotency-Key.
  *
- * Nothing here deletes: a brand or a facet group is retired with `is_active = 0` (T2.3c). The
- * system group Nivel mirrors `experience_levels` (T2.6), so it can never be retired (T2.1b, also
- * a CHECK of migration 006) and its values are not edited by hand. Every write returns the state
- * before and after, which the route records in `audit_log` (T2.4).
+ * Nothing here deletes: a brand or a group of product properties is retired with `is_active = 0`
+ * (T2.3c). No group is locked (FC 048: «Nivel» and the flag of system groups are gone), so any can
+ * be retired and its values edited. Every write returns the state before and after, which the
+ * route records in `audit_log` (T2.4).
  *
  * @module
  */
@@ -39,7 +39,6 @@ interface FacetGroup {
   isOrdered: boolean;
   isFilterable: boolean;
   showOnLanding: boolean;
-  isSystem: boolean;
   isActive: boolean;
   sortOrder: number;
   values: FacetValue[];
@@ -64,7 +63,7 @@ export interface Change<T> {
 }
 
 /** Why a write was refused. */
-export type CatalogRefusal = 'CAT_NOT_FOUND' | 'CAT_SYSTEM_GROUP_LOCKED';
+export type CatalogRefusal = 'CAT_NOT_FOUND';
 
 /* ---------- brands ---------- */
 
@@ -163,7 +162,6 @@ interface GroupRow {
   is_ordered: number;
   is_filterable: number;
   show_on_landing: number;
-  is_system: number;
   is_active: number;
   sort_order: number;
 }
@@ -188,7 +186,6 @@ const groupOf = (row: GroupRow, values: FacetValue[] = []): FacetGroup => ({
   isOrdered: flag(row.is_ordered),
   isFilterable: flag(row.is_filterable),
   showOnLanding: flag(row.show_on_landing),
-  isSystem: flag(row.is_system),
   isActive: flag(row.is_active),
   sortOrder: Number(row.sort_order),
   values,
@@ -210,7 +207,7 @@ const valueOf = (row: ValueRow): FacetValue => ({
  */
 export async function listFacets(db: Db): Promise<FacetGroup[]> {
   const groups = await db.query<GroupRow>(
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC'
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups ORDER BY sort_order ASC, id ASC'
   );
   const values = await db.query<ValueRow>(
     'SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values ORDER BY sort_order ASC, id ASC'
@@ -227,7 +224,7 @@ export async function listFacets(db: Db): Promise<FacetGroup[]> {
 
 async function lockGroup(tx: TxQuery, id: number): Promise<FacetGroup | null> {
   const [row] = await tx.query<GroupRow>(
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE',
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE',
     [id]
   );
   return row ? groupOf(row) : null;
@@ -259,20 +256,19 @@ export async function createFacetGroup(
     ]
   );
   const [row] = await tx.query<GroupRow>(
-    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_system, is_active, sort_order FROM product_facet_groups WHERE code = ?',
+    'SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE code = ?',
     [input.code]
   );
   return { before: null, after: groupOf(row) };
 }
 
 /**
- * Edits or retires a facet group; its code never changes. The system group may be renamed and
- * reordered, never retired (T2.1b).
+ * Edits or retires a group of properties; its code never changes.
  *
  * @param tx - The transaction of the request.
  * @param id - The group.
  * @param patch - The fields to change.
- * @returns The change, CAT_NOT_FOUND, or CAT_SYSTEM_GROUP_LOCKED.
+ * @returns The change, or CAT_NOT_FOUND.
  */
 export async function updateFacetGroup(
   tx: TxQuery,
@@ -281,8 +277,6 @@ export async function updateFacetGroup(
 ): Promise<Change<FacetGroup> | CatalogRefusal> {
   const before = await lockGroup(tx, id);
   if (before === null) return 'CAT_NOT_FOUND';
-  if (before.isSystem && patch.isActive === false)
-    return 'CAT_SYSTEM_GROUP_LOCKED';
   const after = { ...before, ...patch };
   await tx.query(
     'UPDATE product_facet_groups SET name_es = ?, name_en = ?, is_required = ?, is_ordered = ?, is_filterable = ?, show_on_landing = ?, is_active = ?, sort_order = ? WHERE id = ?',
@@ -302,13 +296,12 @@ export async function updateFacetGroup(
 }
 
 /**
- * Adds a value to a group. The system group's values mirror `experience_levels` (T2.6), so
- * they are never added by hand.
+ * Adds a value to a group.
  *
  * @param tx - The transaction of the request.
  * @param groupId - The group.
  * @param input - Code, labels and order.
- * @returns The new value, CAT_NOT_FOUND, or CAT_SYSTEM_GROUP_LOCKED.
+ * @returns The new value, or CAT_NOT_FOUND.
  * @throws The driver's ER_DUP_ENTRY when the group already has that code.
  */
 export async function createFacetValue(
@@ -318,7 +311,6 @@ export async function createFacetValue(
 ): Promise<Change<FacetValue> | CatalogRefusal> {
   const group = await lockGroup(tx, groupId);
   if (group === null) return 'CAT_NOT_FOUND';
-  if (group.isSystem) return 'CAT_SYSTEM_GROUP_LOCKED';
   await tx.query(
     'INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)',
     [groupId, input.code, input.valueEs, input.valueEn, input.sortOrder]
@@ -331,25 +323,23 @@ export async function createFacetValue(
 }
 
 /**
- * Relabels or reorders a value; its code never changes. A value of the system group is
- * locked, like its group's values.
+ * Relabels or reorders a value; its code never changes.
  *
  * @param tx - The transaction of the request.
  * @param id - The value.
  * @param patch - The fields to change.
- * @returns The change, CAT_NOT_FOUND, or CAT_SYSTEM_GROUP_LOCKED.
+ * @returns The change, or CAT_NOT_FOUND.
  */
 export async function updateFacetValue(
   tx: TxQuery,
   id: number,
   patch: Partial<Pick<FacetValue, 'valueEs' | 'valueEn' | 'sortOrder'>>
 ): Promise<Change<FacetValue> | CatalogRefusal> {
-  const [row] = await tx.query<ValueRow & { is_system: number }>(
-    'SELECT v.id, v.group_id, v.code, v.value_es, v.value_en, v.sort_order, g.is_system FROM product_facet_values v JOIN product_facet_groups g ON g.id = v.group_id WHERE v.id = ? FOR UPDATE',
+  const [row] = await tx.query<ValueRow>(
+    'SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE id = ? FOR UPDATE',
     [id]
   );
   if (!row) return 'CAT_NOT_FOUND';
-  if (flag(row.is_system)) return 'CAT_SYSTEM_GROUP_LOCKED';
   const before = valueOf(row);
   const after = { ...before, ...patch };
   await tx.query(

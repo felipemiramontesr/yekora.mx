@@ -13,12 +13,26 @@
         "description": "Producto ficticio de la suite E2E. Nunca se publica.",
         "discipline": "escalada",
         "disciplineName": "Escalada",
-        "level": "avanzado",
-        "levelName": "Avanzado",
         "priceMxnCents": 485000,
         "priceUsdCents": 26216,
         "inStock": true,
-        "images": []
+        "images": [],
+        "properties": [
+          {
+            "groupCode": "material",
+            "groupName": "Material",
+            "valueCode": "nylon",
+            "valueName": "Nailon",
+            "isFilterable": true
+          },
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "rojo",
+            "valueName": "Rojo",
+            "isFilterable": true
+          }
+        ]
       },
       {
         "sku": "E2E-0002",
@@ -27,12 +41,26 @@
         "description": "Producto ficticio de la suite E2E. Nunca se publica.",
         "discipline": "senderismo",
         "disciplineName": "Senderismo",
-        "level": "principiante",
-        "levelName": "Principiante",
         "priceMxnCents": 185000,
         "priceUsdCents": 10000,
         "inStock": true,
-        "images": []
+        "images": [],
+        "properties": [
+          {
+            "groupCode": "material",
+            "groupName": "Material",
+            "valueCode": "nylon",
+            "valueName": "Nailon",
+            "isFilterable": true
+          },
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "azul",
+            "valueName": "Azul",
+            "isFilterable": true
+          }
+        ]
       },
       {
         "sku": "E2E-0003",
@@ -41,14 +69,21 @@
         "description": "Producto ficticio de la suite E2E. Nunca se publica.",
         "discipline": "trail-running",
         "disciplineName": "Trail running",
-        "level": "intermedio",
-        "levelName": "Intermedio",
         "priceMxnCents": 259900,
         "priceUsdCents": 14049,
         "inStock": false,
         "images": [],
         "brand": "marca-e2e",
-        "brandName": "Marca E2E"
+        "brandName": "Marca E2E",
+        "properties": [
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "rojo",
+            "valueName": "Rojo",
+            "isFilterable": true
+          }
+        ]
       }
     ],
     "en": [
@@ -59,12 +94,26 @@
         "description": "Fictitious product of the E2E suite. Never published.",
         "discipline": "escalada",
         "disciplineName": "Climbing",
-        "level": "avanzado",
-        "levelName": "Advanced",
         "priceMxnCents": 485000,
         "priceUsdCents": 26216,
         "inStock": true,
-        "images": []
+        "images": [],
+        "properties": [
+          {
+            "groupCode": "material",
+            "groupName": "Material",
+            "valueCode": "nylon",
+            "valueName": "Nylon",
+            "isFilterable": true
+          },
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "rojo",
+            "valueName": "Red",
+            "isFilterable": true
+          }
+        ]
       },
       {
         "sku": "E2E-0002",
@@ -73,12 +122,26 @@
         "description": "Fictitious product of the E2E suite. Never published.",
         "discipline": "senderismo",
         "disciplineName": "Hiking",
-        "level": "principiante",
-        "levelName": "Beginner",
         "priceMxnCents": 185000,
         "priceUsdCents": 10000,
         "inStock": true,
-        "images": []
+        "images": [],
+        "properties": [
+          {
+            "groupCode": "material",
+            "groupName": "Material",
+            "valueCode": "nylon",
+            "valueName": "Nylon",
+            "isFilterable": true
+          },
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "azul",
+            "valueName": "Blue",
+            "isFilterable": true
+          }
+        ]
       },
       {
         "sku": "E2E-0003",
@@ -87,14 +150,21 @@
         "description": "Fictitious product of the E2E suite. Never published.",
         "discipline": "trail-running",
         "disciplineName": "Trail running",
-        "level": "intermedio",
-        "levelName": "Intermediate",
         "priceMxnCents": 259900,
         "priceUsdCents": 14049,
         "inStock": false,
         "images": [],
         "brand": "marca-e2e",
-        "brandName": "Marca E2E"
+        "brandName": "Marca E2E",
+        "properties": [
+          {
+            "groupCode": "color",
+            "groupName": "Color",
+            "valueCode": "rojo",
+            "valueName": "Red",
+            "isFilterable": true
+          }
+        ]
       }
     ]
   }

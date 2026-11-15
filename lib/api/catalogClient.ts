@@ -34,11 +34,24 @@ const itemSchema = z.object({
   description: z.string(),
   discipline: slug,
   disciplineName: z.string().min(1),
-  level: slug,
-  levelName: z.string().min(1),
   /** Its active brand (FC 047), or null; a snapshot made before this field existed has none. */
   brand: slug.nullable().default(null),
   brandName: z.string().min(1).nullable().default(null),
+  /**
+   * Its properties (FC 048): the values of its active groups, in the language of the read. A
+   * snapshot made before this field existed has none.
+   */
+  properties: z
+    .array(
+      z.object({
+        groupCode: slug,
+        groupName: z.string().min(1),
+        valueCode: slug,
+        valueName: z.string().min(1),
+        isFilterable: z.boolean(),
+      })
+    )
+    .default([]),
   priceMxnCents: z.number().int().positive(),
   priceUsdCents: z.number().int().nonnegative().nullable(),
   inStock: z.boolean(),

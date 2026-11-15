@@ -39,7 +39,6 @@ describe('e2eStackSeed (FC 026 T1.3)', () => {
       'Fictitious product of the E2E suite. Never published.',
       185000,
       2,
-      'principiante',
       'senderismo',
     ]);
   });

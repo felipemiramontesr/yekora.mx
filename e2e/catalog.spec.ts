@@ -72,7 +72,7 @@ test('the English catalog adds the USD reference with its Banxico FIX', async ({
   );
 });
 
-test('filters by discipline and level, sorts by price and recovers from an empty result', async ({
+test('filters by discipline, sorts by price and recovers from an empty search', async ({
   page,
 }) => {
   await page.goto('/catalogo/');
@@ -83,7 +83,9 @@ test('filters by discipline and level, sorts by price and recovers from an empty
     '1 producto'
   );
 
-  await filter(page, 'Nivel').selectOption({ label: 'Principiante' });
+  // There is no level filter any more (FC 048); an empty result now comes from a search.
+  await expect(page.getByLabel('Nivel')).toHaveCount(0);
+  await page.goto('/catalogo/?q=zzzz');
   await expect(page.getByText('Ningún producto coincide')).toBeVisible();
   await page.getByRole('button', { name: 'Quitar filtros' }).click();
   await expect(cards(page)).toHaveCount(3);
@@ -124,7 +126,10 @@ test('a card opens its product page, which switches language and leads back', as
     'Arnés alpino (prueba E2E)'
   );
   await expect(page.locator('main')).toContainText('Escalada');
-  await expect(page.locator('main')).toContainText('Avanzado');
+  // Its properties, as the store set them (FC 048): «group: value», and no level.
+  await expect(page.locator('main')).toContainText('Material:');
+  await expect(page.locator('main')).toContainText('Nailon');
+  await expect(page.locator('main')).not.toContainText('Nivel');
   await expect(page.locator('main')).toContainText('Disponible');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findProduct,
   findProductMedia,
+  findProductProperties,
   listProducts,
   type ProductRow,
 } from './catalog';
@@ -19,9 +20,6 @@ const tent: ProductRow = {
   discipline: 'montana',
   discipline_name_es: 'Montaña',
   discipline_name_en: 'Mountaineering',
-  level: 'expedicion',
-  level_name_es: 'Expedición',
-  level_name_en: 'Expedition',
   brand: 'cumbre',
   brand_name: 'Cumbre',
 };
@@ -45,30 +43,31 @@ describe('listProducts', () => {
     const { db, calls } = scriptedDb([{ total: '7' }], [tent]);
     const page = await listProducts(db, {
       discipline: 'montana',
-      level: null,
       sort: 'price_desc',
       lang: 'en',
       page: 3,
       pageSize: 2,
     });
     expect(page).toEqual({ items: [tent], total: 7 });
-    expect(calls[0].params).toEqual(['montana', 'montana', null, null]);
+    expect(calls[0].params).toEqual(['montana', 'montana']);
     expect(calls[1].params).toEqual([
       'montana',
       'montana',
-      null,
-      null,
       'price_desc',
       'price_desc',
       'en',
       2,
       4,
     ]);
+    // Every placeholder has its parameter: a statement that names a missing one would only fail
+    // on a real database.
+    for (const { sql, params } of calls) {
+      expect(sql.split('?').length - 1).toBe(params.length);
+    }
     for (const { sql } of calls) {
       expect(sql).not.toContain('montana');
-      expect(sql).toContain(
-        'p.is_active = 1 AND c.is_active = 1 AND l.is_active = 1'
-      );
+      expect(sql).toContain('p.is_active = 1 AND c.is_active = 1');
+      expect(sql).not.toContain('experience_levels');
     }
   });
 
@@ -77,7 +76,6 @@ describe('listProducts', () => {
     await expect(
       listProducts(db, {
         discipline: null,
-        level: null,
         sort: 'name',
         lang: 'es-MX',
         page: 1,
@@ -115,6 +113,30 @@ describe('findProduct', () => {
     const { db, calls } = scriptedDb([]);
     await expect(findProduct(db, 'no-existe')).resolves.toBeNull();
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('findProductProperties (FC 048 T0.2)', () => {
+  it('reads the values of the active groups, in the order the store set, slug bound as a parameter', async () => {
+    const row = {
+      group_code: 'material',
+      group_name_es: 'Material',
+      group_name_en: 'Material',
+      is_filterable: 1,
+      value_code: 'nylon',
+      value_es: 'Nailon',
+      value_en: 'Nylon',
+    };
+    const { db, calls } = scriptedDb([row]);
+    await expect(
+      findProductProperties(db, 'tienda-expedicion')
+    ).resolves.toEqual([row]);
+    expect(calls[0].params).toEqual(['tienda-expedicion']);
+    expect(calls[0].sql).toContain('g.is_active = 1');
+    expect(calls[0].sql).toContain(
+      'ORDER BY g.sort_order ASC, g.id ASC, v.sort_order ASC, v.id ASC'
+    );
+    expect(calls[0].sql).not.toContain('experience_levels');
   });
 });
 
