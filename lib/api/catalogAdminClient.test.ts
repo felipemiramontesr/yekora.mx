@@ -192,14 +192,14 @@ describe('facet console client (FC 029 F3b)', () => {
     }
   });
 
-  it('names the refusal of the system group', async () => {
+  it('no longer names a lock on any group (FC 048 T2.1): a refusal it does not know reads as unknown', async () => {
     await expect(
       updateFacetGroup(
         1,
         { isActive: false },
         answering(409, { detail: 'CAT_SYSTEM_GROUP_LOCKED' })
       )
-    ).resolves.toEqual({ ok: false, reason: 'CAT_SYSTEM_GROUP_LOCKED' });
+    ).resolves.toEqual({ ok: false, reason: 'unknown' });
   });
 
   it('uses the global fetch by default', async () => {
