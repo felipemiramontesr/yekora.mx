@@ -99350,12 +99350,25 @@ var fields = {
   widthMm: positive,
   heightMm: positive
 };
+var altText = external_exports.string().trim().max(255).nullable().default(null);
+var MAX_GALLERY_PHOTOS = 5;
+var galleryImages = external_exports.array(
+  external_exports.strictObject({
+    sha256: external_exports.string().regex(SHA256_HEX),
+    altEs: altText,
+    altEn: altText
+  })
+).min(1).max(MAX_GALLERY_PHOTOS).refine(
+  (images) => new Set(images.map((image) => image.sha256)).size === images.length,
+  "An image appears twice"
+);
 var productCreate = external_exports.strictObject({
   sku: external_exports.string().regex(/^[A-Z0-9][A-Z0-9-]{0,63}$/).max(64),
   slug: productSlug(160),
   ...fields,
   brandId: fields.brandId.default(null),
-  facetValueIds: facetIds.default([])
+  facetValueIds: facetIds.default([]),
+  images: galleryImages
 });
 var productPatch = external_exports.strictObject({
   ...Object.fromEntries(
@@ -99364,19 +99377,7 @@ var productPatch = external_exports.strictObject({
   isActive: external_exports.boolean().optional(),
   facetValueIds: facetIds.optional()
 });
-var altText = external_exports.string().trim().max(255).nullable().default(null);
-var galleryPatch = external_exports.strictObject({
-  images: external_exports.array(
-    external_exports.strictObject({
-      sha256: external_exports.string().regex(SHA256_HEX),
-      altEs: altText,
-      altEn: altText
-    })
-  ).max(12).refine(
-    (images) => new Set(images.map((image) => image.sha256)).size === images.length,
-    "An image appears twice"
-  )
-});
+var galleryPatch = external_exports.strictObject({ images: galleryImages });
 var productListQuery = external_exports.object({
   page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
   pageSize: external_exports.coerce.number().int().min(1).max(100).default(50)
@@ -103104,7 +103105,8 @@ async function listAdminProducts(db, paging2) {
     "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
     [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
   );
-  return { items: rows.map((row2) => productOf(row2)), total: Number(total) };
+  const items = await Promise.all(rows.map((row2) => fullProduct(db, row2)));
+  return { items, total: Number(total) };
 }
 async function productRow(tx, id) {
   const [row2] = await tx.query(
@@ -103193,7 +103195,8 @@ async function createProduct(tx, input2) {
   const facets = await checkedFacets(tx, input2.facetValueIds);
   if (facets === "CAT_REFERENCE_INVALID") return facets;
   const refs = await references(tx, input2);
-  if (refs === null) return "CAT_REFERENCE_INVALID";
+  if (refs === null || !await checkedBlobs(tx, input2.images))
+    return "CAT_REFERENCE_INVALID";
   await tx.query(
     "INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
@@ -103219,6 +103222,9 @@ async function createProduct(tx, input2) {
     [input2.sku]
   );
   await relinkFacets(tx, id, facets);
+  await Promise.all(
+    input2.images.map((image, index) => placeImage(tx, id, image, index))
+  );
   const row2 = await productRow(tx, id);
   return { before: null, after: await fullProduct(tx, row2) };
 }
@@ -103261,6 +103267,17 @@ async function updateProduct(tx, id, patch) {
   const after = await fullProduct(tx, await productRow(tx, id));
   return { before, after };
 }
+async function checkedBlobs(tx, images) {
+  const blobs = await Promise.all(
+    images.map(
+      (image) => tx.query(
+        "SELECT sha256 FROM media_blobs WHERE sha256 = ?",
+        [image.sha256]
+      )
+    )
+  );
+  return blobs.every((rows) => rows.length > 0);
+}
 async function placeImage(tx, productId, image, index) {
   const values = [image.altEs, image.altEn, index, index === 0 ? 1 : 0];
   const [existing] = await tx.query(
@@ -103282,15 +103299,7 @@ async function placeImage(tx, productId, image, index) {
 async function replaceGallery(tx, id, images) {
   const row2 = await lockedProduct(tx, id);
   if (!row2) return "CAT_NOT_FOUND";
-  const blobs = await Promise.all(
-    images.map(
-      (image) => tx.query(
-        "SELECT sha256 FROM media_blobs WHERE sha256 = ?",
-        [image.sha256]
-      )
-    )
-  );
-  if (blobs.some((rows) => rows.length === 0)) return "CAT_REFERENCE_INVALID";
+  if (!await checkedBlobs(tx, images)) return "CAT_REFERENCE_INVALID";
   const before = await fullProduct(tx, row2);
   await tx.query(
     "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
@@ -117821,7 +117830,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "3e003e673e6cf72ed12c2823563a4e18bdd54247" : void 0;
+var sha = true ? "8875a40965a147ed48806e71ba5c4483ac43133a" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
