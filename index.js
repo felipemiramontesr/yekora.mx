@@ -53637,7 +53637,7 @@ var require_parse_url = __commonJS({
 var require_form_data = __commonJS({
   "../../node_modules/light-my-request/lib/form-data.js"(exports2, module2) {
     "use strict";
-    var { randomUUID: randomUUID3 } = require("node:crypto");
+    var { randomUUID: randomUUID4 } = require("node:crypto");
     var { Readable } = require("node:stream");
     var textEncoder;
     function isFormDataLike(payload) {
@@ -53645,7 +53645,7 @@ var require_form_data = __commonJS({
     }
     function formDataToStream(formdata) {
       textEncoder = textEncoder ?? new TextEncoder();
-      const boundary = `----formdata-${randomUUID3()}`;
+      const boundary = `----formdata-${randomUUID4()}`;
       const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
       const escape2 = (str) => str.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
@@ -99606,6 +99606,11 @@ var checkoutRequestSchema = external_exports.strictObject({
   customer: customerSchema,
   address: shippingAddressSchema,
   privacyConsent: external_exports.boolean(),
+  /**
+   * A signed-in buyer who typed a new address asks to keep it in their book of addresses (FC 051
+   * T1.4). Ignored for a guest and when the account already holds five.
+   */
+  saveAddress: external_exports.boolean().optional(),
   /** Total with shipping the buyer saw, MXN cents: compared, never charged. */
   expectedTotalMxnCents: external_exports.number().int().nonnegative()
 });
@@ -99643,6 +99648,100 @@ var CHECKOUT_RETURN_PATHS = {
   "es-MX": { success: "/checkout/exito/", cancel: "/checkout/cancelado/" },
   en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
 };
+
+// ../../lib/cart/postalRanges.ts
+var RANGES = [
+  [1, 16, "CMX"],
+  [20, 20, "AGU"],
+  [21, 22, "BCN"],
+  [23, 23, "BCS"],
+  [24, 24, "CAM"],
+  [25, 27, "COA"],
+  [28, 28, "COL"],
+  [29, 30, "CHP"],
+  [31, 33, "CHH"],
+  [34, 35, "DUR"],
+  [36, 38, "GUA"],
+  [39, 41, "GRO"],
+  [42, 43, "HID"],
+  [44, 49, "JAL"],
+  [50, 57, "MEX"],
+  [58, 61, "MIC"],
+  [62, 62, "MOR"],
+  [63, 63, "NAY"],
+  [64, 67, "NLE"],
+  [68, 71, "OAX"],
+  [72, 75, "PUE"],
+  [76, 76, "QUE"],
+  [77, 77, "ROO"],
+  [78, 79, "SLP"],
+  [80, 82, "SIN"],
+  [83, 85, "SON"],
+  [86, 86, "TAB"],
+  [87, 89, "TAM"],
+  [90, 90, "TLA"],
+  [91, 96, "VER"],
+  [97, 97, "YUC"],
+  [98, 99, "ZAC"]
+];
+var POSTAL_CODE = /^\d{5}$/;
+function stateOfPostalCode(postalCode) {
+  if (!POSTAL_CODE.test(postalCode)) return null;
+  const prefix = Number(postalCode.slice(0, 2));
+  const hit = RANGES.find(([from, to]) => prefix >= from && prefix <= to);
+  return hit ? hit[2] : null;
+}
+
+// ../../lib/account/addressTypes.ts
+var MAX_USER_ADDRESSES = 5;
+var profileUpdateRequestSchema = external_exports.strictObject({
+  fullName: external_exports.string().trim().min(2).max(150),
+  phone: customerSchema.shape.phone
+});
+var profileUpdatedSchema = external_exports.object({ fullName: external_exports.string() });
+var addressFields = shippingAddressSchema.extend({
+  name: customerSchema.shape.name,
+  phone: customerSchema.shape.phone,
+  /** What the person calls it («Casa», «Oficina»). */
+  label: external_exports.string().trim().min(1).max(40).optional()
+});
+var addressContentSchema = external_exports.union([
+  addressFields,
+  external_exports.strictObject({ postalCode: addressFields.shape.postalCode })
+]);
+var stateMatches = (address) => stateOfPostalCode(address.postalCode) === address.stateCode;
+var addressUpsertRequestSchema = addressFields.extend({ isDefault: external_exports.boolean().optional() }).refine(stateMatches, "The state does not match the postal code");
+var addressPatchRequestSchema = external_exports.union([
+  addressUpsertRequestSchema,
+  external_exports.strictObject({ isDefault: external_exports.literal(true) })
+]);
+var addressParams = external_exports.object({ id: external_exports.uuid() });
+var addressViewSchema = external_exports.object({
+  id: external_exports.uuid(),
+  isDefault: external_exports.boolean(),
+  /** Whether it can ship an order; the one given at sign-up cannot until it is completed. */
+  isComplete: external_exports.boolean(),
+  stateCode: external_exports.string(),
+  postalCode: external_exports.string().regex(/^\d{5}$/),
+  label: external_exports.string().nullable(),
+  name: external_exports.string().nullable(),
+  phone: external_exports.string().nullable(),
+  street: external_exports.string().nullable(),
+  exteriorNumber: external_exports.string().nullable(),
+  interiorNumber: external_exports.string().nullable(),
+  neighborhood: external_exports.string().nullable(),
+  municipality: external_exports.string().nullable(),
+  references: external_exports.string().nullable()
+});
+var addressListSchema = external_exports.object({
+  items: external_exports.array(addressViewSchema),
+  max: external_exports.number().int().positive()
+});
+var addressSavedSchema = external_exports.object({
+  id: external_exports.uuid(),
+  isDefault: external_exports.boolean(),
+  isComplete: external_exports.boolean()
+});
 
 // ../../lib/account/authTypes.ts
 var emailField = external_exports.string().trim().pipe(external_exports.email().max(255));
@@ -99724,8 +99823,15 @@ var meResponseSchema = external_exports.object({
   fullName: external_exports.string(),
   roles: external_exports.array(external_exports.string()),
   permissions: external_exports.array(external_exports.string()),
-  /** The delivery postal code of the account, only ever given back to its holder (FC 047 T2.3). */
-  postalCode: external_exports.string().regex(/^\d{5}$/).nullish()
+  /**
+   * The postal code of the default delivery address of the account, only ever given back to its
+   * holder (FC 047 T2.3, FC 051): there is no postal code of the account besides the address.
+   */
+  postalCode: external_exports.string().regex(/^\d{5}$/).nullish(),
+  /** The state of that default address (a code of the 32 shipping zones), or none (FC 051). */
+  stateCode: external_exports.string().nullish(),
+  /** The phone of the account, 10 digits, only ever given back to its holder (FC 051 T1.1). */
+  phone: external_exports.string().regex(/^\d{10}$/).nullish()
 });
 
 // ../../lib/account/orderTypes.ts
@@ -100532,6 +100638,9 @@ function registerMediaRoutes(app, deps) {
 }
 
 // src/routes/orders.ts
+var import_node_crypto5 = require("node:crypto");
+
+// src/services/accountAddresses.ts
 var import_node_crypto4 = require("node:crypto");
 
 // src/services/checkoutCrypto.ts
@@ -100595,6 +100704,196 @@ function newOrderNumber(now) {
   for (let i = 0; i < 8; i += 1)
     tail += ORDER_ALPHABET[(0, import_node_crypto3.randomInt)(ORDER_ALPHABET.length)];
   return `YEK-${now.getUTCFullYear()}-${tail}`;
+}
+
+// src/services/accountAddresses.ts
+var subjectOf = (userId, addressId) => `${userId}|${addressId}`;
+function sealed(key, userId, addressId, content) {
+  return encryptPii(
+    key,
+    subjectOf(userId, addressId),
+    "user_address",
+    JSON.stringify(content)
+  );
+}
+function opened(key, userId, row2) {
+  return addressContentSchema.parse(
+    JSON.parse(
+      decryptPii(
+        key,
+        subjectOf(userId, row2.id),
+        "user_address",
+        row2.address_enc
+      )
+    )
+  );
+}
+function viewOf(key, userId, row2, defaultId) {
+  const content = opened(key, userId, row2);
+  return {
+    id: row2.id,
+    isDefault: row2.id === defaultId,
+    isComplete: Number(row2.is_complete) === 1,
+    stateCode: row2.state_code,
+    postalCode: content.postalCode,
+    label: content.label ?? null,
+    name: content.name ?? null,
+    phone: content.phone ?? null,
+    street: content.street ?? null,
+    exteriorNumber: content.exteriorNumber ?? null,
+    interiorNumber: content.interiorNumber ?? null,
+    neighborhood: content.neighborhood ?? null,
+    municipality: content.municipality ?? null,
+    references: content.references ?? null
+  };
+}
+async function listAddresses(db, key, userId) {
+  const rows = await db.query(
+    "SELECT id, state_code, is_complete, address_enc FROM user_addresses WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    [userId]
+  );
+  const [owner] = await db.query(
+    "SELECT default_address_id FROM users WHERE id = ?",
+    [userId]
+  );
+  return rows.map(
+    (row2) => viewOf(key, userId, row2, owner?.default_address_id ?? null)
+  );
+}
+async function accountDelivery(db, key, userId) {
+  const [row2] = await db.query(
+    "SELECT u.phone_enc, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?",
+    [userId]
+  );
+  if (key === null) return { phone: null, postalCode: null, stateCode: null };
+  const address = row2.address_enc ? opened(key, userId, {
+    id: row2.address_id,
+    state_code: row2.state_code,
+    is_complete: 0,
+    address_enc: row2.address_enc
+  }) : null;
+  return {
+    phone: row2.phone_enc ? decryptPii(key, userId, "user_phone", row2.phone_enc) : null,
+    postalCode: address?.postalCode ?? null,
+    stateCode: address ? row2.state_code : null
+  };
+}
+async function updateProfile(tx, key, userId, profile) {
+  await tx.query("UPDATE users SET full_name = ?, phone_enc = ? WHERE id = ?", [
+    profile.fullName,
+    encryptPii(key, userId, "user_phone", profile.phone),
+    userId
+  ]);
+}
+async function insertAddress(tx, key, userId, address) {
+  const id = (0, import_node_crypto4.randomUUID)();
+  await tx.query(
+    "INSERT INTO user_addresses (id, user_id, state_code, is_complete, address_enc) VALUES (?, ?, ?, ?, ?)",
+    [
+      id,
+      userId,
+      address.stateCode,
+      address.isComplete ? 1 : 0,
+      sealed(key, userId, id, address.content)
+    ]
+  );
+  if (address.makeDefault) {
+    await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
+      id,
+      userId
+    ]);
+  }
+  return { id, isDefault: address.makeDefault, isComplete: address.isComplete };
+}
+async function insertSignUpAddress(tx, key, userId, place) {
+  await insertAddress(tx, key, userId, {
+    stateCode: place.stateCode,
+    content: { postalCode: place.postalCode },
+    isComplete: false,
+    makeDefault: true
+  });
+}
+async function createAddress(tx, key, userId, input2, wantsDefault) {
+  await tx.query("SELECT id FROM users WHERE id = ? FOR UPDATE", [userId]);
+  const [{ placed }] = await tx.query(
+    "SELECT COUNT(*) AS placed FROM user_addresses WHERE user_id = ?",
+    [userId]
+  );
+  if (Number(placed) >= MAX_USER_ADDRESSES) return "ADDRESS_LIMIT_REACHED";
+  return insertAddress(tx, key, userId, {
+    stateCode: input2.stateCode,
+    content: input2,
+    isComplete: true,
+    makeDefault: wantsDefault || Number(placed) === 0
+  });
+}
+async function ownedBy(tx, userId, addressId) {
+  const rows = await tx.query(
+    "SELECT id FROM user_addresses WHERE id = ? AND user_id = ? FOR UPDATE",
+    [addressId, userId]
+  );
+  return rows.length > 0;
+}
+async function updateAddress(tx, key, userId, addressId, change) {
+  if (!await ownedBy(tx, userId, addressId)) return "ADDRESS_NOT_FOUND";
+  const { isDefault, ...content } = change;
+  let isComplete = true;
+  if ("postalCode" in content) {
+    await tx.query(
+      "UPDATE user_addresses SET state_code = ?, is_complete = 1, address_enc = ? WHERE id = ? AND user_id = ?",
+      [
+        content.stateCode,
+        sealed(key, userId, addressId, content),
+        addressId,
+        userId
+      ]
+    );
+  } else {
+    const [row2] = await tx.query(
+      "SELECT is_complete FROM user_addresses WHERE id = ? AND user_id = ?",
+      [addressId, userId]
+    );
+    isComplete = Number(row2.is_complete) === 1;
+  }
+  if (isDefault) {
+    await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
+      addressId,
+      userId
+    ]);
+  }
+  const [owner] = await tx.query(
+    "SELECT default_address_id FROM users WHERE id = ?",
+    [userId]
+  );
+  return {
+    id: addressId,
+    isDefault: owner.default_address_id === addressId,
+    isComplete
+  };
+}
+async function deleteAddress(tx, userId, addressId) {
+  if (!await ownedBy(tx, userId, addressId)) return "ADDRESS_NOT_FOUND";
+  await tx.query("DELETE FROM user_addresses WHERE id = ? AND user_id = ?", [
+    addressId,
+    userId
+  ]);
+  const [owner] = await tx.query(
+    "SELECT default_address_id FROM users WHERE id = ?",
+    [userId]
+  );
+  if (owner.default_address_id === null) {
+    const [next] = await tx.query(
+      "SELECT id FROM user_addresses WHERE user_id = ? ORDER BY is_complete DESC, created_at DESC, id DESC LIMIT 1",
+      [userId]
+    );
+    if (next) {
+      await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
+        next.id,
+        userId
+      ]);
+    }
+  }
+  return null;
 }
 
 // src/services/checkout.ts
@@ -100749,6 +101048,15 @@ async function persist(deps, admitted, quote, order2) {
         ]
       );
       const id = inserted.insertId;
+      if (order2.userId !== null && request.saveAddress === true && stateOfPostalCode(address.postalCode) === address.stateCode) {
+        await createAddress(
+          tx,
+          secrets.piiKey,
+          order2.userId,
+          { ...address, name: customer.name, phone: customer.phone },
+          false
+        );
+      }
       await tx.query(
         "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?",
         [
@@ -100955,7 +101263,7 @@ function registerOrderRoutes(app, deps) {
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row2 === void 0 || !(0, import_node_crypto4.timingSafeEqual)(
+      if (row2 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
         Buffer.from(row2.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
@@ -101213,6 +101521,69 @@ var ROUTE_CONTRACTS = [
     responses: { 200: meResponseSchema, ...SIGNED_IN_REFUSALS }
   },
   {
+    method: "PATCH",
+    path: "/v1/account/profile",
+    summary: "Changes the name and the phone of the account; the e-mail never changes (FC 051)",
+    permission: "account:self",
+    request: { headers: mutationHeaders, body: profileUpdateRequestSchema },
+    responses: {
+      200: profileUpdatedSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/addresses",
+    summary: "The account\u2019s book of delivery addresses, oldest first (FC 051)",
+    permission: "account:self",
+    request: {},
+    responses: { 200: addressListSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/addresses",
+    summary: "Adds a delivery address, up to five per account; the first one is the default (FC 051)",
+    permission: "account:self",
+    request: { headers: mutationHeaders, body: addressUpsertRequestSchema },
+    responses: {
+      201: addressSavedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PATCH",
+    path: "/v1/account/addresses/:id",
+    summary: "Edits or completes an address, or makes it the default one; another account\u2019s id is a 404 (FC 051)",
+    permission: "account:self",
+    request: {
+      params: addressParams,
+      headers: mutationHeaders,
+      body: addressPatchRequestSchema
+    },
+    responses: {
+      200: addressSavedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/addresses/:id",
+    summary: "Deletes an address; if it was the default the newest left takes its place (FC 051)",
+    permission: "account:self",
+    request: { params: addressParams, headers: mutationHeaders },
+    responses: {
+      204: external_exports.null(),
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
     method: "POST",
     path: "/v1/account/forget-device",
     summary: "Forgets this browser\u2019s trusted device and expires its cookie",
@@ -101460,7 +101831,7 @@ var ROUTE_CONTRACTS = [
 ];
 
 // src/services/identity.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 
 // src/lib/permissions.ts
 var PERMISSIONS = [
@@ -101475,7 +101846,7 @@ function isPrivileged(roles) {
 }
 
 // src/services/authCrypto.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var KEY_BYTES2 = 32;
 var TOTP_STEP_SECONDS = 30;
 var TOTP_DIGITS = 6;
@@ -101488,30 +101859,30 @@ function parseAuthKey(name2, base643) {
   return key;
 }
 function newToken() {
-  return (0, import_node_crypto5.randomBytes)(32).toString("base64url");
+  return (0, import_node_crypto6.randomBytes)(32).toString("base64url");
 }
 function tokenHash2(token) {
-  return (0, import_node_crypto5.createHash)("sha256").update(token, "utf8").digest("hex");
+  return (0, import_node_crypto6.createHash)("sha256").update(token, "utf8").digest("hex");
 }
 function codeHash(secret, code2) {
-  return (0, import_node_crypto5.createHmac)("sha256", secret).update(code2, "utf8").digest("hex");
+  return (0, import_node_crypto6.createHmac)("sha256", secret).update(code2, "utf8").digest("hex");
 }
 function newEmailCode() {
-  return String((0, import_node_crypto5.randomInt)(0, 1e6)).padStart(6, "0");
+  return String((0, import_node_crypto6.randomInt)(0, 1e6)).padStart(6, "0");
 }
 function sameHash(a, b) {
   const left = Buffer.from(a, "hex");
   const right = Buffer.from(b, "hex");
-  return left.length === right.length && (0, import_node_crypto5.timingSafeEqual)(left, right);
+  return left.length === right.length && (0, import_node_crypto6.timingSafeEqual)(left, right);
 }
 function newBackupCodes() {
   const codes = /* @__PURE__ */ new Set();
   while (codes.size < 8)
-    codes.add(String((0, import_node_crypto5.randomInt)(0, 1e8)).padStart(8, "0"));
+    codes.add(String((0, import_node_crypto6.randomInt)(0, 1e8)).padStart(8, "0"));
   return [...codes];
 }
 function newTotpSecret() {
-  return (0, import_node_crypto5.randomBytes)(20);
+  return (0, import_node_crypto6.randomBytes)(20);
 }
 function base32(bytes) {
   let bits = "";
@@ -101529,7 +101900,7 @@ function otpauthUri(email3, secret) {
 function totpCode(secret, step) {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(step));
-  const mac3 = (0, import_node_crypto5.createHmac)("sha1", secret).update(counter).digest();
+  const mac3 = (0, import_node_crypto6.createHmac)("sha1", secret).update(counter).digest();
   const offset = mac3.readUInt8(mac3.length - 1) & 15;
   const value = mac3.readUInt32BE(offset) & 2147483647;
   return String(value % 10 ** TOTP_DIGITS).padStart(TOTP_DIGITS, "0");
@@ -101538,12 +101909,12 @@ function verifyTotp(secret, code2, now) {
   if (!/^\d{6}$/.test(code2)) return false;
   const step = Math.floor(now.getTime() / 1e3 / TOTP_STEP_SECONDS);
   return [step - 1, step, step + 1].some(
-    (candidate) => (0, import_node_crypto5.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code2))
+    (candidate) => (0, import_node_crypto6.timingSafeEqual)(Buffer.from(totpCode(secret, candidate)), Buffer.from(code2))
   );
 }
 function encryptTotpSecret(key, userId, secret) {
-  const iv = (0, import_node_crypto5.randomBytes)(12);
-  const cipher = (0, import_node_crypto5.createCipheriv)("aes-256-gcm", key, iv);
+  const iv = (0, import_node_crypto6.randomBytes)(12);
+  const cipher = (0, import_node_crypto6.createCipheriv)("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from(userId, "utf8"));
   const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
   const parts = [iv, cipher.getAuthTag(), ciphertext].map(
@@ -101556,7 +101927,7 @@ function decryptTotpSecret(key, userId, stored) {
   if (version3 !== "v1" || ciphertext === void 0) {
     throw new Error("Unknown TOTP secret format");
   }
-  const decipher = (0, import_node_crypto5.createDecipheriv)(
+  const decipher = (0, import_node_crypto6.createDecipheriv)(
     "aes-256-gcm",
     key,
     Buffer.from(iv, "base64url")
@@ -101601,23 +101972,16 @@ function createCustomer(db, user) {
       [user.email]
     );
     if (taken) return false;
-    const id = (0, import_node_crypto6.randomUUID)();
-    const { postal } = user;
-    const identity = [id, user.email, user.passwordHash, user.fullName];
-    if (postal) {
-      await tx.query(
-        "INSERT INTO users (id, email, password_hash, full_name, shipping_postal_code_enc, shipping_state) VALUES (?, ?, ?, ?, ?, ?)",
-        [
-          ...identity,
-          encryptPii(postal.key, id, "shipping_postal_code", postal.code),
-          postal.state
-        ]
-      );
-    } else {
-      await tx.query(
-        "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
-        identity
-      );
+    const id = (0, import_node_crypto7.randomUUID)();
+    await tx.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
+      [id, user.email, user.passwordHash, user.fullName]
+    );
+    if (user.postal) {
+      await insertSignUpAddress(tx, user.postal.key, id, {
+        postalCode: user.postal.code,
+        stateCode: user.postal.state
+      });
     }
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
@@ -101625,19 +101989,6 @@ function createCustomer(db, user) {
     );
     return true;
   });
-}
-async function readPostalCode(db, key, userId) {
-  const [row2] = await db.query(
-    "SELECT shipping_postal_code_enc FROM users WHERE id = ?",
-    [userId]
-  );
-  if (!row2?.shipping_postal_code_enc || key === null) return null;
-  return decryptPii(
-    key,
-    userId,
-    "shipping_postal_code",
-    row2.shipping_postal_code_enc
-  );
 }
 async function revokeAccess(tx, userId) {
   await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [userId]);
@@ -101665,7 +102016,7 @@ async function capabilitiesOf(db, userId) {
   };
 }
 async function openChallenge(db, secret, userId, now, emailCode) {
-  const id = (0, import_node_crypto6.randomUUID)();
+  const id = (0, import_node_crypto7.randomUUID)();
   await db.query(
     "INSERT INTO two_factor_challenges (id, user_id, challenge_type, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
     [
@@ -101885,16 +102236,52 @@ function permissionGuard(deps) {
 }
 
 // src/routes/account.ts
+var ADDRESS_REFUSALS = {
+  ADDRESS_NOT_FOUND: [404, "Not found"],
+  ADDRESS_LIMIT_REACHED: [409, "The account already holds five addresses"]
+};
+function writeGate(deps, request, reply) {
+  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    refuse(reply, 400, "Idempotency-Key required", key.code);
+    return null;
+  }
+  if (deps.piiKey === null) {
+    refuse(
+      reply,
+      503,
+      "Personal data cannot be saved right now",
+      "SERVICE_UNAVAILABLE"
+    );
+    return null;
+  }
+  return { key: key.key, pii: deps.piiKey };
+}
+function refusalOf(refusal) {
+  const [status, title] = ADDRESS_REFUSALS[refusal];
+  return { status, body: problem(status, title, refusal) };
+}
+function auditAddress(tx, request, userId, action, saved) {
+  return recordAudit(tx, {
+    userId,
+    action,
+    entityType: "user_addresses",
+    entityId: saved.id,
+    before: null,
+    after: { isDefault: saved.isDefault, isComplete: saved.isComplete },
+    ip: request.ip
+  });
+}
 function registerAccountRoutes(app, deps) {
   app.get("/v1/account/me", async (request, reply) => {
     const user = request.user;
-    const postalCode = await readPostalCode(
+    const delivery = await accountDelivery(
       deps.db,
       deps.piiKey,
       user.userId
     ).catch((error63) => {
-      request.log.error({ err: error63 }, "postal code unreadable");
-      return null;
+      request.log.error({ err: error63 }, "account data unreadable");
+      return { phone: null, postalCode: null, stateCode: null };
     });
     return reply.send(
       meResponseSchema.parse({
@@ -101903,9 +102290,107 @@ function registerAccountRoutes(app, deps) {
         fullName: user.fullName,
         roles: user.roles,
         permissions: user.permissions,
-        postalCode
+        ...delivery
       })
     );
+  });
+  app.patch("/v1/account/profile", async (request, reply) => {
+    const gate = writeGate(deps, request, reply);
+    if (gate === null) return reply;
+    const body = profileUpdateRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      await updateProfile(tx, gate.pii, userId, body.data);
+      await recordAudit(tx, {
+        userId,
+        action: "ACCOUNT_PROFILE_UPDATED",
+        entityType: "users",
+        entityId: userId,
+        before: null,
+        after: { changed: ["fullName", "phone"] },
+        ip: request.ip
+      });
+      return {
+        status: 200,
+        body: profileUpdatedSchema.parse({ fullName: body.data.fullName })
+      };
+    });
+  });
+  app.get("/v1/account/addresses", async (request, reply) => {
+    if (deps.piiKey === null) {
+      return refuse(
+        reply,
+        503,
+        "Personal data cannot be read right now",
+        "SERVICE_UNAVAILABLE"
+      );
+    }
+    const items = await listAddresses(
+      deps.db,
+      deps.piiKey,
+      request.user.userId
+    );
+    return addressListSchema.parse({ items, max: MAX_USER_ADDRESSES });
+  });
+  app.post("/v1/account/addresses", async (request, reply) => {
+    const gate = writeGate(deps, request, reply);
+    if (gate === null) return reply;
+    const body = addressUpsertRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
+    }
+    const { isDefault, ...address } = body.data;
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      const saved = await createAddress(
+        tx,
+        gate.pii,
+        userId,
+        address,
+        isDefault === true
+      );
+      if (typeof saved === "string") return refusalOf(saved);
+      await auditAddress(tx, request, userId, "ADDRESS_CREATED", saved);
+      return { status: 201, body: addressSavedSchema.parse(saved) };
+    });
+  });
+  app.patch("/v1/account/addresses/:id", async (request, reply) => {
+    const gate = writeGate(deps, request, reply);
+    if (gate === null) return reply;
+    const params = addressParams.safeParse(request.params);
+    const body = addressPatchRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
+    }
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      const saved = await updateAddress(
+        tx,
+        gate.pii,
+        userId,
+        params.data.id,
+        body.data
+      );
+      if (typeof saved === "string") return refusalOf(saved);
+      await auditAddress(tx, request, userId, "ADDRESS_UPDATED", saved);
+      return { status: 200, body: addressSavedSchema.parse(saved) };
+    });
+  });
+  app.delete("/v1/account/addresses/:id", async (request, reply) => {
+    const gate = writeGate(deps, request, reply);
+    if (gate === null) return reply;
+    const params = addressParams.safeParse(request.params);
+    if (!params.success) {
+      return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
+    }
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      const refusal = await deleteAddress(tx, userId, params.data.id);
+      if (refusal !== null) return refusalOf(refusal);
+      await auditAddress(tx, request, userId, "ADDRESS_DELETED", {
+        id: params.data.id
+      });
+      return { status: 204, body: null };
+    });
   });
   app.post("/v1/account/forget-device", async (request, reply) => {
     const token = readDeviceToken(request.headers.cookie);
@@ -101971,10 +102456,10 @@ function registerAdminRoutes(app, deps) {
 }
 
 // src/services/adminUsers.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 
 // src/services/passwordResets.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 
 // src/services/outbox.ts
 async function enqueueMail(tx, event) {
@@ -101988,7 +102473,7 @@ async function enqueueMail(tx, event) {
 // src/services/passwordResets.ts
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto7.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
   await tx.query(
     "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
@@ -102004,7 +102489,7 @@ async function mailResetLink(tx, userId, totpKey, now) {
   });
 }
 function decoyReset(totpKey) {
-  const token = (0, import_node_crypto7.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
     totpKey,
     tokenHash2(token),
@@ -102059,7 +102544,7 @@ function completeReset(db, reset, passwordHash, now, ip) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -102071,7 +102556,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto8.randomBytes)(16),
+    salt: (0, import_node_crypto9.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -102083,11 +102568,11 @@ async function verifyPassword(hash2, password) {
   }
 }
 function unmatchableHash() {
-  return hashPassword((0, import_node_crypto8.randomBytes)(64).toString("hex"));
+  return hashPassword((0, import_node_crypto9.randomBytes)(64).toString("hex"));
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto8.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto9.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -102126,7 +102611,7 @@ async function createAdmin(tx, input2, actor) {
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto9.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto10.randomUUID)();
   if (existing) {
     const roles = await lockedRoles(tx, id);
     if (roles.includes("owner")) return "OWNER_IMMUTABLE";
@@ -102389,51 +102874,8 @@ var PASSWORD_PROBLEMS = {
   common: "PASSWORD_COMMON"
 };
 
-// ../../lib/cart/postalRanges.ts
-var RANGES = [
-  [1, 16, "CMX"],
-  [20, 20, "AGU"],
-  [21, 22, "BCN"],
-  [23, 23, "BCS"],
-  [24, 24, "CAM"],
-  [25, 27, "COA"],
-  [28, 28, "COL"],
-  [29, 30, "CHP"],
-  [31, 33, "CHH"],
-  [34, 35, "DUR"],
-  [36, 38, "GUA"],
-  [39, 41, "GRO"],
-  [42, 43, "HID"],
-  [44, 49, "JAL"],
-  [50, 57, "MEX"],
-  [58, 61, "MIC"],
-  [62, 62, "MOR"],
-  [63, 63, "NAY"],
-  [64, 67, "NLE"],
-  [68, 71, "OAX"],
-  [72, 75, "PUE"],
-  [76, 76, "QUE"],
-  [77, 77, "ROO"],
-  [78, 79, "SLP"],
-  [80, 82, "SIN"],
-  [83, 85, "SON"],
-  [86, 86, "TAB"],
-  [87, 89, "TAM"],
-  [90, 90, "TLA"],
-  [91, 96, "VER"],
-  [97, 97, "YUC"],
-  [98, 99, "ZAC"]
-];
-var POSTAL_CODE = /^\d{5}$/;
-function stateOfPostalCode(postalCode) {
-  if (!POSTAL_CODE.test(postalCode)) return null;
-  const prefix = Number(postalCode.slice(0, 2));
-  const hit = RANGES.find(([from, to]) => prefix >= from && prefix <= to);
-  return hit ? hit[2] : null;
-}
-
 // src/services/botChallenge.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -102444,16 +102886,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto10.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto11.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto10.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto11.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto10.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto10.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto11.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto11.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto10.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto10.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto11.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto11.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -103728,7 +104170,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -103873,9 +104315,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto11.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto12.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto11.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto12.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -107493,7 +107935,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto12 = __toESM(require("node:crypto"), 1);
+var import_node_crypto13 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -109226,7 +109668,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto12.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto13.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -110403,8 +110845,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto12.default.randomBytes(len).toString("hex"),
-      import_node_crypto12.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto13.default.randomBytes(len).toString("hex"),
+      import_node_crypto13.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -111092,7 +111534,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -111103,7 +111545,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto13.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto14.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -111213,7 +111655,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -111228,7 +111670,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto14.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto15.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -111295,7 +111737,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -111308,7 +111750,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto15.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto16.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -111918,7 +112360,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -112236,7 +112678,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto16.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto17.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -112271,7 +112713,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -112436,7 +112878,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto17.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto18.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -113784,7 +114226,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto17.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto18.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -114118,7 +114560,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -114441,7 +114883,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto18.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto19.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -117236,7 +117678,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto19 = require("node:crypto");
+var import_node_crypto20 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -117299,7 +117741,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto19.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto20.timingSafeEqual)(a, b);
 }
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   async function call(path3, init) {
@@ -117350,7 +117792,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto19.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto20.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -117432,7 +117874,7 @@ async function buildApp(deps) {
   await app.register(import_helmet.default);
   await app.register(import_cors.default, {
     origin: deps.config.corsOrigins,
-    methods: ["GET", "POST", "PATCH"],
+    methods: ["GET", "POST", "PATCH", "DELETE"],
     credentials: true
   });
   await app.register(import_rate_limit.default, { max: 120, timeWindow: "1 minute" });
@@ -117830,7 +118272,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "875aa75b9ee246209ea1e2327e7b2bf094b8ad52" : void 0;
+var sha = true ? "7b99ea0d93af3c96a46561aafe523356e9977ac9" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
