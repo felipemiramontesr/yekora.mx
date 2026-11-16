@@ -516,7 +516,8 @@ export function AccountProfileAddresses({
   const t = texts.addresses;
   const [book, setBook] = useState<Book | null>(null);
   const [note, setNote] = useState<Note>(null);
-  const [editing, setEditing] = useState<'new' | string | null>(null);
+  // The id of the address being edited, `new` for a new one, or none.
+  const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
