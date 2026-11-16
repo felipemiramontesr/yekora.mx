@@ -161,7 +161,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
 });
 
-test('the language switch is only in the account menu, at half its size, and its touch area reaches 44 px (FC 052 T2.2, T2.3)', async ({
+test('the language switch is only in the account menu, and each code is a target of 44 × 44 px (FC 052 T2.2, T2.3)', async ({
   page,
 }) => {
   await page.goto('/nosotros/');
@@ -173,17 +173,13 @@ test('the language switch is only in the account menu, at half its size, and its
   const switcher = page
     .getByRole('banner')
     .getByRole('navigation', { name: 'Idioma' });
-  const box = await switcher.boundingBox();
-  // Drawn at 24 × 46 px.
-  expect(box?.height).toBeLessThanOrEqual(24);
-  expect(box?.width).toBeLessThanOrEqual(48);
-  const english = switcher.getByRole('link', { name: 'EN, English' });
-  const at = await english.boundingBox();
-  // A press 12 px under the visible pill, inside the transparent layer, is still the link.
-  await page.mouse.click(
-    (at?.x ?? 0) + (at?.width ?? 0) / 2,
-    (at?.y ?? 0) + (at?.height ?? 0) + 8
-  );
+  // Each code, as drawn, is at least 44 × 44 px: what can be pressed is what is seen.
+  for (const name of ['ES, Español', 'EN, English']) {
+    const box = await switcher.getByRole('link', { name }).boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+  }
+  await switcher.getByRole('link', { name: 'EN, English' }).click();
   await expect(page).toHaveURL(/\/en\/about\/$/);
 });
 

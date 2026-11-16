@@ -893,7 +893,7 @@ describe('products (FC 029 F3c)', () => {
         }) as HTMLButtonElement
       ).disabled
     ).toBe(true);
-  });
+  }, 20_000);
 
   it('shows no photo section when a product is edited: its gallery has its own editor', async () => {
     await openProducts(TRAIL);

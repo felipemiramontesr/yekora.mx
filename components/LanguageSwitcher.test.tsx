@@ -52,7 +52,7 @@ describe('LanguageSwitcher', () => {
     expect(container.querySelector('svg')).toBeNull();
   });
 
-  it('is drawn at half its size, 24 × 46 px, and keeps its touch area through a transparent layer (FC 052 T2.3)', () => {
+  it('gives each code a touch target of at least 44 × 44 px of its own, with no layer reaching out of it (FC 052 T2.3)', () => {
     pathname.current = '/nosotros/';
     render(
       <LanguageSwitcher
@@ -61,22 +61,15 @@ describe('LanguageSwitcher', () => {
       />
     );
     const nav = screen.getByRole('navigation', { name: 'Idioma' });
-    // Visible size: 24 px high, two links of 22 px and the border (46 px), nothing taller or wider.
-    expect(nav.className).toContain('h-6');
-    const [spanish, english] = screen.getAllByRole('link');
-    for (const link of [spanish, english]) {
-      expect(link.className).toContain('w-[22px]');
+    // The pill is 46 px high (44 px inside its 1 px border) and each link fills it, at least 44 px
+    // wide (min-w-11).
+    expect(nav.className).toContain('h-[46px]');
+    for (const link of screen.getAllByRole('link')) {
       expect(link.className).toContain('h-full');
-      // A transparent layer reaches 10 px above and below the link: 44 px of touch height.
-      expect(link.className).toContain("after:content-['']");
-      expect(link.className).toContain('after:-inset-y-[10px]');
+      expect(link.className).toContain('min-w-11');
+      // No transparent layer: what can be pressed is what is seen.
+      expect(link.className).not.toContain('after:');
     }
-    // It reaches 11 px out on the outer side only, so the two layers never cover each other's link.
-    expect(spanish.className).toContain('after:-left-[11px]');
-    expect(spanish.className).toContain('after:right-0');
-    expect(english.className).toContain('after:-right-[11px]');
-    expect(english.className).toContain('after:left-0');
-    expect(nav.className).not.toContain('tap-target');
   });
 
   it('highlights the current language and leaves the other as a link to switch to', () => {
