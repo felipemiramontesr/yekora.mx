@@ -6,7 +6,7 @@ import {
   expireOverdueOrders,
   type CheckoutDeps,
 } from './checkout';
-import { tokenHash } from './checkoutCrypto';
+import { decryptPii, tokenHash } from './checkoutCrypto';
 import type { Db, Transactional, TxQuery } from './db';
 import type { PaymentProcessorPort, SessionRequest } from './paymentPort';
 import type { ShipmentQuote, ShippingRateProvider } from './shippingPort';
@@ -61,6 +61,8 @@ interface State {
     params: unknown[];
   }[];
   methods: { code: string; id: number; hold: number; active: boolean }[];
+  /** The rows of `user_addresses` the checkout inserted (FC 051 T1.4): their parameters. */
+  addresses: { params: unknown[] }[];
 }
 
 /**
@@ -98,6 +100,7 @@ function memoryDb(
       { code: 'SPEI', id: 3, hold: 1440, active: true },
       { code: 'MERCADO_PAGO_BALANCE', id: 4, hold: 60, active: false },
     ],
+    addresses: [],
     ...seed,
   };
   let snapshot: State | null = null;
@@ -197,6 +200,24 @@ function memoryDb(
         state.products.filter((x) => x.sku === sku).map((x) => ({ id: x.id })),
     ],
     ['INSERT INTO orders', insertOrder],
+    // The book of the buyer (FC 051 T1.4): the lock, the count and the insert.
+    ['SELECT id FROM users WHERE id = ? FOR UPDATE', ([id]) => [{ id }]],
+    [
+      'SELECT COUNT(*) AS placed',
+      ([id]) => [
+        {
+          placed: state.addresses.filter((a) => a.params[1] === id).length,
+        },
+      ],
+    ],
+    [
+      'INSERT INTO user_addresses',
+      (p) => {
+        state.addresses.push({ params: p });
+        return { affectedRows: 1 };
+      },
+    ],
+    ['UPDATE users SET default_address_id', () => ({ affectedRows: 1 })],
     [
       'INSERT INTO order_items',
       // Multi-row insert: the only parameter is the array of rows.
@@ -715,5 +736,69 @@ describe('lazy expiry (no cron, no public endpoint)', () => {
     );
     await expect(expireOverdueOrders(db, NOW)).resolves.toBe(0);
     expect(state().orders.map((o) => o.status)).toEqual([1, 2]);
+  });
+});
+
+describe('the address a signed-in buyer asks to keep (FC 051 T1.4, T2.5)', () => {
+  const BUYER = 'b0000000-0000-4000-8000-000000000001';
+  const keep = (over: Record<string, unknown> = {}) =>
+    body({ saveAddress: true, ...over });
+
+  it('puts it in the buyer’s book, sealed for the account and its row, and the order keeps its own copy', async () => {
+    const { db, state } = memoryDb();
+    const outcome = await createCheckout(deps(db), keep(), 'es-MX', BUYER);
+    expect(outcome).toMatchObject({ ok: true });
+    expect(state().orders).toHaveLength(1);
+    const [row] = state().addresses;
+    // user_addresses (id, user_id, state_code, is_complete, address_enc)
+    expect(row.params.slice(1, 4)).toEqual([BUYER, 'ZAC', 1]);
+    const opened = JSON.parse(
+      decryptPii(
+        PII_KEY,
+        `${BUYER}|${row.params[0]}`,
+        'user_address',
+        row.params[4] as Buffer
+      )
+    );
+    expect(opened).toMatchObject({
+      name: 'Ana Flores',
+      phone: '4929421780',
+      street: 'Av. Barones',
+      postalCode: '98612',
+    });
+  });
+
+  it.each([
+    ['a guest', null, {}],
+    ['a signed-in buyer who did not ask', BUYER, { saveAddress: false }],
+    [
+      'a postal code that is not in the state it was typed with',
+      BUYER,
+      { address: { ...body().address, postalCode: '17000' } },
+    ],
+  ])(
+    'keeps nothing for %s, and the payment goes on',
+    async (_case, userId, over) => {
+      const { db, state } = memoryDb();
+      const outcome = await createCheckout(
+        deps(db),
+        keep(over),
+        'es-MX',
+        userId
+      );
+      expect(outcome).toMatchObject({ ok: true });
+      expect(state().addresses).toEqual([]);
+      expect(state().orders).toHaveLength(1);
+    }
+  );
+
+  it('keeps nothing when the book already holds five, and never refuses the payment for it', async () => {
+    const full = Array.from({ length: 5 }, (_, n) => ({
+      params: [`a${n}`, BUYER],
+    }));
+    const { db, state } = memoryDb({ addresses: full });
+    const outcome = await createCheckout(deps(db), keep(), 'es-MX', BUYER);
+    expect(outcome).toMatchObject({ ok: true });
+    expect(state().addresses).toHaveLength(5);
   });
 });

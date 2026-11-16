@@ -129,7 +129,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // FC 028: the session cookie travels only with credentials, from the site's exact origins.
   await app.register(cors, {
     origin: deps.config.corsOrigins,
-    methods: ['GET', 'POST', 'PATCH'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     credentials: true,
   });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });

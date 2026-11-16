@@ -28,7 +28,9 @@ import {
   checkoutRequestSchema,
   PAYMENT_METHOD_CODES,
 } from '../../../../lib/checkout/checkoutTypes';
+import { stateOfPostalCode } from '../../../../lib/cart/postalRanges';
 import type { CheckoutSecrets, PaymentsConfig } from '../config';
+import { createAddress } from './accountAddresses';
 import { quoteCartToDestination } from './cartQuote';
 import {
   emailHmac,
@@ -313,6 +315,22 @@ async function persist(
         ]
       );
       const id = (inserted as unknown as { insertId: number }).insertId;
+      // FC 051 T1.4: a signed-in buyer who asked to keep the address typed here gets it in their
+      // book. The order keeps its own sealed copy either way (T2.5); a full book, or a postal code
+      // that is not in the state it was typed with, saves nothing and never refuses the payment.
+      if (
+        order.userId !== null &&
+        request.saveAddress === true &&
+        stateOfPostalCode(address.postalCode) === address.stateCode
+      ) {
+        await createAddress(
+          tx,
+          secrets.piiKey,
+          order.userId,
+          { ...address, name: customer.name, phone: customer.phone },
+          false
+        );
+      }
       // One multi-row insert: mysql2 expands `VALUES ?` from the nested array, escaping each value.
       await tx.query(
         'INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents) VALUES ?',

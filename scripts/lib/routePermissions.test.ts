@@ -149,6 +149,39 @@ describe('routePermissionViolations (FC 027 T2.6, S02)', () => {
     ).toEqual(['DELETE /v1/admin/catalog/*: DELETE must only refuse (405)']);
   });
 
+  it('lets the holder delete their own address, with their own permission only (FC 051)', () => {
+    const own = (permission: string) => ({
+      method: 'DELETE',
+      path: '/v1/account/addresses/:id',
+      permission,
+      responses: { 204: {}, 404: {} },
+    });
+    expect(
+      routePermissionViolations([own('account:self')], ['account:self'])
+    ).toEqual([]);
+    expect(
+      routePermissionViolations([own('orders:read')], ['orders:read'])
+    ).toEqual([
+      "DELETE /v1/account/addresses/:id: a delete of one's own data needs account:self",
+    ]);
+    // Named one by one: another account route is no exception.
+    expect(
+      routePermissionViolations(
+        [
+          {
+            method: 'DELETE',
+            path: '/v1/account/orders/:order_number',
+            permission: 'account:self',
+            responses: { 204: {} },
+          },
+        ],
+        ['account:self']
+      )
+    ).toEqual([
+      'DELETE /v1/account/orders/:order_number: DELETE must only refuse (405)',
+    ]);
+  });
+
   it('treats a DELETE without declared answers as one that may do anything', () => {
     expect(
       routePermissionViolations(

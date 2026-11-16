@@ -154,10 +154,20 @@ export const meResponseSchema = z.object({
   fullName: z.string(),
   roles: z.array(z.string()),
   permissions: z.array(z.string()),
-  /** The delivery postal code of the account, only ever given back to its holder (FC 047 T2.3). */
+  /**
+   * The postal code of the default delivery address of the account, only ever given back to its
+   * holder (FC 047 T2.3, FC 051): there is no postal code of the account besides the address.
+   */
   postalCode: z
     .string()
     .regex(/^\d{5}$/)
+    .nullish(),
+  /** The state of that default address (a code of the 32 shipping zones), or none (FC 051). */
+  stateCode: z.string().nullish(),
+  /** The phone of the account, 10 digits, only ever given back to its holder (FC 051 T1.1). */
+  phone: z
+    .string()
+    .regex(/^\d{10}$/)
     .nullish(),
 });
 

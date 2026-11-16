@@ -86,47 +86,70 @@ describe('personal data at rest (T2: only AES-256-GCM ciphertext)', () => {
   });
 });
 
-describe('decrypting what an account stored (FC 047 T2.3)', () => {
+describe('decrypting what an account stored (FC 047 T2.3, FC 051 T2.2)', () => {
   const ACCOUNT = 'b0000000-0000-4000-8000-000000000001';
 
   it('gives back exactly what was encrypted for that account and column', () => {
-    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
-    expect(decryptPii(KEY, ACCOUNT, 'shipping_postal_code', stored)).toBe(
-      '98612'
-    );
+    const stored = encryptPii(KEY, ACCOUNT, 'user_phone', '4929421780');
+    expect(decryptPii(KEY, ACCOUNT, 'user_phone', stored)).toBe('4929421780');
   });
 
   it('refuses another account, another column, another key or an altered byte', () => {
-    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
+    const stored = encryptPii(KEY, ACCOUNT, 'user_phone', '4929421780');
     expect(() =>
       decryptPii(
         KEY,
         'b0000000-0000-4000-8000-000000000002',
-        'shipping_postal_code',
+        'user_phone',
         stored
       )
     ).toThrow();
     expect(() => decryptPii(KEY, ACCOUNT, 'customer_phone', stored)).toThrow();
     expect(() =>
-      decryptPii(randomBytes(32), ACCOUNT, 'shipping_postal_code', stored)
+      decryptPii(randomBytes(32), ACCOUNT, 'user_phone', stored)
     ).toThrow();
     const altered = Buffer.from(stored);
     altered[20] ^= 0x01;
-    expect(() =>
-      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', altered)
-    ).toThrow();
+    expect(() => decryptPii(KEY, ACCOUNT, 'user_phone', altered)).toThrow();
   });
 
   it('refuses a value that is too short or of another format version', () => {
-    const stored = encryptPii(KEY, ACCOUNT, 'shipping_postal_code', '98612');
+    const stored = encryptPii(KEY, ACCOUNT, 'user_phone', '4929421780');
     expect(() =>
-      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', stored.subarray(0, 20))
+      decryptPii(KEY, ACCOUNT, 'user_phone', stored.subarray(0, 20))
     ).toThrow('Unreadable personal data');
     const foreign = Buffer.from(stored);
     foreign[0] = 0x02;
-    expect(() =>
-      decryptPii(KEY, ACCOUNT, 'shipping_postal_code', foreign)
-    ).toThrow('Unreadable personal data');
+    expect(() => decryptPii(KEY, ACCOUNT, 'user_phone', foreign)).toThrow(
+      'Unreadable personal data'
+    );
+  });
+});
+
+describe('an address is bound to its account and to its row (FC 051 T2.2)', () => {
+  const ACCOUNT = 'b0000000-0000-4000-8000-000000000001';
+  const ROW = 'a0000000-0000-4000-8000-000000000001';
+  const subject = `${ACCOUNT}|${ROW}`;
+
+  it('opens only for the account and the row it was sealed for', () => {
+    const stored = encryptPii(
+      KEY,
+      subject,
+      'user_address',
+      '{"postalCode":"98612"}'
+    );
+    expect(decryptPii(KEY, subject, 'user_address', stored)).toBe(
+      '{"postalCode":"98612"}'
+    );
+    for (const other of [
+      `b0000000-0000-4000-8000-000000000002|${ROW}`,
+      `${ACCOUNT}|a0000000-0000-4000-8000-000000000002`,
+      ACCOUNT,
+    ]) {
+      expect(() => decryptPii(KEY, other, 'user_address', stored)).toThrow();
+    }
+    // The same bytes are not a phone either.
+    expect(() => decryptPii(KEY, subject, 'user_phone', stored)).toThrow();
   });
 });
 

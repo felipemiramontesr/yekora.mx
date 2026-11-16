@@ -27,7 +27,7 @@ const STATE_CODES = new Set(MEXICAN_STATES.map((state) => state.code));
 const text = (max: number) => z.string().trim().min(1).max(max);
 
 /** Buyer's contact (personal data: stored only encrypted). */
-const customerSchema = z.strictObject({
+export const customerSchema = z.strictObject({
   name: z.string().trim().min(3).max(120),
   // Trimmed first, then checked as an e-mail (Zod 4 format schema).
   email: z.string().trim().pipe(z.email().max(254)),
@@ -35,7 +35,7 @@ const customerSchema = z.strictObject({
 });
 
 /** Mexican shipping address; the state must be one of the 32 zones (T1.1 A). */
-const shippingAddressSchema = z.strictObject({
+export const shippingAddressSchema = z.strictObject({
   street: text(120),
   exteriorNumber: text(20),
   interiorNumber: z.string().trim().max(20).optional(),
@@ -55,6 +55,11 @@ export const checkoutRequestSchema = z.strictObject({
   customer: customerSchema,
   address: shippingAddressSchema,
   privacyConsent: z.boolean(),
+  /**
+   * A signed-in buyer who typed a new address asks to keep it in their book of addresses (FC 051
+   * T1.4). Ignored for a guest and when the account already holds five.
+   */
+  saveAddress: z.boolean().optional(),
   /** Total with shipping the buyer saw, MXN cents: compared, never charged. */
   expectedTotalMxnCents: z.number().int().nonnegative(),
 });

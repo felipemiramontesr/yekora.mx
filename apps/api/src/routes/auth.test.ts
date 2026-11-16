@@ -69,6 +69,8 @@ function freshState() {
   return {
     users: new Map<string, Record<string, unknown>>(),
     userRoles: [] as [string, string][],
+    // FC 051 (migration 011): the book of addresses of each account.
+    addresses: new Map<string, Record<string, unknown>>(),
     totp: new Map<string, { secret: string; enabled: number }>(),
     backup: [] as { user: string; hash: string; used: number }[],
     challenges: new Map<
@@ -237,21 +239,48 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
           email: p[1],
           password_hash: p[2],
           full_name: p[3],
-          shipping_postal_code_enc: p[4] ?? null,
-          shipping_state: p[5] ?? null,
+          phone_enc: null,
+          default_address_id: null,
           is_active: 1,
           email_verified_at: null,
         })
       ),
   ],
   [
-    'SELECT shipping_postal_code_enc FROM users',
-    (s, p) => [
-      {
-        shipping_postal_code_enc:
-          s.users.get(p[0] as string)?.shipping_postal_code_enc ?? null,
-      },
-    ],
+    'INSERT INTO user_addresses',
+    (s, p) =>
+      write(() =>
+        s.addresses.set(p[0] as string, {
+          id: p[0],
+          user_id: p[1],
+          state_code: p[2],
+          is_complete: p[3],
+          address_enc: p[4],
+        })
+      ),
+  ],
+  [
+    'UPDATE users SET default_address_id',
+    (s, p) =>
+      write(() => {
+        const user = s.users.get(p[1] as string) ?? {};
+        user.default_address_id = p[0];
+      }),
+  ],
+  [
+    'SELECT u.phone_enc, a.id AS address_id',
+    (s, p) => {
+      const user = s.users.get(p[0] as string);
+      const address = s.addresses.get(String(user?.default_address_id));
+      return [
+        {
+          phone_enc: user?.phone_enc ?? null,
+          address_id: address?.id ?? null,
+          state_code: address?.state_code ?? null,
+          address_enc: address?.address_enc ?? null,
+        },
+      ];
+    },
   ],
   [
     'UPDATE users SET email_verified_at',
@@ -664,28 +693,36 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.userRoles).toEqual([[user.id, 'customer']]);
   });
 
-  it('FC 047 T1.3 · keeps the postal code only as ciphertext bound to the account, and derives the state', async () => {
+  it('FC 051 T2.4 · the postal code becomes the first address, incomplete and the default, sealed for it, with the state derived', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
     const response = await register('ana@example.test', 'Ana', ' 98612 ');
     expect(response.statusCode).toBe(202);
     const [user] = [...store.users.values()];
-    const stored = user.shipping_postal_code_enc as Buffer;
-    expect(Buffer.isBuffer(stored)).toBe(true);
+    const [address] = [...store.addresses.values()];
+    expect(store.addresses.size).toBe(1);
+    expect(address).toMatchObject({
+      user_id: user.id,
+      state_code: 'ZAC',
+      is_complete: 0,
+    });
+    expect(user.default_address_id).toBe(address.id);
+    const stored = address.address_enc as Buffer;
     expect(stored.includes(Buffer.from('98612'))).toBe(false);
     expect(
-      decryptPii(PII_KEY, String(user.id), 'shipping_postal_code', stored)
-    ).toBe('98612');
-    expect(user.shipping_state).toBe('ZAC');
+      JSON.parse(
+        decryptPii(PII_KEY, `${user.id}|${address.id}`, 'user_address', stored)
+      )
+    ).toEqual({ postalCode: '98612' });
   });
 
-  it('FC 047 T1.3 · an omitted or empty postal code is the sign-up of before: nothing is written', async () => {
+  it('FC 047 T1.3 · an omitted or empty postal code is the sign-up of before: no address is written', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
     await register('ana@example.test');
     await register('luis@example.test', 'Luis', '');
     for (const user of store.users.values()) {
-      expect(user.shipping_postal_code_enc).toBeNull();
-      expect(user.shipping_state).toBeNull();
+      expect(user.default_address_id).toBeNull();
     }
+    expect(store.addresses.size).toBe(0);
     expect(store.users.size).toBe(2);
   });
 
@@ -975,28 +1012,32 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     await register('ana@example.test', 'Ana', '98612');
     const { cookie } = await signedInBuyer('ana@example.test');
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
-    expect(me.json()).toMatchObject({ postalCode: '98612' });
+    expect(me.json()).toMatchObject({ postalCode: '98612', stateCode: 'ZAC' });
     await register('luis@example.test', 'Luis');
     const other = await signedInBuyer('luis@example.test');
     const theirs = await app.inject({
       url: '/v1/account/me',
       headers: { cookie: other.cookie },
     });
-    expect(theirs.json()).toMatchObject({ postalCode: null });
+    expect(theirs.json()).toMatchObject({
+      postalCode: null,
+      stateCode: null,
+      phone: null,
+    });
   });
 
   it('FC 047 T2.3 · a stored value that does not authenticate is left out and never breaks the account area', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
     await register('ana@example.test', 'Ana', '98612');
     const { cookie } = await signedInBuyer('ana@example.test');
-    const [user] = [...store.users.values()];
+    const [address] = [...store.addresses.values()];
     // Moved to another account: the additional data no longer matches.
-    Object.assign(user, {
-      shipping_postal_code_enc: encryptPii(
+    Object.assign(address, {
+      address_enc: encryptPii(
         PII_KEY,
-        'b0000000-0000-4000-8000-0000000000ff',
-        'shipping_postal_code',
-        '98612'
+        `b0000000-0000-4000-8000-0000000000ff|${address.id}`,
+        'user_address',
+        JSON.stringify({ postalCode: '98612' })
       ),
     });
     const moved = await app.inject({
@@ -1004,21 +1045,28 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
       headers: { cookie },
     });
     expect(moved.statusCode).toBe(200);
-    expect(moved.json()).toMatchObject({ postalCode: null });
+    expect(moved.json()).toMatchObject({ postalCode: null, stateCode: null });
   });
 
   it('FC 047 T2.3 · without the checkout secrets a stored postal code stays unread', async () => {
     await start();
     const { cookie } = await signedInBuyer('ana@example.test');
     const [user] = [...store.users.values()];
-    user.shipping_postal_code_enc = encryptPii(
-      PII_KEY,
-      String(user.id),
-      'shipping_postal_code',
-      '98612'
-    );
+    store.addresses.set('a0000000-0000-4000-8000-000000000001', {
+      id: 'a0000000-0000-4000-8000-000000000001',
+      user_id: user.id,
+      state_code: 'ZAC',
+      is_complete: 0,
+      address_enc: encryptPii(
+        PII_KEY,
+        `${user.id}|a0000000-0000-4000-8000-000000000001`,
+        'user_address',
+        JSON.stringify({ postalCode: '98612' })
+      ),
+    });
+    user.default_address_id = 'a0000000-0000-4000-8000-000000000001';
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
-    expect(me.json()).toMatchObject({ postalCode: null });
+    expect(me.json()).toMatchObject({ postalCode: null, stateCode: null });
   });
 
   it('OWASP-A07 · refuses staff whose authenticator is off (403, T2.1a)', async () => {

@@ -46,6 +46,15 @@ import {
   orderViewSchema,
 } from '../../../lib/checkout/checkoutTypes';
 import {
+  addressListSchema,
+  addressParams,
+  addressPatchRequestSchema,
+  addressSavedSchema,
+  addressUpsertRequestSchema,
+  profileUpdatedSchema,
+  profileUpdateRequestSchema,
+} from '../../../lib/account/addressTypes';
+import {
   challengeRequestSchema,
   codeRequestSchema,
   confirmResponseSchema,
@@ -412,6 +421,73 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     permission: 'account:self',
     request: {},
     responses: { 200: meResponseSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'PATCH',
+    path: '/v1/account/profile',
+    summary:
+      'Changes the name and the phone of the account; the e-mail never changes (FC 051)',
+    permission: 'account:self',
+    request: { headers: mutationHeaders, body: profileUpdateRequestSchema },
+    responses: {
+      200: profileUpdatedSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/addresses',
+    summary: 'The account’s book of delivery addresses, oldest first (FC 051)',
+    permission: 'account:self',
+    request: {},
+    responses: { 200: addressListSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/addresses',
+    summary:
+      'Adds a delivery address, up to five per account; the first one is the default (FC 051)',
+    permission: 'account:self',
+    request: { headers: mutationHeaders, body: addressUpsertRequestSchema },
+    responses: {
+      201: addressSavedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'PATCH',
+    path: '/v1/account/addresses/:id',
+    summary:
+      'Edits or completes an address, or makes it the default one; another account’s id is a 404 (FC 051)',
+    permission: 'account:self',
+    request: {
+      params: addressParams,
+      headers: mutationHeaders,
+      body: addressPatchRequestSchema,
+    },
+    responses: {
+      200: addressSavedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/addresses/:id',
+    summary:
+      'Deletes an address; if it was the default the newest left takes its place (FC 051)',
+    permission: 'account:self',
+    request: { params: addressParams, headers: mutationHeaders },
+    responses: {
+      204: z.null(),
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
   },
   {
     method: 'POST',

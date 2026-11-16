@@ -7,6 +7,9 @@
  * - T2.3a: a `/v1/admin` route needs a granular permission, never the buyer's `account:self`.
  * - T2.3c: a `DELETE` route may only refuse (405); no master entity is ever deleted. FC 029
  *   T1.1: a guarded DELETE may also carry the guard's 401, 403 and 503, which come first.
+ *   FC 051: the holder of an account may delete their own personal data (the right of
+ *   cancellation, LFPDPPP), which is not a master entity: the routes of {@link OWN_DATA_DELETES},
+ *   and only they, really delete, and only with the buyer's own permission.
  * - T2.6a: the one public route a private prefix may hold is a 405 refusal, which answers
  *   nothing else and reveals nothing.
  *
@@ -38,6 +41,14 @@ const under = (path: string, prefix: string) =>
 const onlyRefuses = (route: PermissionedRoute) =>
   Object.keys(route.responses ?? {}).join() === '405';
 
+/**
+ * The only DELETE routes that do something (FC 051): a holder deleting a row of their own
+ * personal data. Named one by one, never by pattern, so a new one is a decision of the contract.
+ */
+const OWN_DATA_DELETES: ReadonlySet<string> = new Set([
+  'DELETE /v1/account/addresses/:id',
+]);
+
 /** What the session guard may answer before a guarded route runs (lib/guard.ts). */
 const GUARD_REFUSALS = new Set(['401', '403', '503']);
 
@@ -52,6 +63,19 @@ const refusesBehindGuard = (route: PermissionedRoute) => {
     statuses.every((status) => status === '405' || GUARD_REFUSALS.has(status))
   );
 };
+
+/** What is wrong with a DELETE route, or null: it only refuses, or it is one of the holder's own. */
+function deleteViolation(route: PermissionedRoute): string | null {
+  const at = `${route.method} ${route.path}`;
+  if (OWN_DATA_DELETES.has(at)) {
+    return route.permission === SELF_PERMISSION
+      ? null
+      : "a delete of one's own data needs account:self";
+  }
+  return route.method === 'DELETE' && !refusesBehindGuard(route)
+    ? 'DELETE must only refuse (405)'
+    : null;
+}
 
 /**
  * Finds every route that breaks the route ↔ permission rule.
@@ -79,8 +103,8 @@ export function routePermissionViolations(
       violations.push(`${at}: private route declared public`);
     if (under(path, '/v1/admin') && permission === SELF_PERMISSION)
       violations.push(`${at}: panel route without a granular permission`);
-    if (method === 'DELETE' && !refusesBehindGuard(route))
-      violations.push(`${at}: DELETE must only refuse (405)`);
+    const deleting = deleteViolation(route);
+    if (deleting !== null) violations.push(`${at}: ${deleting}`);
   }
   return violations;
 }

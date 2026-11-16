@@ -41,6 +41,14 @@ import {
   replaceGallery,
   updateProduct,
 } from './services/catalogProducts';
+import {
+  accountDelivery,
+  createAddress,
+  deleteAddress,
+  listAddresses,
+  updateAddress,
+  updateProfile,
+} from './services/accountAddresses';
 import { createDb } from './services/db';
 import { runIdempotent } from './services/idempotency';
 import { inspectMedia, readMedia, storeMedia } from './services/media';
@@ -56,7 +64,6 @@ import {
   openChallenge,
   openSession,
   passEmailChallenge,
-  readPostalCode,
   savePendingTotp,
   sessionUser,
   totpOf,
@@ -1806,67 +1813,221 @@ describe('administrators managed by the owner on real SQL (adminUsers.ts, FC 044
   });
 });
 
-describe('the delivery postal code of an account on real SQL (migration 009, identity.ts, FC 047 F0)', () => {
+describe('the phone and the book of addresses of an account on real SQL (migration 011, accountAddresses.ts, FC 051 F0)', () => {
   const KEY = Buffer.alloc(32, 5);
   const ARGON =
     '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
-  const rowOf = async (email: string) =>
+  const idOf = async (email: string) =>
     (
-      await db.query<{
-        id: string;
-        shipping_postal_code_enc: Buffer | null;
-        shipping_state: string | null;
-      }>(
-        'SELECT id, shipping_postal_code_enc, shipping_state FROM users WHERE email = ?',
-        [email]
-      )
-    )[0];
-
-  it('stores the code only as ciphertext, with its derived state, and gives it back to its holder (T1.3, T2.3)', async () => {
-    expect(
-      await createCustomer(db, {
-        email: 'postal@example.test',
-        passwordHash: ARGON,
-        fullName: 'Postal',
-        postal: { code: '98612', state: 'ZAC', key: KEY },
-      })
-    ).toBe(true);
-    const row = await rowOf('postal@example.test');
-    expect(row.shipping_state).toBe('ZAC');
-    expect(
-      Buffer.from(row.shipping_postal_code_enc ?? []).includes('98612')
-    ).toBe(false);
-    expect(await readPostalCode(db, KEY, row.id)).toBe('98612');
-    expect(await readPostalCode(db, null, row.id)).toBeNull();
-  });
-
-  it('leaves both columns empty for an account without a postal code, and reads none (T1.3)', async () => {
+      await db.query<{ id: string }>('SELECT id FROM users WHERE email = ?', [
+        email,
+      ])
+    )[0].id;
+  const signUp = async (email: string, code?: string) => {
     await createCustomer(db, {
-      email: 'nopostal@example.test',
+      email,
       passwordHash: ARGON,
-      fullName: 'Sin CP',
+      fullName: 'Prueba',
+      postal: code ? { code, state: 'ZAC', key: KEY } : undefined,
     });
-    const row = await rowOf('nopostal@example.test');
-    expect(row.shipping_postal_code_enc).toBeNull();
-    expect(row.shipping_state).toBeNull();
-    expect(await readPostalCode(db, KEY, row.id)).toBeNull();
+    return idOf(email);
+  };
+  const casa = (label: string, postalCode = '98612') => ({
+    label,
+    name: 'Ana Pérez López',
+    phone: '4929421780',
+    street: 'Av. Barones',
+    exteriorNumber: '209',
+    neighborhood: 'Las Américas',
+    municipality: 'Guadalupe',
+    stateCode: 'ZAC',
+    postalCode,
+  });
+  const add = (userId: string, label: string, wantsDefault = false) =>
+    db.transaction((tx) =>
+      createAddress(tx, KEY, userId, casa(label), wantsDefault)
+    );
+  const defaultOf = async (userId: string) =>
+    (
+      await db.query<{ default_address_id: string | null }>(
+        'SELECT default_address_id FROM users WHERE id = ?',
+        [userId]
+      )
+    )[0].default_address_id;
+
+  it('stores the postal code of the sign-up as the first address: incomplete, the default, only as ciphertext (T2.4, T2.2)', async () => {
+    const id = await signUp('postal@example.test', '98612');
+    const rows = await db.query<{
+      id: string;
+      state_code: string;
+      is_complete: number;
+      address_enc: Buffer;
+    }>(
+      'SELECT id, state_code, is_complete, address_enc FROM user_addresses WHERE user_id = ?',
+      [id]
+    );
+    expect(rows).toHaveLength(1);
+    expect([rows[0].state_code, Number(rows[0].is_complete)]).toEqual([
+      'ZAC',
+      0,
+    ]);
+    expect(Buffer.from(rows[0].address_enc).includes('98612')).toBe(false);
+    expect(await defaultOf(id)).toBe(rows[0].id);
+    expect(await accountDelivery(db, KEY, id)).toEqual({
+      phone: null,
+      postalCode: '98612',
+      stateCode: 'ZAC',
+    });
+    expect(await accountDelivery(db, null, id)).toEqual({
+      phone: null,
+      postalCode: null,
+      stateCode: null,
+    });
+    // The same bytes do not open for another account.
+    const other = await signUp('otro-cp@example.test');
+    await db.query('UPDATE user_addresses SET user_id = ? WHERE id = ?', [
+      other,
+      rows[0].id,
+    ]);
+    await db.query('UPDATE users SET default_address_id = ? WHERE id = ?', [
+      rows[0].id,
+      other,
+    ]);
+    await expect(accountDelivery(db, KEY, other)).rejects.toThrow();
   });
 
-  it('refuses a state without its ciphertext, a ciphertext without its state, and a state that is not a shipping zone (foreign key)', async () => {
-    const insert = (enc: Buffer | null, state: string | null, email: string) =>
+  it('writes no address for an account without a postal code, and reads none', async () => {
+    const id = await signUp('nopostal@example.test');
+    expect(await listAddresses(db, KEY, id)).toEqual([]);
+    expect(await defaultOf(id)).toBeNull();
+    expect(await accountDelivery(db, KEY, id)).toEqual({
+      phone: null,
+      postalCode: null,
+      stateCode: null,
+    });
+  });
+
+  it('keeps the phone sealed for its account (T1.1, T2.2)', async () => {
+    const id = await signUp('phone@example.test');
+    await db.transaction((tx) =>
+      updateProfile(tx, KEY, id, { fullName: 'Ana Nueva', phone: '4929421780' })
+    );
+    const [row] = await db.query<{ full_name: string; phone_enc: Buffer }>(
+      'SELECT full_name, phone_enc FROM users WHERE id = ?',
+      [id]
+    );
+    expect(row.full_name).toBe('Ana Nueva');
+    expect(Buffer.from(row.phone_enc).includes('4929421780')).toBe(false);
+    expect((await accountDelivery(db, KEY, id)).phone).toBe('4929421780');
+  });
+
+  it('adds up to five addresses under the lock, the first one the default, and refuses the sixth (T2.4)', async () => {
+    const id = await signUp('book@example.test');
+    const first = await add(id, 'Casa 0');
+    expect(first).toMatchObject({ isDefault: true, isComplete: true });
+    for (const n of [1, 2, 3, 4]) await add(id, `Casa ${n}`);
+    expect(await add(id, 'Casa 5')).toBe('ADDRESS_LIMIT_REACHED');
+    const book = await listAddresses(db, KEY, id);
+    expect(book.map((a) => a.label)).toEqual([
+      'Casa 0',
+      'Casa 1',
+      'Casa 2',
+      'Casa 3',
+      'Casa 4',
+    ]);
+    expect(book.filter((a) => a.isDefault).map((a) => a.label)).toEqual([
+      'Casa 0',
+    ]);
+    // Another account has its own five.
+    const other = await signUp('book2@example.test');
+    expect(await add(other, 'Mía')).toMatchObject({ isDefault: true });
+  });
+
+  it('completes an address, makes another the default, and moves the default when it is deleted (T1.3, T2.4)', async () => {
+    const id = await signUp('moves@example.test', '98612');
+    const [signUpAddress] = await listAddresses(db, KEY, id);
+    expect(signUpAddress).toMatchObject({ isComplete: false, street: null });
+    await expect(
+      db.transaction((tx) =>
+        updateAddress(tx, KEY, id, signUpAddress.id, casa('Casa'))
+      )
+    ).resolves.toEqual({
+      id: signUpAddress.id,
+      isDefault: true,
+      isComplete: true,
+    });
+    const second = (await add(id, 'Oficina')) as { id: string };
+    const third = (await add(id, 'Papás')) as { id: string };
+    await expect(
+      db.transaction((tx) =>
+        updateAddress(tx, KEY, id, second.id, { isDefault: true })
+      )
+    ).resolves.toMatchObject({ isDefault: true, isComplete: true });
+    expect(await defaultOf(id)).toBe(second.id);
+    // The default goes: the foreign key clears it and the newest left takes its place.
+    expect(
+      await db.transaction((tx) => deleteAddress(tx, id, second.id))
+    ).toBeNull();
+    expect(await defaultOf(id)).toBe(third.id);
+    await db.transaction((tx) => deleteAddress(tx, id, third.id));
+    await db.transaction((tx) => deleteAddress(tx, id, signUpAddress.id));
+    expect(await defaultOf(id)).toBeNull();
+    expect(await listAddresses(db, KEY, id)).toEqual([]);
+  });
+
+  it('never opens another account’s address: an id of someone else reads as one that does not exist (T2.3)', async () => {
+    const ana = await signUp('ana-idor@example.test');
+    const luis = await signUp('luis-idor@example.test');
+    const mine = (await add(ana, 'Casa')) as { id: string };
+    await expect(
+      db.transaction((tx) => updateAddress(tx, KEY, luis, mine.id, casa('X')))
+    ).resolves.toBe('ADDRESS_NOT_FOUND');
+    await expect(
+      db.transaction((tx) =>
+        updateAddress(tx, KEY, luis, mine.id, { isDefault: true })
+      )
+    ).resolves.toBe('ADDRESS_NOT_FOUND');
+    await expect(
+      db.transaction((tx) => deleteAddress(tx, luis, mine.id))
+    ).resolves.toBe('ADDRESS_NOT_FOUND');
+    expect(await listAddresses(db, KEY, ana)).toHaveLength(1);
+    expect(await defaultOf(luis)).toBeNull();
+  });
+
+  it('refuses a state that is not a shipping zone and a flag that is not 0 or 1 (foreign key, CHECK)', async () => {
+    const id = await signUp('constraints@example.test');
+    const insert = (state: string, complete: number) =>
       db.query(
-        'INSERT INTO users (id, email, password_hash, full_name, shipping_postal_code_enc, shipping_state) VALUES (UUID(), ?, ?, ?, ?, ?)',
-        [email, ARGON, 'Prueba', enc, state]
+        'INSERT INTO user_addresses (id, user_id, state_code, is_complete, address_enc) VALUES (UUID(), ?, ?, ?, ?)',
+        [id, state, complete, Buffer.from('x')]
       );
-    await expect(insert(null, 'ZAC', 'a1@example.test')).rejects.toThrow();
-    await expect(
-      insert(Buffer.from('x'), null, 'a2@example.test')
-    ).rejects.toThrow();
-    await expect(
-      insert(Buffer.from('x'), 'zac', 'a3@example.test')
-    ).rejects.toThrow();
-    await expect(
-      insert(Buffer.from('x'), 'ZZZ', 'a4@example.test')
-    ).rejects.toThrow();
+    await expect(insert('ZZZ', 1)).rejects.toThrow();
+    await expect(insert('zac', 1)).rejects.toThrow();
+    await expect(insert('ZAC', 2)).rejects.toThrow();
+    await expect(insert('ZAC', 1)).resolves.toBeDefined();
+  });
+
+  it('takes the addresses with the account (ON DELETE CASCADE) and leaves the owner untouched (T2.1)', async () => {
+    const id = await signUp('cascade@example.test', '98612');
+    await db.query('DELETE FROM users WHERE id = ?', [id]);
+    expect(
+      (
+        await db.query<{ n: number }>(
+          'SELECT COUNT(*) AS n FROM user_addresses WHERE user_id = ?',
+          [id]
+        )
+      )[0].n
+    ).toBe(0);
+    const [owners] = await db.query<{ touched: number }>(
+      "SELECT COUNT(*) AS touched FROM users u JOIN user_roles r ON r.user_id = u.id AND r.role_id = 'owner' WHERE u.phone_enc IS NOT NULL OR u.default_address_id IS NOT NULL"
+    );
+    expect(Number(owners.touched)).toBe(0);
+  });
+
+  it('retired the postal code and state columns of migration 009 (T2.1)', async () => {
+    const [gone] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME IN ('shipping_postal_code_enc', 'shipping_state')"
+    );
+    expect(Number(gone.n)).toBe(0);
   });
 });

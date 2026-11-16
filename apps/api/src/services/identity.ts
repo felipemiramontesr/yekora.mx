@@ -15,7 +15,7 @@
 import { randomUUID } from 'node:crypto';
 import { isPrivileged } from '../lib/permissions';
 import { codeHash, newToken, tokenHash } from './authCrypto';
-import { decryptPii, encryptPii } from './checkoutCrypto';
+import { insertSignUpAddress } from './accountAddresses';
 import type { Db, Transactional } from './db';
 
 /** Lifetime of a sign-in challenge. */
@@ -120,13 +120,13 @@ export async function emailOf(db: Db, userId: string): Promise<string> {
   return row.email;
 }
 
-/** The delivery postal code given at sign-up, with the state derived from it (FC 047). */
+/** The delivery postal code given at sign-up, with the state derived from it (FC 047, FC 051). */
 interface SignUpPostal {
   /** Five digits, already validated. */
   code: string;
   /** State code derived from it (informational). */
   state: string;
-  /** CHECKOUT_PII_KEY: the code is stored only as ciphertext bound to the new account. */
+  /** CHECKOUT_PII_KEY: the code is stored only as ciphertext bound to the new address. */
   key: Buffer;
 }
 
@@ -135,7 +135,7 @@ interface SignUpPostal {
  *
  * @param db - Database with transactions.
  * @param user - Canonical e-mail, Argon2id hash and full name, and optionally the delivery
- *   postal code, which is encrypted before it is stored.
+ *   postal code, which becomes the account's first address and is encrypted before it is stored.
  * @returns True when created; false when the e-mail already had an account.
  */
 export function createCustomer(
@@ -154,25 +154,17 @@ export function createCustomer(
     );
     if (taken) return false;
     const id = randomUUID();
-    const { postal } = user;
-    const identity = [id, user.email, user.passwordHash, user.fullName];
-    // Two statements, not one with NULLs: an account without a postal code never names the
-    // columns of migration 009, so a deployment that reaches production before that migration
-    // still signs people up (FC 047 F0).
-    if (postal) {
-      await tx.query(
-        'INSERT INTO users (id, email, password_hash, full_name, shipping_postal_code_enc, shipping_state) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          ...identity,
-          encryptPii(postal.key, id, 'shipping_postal_code', postal.code),
-          postal.state,
-        ]
-      );
-    } else {
-      await tx.query(
-        'INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
-        identity
-      );
+    await tx.query(
+      'INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
+      [id, user.email, user.passwordHash, user.fullName]
+    );
+    // FC 051: the postal code given at sign-up is the account's first address, incomplete, and
+    // the default; it is the only place the account keeps a postal code.
+    if (user.postal) {
+      await insertSignUpAddress(tx, user.postal.key, id, {
+        postalCode: user.postal.code,
+        stateCode: user.postal.state,
+      });
     }
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
@@ -180,33 +172,6 @@ export function createCustomer(
     );
     return true;
   });
-}
-
-/**
- * The delivery postal code an account gave at sign-up, decrypted for its holder (FC 047 T2.3).
- *
- * @param db - Database port.
- * @param key - CHECKOUT_PII_KEY, or null when the checkout secrets are not configured.
- * @param userId - The account.
- * @returns The five digits, or null when there is none or the key is missing.
- * @throws When the stored value does not authenticate (altered, or moved to another account).
- */
-export async function readPostalCode(
-  db: Db,
-  key: Buffer | null,
-  userId: string
-): Promise<string | null> {
-  const [row] = await db.query<{ shipping_postal_code_enc: Buffer | null }>(
-    'SELECT shipping_postal_code_enc FROM users WHERE id = ?',
-    [userId]
-  );
-  if (!row?.shipping_postal_code_enc || key === null) return null;
-  return decryptPii(
-    key,
-    userId,
-    'shipping_postal_code',
-    row.shipping_postal_code_enc
-  );
 }
 
 /**
