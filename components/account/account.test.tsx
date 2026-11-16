@@ -26,6 +26,7 @@ import {
   checkReset,
   verify,
 } from '@/lib/api/accountClient';
+import { listAddresses, updateProfile } from '@/lib/api/accountDataClient';
 import {
   inviteAdminUser,
   listAdminUsers,
@@ -50,12 +51,24 @@ vi.mock('@/lib/api/accountClient', () => ({
   checkReset: vi.fn(),
 }));
 
+vi.mock('@/lib/api/accountDataClient', () => ({
+  listAddresses: vi.fn(),
+  updateProfile: vi.fn(),
+  createAddress: vi.fn(),
+  updateAddress: vi.fn(),
+  deleteAddress: vi.fn(),
+}));
+
 vi.mock('@/lib/api/adminUsersClient', () => ({
   listAdminUsers: vi.fn(),
   inviteAdminUser: vi.fn(),
   updateAdminUser: vi.fn(),
 }));
 
+const data = {
+  list: vi.mocked(listAddresses),
+  profile: vi.mocked(updateProfile),
+};
 const api = {
   listAdminUsers: vi.mocked(listAdminUsers),
   inviteAdminUser: vi.mocked(inviteAdminUser),
@@ -489,6 +502,32 @@ describe('account area · trusted device (FC 028 Enmienda 1, E2)', () => {
     press(account.signIn.submit);
     await screen.findByText('Hola, Ana Flores');
     expect(api.verify).not.toHaveBeenCalled();
+  });
+});
+
+describe('account area · data and addresses (FC 051 T1.4, T2.6)', () => {
+  it('opens «Datos y domicilios» by its address, and asks who is signed in again after saving the profile', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    data.list.mockResolvedValue(ok({ items: [], max: 5 }));
+    data.profile.mockResolvedValue(ok({ fullName: 'Ana P. Flores' }));
+    globalThis.history.replaceState(null, '', '/cuenta/datos/');
+    renderApp();
+    const form = await screen.findByRole('form', {
+      name: account.data.profile.title,
+    });
+    const breadcrumb = screen.getByRole('navigation', {
+      name: account.dashboard.breadcrumb,
+    });
+    expect(
+      within(breadcrumb).getByText(account.dashboard.profile)
+    ).toBeTruthy();
+    api.me.mockResolvedValue(ok({ ...BUYER, fullName: 'Ana P. Flores' }));
+    fireEvent.change(within(form).getByLabelText(account.data.profile.phone), {
+      target: { value: '4929421780' },
+    });
+    fireEvent.submit(form);
+    expect(await screen.findByText(account.data.profile.saved)).toBeTruthy();
+    await screen.findByText('Hola, Ana P. Flores');
   });
 });
 

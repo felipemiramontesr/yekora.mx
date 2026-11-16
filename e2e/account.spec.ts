@@ -86,6 +86,74 @@ test('a buyer remembers this device, signs in again without a code, then forgets
   ).toBeVisible();
 });
 
+test('a buyer keeps their data and up to five addresses, and the header follows the default one (FC 051 T1.4, T2.6)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer' });
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  const delivery = page.getByRole('banner').getByRole('link', {
+    name: /Agregar CP|Enviar al código postal/,
+  });
+  await expect(delivery).toHaveText(/Agregar CP/);
+  await openAccountMenu(page);
+  await page.getByRole('link', { name: 'Datos y domicilios' }).click();
+  await expect(page).toHaveURL(/\/cuenta\/datos\/$/);
+  // The e-mail is shown, never a field to change.
+  await expect(page.getByText('ana@example.test')).toBeVisible();
+  await expect(page.getByLabel('Correo electrónico')).toHaveCount(0);
+
+  const profile = page.getByRole('form', { name: 'Tus datos' });
+  await profile.getByLabel('Teléfono').fill('4929421780');
+  await profile.getByRole('button', { name: 'Guardar datos' }).click();
+  await expect(page.getByText('Datos guardados.')).toBeVisible();
+
+  const addAddress = async (label: string, street: string, postal: string) => {
+    await page.getByRole('button', { name: 'Agregar domicilio' }).click();
+    const form = page.getByRole('form', { name: 'Nuevo domicilio' });
+    await form.getByLabel('Nombre del domicilio').fill(label);
+    await form.getByLabel('Calle').fill(street);
+    await form.getByLabel('Número exterior').fill('12');
+    await form.getByLabel('Colonia').fill('Centro');
+    await form.getByLabel('Municipio o alcaldía').fill('Municipio');
+    await form.getByLabel('Código postal').fill(postal);
+    await form.getByRole('button', { name: 'Guardar domicilio' }).click();
+    await expect(page.getByText('Domicilio guardado.')).toBeVisible();
+  };
+  await addAddress('Casa', 'Av. Barones', '98612');
+  await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
+  await expect(page.getByText('Predeterminado', { exact: true })).toHaveCount(
+    1
+  );
+
+  await addAddress('Oficina', 'Calle Reforma', '06600');
+  await expect(page.getByText('2 de 5 domicilios')).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Hacer predeterminado: Oficina' })
+    .click();
+  await expect(
+    page.getByText('Ahora es tu domicilio predeterminado.')
+  ).toBeVisible();
+  await expect(delivery).toHaveAccessibleName('Enviar al código postal 06600');
+  // The browser keeps the state of the default address and nothing else of it.
+  const stored = await page.evaluate(() => ({
+    state: localStorage.getItem('yekora_shipping_state_v1'),
+    all: Object.values({ ...localStorage }).join(' '),
+  }));
+  expect(stored.state).toBe('CMX');
+  expect(stored.all).not.toMatch(/98612|06600|Barones|Reforma|4929421780/);
+
+  await page.getByRole('button', { name: 'Eliminar: Oficina' }).click();
+  await expect(page.getByText('¿Eliminar este domicilio?')).toBeVisible();
+  await page.getByRole('button', { name: 'Conservar' }).click();
+  await expect(page.getByText('2 de 5 domicilios')).toBeVisible();
+  await page.getByRole('button', { name: 'Eliminar: Oficina' }).click();
+  await page.getByRole('button', { name: 'Sí, eliminar' }).click();
+  await expect(page.getByText('Domicilio eliminado.')).toBeVisible();
+  await expect(page.getByText('1 de 5 domicilios')).toBeVisible();
+  await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
+});
+
 test('staff see the panel’s orders, in English too', async ({ page }) => {
   await mockAccountApi(page, { signedIn: 'staff' });
   await page.goto('/en/account/');

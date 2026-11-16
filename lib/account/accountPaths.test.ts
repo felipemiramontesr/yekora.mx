@@ -7,6 +7,7 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
   it.each([
     ['/cuenta/', { tab: 'orders', orderNumber: null }],
     [`/cuenta/${ORDER}/`, { tab: 'orders', orderNumber: ORDER }],
+    ['/cuenta/datos/', { tab: 'profile', orderNumber: null }],
     ['/cuenta/panel/', { tab: 'panel', orderNumber: null }],
     [`/cuenta/panel/${ORDER}/`, { tab: 'panel', orderNumber: ORDER }],
     ['/cuenta/panel/not-an-order/', { tab: 'panel', orderNumber: null }],
@@ -20,6 +21,7 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
     for (const view of [
       { tab: 'orders', orderNumber: null },
       { tab: 'orders', orderNumber: ORDER },
+      { tab: 'profile', orderNumber: null },
       { tab: 'panel', orderNumber: null },
       { tab: 'panel', orderNumber: ORDER },
     ] as const) {
@@ -29,6 +31,20 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
     expect(accountPath('/cuenta/', { tab: 'panel', orderNumber: ORDER })).toBe(
       `/cuenta/panel/${ORDER}/`
     );
+  });
+});
+
+describe('data and addresses path (FC 051)', () => {
+  it('reads and writes /datos/ in both languages, with no order in it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}datos/`, area)).toEqual({
+        tab: 'profile',
+        orderNumber: null,
+      });
+      expect(accountPath(area, { tab: 'profile', orderNumber: null })).toBe(
+        `${area}datos/`
+      );
+    }
   });
 });
 

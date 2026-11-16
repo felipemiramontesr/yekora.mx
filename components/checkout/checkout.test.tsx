@@ -9,6 +9,8 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMessages, type Locale } from '@/app/i18n';
+import type { AddressView } from '@/lib/account/addressTypes';
+import { listAddresses } from '@/lib/api/accountDataClient';
 import type { QuoteState } from '@/lib/api/cartClient';
 import { fetchOrder, submitCheckout } from '@/lib/api/checkoutClient';
 import { getCartStore } from '@/lib/cart/cartStore';
@@ -18,6 +20,7 @@ import type { OrderView } from '@/lib/checkout/checkoutTypes';
 import { recallOrder, rememberOrder } from '@/lib/checkout/orderAccess';
 import { CartContents } from '../cart/CartContents';
 import { useCartQuote } from '../cart/useCart';
+import { useHeaderAccount } from '../useHeaderAccount';
 import { CheckoutForm } from './CheckoutForm';
 import { OrderStatus } from './OrderStatus';
 
@@ -31,7 +34,13 @@ vi.mock('../cart/useCart', async (original) => ({
   useCartQuote: vi.fn(),
 }));
 
+// FC 051: the account of the header and its saved addresses are what each test sets; a guest by default.
+vi.mock('../useHeaderAccount', () => ({ useHeaderAccount: vi.fn() }));
+vi.mock('@/lib/api/accountDataClient', () => ({ listAddresses: vi.fn() }));
+
 const submit = vi.mocked(submitCheckout);
+const account = vi.mocked(useHeaderAccount);
+const savedBook = vi.mocked(listAddresses);
 const readOrder = vi.mocked(fetchOrder);
 const liveQuote = vi.mocked(useCartQuote);
 
@@ -114,6 +123,7 @@ beforeEach(() => {
   liveQuote.mockReturnValue(READY);
   getCartStore().addItem('TENT', 1);
   getDestinationStore().setState('ZAC');
+  account.mockReturnValue({ firstName: null, user: null });
 });
 
 afterEach(() => {
@@ -601,5 +611,187 @@ describe('OrderStatus (return pages)', () => {
       answer({ ok: true, order: ORDER });
     });
     expect(getCartStore().getSnapshot()).toHaveLength(1);
+  });
+});
+
+describe('CheckoutForm of a signed-in buyer (FC 051 T1.4, T2.5, T2.6)', () => {
+  const ANA = {
+    id: 'f0000000-0000-4000-8000-000000000001',
+    email: 'ana@example.test',
+    fullName: 'Ana Pérez',
+    roles: ['customer'],
+    permissions: ['account:self'],
+    phone: '4929421780',
+    postalCode: '98612',
+    stateCode: 'ZAC',
+  };
+  const address = (over: Partial<AddressView> = {}): AddressView => ({
+    id: 'a0000000-0000-4000-8000-000000000001',
+    isDefault: true,
+    isComplete: true,
+    stateCode: 'ZAC',
+    postalCode: '98612',
+    label: 'Casa',
+    name: 'Ana Pérez',
+    phone: '4929421780',
+    street: 'Av. Barones',
+    exteriorNumber: '209',
+    interiorNumber: null,
+    neighborhood: 'Las Américas',
+    municipality: 'Guadalupe',
+    references: null,
+    ...over,
+  });
+  const OFICINA = address({
+    id: 'a0000000-0000-4000-8000-000000000002',
+    isDefault: false,
+    label: 'Oficina',
+    street: 'Calle Hidalgo',
+    exteriorNumber: '12',
+    neighborhood: 'Centro',
+    municipality: 'Zacatecas',
+    postalCode: '98000',
+  });
+  const INCOMPLETE = address({
+    id: 'a0000000-0000-4000-8000-000000000003',
+    isDefault: false,
+    isComplete: false,
+    label: 'Sin completar',
+    street: null,
+  });
+  const signedIn = (items: AddressView[], max = 5) => {
+    account.mockReturnValue({ firstName: 'Ana', user: ANA });
+    savedBook.mockResolvedValue({ ok: true, data: { items, max } });
+  };
+  const field = (label: string) =>
+    screen.getByLabelText(label) as HTMLInputElement;
+  const pay = async () => {
+    fireEvent.click(screen.getByLabelText(/Efectivo en OXXO/));
+    fireEvent.click(screen.getByRole('checkbox', { name: /privacidad/i }));
+    submit.mockResolvedValue({ ok: true, session: SESSION });
+    fireEvent.click(payButton());
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    return submit.mock.calls[0][0];
+  };
+
+  it('starts with the contact of the account and the default saved address chosen and filled in', async () => {
+    signedIn([address(), OFICINA, INCOMPLETE]);
+    renderForm();
+    expect(await screen.findByLabelText(/Casa/)).toHaveProperty(
+      'checked',
+      true
+    );
+    expect(field('Nombre completo').value).toBe('Ana Pérez');
+    expect(field('Correo electrónico').value).toBe('ana@example.test');
+    expect(field('Teléfono').value).toBe('4929421780');
+    expect(field('Calle').value).toBe('Av. Barones');
+    expect(field('Código postal').value).toBe('98612');
+    // Only the addresses that can ship an order are offered, the default one marked.
+    expect(screen.getByText(/Casa · Predeterminado/)).toBeTruthy();
+    expect(screen.getByLabelText(/Oficina/)).toBeTruthy();
+    expect(screen.queryByLabelText(/Sin completar/)).toBeNull();
+    expect(
+      screen
+        .getByRole('link', { name: 'Administrar mis domicilios' })
+        .getAttribute('href')
+    ).toBe('/cuenta/datos/');
+    expect(screen.queryByLabelText(/Guardar este domicilio/)).toBeNull();
+  });
+
+  it('fills the form and the delivery state with another saved address, and sends no request to keep it', async () => {
+    signedIn([address(), OFICINA]);
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    fireEvent.click(screen.getByLabelText(/Oficina/));
+    expect(field('Calle').value).toBe('Calle Hidalgo');
+    expect(field('Colonia').value).toBe('Centro');
+    expect(field('Código postal').value).toBe('98000');
+    const request = await pay();
+    expect(request).toMatchObject({
+      address: {
+        street: 'Calle Hidalgo',
+        postalCode: '98000',
+        stateCode: 'ZAC',
+      },
+      customer: { name: 'Ana Pérez', email: 'ana@example.test' },
+    });
+    expect(request.saveAddress).toBeUndefined();
+  });
+
+  it('clears the address fields for «use another address», offers to keep it, and asks the API to', async () => {
+    signedIn([address()]);
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    fireEvent.click(screen.getByLabelText('Usar otro domicilio'));
+    expect(field('Calle').value).toBe('');
+    expect(field('Código postal').value).toBe('');
+    fireEvent.change(field('Calle'), { target: { value: 'Av. Nueva' } });
+    fireEvent.change(field('Número exterior'), { target: { value: '7' } });
+    fireEvent.change(field('Colonia'), { target: { value: 'Centro' } });
+    fireEvent.change(field('Municipio o alcaldía'), {
+      target: { value: 'Zacatecas' },
+    });
+    fireEvent.change(field('Código postal'), { target: { value: '98000' } });
+    fireEvent.click(screen.getByLabelText(/Guardar este domicilio/));
+    const request = await pay();
+    expect(request).toMatchObject({
+      saveAddress: true,
+      address: { street: 'Av. Nueva', postalCode: '98000' },
+    });
+  });
+
+  it('offers to keep the address of a buyer with an empty book, and not when the book is full', async () => {
+    signedIn([]);
+    renderForm();
+    expect(await screen.findByLabelText(/Guardar este domicilio/)).toBeTruthy();
+    expect(screen.queryByLabelText('Usar otro domicilio')).toBeNull();
+    cleanup();
+    const full = Array.from({ length: 5 }, (_, n) =>
+      address({
+        id: `a0000000-0000-4000-8000-00000000010${n}`,
+        isDefault: n === 0,
+      })
+    );
+    signedIn(full);
+    renderForm();
+    await screen.findByLabelText('Usar otro domicilio');
+    fireEvent.click(screen.getByLabelText('Usar otro domicilio'));
+    expect(screen.queryByLabelText(/Guardar este domicilio/)).toBeNull();
+  });
+
+  it('keeps what the buyer typed before the account answered, and works as a guest when the book fails', async () => {
+    account.mockReturnValue({ firstName: 'Ana', user: ANA });
+    savedBook.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderForm();
+    await waitFor(() => expect(savedBook).toHaveBeenCalled());
+    expect(field('Nombre completo').value).toBe('Ana Pérez');
+    expect(screen.queryByLabelText('Usar otro domicilio')).toBeNull();
+    expect(screen.queryByLabelText(/Guardar este domicilio/)).toBeNull();
+    fireEvent.change(field('Nombre completo'), {
+      target: { value: 'Otra Persona' },
+    });
+    expect(field('Nombre completo').value).toBe('Otra Persona');
+  });
+
+  it('offers an address without a name by its street, and starts without a phone when the account has none', async () => {
+    account.mockReturnValue({
+      firstName: 'Ana',
+      user: { ...ANA, phone: null },
+    });
+    savedBook.mockResolvedValue({
+      ok: true,
+      data: { items: [address({ label: null })], max: 5 },
+    });
+    renderForm();
+    expect(
+      await screen.findByText(/Av\. Barones · Predeterminado/)
+    ).toBeTruthy();
+    expect(field('Teléfono').value).toBe('');
+  });
+
+  it('asks the API for nothing when there is no account', () => {
+    renderForm();
+    expect(savedBook).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/Guardar este domicilio/)).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
+import { accountPath } from '@/lib/account/accountPaths';
 import { routeFor, searchIndexPath } from '@/lib/routes';
 import { AccountMenu } from './AccountMenu';
 import { CartButton } from './cart/CartButton';
@@ -77,7 +78,10 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
           </Link>
           <div className="order-5 md:order-2">
             <DeliveryIndicator
-              accountHref={routeFor('account', locale)}
+              accountHref={accountPath(routeFor('account', locale), {
+                tab: 'profile',
+                orderNumber: null,
+              })}
               registerHref={`${routeFor('account', locale)}?action=register`}
               messages={messages.header.delivery}
             />

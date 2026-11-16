@@ -343,7 +343,7 @@
       "guest": "Your ZIP",
       "guestHint": "Create your account with your postal code to see where we deliver",
       "add": "Add postal code",
-      "addHint": "Add your postal code in your account",
+      "addHint": "Add your delivery address in your account",
       "to": "Deliver to postal code {code}"
     },
     "accountMenu": {
@@ -712,6 +712,15 @@
         "description": "Optional. Something that helps find the place: the color of the house, between which streets.",
         "example": "Black gate, between Hidalgo and Juárez"
       }
+    },
+    "saved": {
+      "legend": "Your saved addresses",
+      "other": "Use another address",
+      "default": "Default",
+      "save": "Save this address to my account",
+      "loading": "Loading your addresses…",
+      "manage": "Manage my addresses",
+      "profile": "We use the name and phone of your account; you can change them here for this order only."
     }
   },
   "account": {
@@ -840,7 +849,8 @@
       "catalog": "Catalog",
       "admins": "Administrators",
       "ownerBadge": "Owner",
-      "breadcrumb": "Where you are in your account"
+      "breadcrumb": "Where you are in your account",
+      "profile": "Details and addresses"
     },
     "orders": {
       "loading": "Loading orders…",
@@ -1306,6 +1316,126 @@
       "code": {
         "description": "The 6-digit code you received. With your authenticator app, one of your 8-digit backup codes works too.",
         "example": "123456"
+      }
+    },
+    "data": {
+      "loading": "Loading your details…",
+      "profile": {
+        "title": "Your details",
+        "intro": "We use them to contact you and ship your orders. Without a name and a phone we cannot dispatch.",
+        "email": "E-mail",
+        "emailNote": "It is the identifier of your account and cannot be changed.",
+        "fullName": "Full name",
+        "phone": "Phone",
+        "save": "Save details",
+        "saving": "Saving…",
+        "saved": "Details saved.",
+        "incomplete": "Your phone is missing: we need it to deliver your orders."
+      },
+      "addresses": {
+        "title": "Delivery addresses",
+        "intro": "Keep up to {max} addresses. The default one is the postal code you see above, next to the search box.",
+        "count": "{count} of {max} addresses",
+        "empty": "You have no saved addresses yet.",
+        "limit": "You already have {max} addresses. Delete one to add another.",
+        "new": "Add address",
+        "edit": "Edit",
+        "complete": "Complete",
+        "remove": "Delete",
+        "makeDefault": "Make default",
+        "default": "Default",
+        "incomplete": "This address is missing details before you can use it for your orders.",
+        "unlabeled": "Address",
+        "saved": "Address saved.",
+        "madeDefault": "It is now your default address.",
+        "removed": "Address deleted.",
+        "confirm": {
+          "title": "Delete this address?",
+          "text": "It is removed from your account. Your past orders do not change.",
+          "yes": "Yes, delete",
+          "no": "Keep it"
+        }
+      },
+      "form": {
+        "titleNew": "New address",
+        "titleEdit": "Edit address",
+        "label": "Name of the address",
+        "name": "Who receives",
+        "phone": "Phone of who receives",
+        "street": "Street",
+        "exteriorNumber": "Exterior number",
+        "interiorNumber": "Interior number (optional)",
+        "neighborhood": "Neighborhood",
+        "municipality": "Municipality or borough",
+        "postalCode": "Postal code",
+        "references": "Delivery references (optional)",
+        "state": "State",
+        "stateUnknown": "Filled in from your postal code",
+        "isDefault": "Use as my default address",
+        "save": "Save address",
+        "saving": "Saving…",
+        "cancel": "Cancel"
+      },
+      "fields": {
+        "label": {
+          "description": "Optional. What you want to call this address.",
+          "example": "Home"
+        },
+        "name": {
+          "description": "Who will receive the order: first and last name.",
+          "example": "Ana Pérez López"
+        },
+        "phone": {
+          "description": "10 digits, no spaces or hyphens.",
+          "example": "9981234567"
+        },
+        "street": {
+          "description": "The name of the delivery street, without the number.",
+          "example": "Avenida Reforma"
+        },
+        "exteriorNumber": {
+          "description": "The number of the door or the building.",
+          "example": "123"
+        },
+        "interiorNumber": {
+          "description": "Optional. Apartment, floor or unit, if there is one.",
+          "example": "4B"
+        },
+        "neighborhood": {
+          "description": "The neighborhood or the housing development.",
+          "example": "Centro"
+        },
+        "municipality": {
+          "description": "The municipality or borough where the address is.",
+          "example": "Benito Juárez"
+        },
+        "postalCode": {
+          "description": "The 5 digits of the postal code. We take the state from it.",
+          "example": "98000"
+        },
+        "references": {
+          "description": "Optional. Something that helps find the place: the color of the house, between which streets.",
+          "example": "Black gate, between Hidalgo and Juárez"
+        }
+      },
+      "errors": {
+        "fullName": "Enter your full name.",
+        "name": "Enter the full name of who receives.",
+        "phone": "Enter the phone with 10 digits.",
+        "required": "Complete this field.",
+        "postalCode": "Enter a 5-digit postal code from Mexico.",
+        "INVALID_REQUEST": "Check your details and try again.",
+        "INVALID_ADDRESS": "Check the address: every required field and a postal code from Mexico.",
+        "ADDRESS_NOT_FOUND": "That address no longer exists.",
+        "ADDRESS_LIMIT_REACHED": "You already have 5 addresses. Delete one to add another.",
+        "SERVICE_UNAVAILABLE": "We cannot save your details right now. Try again later.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts. Wait a moment.",
+        "offline": "No connection. Check your internet and try again.",
+        "timeout": "The request took too long. Try again.",
+        "server": "We could not complete the request. Try again.",
+        "invalid": "We could not complete the request. Try again.",
+        "unknown": "We could not complete the request. Try again."
       }
     }
   }

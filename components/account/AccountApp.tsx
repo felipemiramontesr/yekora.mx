@@ -32,6 +32,7 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
+import { AccountProfileAddresses } from './AccountProfileAddresses';
 import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -274,6 +275,7 @@ export function AccountApp({
           view={view}
           texts={{ account: messages, methods }}
           onNavigate={navigate}
+          onChanged={() => void loadSession()}
         />
       )}
     </div>
@@ -293,6 +295,7 @@ function Dashboard({
   view,
   texts,
   onNavigate,
+  onChanged,
 }: Readonly<{
   locale: Locale;
   area: string;
@@ -300,6 +303,7 @@ function Dashboard({
   view: AccountView;
   texts: { account: Messages['account']; methods: AccountAppProps['methods'] };
   onNavigate: (view: AccountView) => void;
+  onChanged: () => void;
 }>) {
   const { dashboard } = texts.account;
   // A tab is offered only with its permission or role; the API would refuse it anyway.
@@ -336,6 +340,14 @@ function Dashboard({
           {fill(dashboard.greeting, { name: user.fullName })}
         </p>
       </div>
+      {tab === 'profile' && (
+        <AccountProfileAddresses
+          user={user}
+          messages={texts.account}
+          locale={locale}
+          onChanged={onChanged}
+        />
+      )}
       {tab === 'catalog' && (
         <CatalogConsole texts={texts.account.catalog} locale={locale} />
       )}

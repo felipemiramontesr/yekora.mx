@@ -343,7 +343,7 @@
       "guest": "Tu CP",
       "guestHint": "Crea tu cuenta con tu código postal para ver a dónde enviamos",
       "add": "Agregar CP",
-      "addHint": "Agrega tu código postal en tu cuenta",
+      "addHint": "Agrega tu domicilio de entrega en tu cuenta",
       "to": "Enviar al código postal {code}"
     },
     "accountMenu": {
@@ -712,6 +712,15 @@
         "description": "Opcional. Algo que ayude a encontrar el lugar: el color de la casa, entre qué calles.",
         "example": "Portón negro, entre Hidalgo y Juárez"
       }
+    },
+    "saved": {
+      "legend": "Tus domicilios guardados",
+      "other": "Usar otro domicilio",
+      "default": "Predeterminado",
+      "save": "Guardar este domicilio en mi cuenta",
+      "loading": "Cargando tus domicilios…",
+      "manage": "Administrar mis domicilios",
+      "profile": "Usamos tu nombre y tu teléfono de tu cuenta; puedes cambiarlos aquí solo para este pedido."
     }
   },
   "account": {
@@ -840,7 +849,8 @@
       "catalog": "Catálogo",
       "admins": "Administradores",
       "ownerBadge": "Owner",
-      "breadcrumb": "Dónde estás en tu cuenta"
+      "breadcrumb": "Dónde estás en tu cuenta",
+      "profile": "Datos y domicilios"
     },
     "orders": {
       "loading": "Cargando pedidos…",
@@ -1306,6 +1316,126 @@
       "code": {
         "description": "El código de 6 dígitos que recibiste. Con tu app de autenticación también sirve uno de tus códigos de respaldo de 8 dígitos.",
         "example": "123456"
+      }
+    },
+    "data": {
+      "loading": "Cargando tus datos…",
+      "profile": {
+        "title": "Tus datos",
+        "intro": "Con estos datos te contactamos y enviamos tus pedidos. Sin nombre y teléfono no podemos despachar.",
+        "email": "Correo electrónico",
+        "emailNote": "Es el identificador de tu cuenta y no se puede cambiar.",
+        "fullName": "Nombre completo",
+        "phone": "Teléfono",
+        "save": "Guardar datos",
+        "saving": "Guardando…",
+        "saved": "Datos guardados.",
+        "incomplete": "Falta tu teléfono: lo necesitamos para entregar tus pedidos."
+      },
+      "addresses": {
+        "title": "Domicilios de entrega",
+        "intro": "Guarda hasta {max} domicilios. El predeterminado es el código postal que ves arriba, junto al buscador.",
+        "count": "{count} de {max} domicilios",
+        "empty": "Aún no tienes domicilios guardados.",
+        "limit": "Ya tienes {max} domicilios. Elimina uno para agregar otro.",
+        "new": "Agregar domicilio",
+        "edit": "Editar",
+        "complete": "Completar",
+        "remove": "Eliminar",
+        "makeDefault": "Hacer predeterminado",
+        "default": "Predeterminado",
+        "incomplete": "Falta completar este domicilio para usarlo en tus pedidos.",
+        "unlabeled": "Domicilio",
+        "saved": "Domicilio guardado.",
+        "madeDefault": "Ahora es tu domicilio predeterminado.",
+        "removed": "Domicilio eliminado.",
+        "confirm": {
+          "title": "¿Eliminar este domicilio?",
+          "text": "Se borra de tu cuenta. Tus pedidos anteriores no cambian.",
+          "yes": "Sí, eliminar",
+          "no": "Conservar"
+        }
+      },
+      "form": {
+        "titleNew": "Nuevo domicilio",
+        "titleEdit": "Editar domicilio",
+        "label": "Nombre del domicilio",
+        "name": "Quién recibe",
+        "phone": "Teléfono de quien recibe",
+        "street": "Calle",
+        "exteriorNumber": "Número exterior",
+        "interiorNumber": "Número interior (opcional)",
+        "neighborhood": "Colonia",
+        "municipality": "Municipio o alcaldía",
+        "postalCode": "Código postal",
+        "references": "Referencias para la entrega (opcional)",
+        "state": "Estado",
+        "stateUnknown": "Se llena con tu código postal",
+        "isDefault": "Usar como mi domicilio predeterminado",
+        "save": "Guardar domicilio",
+        "saving": "Guardando…",
+        "cancel": "Cancelar"
+      },
+      "fields": {
+        "label": {
+          "description": "Opcional. Cómo quieres llamar a este domicilio.",
+          "example": "Casa"
+        },
+        "name": {
+          "description": "Quien recibirá el pedido: nombre y apellidos.",
+          "example": "Ana Pérez López"
+        },
+        "phone": {
+          "description": "10 dígitos, sin espacios ni guiones.",
+          "example": "9981234567"
+        },
+        "street": {
+          "description": "El nombre de la calle de entrega, sin el número.",
+          "example": "Avenida Reforma"
+        },
+        "exteriorNumber": {
+          "description": "El número de la puerta o del edificio.",
+          "example": "123"
+        },
+        "interiorNumber": {
+          "description": "Opcional. Departamento, piso o local, si lo hay.",
+          "example": "4B"
+        },
+        "neighborhood": {
+          "description": "La colonia o el fraccionamiento.",
+          "example": "Centro"
+        },
+        "municipality": {
+          "description": "El municipio o la alcaldía donde está la dirección.",
+          "example": "Benito Juárez"
+        },
+        "postalCode": {
+          "description": "Los 5 dígitos del código postal. De él tomamos el estado.",
+          "example": "98000"
+        },
+        "references": {
+          "description": "Opcional. Algo que ayude a encontrar el lugar: el color de la casa, entre qué calles.",
+          "example": "Portón negro, entre Hidalgo y Juárez"
+        }
+      },
+      "errors": {
+        "fullName": "Escribe tu nombre completo.",
+        "name": "Escribe el nombre completo de quien recibe.",
+        "phone": "Escribe el teléfono a 10 dígitos.",
+        "required": "Completa este campo.",
+        "postalCode": "Escribe un código postal de 5 dígitos de México.",
+        "INVALID_REQUEST": "Revisa tus datos e intenta de nuevo.",
+        "INVALID_ADDRESS": "Revisa el domicilio: todos los campos obligatorios y un código postal de México.",
+        "ADDRESS_NOT_FOUND": "Ese domicilio ya no existe.",
+        "ADDRESS_LIMIT_REACHED": "Ya tienes 5 domicilios. Elimina uno para agregar otro.",
+        "SERVICE_UNAVAILABLE": "No podemos guardar tus datos en este momento. Intenta más tarde.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Entra de nuevo.",
+        "rate_limited": "Demasiados intentos. Espera un momento.",
+        "offline": "Sin conexión. Revisa tu internet e intenta de nuevo.",
+        "timeout": "La solicitud tardó demasiado. Intenta de nuevo.",
+        "server": "No pudimos completar la solicitud. Intenta de nuevo.",
+        "invalid": "No pudimos completar la solicitud. Intenta de nuevo.",
+        "unknown": "No pudimos completar la solicitud. Intenta de nuevo."
       }
     }
   }

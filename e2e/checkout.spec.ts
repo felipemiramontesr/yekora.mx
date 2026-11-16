@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
+import { E2E_HOME, mockAccountApi } from './support/accountApi';
 import { mockQuoteApi } from './support/quoteApi';
 
 /**
@@ -222,6 +223,88 @@ test('buys by card: cart → checkout → Stripe → paid, with the token only i
   }));
   expect(stored.session).toContain(ORDER);
   expect(stored.local).not.toMatch(/Ana|Barones|4929421780|example\.com/);
+});
+
+/** Opens the checkout of a signed-in buyer: the header knows their first name, the API their account. */
+async function signedInCheckout(page: Page, addresses: (typeof E2E_HOME)[]) {
+  await mockAccountApi(page, {
+    signedIn: 'buyer',
+    phone: '4929421780',
+    addresses,
+  });
+  const seen = await backend(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+  });
+  await withPack(page, '/checkout/');
+  return seen;
+}
+
+test('a signed-in buyer pays with a saved address: contact and address come filled, and nothing is asked to be kept (FC 051 T1.4)', async ({
+  page,
+}) => {
+  const seen = await signedInCheckout(page, [E2E_HOME]);
+  const form = page.locator('main form');
+  await expect(form.getByRole('radio', { name: /Casa/ })).toBeChecked();
+  await expect(form.getByLabel('Nombre completo')).toHaveValue('Ana E2E');
+  await expect(form.getByLabel('Correo electrónico')).toHaveValue(
+    'ana@example.test'
+  );
+  await expect(form.getByLabel('Teléfono')).toHaveValue('4929421780');
+  await expect(form.getByLabel('Calle')).toHaveValue('Av. Barones');
+  await expect(form.getByLabel('Código postal')).toHaveValue('98612');
+  await expect(
+    form.getByRole('link', { name: 'Administrar mis domicilios' })
+  ).toHaveAttribute('href', '/cuenta/datos/');
+  await expect(
+    form.getByLabel('Guardar este domicilio en mi cuenta')
+  ).toHaveCount(0);
+  await form
+    .getByRole('radio', { name: /Tarjeta de crédito o débito/ })
+    .check();
+  await form.getByRole('checkbox', { name: /privacidad/i }).check();
+  await payButton(page).click();
+  await expect(page).toHaveURL(STRIPE_PAGE);
+  expect(seen.checkouts).toEqual([
+    expect.objectContaining({
+      customer: {
+        name: 'Ana E2E',
+        email: 'ana@example.test',
+        phone: '4929421780',
+      },
+      address: expect.objectContaining({
+        street: 'Av. Barones',
+        postalCode: '98612',
+        stateCode: 'ZAC',
+      }),
+    }),
+  ]);
+  expect(seen.checkouts[0]).not.toHaveProperty('saveAddress');
+});
+
+test('a signed-in buyer types another address and asks to keep it in their account (FC 051 T1.4)', async ({
+  page,
+}) => {
+  const seen = await signedInCheckout(page, [E2E_HOME]);
+  const form = page.locator('main form');
+  await form.getByRole('radio', { name: 'Usar otro domicilio' }).check();
+  await expect(form.getByLabel('Calle')).toHaveValue('');
+  await form.getByLabel('Calle').fill('Calle Reforma');
+  await form.getByLabel('Número exterior').fill('12');
+  await form.getByLabel('Colonia').fill('Centro');
+  await form.getByLabel('Municipio o alcaldía').fill('Zacatecas');
+  await form.getByLabel('Código postal').fill('98000');
+  await form.getByLabel('Guardar este domicilio en mi cuenta').check();
+  await form
+    .getByRole('radio', { name: /Tarjeta de crédito o débito/ })
+    .check();
+  await form.getByRole('checkbox', { name: /privacidad/i }).check();
+  await payButton(page).click();
+  await expect(page).toHaveURL(STRIPE_PAGE);
+  expect(seen.checkouts[0]).toMatchObject({
+    saveAddress: true,
+    address: { street: 'Calle Reforma', postalCode: '98000' },
+  });
 });
 
 test('SPEI goes to Mercado Pago; back from cancel, the same payment page is offered', async ({

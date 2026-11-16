@@ -8,7 +8,7 @@
 import type { MeResponse } from './authTypes';
 
 /** A section of the area, in the order they are offered. */
-type AccountSection = 'orders' | 'panel' | 'catalog' | 'admins';
+type AccountSection = 'orders' | 'profile' | 'panel' | 'catalog' | 'admins';
 
 /** The permission that opens the panel's orders. */
 const PANEL_PERMISSION = 'orders:read';
@@ -19,7 +19,7 @@ const CATALOG_PERMISSION = 'catalog:write';
 /** The role that opens the administrators console (FC 044 T1.4): no permission grants it. */
 const OWNER_ROLE = 'owner';
 
-/** Who is offered each section: the buyer's orders always; the rest by permission or role. */
+/** Who is offered each section: the buyer's orders and data always; the rest by permission or role. */
 const ACCESS: Readonly<
   Record<
     AccountSection,
@@ -27,6 +27,7 @@ const ACCESS: Readonly<
   >
 > = {
   orders: () => true,
+  profile: () => true,
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
   admins: (user) => user.roles.includes(OWNER_ROLE),
@@ -35,6 +36,7 @@ const ACCESS: Readonly<
 /** Every section, in the order they are offered. */
 const ORDER: readonly AccountSection[] = [
   'orders',
+  'profile',
   'panel',
   'catalog',
   'admins',

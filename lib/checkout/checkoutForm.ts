@@ -86,6 +86,8 @@ interface FormInput {
   consent: boolean;
   lines: readonly CartLine[];
   expectedTotalMxnCents: number;
+  /** A signed-in buyer asks to keep the address typed here in their book (FC 051 T1.4). */
+  saveAddress?: boolean;
 }
 
 const optional = (value: string) => (value.trim() === '' ? undefined : value);
@@ -93,7 +95,8 @@ const optional = (value: string) => (value.trim() === '' ? undefined : value);
 /**
  * Builds the checkout request and validates it with the API's schema.
  *
- * @param input - Form values, delivery state, method, consent, cart lines and shown total.
+ * @param input - Form values, delivery state, method, consent, cart lines, shown total and, for a
+ *   signed-in buyer, whether to keep the address.
  * @returns The request to send, or the invalid fields (consent is required here: the schema
  *   accepts `false` so that the API can answer PRIVACY_CONSENT_REQUIRED).
  */
@@ -116,6 +119,7 @@ export function validateCheckout(
       references: optional(values.references),
     },
     privacyConsent: input.consent,
+    saveAddress: input.saveAddress ? true : undefined,
     expectedTotalMxnCents: input.expectedTotalMxnCents,
   });
   const errors: FieldErrors = {};

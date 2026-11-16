@@ -275,18 +275,159 @@ const PASSWORD_ROUTES: Record<
       : problem(route, 400, 'RESET_TOKEN_INVALID'),
 };
 
+/** One address of the buyer's book, as the API answers it (FC 051). */
+export interface E2eAddress {
+  id: string;
+  isDefault: boolean;
+  isComplete: boolean;
+  stateCode: string;
+  postalCode: string;
+  label: string | null;
+  name: string | null;
+  phone: string | null;
+  street: string | null;
+  exteriorNumber: string | null;
+  interiorNumber: string | null;
+  neighborhood: string | null;
+  municipality: string | null;
+  references: string | null;
+}
+
+/** An address of Ana in Zacatecas, whole, for a test to start with. */
+export const E2E_HOME: E2eAddress = {
+  id: 'a0000000-0000-4000-8000-000000000001',
+  isDefault: true,
+  isComplete: true,
+  stateCode: 'ZAC',
+  postalCode: '98612',
+  label: 'Casa',
+  name: 'Ana E2E',
+  phone: '4929421780',
+  street: 'Av. Barones',
+  exteriorNumber: '209',
+  interiorNumber: null,
+  neighborhood: 'Las Américas',
+  municipality: 'Guadalupe',
+  references: null,
+};
+
+/** The profile and the book of addresses the interceptor keeps for the signed-in buyer (FC 051). */
+interface AccountData {
+  fullName: string | null;
+  phone: string | null;
+  addresses: E2eAddress[];
+  next: number;
+}
+
+/** The place of the default address, as `GET /v1/account/me` hands it back. */
+function deliveryOf(data: AccountData) {
+  const chosen = data.addresses.find((address) => address.isDefault);
+  return {
+    phone: data.phone,
+    postalCode: chosen?.postalCode ?? null,
+    stateCode: chosen?.stateCode ?? null,
+  };
+}
+
+/** Keeps exactly one default address: the given one, or the first left. */
+function settleDefault(data: AccountData, id: string | null) {
+  const chosen =
+    data.addresses.find((address) => address.id === id) ?? data.addresses[0];
+  for (const address of data.addresses) {
+    address.isDefault = address === chosen;
+  }
+}
+
+/** Answers `/v1/account/profile` and `/v1/account/addresses` from the buyer's own data. */
+function answerData(route: Route, data: AccountData) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  const method = request.method();
+  const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+  if (path === '/v1/account/profile') {
+    data.fullName = String(body.fullName);
+    data.phone = String(body.phone);
+    return json(route, 200, { fullName: data.fullName });
+  }
+  if (method === 'GET') {
+    return json(route, 200, { items: data.addresses, max: 5 });
+  }
+  if (method === 'POST') {
+    if (data.addresses.length >= 5) {
+      return problem(route, 409, 'ADDRESS_LIMIT_REACHED');
+    }
+    data.next += 1;
+    const created = {
+      id: `a0000000-0000-4000-8000-${String(data.next).padStart(12, '0')}`,
+      isDefault: false,
+      isComplete: true,
+      label: null,
+      interiorNumber: null,
+      references: null,
+      ...body,
+    } as E2eAddress;
+    data.addresses.push(created);
+    settleDefault(
+      data,
+      body.isDefault === true || data.addresses.length === 1
+        ? created.id
+        : (data.addresses.find((address) => address.isDefault)?.id ?? null)
+    );
+    return json(route, 201, {
+      id: created.id,
+      isDefault: created.isDefault,
+      isComplete: true,
+    });
+  }
+  const id = path.split('/').pop() as string;
+  const found = data.addresses.find((address) => address.id === id);
+  if (!found) return problem(route, 404, 'ADDRESS_NOT_FOUND');
+  if (method === 'DELETE') {
+    data.addresses = data.addresses.filter((address) => address !== found);
+    settleDefault(data, null);
+    return json(route, 204);
+  }
+  const { isDefault, ...changes } = body;
+  if (Object.keys(changes).length > 0) {
+    Object.assign(found, changes, { isComplete: true });
+  }
+  settleDefault(
+    data,
+    isDefault === true
+      ? id
+      : (data.addresses.find((address) => address.isDefault)?.id ?? null)
+  );
+  return json(route, 200, {
+    id,
+    isDefault: found.isDefault,
+    isComplete: found.isComplete,
+  });
+}
+
 /**
  * Intercepts the account API of a page.
  *
  * @param page - The page under test.
- * @param options - Who is signed in from the start (none by default) and who signs in.
+ * @param options - Who is signed in from the start (none by default), who signs in, and the
+ *   addresses and phone the buyer starts with (FC 051).
  */
 export async function mockAccountApi(
   page: Page,
-  options: { signedIn?: Persona; persona?: Persona } = {}
+  options: {
+    signedIn?: Persona;
+    persona?: Persona;
+    addresses?: E2eAddress[];
+    phone?: string | null;
+  } = {}
 ): Promise<void> {
   let user: Persona | null = options.signedIn ?? null;
   let trusted = false;
+  const data: AccountData = {
+    fullName: null,
+    phone: options.phone ?? null,
+    addresses: structuredClone(options.addresses ?? []),
+    next: 10,
+  };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   const admins = adminAccounts();
   await page.route(
@@ -327,7 +468,8 @@ export async function mockAccountApi(
         route,
         () => user,
         () => (user = null),
-        () => (trusted = false)
+        () => (trusted = false),
+        data
       )
     )
   );
@@ -352,12 +494,25 @@ function answerAccount(
   route: Route,
   who: () => Persona | null,
   signOut: () => void,
-  forget: () => void
+  forget: () => void,
+  data: AccountData
 ) {
   const user = who();
   if (user === null) return problem(route, 401, 'SESSION_INVALID_OR_EXPIRED');
   const path = new URL(route.request().url()).pathname;
-  if (path === '/v1/account/me') return json(route, 200, USERS[user]);
+  if (path === '/v1/account/me') {
+    return json(route, 200, {
+      ...USERS[user],
+      fullName: data.fullName ?? (USERS[user] as { fullName: string }).fullName,
+      ...deliveryOf(data),
+    });
+  }
+  if (
+    path === '/v1/account/profile' ||
+    path.startsWith('/v1/account/addresses')
+  ) {
+    return answerData(route, data);
+  }
   if (path === '/v1/account/logout') {
     signOut();
     return json(route, 204);

@@ -115,7 +115,13 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['Mis pedidos', 'Panel: pedidos', 'Catálogo', 'Administradores']);
+    ).toEqual([
+      'Mis pedidos',
+      'Datos y domicilios',
+      'Panel: pedidos',
+      'Catálogo',
+      'Administradores',
+    ]);
     expect(
       within(nav)
         .getByRole('link', { name: 'Administradores' })

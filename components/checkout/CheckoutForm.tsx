@@ -1,8 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { type ComponentProps, type SubmitEvent, useId, useState } from 'react';
+import {
+  type ComponentProps,
+  type SubmitEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import type { Locale, Messages } from '@/app/i18n';
+import { accountPath } from '@/lib/account/accountPaths';
+import type { AddressView } from '@/lib/account/addressTypes';
+import { listAddresses } from '@/lib/api/accountDataClient';
 import { type CheckoutFailure, submitCheckout } from '@/lib/api/checkoutClient';
 import {
   type CheckoutValues,
@@ -20,9 +30,16 @@ import { fill, formatMoney } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import { CartSummary, StateSelect } from '../cart/CartSummary';
 import { useCartLines, useCartQuote, useDeliveryState } from '../cart/useCart';
+import { useHeaderAccount } from '../useHeaderAccount';
 import { Field } from '../ui/Field';
 import { TextField } from '../ui/TextField';
-import { FieldError, PaymentMethodPicker } from './CheckoutFields';
+import {
+  addressValues,
+  FieldError,
+  OTHER_ADDRESS,
+  PaymentMethodPicker,
+  SavedAddressPicker,
+} from './CheckoutFields';
 
 /** Props of {@link CheckoutForm}. */
 interface CheckoutFormProps {
@@ -132,6 +149,51 @@ export function CheckoutForm({
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  // FC 051 T1.4: a signed-in buyer starts with their contact and their saved addresses.
+  const { user } = useHeaderAccount();
+  const [book, setBook] = useState<{
+    items: AddressView[];
+    max: number;
+  } | null>(null);
+  const [choice, setChoice] = useState<string | null>(null);
+  const [keep, setKeep] = useState(false);
+  const loadedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || loadedFor.current === user.id) return;
+    loadedFor.current = user.id;
+    setValues((current) => ({
+      ...current,
+      name: current.name || user.fullName,
+      email: current.email || user.email,
+      phone: current.phone || (user.phone ?? ''),
+    }));
+    void listAddresses().then((result) => {
+      if (!result.ok) return;
+      setBook(result.data);
+      const ready = result.data.items.filter((address) => address.isComplete);
+      const first = ready.find((address) => address.isDefault) ?? ready[0];
+      if (first) {
+        setChoice(first.id);
+        setValues((current) => ({ ...current, ...addressValues(first) }));
+        setStateCode(first.stateCode);
+      }
+    });
+  }, [user, setStateCode]);
+
+  const saved = book?.items.filter((address) => address.isComplete) ?? [];
+  /** Typing a new address, with room in the book: the buyer may keep it. */
+  const canKeep =
+    book !== null &&
+    book.items.length < book.max &&
+    (saved.length === 0 || choice === OTHER_ADDRESS);
+
+  function choose(next: string) {
+    setChoice(next);
+    const address = saved.find((candidate) => candidate.id === next) ?? null;
+    setValues((current) => ({ ...current, ...addressValues(address) }));
+    if (address) setStateCode(address.stateCode);
+  }
 
   if (lines.length === 0) {
     return (
@@ -166,6 +228,7 @@ export function CheckoutForm({
       consent,
       lines,
       expectedTotalMxnCents: total,
+      saveAddress: keep && canKeep,
     });
     if (!check.ok) {
       setErrors(check.errors);
@@ -213,6 +276,24 @@ export function CheckoutForm({
             <legend className="text-lg font-semibold">
               {messages[group].legend}
             </legend>
+            {group === 'contact' && user && (
+              <p className="text-sm text-petroleo/80">
+                {messages.saved.profile}
+              </p>
+            )}
+            {group === 'address' && saved.length > 0 && (
+              <SavedAddressPicker
+                id={`${base}-saved`}
+                addresses={saved}
+                value={choice}
+                onChange={choose}
+                manageHref={accountPath(routeFor('account', locale), {
+                  tab: 'profile',
+                  orderNumber: null,
+                })}
+                messages={messages.saved}
+              />
+            )}
             {TEXT_FIELDS.filter((field) => field.group === group).map(
               ({ name, input }) => (
                 <TextField
@@ -253,6 +334,17 @@ export function CheckoutForm({
                   />
                 )}
               </Field>
+            )}
+            {group === 'address' && canKeep && (
+              <label className="flex min-h-11 items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={keep}
+                  onChange={(event) => setKeep(event.target.checked)}
+                  className="size-5 accent-petroleo"
+                />
+                {messages.saved.save}
+              </label>
             )}
           </fieldset>
         ))}

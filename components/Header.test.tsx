@@ -112,6 +112,11 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
     reason:
       'the breadcrumb of the account area: its own paths (Apache fallback, no export), changed without a reload',
   },
+  'components/checkout/CheckoutFields.tsx': {
+    count: 1,
+    reason:
+      'the link of the saved addresses to «Datos y domicilios» of the account area: its own path (Apache fallback, no export)',
+  },
   'components/account/AccountOrders.tsx': {
     count: 1,
     reason: 'order links inside the account area, same in-area router',
