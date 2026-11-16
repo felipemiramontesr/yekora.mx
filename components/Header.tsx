@@ -87,12 +87,16 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
             />
           </div>
           <div className="order-4 w-full md:order-3 md:w-auto md:flex-1">
-            <SearchCombobox
-              locale={locale}
-              action={routeFor('catalog', locale)}
-              indexUrl={searchIndexPath(locale)}
-              messages={messages.header.search}
-            />
+            {/* FC 052 T2.5: from `md` the search takes 90 % of its cell, centred, so the elements
+                of the bar breathe; on a phone it keeps its own full row. */}
+            <div className="md:mx-auto md:w-[90%]">
+              <SearchCombobox
+                locale={locale}
+                action={routeFor('catalog', locale)}
+                indexUrl={searchIndexPath(locale)}
+                messages={messages.header.search}
+              />
+            </div>
           </div>
           <div className="order-2 md:order-4">
             <AccountMenu

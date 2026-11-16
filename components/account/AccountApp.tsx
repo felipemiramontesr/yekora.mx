@@ -6,6 +6,7 @@ import type { Locale, Messages } from '@/app/i18n';
 import {
   type AccountView,
   accountPath,
+  type CatalogSection,
   parseAccountPath,
 } from '@/lib/account/accountPaths';
 import type { MeResponse } from '@/lib/account/authTypes';
@@ -17,7 +18,7 @@ import {
   subscribeSessionHint,
 } from '@/lib/account/sessionHint';
 import { me } from '@/lib/api/accountClient';
-import { sectionsOf } from '@/lib/account/sections';
+import { canOpen } from '@/lib/account/sections';
 import { fill } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import {
@@ -32,6 +33,7 @@ import {
   SignInForm,
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
+import { AccountAdminHub } from './AccountAdminHub';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
@@ -43,7 +45,12 @@ import type { CatalogTexts } from './catalog/catalogTexts';
  * under the tabs (a placeholder could not be localized: `loading` gets no props); once loaded, the
  * console shows its own «Cargando…» until the API answers.
  */
-const CatalogConsole = dynamic<{ texts: CatalogTexts; locale: Locale }>(
+const CatalogConsole = dynamic<{
+  texts: CatalogTexts;
+  locale: Locale;
+  open: CatalogSection | null;
+  onOpen: (section: CatalogSection) => void;
+}>(
   () =>
     import('./catalog/CatalogConsole').then((module) => module.CatalogConsole),
   { ssr: false }
@@ -283,6 +290,19 @@ export function AccountApp({
 }
 
 /**
+ * The name of the last step of the breadcrumb: the section, or the console under «Administración».
+ */
+function crumbOf(view: AccountView, texts: Messages['account']): string {
+  const cards = texts.adminHub.cards;
+  if (view.tab === 'panel') return cards.orders.name;
+  if (view.tab === 'admins') return cards.admins.name;
+  if (view.tab === 'catalog') {
+    return (view.section === 'productos' ? cards.products : cards.catalog).name;
+  }
+  return texts.dashboard[view.tab];
+}
+
+/**
  * The signed-in area (FC 047 T2.5): where the person is, and the open list or order. The sections
  * themselves, with sign-out and the language, live in the account menu of the header, so the area
  * has no navigation of its own; it only says where you are: the greeting, and a breadcrumb
@@ -306,9 +326,10 @@ function Dashboard({
   onChanged: () => void;
 }>) {
   const { dashboard } = texts.account;
-  // A tab is offered only with its permission or role; the API would refuse it anyway.
-  const tabs = sectionsOf(user);
-  const tab = tabs.includes(view.tab) ? view.tab : 'orders';
+  // A tab opens only with its permission or role; the API would refuse it anyway.
+  const tab = canOpen(user, view.tab) ? view.tab : 'orders';
+  // A console is a step under «Administración» (FC 052): «Mi cuenta › Administración › Catálogo».
+  const underAdmin = tab === 'panel' || tab === 'catalog' || tab === 'admins';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
@@ -330,9 +351,29 @@ function Dashboard({
                 {texts.account.title}
               </a>
             </li>
+            {underAdmin && (
+              <>
+                <li aria-hidden="true">›</li>
+                <li>
+                  <a
+                    href={accountPath(area, {
+                      tab: 'admin',
+                      orderNumber: null,
+                    })}
+                    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                      event.preventDefault();
+                      onNavigate({ tab: 'admin', orderNumber: null });
+                    }}
+                    className="tap-target underline underline-offset-4"
+                  >
+                    {dashboard.admin}
+                  </a>
+                </li>
+              </>
+            )}
             <li aria-hidden="true">›</li>
             <li aria-current="page" className="font-semibold text-petroleo">
-              {dashboard[tab]}
+              {crumbOf({ ...view, tab }, texts.account)}
             </li>
           </ol>
         </nav>
@@ -348,8 +389,23 @@ function Dashboard({
           onChanged={onChanged}
         />
       )}
+      {tab === 'admin' && (
+        <AccountAdminHub
+          user={user}
+          area={area}
+          texts={texts.account.adminHub}
+          onNavigate={onNavigate}
+        />
+      )}
       {tab === 'catalog' && (
-        <CatalogConsole texts={texts.account.catalog} locale={locale} />
+        <CatalogConsole
+          texts={texts.account.catalog}
+          locale={locale}
+          open={view.section ?? null}
+          onOpen={(section) =>
+            onNavigate({ tab: 'catalog', orderNumber: null, section })
+          }
+        />
       )}
       {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
       {isOrders && view.orderNumber && (

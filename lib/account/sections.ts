@@ -1,14 +1,20 @@
 /**
- * The sections of the account area a person may open (FC 044 T1.4, FC 047): one place, read by
- * the area itself and by the account menu of the header, so the two can never disagree. The API
+ * The sections of the account area a person may open (FC 044 T1.4, FC 047, FC 052): one place, read
+ * by the area itself and by the account menu of the header, so the two can never disagree. The API
  * refuses what a person may not open anyway; this only decides what is offered.
+ *
+ * The menu offers three entries: «Mis pedidos», «Mi información» and, to whoever may open at least
+ * one console, «Administración», a page with a card for each console the account may open. The
+ * consoles themselves (the panel's orders, the catalog, the administrators) are no longer entries
+ * of the menu, but the area still opens them by their own address.
  *
  * @module
  */
 import type { MeResponse } from './authTypes';
 
-/** A section of the area, in the order they are offered. */
-type AccountSection = 'orders' | 'profile' | 'panel' | 'catalog' | 'admins';
+/** A section of the area. */
+type AccountSection =
+  'orders' | 'profile' | 'admin' | 'panel' | 'catalog' | 'admins';
 
 /** The permission that opens the panel's orders. */
 const PANEL_PERMISSION = 'orders:read';
@@ -19,39 +25,80 @@ const CATALOG_PERMISSION = 'catalog:write';
 /** The role that opens the administrators console (FC 044 T1.4): no permission grants it. */
 const OWNER_ROLE = 'owner';
 
-/** Who is offered each section: the buyer's orders and data always; the rest by permission or role. */
-const ACCESS: Readonly<
-  Record<
-    AccountSection,
-    (user: Pick<MeResponse, 'roles' | 'permissions'>) => boolean
-  >
-> = {
+/** What the rule reads of an account. */
+type Who = Pick<MeResponse, 'roles' | 'permissions'>;
+
+/** Who may open each section: the buyer's orders and data always; the rest by permission or role. */
+const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
   orders: () => true,
   profile: () => true,
+  admin: (user) =>
+    ACCESS.panel(user) || ACCESS.catalog(user) || ACCESS.admins(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
   admins: (user) => user.roles.includes(OWNER_ROLE),
 };
 
-/** Every section, in the order they are offered. */
-const ORDER: readonly AccountSection[] = [
-  'orders',
-  'profile',
-  'panel',
-  'catalog',
-  'admins',
+/** The entries of the account menu, in order. */
+const MENU: readonly AccountSection[] = ['orders', 'profile', 'admin'];
+
+/**
+ * The entries the account menu offers.
+ *
+ * @param user - Its roles and permissions.
+ * @returns «Mis pedidos» and «Mi información» always, and «Administración» when the account may open
+ *   at least one console (FC 052 T1.1: `orders:read` ∨ `catalog:write` ∨ the owner role).
+ */
+export function sectionsOf(user: Who): AccountSection[] {
+  return MENU.filter((section) => ACCESS[section](user));
+}
+
+/**
+ * Whether the area opens a section for an account.
+ *
+ * @param user - Its roles and permissions.
+ * @param section - The section.
+ * @returns True when the account may open it.
+ */
+export function canOpen(user: Who, section: AccountSection): boolean {
+  return ACCESS[section](user);
+}
+
+/** A card of the administration hub. */
+export interface AdminCard {
+  /** Which text it reads from `account.adminHub.cards`. */
+  key: 'orders' | 'products' | 'catalog' | 'admins';
+  /** The console it opens. */
+  tab: 'panel' | 'catalog' | 'admins';
+  /** The tab of the catalog console it opens, for the two that open it. */
+  section: 'productos' | 'marcas' | null;
+}
+
+/** The cards, in order, each with the section that grants it. */
+const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
+  { key: 'orders', tab: 'panel', section: null, grantedBy: 'panel' },
+  {
+    key: 'products',
+    tab: 'catalog',
+    section: 'productos',
+    grantedBy: 'catalog',
+  },
+  { key: 'catalog', tab: 'catalog', section: 'marcas', grantedBy: 'catalog' },
+  { key: 'admins', tab: 'admins', section: null, grantedBy: 'admins' },
 ];
 
 /**
- * The sections an account is offered.
+ * The cards of the administration hub an account is shown (FC 052 T2.4): each one if and only if
+ * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
+ * `catalog:write`, «Administradores» with the owner role.
  *
  * @param user - Its roles and permissions.
- * @returns The sections, in order; «orders» is always the first.
+ * @returns The cards, in order.
  */
-export function sectionsOf(
-  user: Pick<MeResponse, 'roles' | 'permissions'>
-): AccountSection[] {
-  return ORDER.filter((section) => ACCESS[section](user));
+export function adminCardsOf(user: Who): AdminCard[] {
+  return CARDS.filter((card) => ACCESS[card.grantedBy](user)).map(
+    ({ key, tab, section }) => ({ key, tab, section })
+  );
 }
 
 /**

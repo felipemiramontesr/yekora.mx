@@ -48,6 +48,14 @@ describe('Header', () => {
     expect(spanish).toContain('action="/catalogo/"');
   });
 
+  it('gives the search 90 % of its cell, centred, from md up, and its whole row on a phone (FC 052 T2.5)', () => {
+    // The cell that holds the search is the one that grows; the search sits inside it at 90 %.
+    expect(html).toMatch(
+      /<div class="md:mx-auto md:w-\[90%\]">[\s\S]*?role="search"/
+    );
+    expect(html).not.toMatch(/<form[^>]*class="[^"]*w-\[90%\]/);
+  });
+
   it('puts the disciplines in a strip under the bar, each leading to its products', () => {
     for (const slug of [
       'senderismo',
@@ -55,6 +63,8 @@ describe('Header', () => {
       'escalada',
       'canonismo',
       'trail-running',
+      'campismo',
+      'preparacionismo',
     ]) {
       expect(html).toContain(`href="/en/catalog/?disciplina=${slug}"`);
       expect(spanish).toContain(`href="/catalogo/?disciplina=${slug}"`);
@@ -108,9 +118,14 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
       'the sections of the account area are paths it routes itself (no page per path in the export); inside the area a click changes the view without a reload',
   },
   'components/account/AccountApp.tsx': {
+    count: 2,
+    reason:
+      'the breadcrumb of the account area, and its «Administración» step: its own paths (Apache fallback, no export), changed without a reload',
+  },
+  'components/account/AccountAdminHub.tsx': {
     count: 1,
     reason:
-      'the breadcrumb of the account area: its own paths (Apache fallback, no export), changed without a reload',
+      'the cards of the administration hub: each one a link to a console of the area, same in-area router',
   },
   'components/checkout/CheckoutFields.tsx': {
     count: 1,

@@ -860,7 +860,8 @@
       "admins": "Administrators",
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
-      "profile": "Details and addresses"
+      "profile": "My information",
+      "admin": "Administration"
     },
     "orders": {
       "loading": "Loading orders…",
@@ -1448,6 +1449,29 @@
         "server": "We could not complete the request. Try again.",
         "invalid": "We could not complete the request. Try again.",
         "unknown": "We could not complete the request. Try again."
+      }
+    },
+    "adminHub": {
+      "title": "Administration",
+      "intro": "You run the store from here. You only see what your account can open.",
+      "open": "Open",
+      "cards": {
+        "orders": {
+          "name": "Orders",
+          "description": "Review every order of the store: its status and its payment."
+        },
+        "products": {
+          "name": "Products",
+          "description": "Create and edit products: their photos, their stock and their price."
+        },
+        "catalog": {
+          "name": "Catalog",
+          "description": "Brands, product properties and publishing the catalog to the store."
+        },
+        "admins": {
+          "name": "Administrators",
+          "description": "Invite, switch on or withdraw those who run the store. The owner only."
+        }
       }
     }
   }

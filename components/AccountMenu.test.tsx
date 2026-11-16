@@ -115,18 +115,12 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual([
-      'Mis pedidos',
-      'Datos y domicilios',
-      'Panel: pedidos',
-      'Catálogo',
-      'Administradores',
-    ]);
+    ).toEqual(['Mis pedidos', 'Mi información', 'Administración']);
     expect(
       within(nav)
-        .getByRole('link', { name: 'Administradores' })
+        .getByRole('link', { name: 'Administración' })
         .getAttribute('href')
-    ).toBe('/cuenta/administradores/');
+    ).toBe('/cuenta/administracion/');
     expect(screen.getByText('Owner')).toBeTruthy();
     expect(
       screen
@@ -194,9 +188,9 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
     globalThis.addEventListener('popstate', heard);
     const push = vi.spyOn(globalThis.history, 'pushState');
     renderMenu();
-    const panel = screen.getByRole('link', { name: 'Panel: pedidos' });
+    const panel = screen.getByRole('link', { name: 'Administración' });
     expect(fireEvent.click(panel)).toBe(false);
-    expect(push).toHaveBeenCalledWith(null, '', '/cuenta/panel/');
+    expect(push).toHaveBeenCalledWith(null, '', '/cuenta/administracion/');
     expect(heard).toHaveBeenCalledTimes(1);
     globalThis.removeEventListener('popstate', heard);
     push.mockRestore();
@@ -211,18 +205,55 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
     pathname = '/catalogo/';
     renderMenu();
     expect(
-      fireEvent.click(screen.getByRole('link', { name: 'Panel: pedidos' }))
+      fireEvent.click(screen.getByRole('link', { name: 'Administración' }))
     ).toBe(true);
     cleanup();
     pathname = '/cuenta/';
     renderMenu();
-    const panel = screen.getByRole('link', { name: 'Panel: pedidos' });
+    const panel = screen.getByRole('link', { name: 'Administración' });
     expect(fireEvent.click(panel, { ctrlKey: true })).toBe(true);
     expect(fireEvent.click(panel, { shiftKey: true })).toBe(true);
     expect(fireEvent.click(panel, { button: 1 })).toBe(true);
     expect(push).not.toHaveBeenCalled();
     push.mockRestore();
   });
+
+  it.each([
+    [[], [], false],
+    [['orders:read'], [], true],
+    [['catalog:write'], [], true],
+    [[], ['owner'], true],
+    [['orders:read', 'catalog:write'], [], true],
+    [['orders:read'], ['owner'], true],
+    [['catalog:write'], ['owner'], true],
+    [['orders:read', 'catalog:write'], ['owner'], true],
+  ])(
+    'offers «Administración» only to whoever may open a console: orders %j, roles %j → %s (FC 052 T1.1)',
+    (permissions, roles, offered) => {
+      account.mockReturnValue({
+        firstName: 'Ana',
+        user: {
+          ...BUYER,
+          roles: ['customer', ...roles],
+          permissions: ['account:self', ...permissions],
+        },
+      });
+      renderMenu();
+      const nav = screen.getByRole('navigation', { name: 'Mi cuenta' });
+      const names = within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent);
+      expect(names).toEqual(
+        offered
+          ? ['Mis pedidos', 'Mi información', 'Administración']
+          : ['Mis pedidos', 'Mi información']
+      );
+      // The consoles are no longer entries of the menu (FC 052 T1.1).
+      for (const gone of ['Panel: pedidos', 'Catálogo', 'Administradores']) {
+        expect(within(nav).queryByRole('link', { name: gone })).toBeNull();
+      }
+    }
+  );
 
   it('opens the sign-up form from inside the area too', () => {
     account.mockReturnValue({ firstName: null, user: null });

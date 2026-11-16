@@ -16,7 +16,9 @@ import {
   it,
   vi,
 } from 'vitest';
+import { useState } from 'react';
 import { getMessages } from '@/app/i18n';
+import type { CatalogSection } from '@/lib/account/accountPaths';
 import { listOrders, me } from '@/lib/api/accountClient';
 import {
   createBrand,
@@ -111,7 +113,14 @@ const EDITOR = {
   permissions: ['account:self', 'catalog:write'],
 };
 
-const renderConsole = () => render(<CatalogConsole texts={t} locale="es-MX" />);
+/** The console as the area drives it: the open tab lives above it, in the address (FC 052). */
+function Console() {
+  const [open, setOpen] = useState<CatalogSection | null>(null);
+  return (
+    <CatalogConsole texts={t} locale="es-MX" open={open} onOpen={setOpen} />
+  );
+}
+const renderConsole = () => render(<Console />);
 const press = (name: string) =>
   fireEvent.click(screen.getByRole('button', { name }));
 

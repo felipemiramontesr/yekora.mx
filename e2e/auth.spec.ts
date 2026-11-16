@@ -183,7 +183,11 @@ test('the owner invites, switches off and withdraws administrators; the owner ro
   const header = page.getByRole('banner');
   await header.locator('summary').click();
   await expect(header.getByText('Owner', { exact: true })).toBeVisible();
-  await header.getByRole('link', { name: 'Administradores' }).click();
+  await header.getByRole('link', { name: 'Administración' }).click();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Administradores/ })
+    .click();
   await expect(page).toHaveURL(/\/cuenta\/administradores\/$/);
   const row = (name: string) => page.getByRole('row').filter({ hasText: name });
   await expect(row('GrayMan')).toContainText(
@@ -219,12 +223,12 @@ test('the administrators console has its own address in English, and only the ow
   await mockAccountApi(page, { signedIn: 'owner' });
   await page.goto('/en/account/');
   await openAccountMenu(page);
-  await page.getByRole('link', { name: 'Administrators' }).click();
+  await page.getByRole('link', { name: 'Administration' }).click();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Administrators/ })
+    .click();
   await expect(page).toHaveURL(/\/en\/account\/administradores\/$/);
-  await openAccountMenu(page);
-  await expect(
-    page.getByRole('link', { name: 'Administrators' })
-  ).toHaveAttribute('aria-current', 'page');
   await expect(
     page.getByRole('row').filter({ hasText: 'GrayMan' })
   ).toContainText('Protected: nobody can change it');
@@ -232,9 +236,15 @@ test('the administrators console has its own address in English, and only the ow
   await mockAccountApi(page, { signedIn: 'staff' });
   await page.goto('/en/account/');
   await expect(page.getByText('Hello, Luis E2E')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Administrators' })).toHaveCount(
-    0
-  );
+  // Staff with only the panel's orders see «Administración» and one card, never the owner's.
+  await openAccountMenu(page);
+  await page.getByRole('link', { name: 'Administration' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Administration' }).getByRole('link')
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole('main').getByRole('link', { name: /^Administrators/ })
+  ).toHaveCount(0);
 });
 
 /**
@@ -251,9 +261,13 @@ test('the owner crops a photo in the browser Canvas and uploads it at the chosen
   await openAccountMenu(page);
   await page
     .getByRole('banner')
-    .getByRole('link', { name: 'Catálogo' })
+    .getByRole('link', { name: 'Administración' })
     .click();
-  await page.getByRole('tab', { name: 'Productos' }).click();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Productos/ })
+    .click();
+  await expect(page).toHaveURL(/\/cuenta\/catalogo\/productos\/$/);
   await page.getByRole('button', { name: 'Galería: Tenis trail E2E' }).click();
   // A real modal: it opens over the page, Escape closes it, and the page can open it again.
   await page.getByRole('button', { name: 'Agregar foto' }).click();

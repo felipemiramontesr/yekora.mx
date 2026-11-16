@@ -35,9 +35,16 @@ test('a buyer signs in with the mailed code and opens an order', async ({
   await page.getByLabel('Código').fill(E2E_CODE);
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Panel: pedidos' })).toHaveCount(
-    0
-  );
+  // A buyer is offered no console: not in the menu, and no «Administración» either (FC 052 T1.1).
+  await openAccountMenu(page);
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: 'Administración' })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: 'Panel: pedidos' })
+  ).toHaveCount(0);
+  // Fold the menu again: it is a <details>, and an open one would cover the table.
+  await page.getByRole('banner').locator('summary').click();
   await page
     .getByRole('link', { name: `Ver detalle del pedido ${E2E_ORDER}` })
     .click();
@@ -97,7 +104,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   });
   await expect(delivery).toHaveText(/Agregar CP/);
   await openAccountMenu(page);
-  await page.getByRole('link', { name: 'Datos y domicilios' }).click();
+  await page.getByRole('link', { name: 'Mi información' }).click();
   await expect(page).toHaveURL(/\/cuenta\/datos\/$/);
   // The e-mail is shown, never a field to change.
   await expect(page.getByText('ana@example.test')).toBeVisible();
@@ -154,12 +161,58 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
 });
 
+test('the language switch is only in the account menu, at half its size, and its touch area reaches 44 px (FC 052 T2.2, T2.3)', async ({
+  page,
+}) => {
+  await page.goto('/nosotros/');
+  // Not in the footer, for anyone.
+  await expect(
+    page.getByRole('contentinfo').getByRole('navigation', { name: 'Idioma' })
+  ).toHaveCount(0);
+  await openAccountMenu(page);
+  const switcher = page
+    .getByRole('banner')
+    .getByRole('navigation', { name: 'Idioma' });
+  const box = await switcher.boundingBox();
+  // Drawn at 24 × 46 px.
+  expect(box?.height).toBeLessThanOrEqual(24);
+  expect(box?.width).toBeLessThanOrEqual(48);
+  const english = switcher.getByRole('link', { name: 'EN, English' });
+  const at = await english.boundingBox();
+  // A press 12 px under the visible pill, inside the transparent layer, is still the link.
+  await page.mouse.click(
+    (at?.x ?? 0) + (at?.width ?? 0) / 2,
+    (at?.y ?? 0) + (at?.height ?? 0) + 8
+  );
+  await expect(page).toHaveURL(/\/en\/about\/$/);
+});
+
+test('the search box takes 90 % of its cell on a desktop bar and the whole row on a phone (FC 052 T2.5)', async ({
+  page,
+}) => {
+  const share = async () =>
+    page.evaluate(() => {
+      const form = document.querySelector('header form[role="search"]');
+      const cell = form?.closest('div.md\\:mx-auto')?.parentElement;
+      const inner = form?.getBoundingClientRect().width ?? 0;
+      return inner / (cell?.getBoundingClientRect().width ?? 1);
+    });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  expect(await share()).toBeGreaterThan(0.88);
+  expect(await share()).toBeLessThan(0.92);
+  await page.setViewportSize({ width: 390, height: 800 });
+  expect(await share()).toBeGreaterThan(0.98);
+});
+
 test('staff see the panel’s orders, in English too', async ({ page }) => {
   await mockAccountApi(page, { signedIn: 'staff' });
   await page.goto('/en/account/');
   await expect(page.getByText('Hello, Luis E2E')).toBeVisible();
   await openAccountMenu(page);
-  await page.getByRole('link', { name: 'Panel: orders' }).click();
+  await page.getByRole('link', { name: 'Administration' }).click();
+  await expect(page).toHaveURL(/\/en\/account\/administracion\/$/);
+  await page.getByRole('link', { name: /^Orders/ }).click();
   await expect(page).toHaveURL(/\/en\/account\/panel\/$/);
   await expect(page.getByLabel('Status')).toBeVisible();
   await page
@@ -281,15 +334,24 @@ test('the area shows only a breadcrumb: the sections are in the header menu (FC 
   const header = page.getByRole('banner');
   await expect(header.getByText('Luis E2E', { exact: true })).toBeVisible();
   await expect(header.getByText('luis@example.test')).toHaveCount(0);
-  await header.getByRole('link', { name: 'Panel: pedidos' }).click();
+  // The consoles are cards of «Administración», one click from the menu (FC 052 T1.1).
+  await header.getByRole('link', { name: 'Administración' }).click();
+  await expect(page).toHaveURL(/\/cuenta\/administracion\/$/);
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Pedidos/ })
+    .click();
   await expect(page).toHaveURL(/\/cuenta\/panel\/$/);
-  await expect(crumbs.getByText('Panel: pedidos')).toHaveAttribute(
+  // Mi cuenta › Administración › Pedidos, with «Administración» leading back to the cards.
+  await expect(crumbs.getByText('Pedidos')).toHaveAttribute(
     'aria-current',
     'page'
   );
+  await crumbs.getByRole('link', { name: 'Administración' }).click();
+  await expect(page).toHaveURL(/\/cuenta\/administracion\/$/);
   // The same area, no reload: the menu follows the page it is on.
   await openAccountMenu(page);
   await expect(
-    header.getByRole('link', { name: 'Panel: pedidos' })
+    header.getByRole('link', { name: 'Administración' })
   ).toHaveAttribute('aria-current', 'page');
 });

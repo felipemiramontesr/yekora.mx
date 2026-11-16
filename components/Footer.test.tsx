@@ -34,9 +34,12 @@ describe('Footer', () => {
     );
   });
 
-  it('links each discipline to its products, offers the language switch and credits Mexican makers without naming brands', () => {
+  it('links each discipline to its products and credits Mexican makers without naming brands, with no language switch (FC 052 T2.2)', () => {
     expect(html).toContain('href="/catalogo/?disciplina=trail-running"');
-    expect(html).toContain('aria-label="ES, Español"');
+    expect(html).toContain('href="/catalogo/?disciplina=campismo"');
+    expect(html).toContain('href="/catalogo/?disciplina=preparacionismo"');
+    expect(html).not.toContain('aria-label="ES, Español"');
+    expect(html).not.toContain('aria-label="Idioma"');
     expect(html).toContain('Impulsamos a marcas y fabricantes mexicanos');
     expect(html).toContain(`© ${new Date().getFullYear()} YĒKORA.`);
   });

@@ -34,6 +34,33 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
   });
 });
 
+describe('administration paths (FC 052 T1.1)', () => {
+  it('reads and writes /administracion/ in both languages', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}administracion/`, area)).toEqual({
+        tab: 'admin',
+        orderNumber: null,
+      });
+      expect(accountPath(area, { tab: 'admin', orderNumber: null })).toBe(
+        `${area}administracion/`
+      );
+    }
+  });
+
+  it.each([['productos'], ['marcas'], ['propiedades'], ['publicar']] as const)(
+    'gives the %s tab of the catalog console its own address',
+    (section) => {
+      for (const area of ['/cuenta/', '/en/account/']) {
+        const view = { tab: 'catalog', orderNumber: null, section } as const;
+        expect(accountPath(area, view)).toBe(`${area}catalogo/${section}/`);
+        expect(parseAccountPath(`${area}catalogo/${section}/`, area)).toEqual(
+          view
+        );
+      }
+    }
+  );
+});
+
 describe('data and addresses path (FC 051)', () => {
   it('reads and writes /datos/ in both languages, with no order in it', () => {
     for (const area of ['/cuenta/', '/en/account/']) {
@@ -54,10 +81,13 @@ describe('catalog console path (FC 029 F3)', () => {
       expect(parseAccountPath(`${area}catalogo/`, area)).toEqual({
         tab: 'catalog',
         orderNumber: null,
+        section: null,
       });
-      expect(parseAccountPath(`${area}catalogo/marcas/`, area).tab).toBe(
-        'catalog'
-      );
+      expect(parseAccountPath(`${area}catalogo/otra-cosa/`, area)).toEqual({
+        tab: 'catalog',
+        orderNumber: null,
+        section: null,
+      });
       expect(accountPath(area, { tab: 'catalog', orderNumber: null })).toBe(
         `${area}catalogo/`
       );

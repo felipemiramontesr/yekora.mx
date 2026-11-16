@@ -677,12 +677,86 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     const crumbs = screen.getByRole('navigation', {
       name: account.dashboard.breadcrumb,
     });
+    // A console is a step under «Administración» (FC 052): Mi cuenta › Administración › Pedidos.
     expect(
       within(crumbs)
-        .getByText(account.dashboard.panel)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual([account.title, account.dashboard.admin]);
+    expect(
+      within(crumbs)
+        .getByText(account.adminHub.cards.orders.name)
         .getAttribute('aria-current')
     ).toBe('page');
     expect(screen.queryByRole('button', { name: /Salir|Olvidar/ })).toBeNull();
+    // «Administración» in the breadcrumb goes up to the hub, with the card of this console.
+    fireEvent.click(
+      within(crumbs).getByRole('link', { name: account.dashboard.admin })
+    );
+    expect(globalThis.location.pathname).toBe('/cuenta/administracion/');
+    expect(
+      await screen.findByRole('region', { name: account.adminHub.title })
+    ).toBeTruthy();
+  });
+
+  it('opens the administration hub with a card for each console the account may open, and goes to it (FC 052 T1.1, T2.4)', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/administracion/');
+    api.me.mockResolvedValue(
+      ok({
+        ...STAFF,
+        roles: ['owner'],
+        permissions: ['account:self', 'orders:read', 'catalog:write'],
+      })
+    );
+    renderApp();
+    const hub = await screen.findByRole('region', {
+      name: account.adminHub.title,
+    });
+    const cards = within(hub)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(cards).toEqual([
+      '/cuenta/panel/',
+      '/cuenta/catalogo/productos/',
+      '/cuenta/catalogo/marcas/',
+      '/cuenta/administradores/',
+    ]);
+    fireEvent.click(
+      within(hub).getByRole('link', {
+        name: new RegExp(account.adminHub.cards.products.name),
+      })
+    );
+    expect(globalThis.location.pathname).toBe('/cuenta/catalogo/productos/');
+    // The tab the address names is the one that opens, under Mi cuenta › Administración › Productos.
+    expect(
+      await screen.findByRole('tab', { name: 'Productos', selected: true })
+    ).toBeTruthy();
+    const crumbs = screen.getByRole('navigation', {
+      name: account.dashboard.breadcrumb,
+    });
+    expect(
+      within(crumbs)
+        .getByText(account.adminHub.cards.products.name)
+        .getAttribute('aria-current')
+    ).toBe('page');
+    // The tabs of the console change the address too, so the back button returns to the one before.
+    fireEvent.click(screen.getByRole('tab', { name: /Propiedades/ }));
+    expect(globalThis.location.pathname).toBe('/cuenta/catalogo/propiedades/');
+  });
+
+  it('shows a buyer no card, and sends them back to their orders when they ask for the hub (T2.4)', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/administracion/');
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    await screen.findByText(/Hola, /);
+    expect(
+      screen.queryByRole('region', { name: account.adminHub.title })
+    ).toBeNull();
+    expect(
+      screen.queryAllByRole('link', {
+        name: /Pedidos|Productos|Catálogo|Administradores/,
+      })
+    ).toHaveLength(0);
   });
 });
 

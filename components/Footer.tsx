@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { disciplines, type Locale, type Messages } from '@/app/i18n';
 import { routeFor } from '@/lib/routes';
-import { LanguageSwitcher } from './LanguageSwitcher';
 
 /** Props of {@link Footer}. */
 interface FooterProps {
@@ -12,8 +11,9 @@ interface FooterProps {
 }
 
 /**
- * Site footer: brand lockup and promise, the disciplines (each one leads to its products), About, the language switch (a fallback of the account menu, FC 047 T2.4), and the legal pages
- * (privacy, cookies, terms, shipping and returns) in the current language.
+ * Site footer: brand lockup and promise, the disciplines (each one leads to its products), About
+ * and the legal pages (privacy, cookies, terms, shipping and returns) in the current language. The
+ * language switch lives only in the account menu (FC 052 T2.2).
  */
 export function Footer({ locale, messages }: Readonly<FooterProps>) {
   const { footer } = messages;
@@ -83,12 +83,6 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
               </Link>
             </li>
             <li className="text-marfil/90">{footer.mexicanTalent}</li>
-            <li className="mt-3">
-              <LanguageSwitcher
-                locale={locale}
-                messages={messages.languageSwitcher}
-              />
-            </li>
           </ul>
         </div>
         <nav aria-label={footer.legalTitle}>

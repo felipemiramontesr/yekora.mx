@@ -48,9 +48,35 @@ describe('LanguageSwitcher', () => {
       'es-MX',
       'en',
     ]);
-    // No globe and no full names on screen; each link keeps its 44 px touch target.
+    // No globe and no full names on screen.
     expect(container.querySelector('svg')).toBeNull();
-    for (const link of links) expect(link.className).toContain('tap-target');
+  });
+
+  it('is drawn at half its size, 24 × 46 px, and keeps its touch area through a transparent layer (FC 052 T2.3)', () => {
+    pathname.current = '/nosotros/';
+    render(
+      <LanguageSwitcher
+        locale="es-MX"
+        messages={getMessages('es-MX').languageSwitcher}
+      />
+    );
+    const nav = screen.getByRole('navigation', { name: 'Idioma' });
+    // Visible size: 24 px high, two links of 22 px and the border (46 px), nothing taller or wider.
+    expect(nav.className).toContain('h-6');
+    const [spanish, english] = screen.getAllByRole('link');
+    for (const link of [spanish, english]) {
+      expect(link.className).toContain('w-[22px]');
+      expect(link.className).toContain('h-full');
+      // A transparent layer reaches 10 px above and below the link: 44 px of touch height.
+      expect(link.className).toContain("after:content-['']");
+      expect(link.className).toContain('after:-inset-y-[10px]');
+    }
+    // It reaches 11 px out on the outer side only, so the two layers never cover each other's link.
+    expect(spanish.className).toContain('after:-left-[11px]');
+    expect(spanish.className).toContain('after:right-0');
+    expect(english.className).toContain('after:-right-[11px]');
+    expect(english.className).toContain('after:left-0');
+    expect(nav.className).not.toContain('tap-target');
   });
 
   it('highlights the current language and leaves the other as a link to switch to', () => {

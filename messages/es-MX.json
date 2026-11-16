@@ -860,7 +860,8 @@
       "admins": "Administradores",
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
-      "profile": "Datos y domicilios"
+      "profile": "Mi información",
+      "admin": "Administración"
     },
     "orders": {
       "loading": "Cargando pedidos…",
@@ -1448,6 +1449,29 @@
         "server": "No pudimos completar la solicitud. Intenta de nuevo.",
         "invalid": "No pudimos completar la solicitud. Intenta de nuevo.",
         "unknown": "No pudimos completar la solicitud. Intenta de nuevo."
+      }
+    },
+    "adminHub": {
+      "title": "Administración",
+      "intro": "Desde aquí administras la tienda. Ves solo lo que tu cuenta puede abrir.",
+      "open": "Abrir",
+      "cards": {
+        "orders": {
+          "name": "Pedidos",
+          "description": "Revisa todos los pedidos de la tienda: su estado y su pago."
+        },
+        "products": {
+          "name": "Productos",
+          "description": "Crea y edita productos: sus fotos, su inventario y su precio."
+        },
+        "catalog": {
+          "name": "Catálogo",
+          "description": "Marcas, propiedades de producto y publicación del catálogo en la tienda."
+        },
+        "admins": {
+          "name": "Administradores",
+          "description": "Invita, activa o retira a quienes administran la tienda. Solo el dueño."
+        }
       }
     }
   }
