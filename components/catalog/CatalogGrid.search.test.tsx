@@ -52,7 +52,12 @@ const names = () =>
 
 function renderGrid() {
   return render(
-    <CatalogGrid locale="es-MX" items={ITEMS} messages={messages} />
+    <CatalogGrid
+      locale="es-MX"
+      items={ITEMS}
+      messages={messages}
+      disciplineNames={getMessages('es-MX').disciplines}
+    />
   );
 }
 
@@ -71,6 +76,35 @@ describe('catalog grid filters from the address (FC 047 T2.1, T1.2)', () => {
       (screen.getByLabelText(messages.filters.discipline) as HTMLSelectElement)
         .value
     ).toBe('escalada');
+  });
+
+  it('says a discipline has no products yet, by its name, and keeps it in the select (FC 052 T1.2)', () => {
+    search = 'disciplina=campismo';
+    renderGrid();
+    expect(
+      screen.getByText(
+        'Todavía no hay productos de Campismo. Estamos preparando la selección: vuelve pronto o mira el resto del catálogo.'
+      )
+    ).toBeTruthy();
+    expect(screen.queryByText(messages.filters.empty)).toBeNull();
+    expect(
+      (screen.getByLabelText(messages.filters.discipline) as HTMLSelectElement)
+        .value
+    ).toBe('campismo');
+    fireEvent.click(
+      screen.getByRole('button', { name: messages.filters.seeAll })
+    );
+    expect(names()).toHaveLength(3);
+  });
+
+  it('ignores a discipline that is not one of the seven, and shows the whole catalog (FC 052 T1.2)', () => {
+    search = 'disciplina=buceo';
+    renderGrid();
+    expect(names()).toHaveLength(3);
+    expect(
+      (screen.getByLabelText(messages.filters.discipline) as HTMLSelectElement)
+        .value
+    ).toBe('');
   });
 
   it('shows what the search of the header found, says for what, and can drop the search', () => {
@@ -112,10 +146,24 @@ describe('catalog grid filters from the address (FC 047 T2.1, T1.2)', () => {
     const { rerender } = renderGrid();
     expect(names()).toEqual(['Arnés alpino']);
     search = 'disciplina=senderismo';
-    rerender(<CatalogGrid locale="es-MX" items={ITEMS} messages={messages} />);
+    rerender(
+      <CatalogGrid
+        locale="es-MX"
+        items={ITEMS}
+        messages={messages}
+        disciplineNames={getMessages('es-MX').disciplines}
+      />
+    );
     expect(names()).toEqual(['Mochila ligera']);
     search = '';
-    rerender(<CatalogGrid locale="es-MX" items={ITEMS} messages={messages} />);
+    rerender(
+      <CatalogGrid
+        locale="es-MX"
+        items={ITEMS}
+        messages={messages}
+        disciplineNames={getMessages('es-MX').disciplines}
+      />
+    );
     expect(names()).toHaveLength(3);
   });
 

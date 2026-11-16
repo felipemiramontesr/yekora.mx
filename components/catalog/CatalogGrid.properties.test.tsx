@@ -66,7 +66,14 @@ const choose = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
 function show(items = ITEMS) {
-  render(<CatalogGrid locale="en" items={items} messages={messages} />);
+  render(
+    <CatalogGrid
+      locale="en"
+      items={items}
+      messages={messages}
+      disciplineNames={getMessages('en').disciplines}
+    />
+  );
 }
 
 describe('property filters of the catalog grid (FC 048 T1.2, T2.4)', () => {

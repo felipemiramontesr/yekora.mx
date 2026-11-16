@@ -64,6 +64,7 @@ function show(locale: Locale = 'en', items = ITEMS) {
       locale={locale}
       items={items}
       messages={getMessages(locale).catalog}
+      disciplineNames={getMessages(locale).disciplines}
     />
   );
 }
@@ -142,6 +143,7 @@ describe('CatalogGrid hydration guard (FC 035 T1.1, 256_AN)', () => {
       locale="en"
       items={ITEMS}
       messages={getMessages('en').catalog}
+      disciplineNames={getMessages('en').disciplines}
     />
   );
 

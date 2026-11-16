@@ -359,7 +359,9 @@
     "montana": "Mountaineering",
     "escalada": "Climbing",
     "canonismo": "Canyoning",
-    "trail-running": "Trail running"
+    "trail-running": "Trail running",
+    "campismo": "Camping",
+    "preparacionismo": "Prepping"
   },
   "activities": {
     "items": {
@@ -377,6 +379,12 @@
       },
       "trail-running": {
         "description": "Light footwear and gear for mountain running, matched to your terrain and distance."
+      },
+      "campismo": {
+        "description": "Tents, sleeping bags, camp stoves and what you need to spend the night outdoors, as comfortable as your trip asks for."
+      },
+      "preparacionismo": {
+        "description": "Gear to be ready for the unexpected: water, light, first aid, communication and shelter, for you and yours."
       }
     }
   },
@@ -467,7 +475,9 @@
       "reset": "Clear filters",
       "searching": "Results for “{query}”",
       "clearSearch": "Clear the search",
-      "any": "Any"
+      "any": "Any",
+      "emptyDiscipline": "There are no {discipline} products yet. We are preparing the selection: come back soon or browse the rest of the catalog.",
+      "seeAll": "See the whole catalog"
     },
     "product": {
       "back": "Back to the catalog",
@@ -1164,7 +1174,9 @@
           "montana": "Mountaineering",
           "escalada": "Climbing",
           "canonismo": "Canyoning",
-          "trail-running": "Trail running"
+          "trail-running": "Trail running",
+          "campismo": "Camping",
+          "preparacionismo": "Prepping"
         },
         "shippingClassNames": {
           "estandar": "Standard: regular parcels",

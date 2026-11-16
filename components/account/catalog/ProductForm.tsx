@@ -29,6 +29,8 @@ const DISCIPLINES = [
   'escalada',
   'canonismo',
   'trail-running',
+  'campismo',
+  'preparacionismo',
 ];
 const SHIPPING_CLASSES = ['estandar', 'voluminoso'];
 

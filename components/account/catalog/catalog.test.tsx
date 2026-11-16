@@ -911,6 +911,8 @@ describe('products (FC 029 F3c)', () => {
       ['escalada', 'Escalada'],
       ['canonismo', 'Cañonismo'],
       ['trail-running', 'Trail running'],
+      ['campismo', 'Campismo'],
+      ['preparacionismo', 'Preparacionismo'],
     ]);
     expect(options(p.shippingClass)).toEqual([
       ['', p.chooseShippingClass],

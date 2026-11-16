@@ -82,6 +82,7 @@ export function CatalogView({
             locale={locale}
             items={products.map((product) => gridItem(product, locale))}
             messages={catalog}
+            disciplineNames={getMessages(locale).disciplines}
           />
         </>
       )}

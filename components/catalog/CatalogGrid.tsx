@@ -12,7 +12,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Locale, Messages } from '@/app/i18n';
+import { isDiscipline, type Locale, type Messages } from '@/app/i18n';
 import { fill, type PriceText } from '@/lib/catalog/format';
 import { matchEntries } from '@/lib/catalog/search';
 import { ProductVisual } from './ProductVisual';
@@ -99,6 +99,8 @@ interface CatalogGridProps {
   items: GridItem[];
   /** `catalog` texts of the page's language. */
   messages: Messages['catalog'];
+  /** The names of the disciplines in the page's language (for a discipline with no products yet). */
+  disciplineNames: Messages['disciplines'];
 }
 
 type Sort = 'name' | 'price_asc' | 'price_desc';
@@ -170,7 +172,9 @@ function UrlFilters({
   onChange: (filters: { discipline: string; query: string }) => void;
 }>) {
   const params = useSearchParams();
-  const discipline = params?.get('disciplina') ?? '';
+  // A slug that is not one of the disciplines is ignored: the whole catalog shows (FC 052 T1.2).
+  const asked = params?.get('disciplina') ?? '';
+  const discipline = isDiscipline(asked) ? asked : '';
   const query = params?.get('q') ?? '';
   const seen = useRef(false);
   useEffect(() => {
@@ -235,6 +239,7 @@ export function CatalogGrid({
   locale,
   items,
   messages,
+  disciplineNames,
 }: Readonly<CatalogGridProps>) {
   const [discipline, setDiscipline] = useState('');
   const [query, setQuery] = useState('');
@@ -245,16 +250,26 @@ export function CatalogGrid({
   useEffect(() => setIsMounted(true), []);
   const { filters } = messages;
 
-  const disciplineOptions = useMemo(
-    () =>
-      optionsOf(
-        items,
-        (item) => item.discipline,
-        (item) => item.disciplineName,
-        locale
-      ),
-    [items, locale]
-  );
+  const disciplineOptions = useMemo(() => {
+    const options = optionsOf(
+      items,
+      (item) => item.discipline,
+      (item) => item.disciplineName,
+      locale
+    );
+    // A discipline the address asks for, with no products yet, stays in the list so the select
+    // shows what is filtered (FC 052 T1.2).
+    return isDiscipline(discipline) &&
+      !options.some((option) => option.slug === discipline)
+      ? [...options, { slug: discipline, name: disciplineNames[discipline] }]
+      : options;
+  }, [items, locale, discipline, disciplineNames]);
+  /** The discipline asked for when the catalog holds no product of it (FC 052 T1.2). */
+  const noneOf =
+    isDiscipline(discipline) &&
+    !items.some((item) => item.discipline === discipline)
+      ? discipline
+      : null;
   const propertyFilterList = useMemo(
     () => propertyFilters(items, locale),
     [items, locale]
@@ -375,7 +390,13 @@ export function CatalogGrid({
 
       {visible.length === 0 ? (
         <div className="mt-6 flex flex-col items-start gap-4">
-          <p>{filters.empty}</p>
+          <p>
+            {noneOf
+              ? fill(filters.emptyDiscipline, {
+                  discipline: disciplineNames[noneOf],
+                })
+              : filters.empty}
+          </p>
           <button
             type="button"
             onClick={() => {
@@ -385,7 +406,7 @@ export function CatalogGrid({
             }}
             className="min-h-11 rounded-md border border-petroleo px-5 font-semibold"
           >
-            {filters.reset}
+            {noneOf ? filters.seeAll : filters.reset}
           </button>
         </div>
       ) : (

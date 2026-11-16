@@ -37,7 +37,7 @@ export function getMessages(locale: Locale): Messages {
 }
 
 /**
- * The five disciplines, in menu order. Each slug is a stable id: dictionary key, pictogram
+ * The seven disciplines, in menu order. Each slug is a stable id: dictionary key, pictogram
  * key (components/icons/DisciplineIcon) and anchor on the home page (`/#escalada`).
  */
 export const disciplines = [
@@ -46,13 +46,15 @@ export const disciplines = [
   'escalada',
   'canonismo',
   'trail-running',
+  'campismo',
+  'preparacionismo',
 ] as const;
 
 /** Slug of one discipline. */
 export type Discipline = (typeof disciplines)[number];
 
 /**
- * Whether a slug is one of the five disciplines. Catalog references come from the database
+ * Whether a slug is one of the seven disciplines. Catalog references come from the database
  * (ADR 0007), so a discipline added there later is valid data without a pictogram of its own.
  *
  * @param slug - Discipline slug from the catalog.

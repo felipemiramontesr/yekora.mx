@@ -359,7 +359,9 @@
     "montana": "Montaña",
     "escalada": "Escalada",
     "canonismo": "Cañonismo",
-    "trail-running": "Trail running"
+    "trail-running": "Trail running",
+    "campismo": "Campismo",
+    "preparacionismo": "Preparacionismo"
   },
   "activities": {
     "items": {
@@ -377,6 +379,12 @@
       },
       "trail-running": {
         "description": "Calzado y equipo ligero para correr en montaña según tu terreno y tu distancia."
+      },
+      "campismo": {
+        "description": "Tiendas, sacos de dormir, cocinas de campo y lo necesario para pasar la noche al aire libre con la comodidad que tu salida pide."
+      },
+      "preparacionismo": {
+        "description": "Equipo para estar listo ante imprevistos: agua, luz, primeros auxilios, comunicación y refugio, para ti y los tuyos."
       }
     }
   },
@@ -467,7 +475,9 @@
       "reset": "Quitar filtros",
       "searching": "Resultados para «{query}»",
       "clearSearch": "Quitar la búsqueda",
-      "any": "Cualquiera"
+      "any": "Cualquiera",
+      "emptyDiscipline": "Todavía no hay productos de {discipline}. Estamos preparando la selección: vuelve pronto o mira el resto del catálogo.",
+      "seeAll": "Ver todo el catálogo"
     },
     "product": {
       "back": "Volver al catálogo",
@@ -1164,7 +1174,9 @@
           "montana": "Montaña",
           "escalada": "Escalada",
           "canonismo": "Cañonismo",
-          "trail-running": "Trail running"
+          "trail-running": "Trail running",
+          "campismo": "Campismo",
+          "preparacionismo": "Preparacionismo"
         },
         "shippingClassNames": {
           "estandar": "Estándar: paquetes normales",

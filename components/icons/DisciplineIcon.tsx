@@ -1,7 +1,7 @@
 /**
  * YĒKORA's own discipline pictograms (FC 004).
  *
- * Lucide has no climbing or canyoning icon, so the five disciplines get original line drawings
+ * Lucide has no climbing or canyoning icon, so the seven disciplines get original line drawings
  * built on Lucide's grid: 24 × 24 viewBox, 2 px stroke, round caps and joins, no fill. They sit
  * next to Lucide icons without looking foreign.
  *
@@ -55,6 +55,22 @@ const PICTOGRAMS: Record<Discipline, ReactNode> = {
       <path d="M3 16.5 4.5 9 9 8l2 3h3.5l6.5 3.5v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
       <path d="M3 16h18" />
       <path d="m7 18.5-.5 2M11 18.5l-.5 2M15 18.5l-.5 2M19 18.5l-.5 2" />
+    </>
+  ),
+  // Camping: an A-frame tent, its door open, on the ground.
+  campismo: (
+    <>
+      <path d="m12 3 9 16H3Z" />
+      <path d="m9.5 19 2.5-5 2.5 5" />
+      <path d="M2 21h20" />
+    </>
+  ),
+  // Prepping: an emergency backpack with its first-aid cross.
+  preparacionismo: (
+    <>
+      <path d="M9 6V5a3 3 0 0 1 6 0v1" />
+      <path d="M8 6h8a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z" />
+      <path d="M12 10v6M9 13h6" />
     </>
   ),
 };
