@@ -88,6 +88,8 @@ interface FormInput {
   expectedTotalMxnCents: number;
   /** A signed-in buyer asks to keep the address typed here in their book (FC 051 T1.4). */
   saveAddress?: boolean;
+  /** A signed-in buyer paying by card asks Stripe to keep it for later purchases (FC 054 T1.3). */
+  savePaymentMethod?: boolean;
 }
 
 const optional = (value: string) => (value.trim() === '' ? undefined : value);
@@ -120,6 +122,7 @@ export function validateCheckout(
     },
     privacyConsent: input.consent,
     saveAddress: input.saveAddress ? true : undefined,
+    savePaymentMethod: input.savePaymentMethod ? true : undefined,
     expectedTotalMxnCents: input.expectedTotalMxnCents,
   });
   const errors: FieldErrors = {};

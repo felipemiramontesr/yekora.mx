@@ -311,11 +311,34 @@ export const E2E_HOME: E2eAddress = {
   references: null,
 };
 
-/** The profile and the book of addresses the interceptor keeps for the signed-in buyer (FC 051). */
+/** One saved card as the API shows it: brand, last four digits and expiry, nothing else (FC 054). */
+export interface E2eCard {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+
+/** A Visa of Ana, for a test to start with. */
+export const E2E_VISA: E2eCard = {
+  id: 'pm_1E2eVisa000001',
+  brand: 'visa',
+  last4: '4242',
+  expMonth: 3,
+  expYear: 2031,
+};
+
+/** Where the emulated «add a card» sends the browser: Stripe's own host, which a test intercepts. */
+export const E2E_CARD_SETUP_PAGE =
+  'https://checkout.stripe.com/c/setup/cs_test_e2e';
+
+/** The profile, the book of addresses and the saved cards the interceptor keeps for the buyer. */
 interface AccountData {
   fullName: string | null;
   phone: string | null;
   addresses: E2eAddress[];
+  cards: E2eCard[];
   next: number;
 }
 
@@ -417,6 +440,8 @@ export async function mockAccountApi(
     signedIn?: Persona;
     persona?: Persona;
     addresses?: E2eAddress[];
+    /** The cards the buyer has saved at Stripe from the start (FC 054). */
+    cards?: E2eCard[];
     phone?: string | null;
     /** How long the signed-in routes take to answer, as a sleeping API does (FC 053). */
     latencyMs?: number;
@@ -428,6 +453,7 @@ export async function mockAccountApi(
     fullName: null,
     phone: options.phone ?? null,
     addresses: structuredClone(options.addresses ?? []),
+    cards: structuredClone(options.cards ?? []),
     next: 10,
   };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
@@ -518,6 +544,9 @@ function answerAccount(
   ) {
     return answerData(route, data);
   }
+  if (path.startsWith('/v1/account/payment-methods')) {
+    return answerCards(route, data);
+  }
   if (path === '/v1/account/logout') {
     signOut();
     return json(route, 204);
@@ -527,6 +556,26 @@ function answerAccount(
     return json(route, 204);
   }
   return answerOrders(route);
+}
+
+/** Answers `/v1/account/payment-methods`: list, open Stripe's page to add one, detach one (FC 054). */
+function answerCards(route: Route, data: AccountData) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  if (request.method() === 'GET') {
+    return json(route, 200, {
+      items: data.cards,
+      hasCustomer: data.cards.length > 0,
+    });
+  }
+  if (path.endsWith('/setup')) {
+    return json(route, 201, { redirectUrl: E2E_CARD_SETUP_PAGE });
+  }
+  const id = path.split('/').pop();
+  const found = data.cards.some((card) => card.id === id);
+  if (!found) return problem(route, 404, 'PAYMENT_METHOD_NOT_FOUND');
+  data.cards = data.cards.filter((card) => card.id !== id);
+  return json(route, 200, { detached: true });
 }
 
 /** A list of one order, or that order. */

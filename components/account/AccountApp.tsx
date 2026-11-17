@@ -39,6 +39,7 @@ import {
 } from './AccountForms';
 import { OrderDetailView, OrderList } from './AccountOrders';
 import { AccountAdminHub } from './AccountAdminHub';
+import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
 import type { AdminUsersTexts } from './AdminUsersConsole';
@@ -416,6 +417,9 @@ function Dashboard({
           locale={locale}
           onChanged={onChanged}
         />
+      )}
+      {tab === 'payment-methods' && (
+        <AccountPaymentMethods messages={texts.account} locale={locale} />
       )}
       {tab === 'admin' && (
         <AccountAdminHub

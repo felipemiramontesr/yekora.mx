@@ -92,7 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Última actualización",
-    "updated": "21 de octubre de 2026",
+    "updated": "17 de noviembre de 2026",
     "privacy": {
       "metaTitle": "Aviso de privacidad | YĒKORA",
       "title": "Aviso de privacidad y manejo de datos personales",
@@ -107,7 +107,8 @@
           "title": "Datos personales que tratamos",
           "paragraphs": [
             "Si compras en el sitio, te pedimos tu nombre completo, correo electrónico, teléfono y dirección de entrega, y tu consentimiento expreso con una casilla antes de pagar. No te pedimos datos sensibles. Los datos de tu tarjeta o de tu cuenta los capturas directamente en la página de Stripe o de Mercado Pago y nunca llegan a YĒKORA.",
-            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos una sola cookie técnica propia, descrita en la Política de cookies."
+            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos una sola cookie técnica propia, descrita en la Política de cookies.",
+            "Si tienes una cuenta y decides guardar una tarjeta, Stripe, Inc. la conserva a tu nombre mediante tokenización; YĒKORA guarda solo un identificador opaco de tu cliente en Stripe y le consulta la marca, los últimos cuatro dígitos y el vencimiento únicamente para mostrártelos. YĒKORA no recibe, procesa ni conserva el número completo de tu tarjeta ni su código de seguridad."
           ]
         },
         {
@@ -121,7 +122,8 @@
           "title": "Transferencias",
           "paragraphs": [
             "Para cobrar tu pedido usamos el procesador de pago que elijas: Stripe para tarjeta y efectivo en OXXO, y Mercado Pago para transferencia SPEI y saldo de Mercado Pago. Solo les enviamos el número de pedido y el monto; lo que captures en su página lo tratan conforme a sus propios avisos de privacidad.",
-            "Para entregar tu pedido compartimos con la empresa de mensajería solo tu nombre, teléfono y dirección de entrega. El proveedor de alojamiento del sitio actúa como encargado y trata los datos por cuenta del responsable. Fuera de estos casos no transferimos tus datos personales a terceros."
+            "Para entregar tu pedido compartimos con la empresa de mensajería solo tu nombre, teléfono y dirección de entrega. El proveedor de alojamiento del sitio actúa como encargado y trata los datos por cuenta del responsable. Fuera de estos casos no transferimos tus datos personales a terceros.",
+            "Si guardas una tarjeta, Stripe, Inc. la trata como responsable del procesamiento de pagos, lo que incluye conservarla y transferirla fuera de México conforme a su propio aviso de privacidad. A Stripe solo le enviamos el identificador de tu cuenta de cliente y lo necesario para cobrar. Puedes eliminar la tarjeta en cualquier momento en Mi cuenta › Métodos de pago."
           ]
         },
         {
@@ -135,7 +137,8 @@
           "title": "Derechos ARCO y revocación del consentimiento",
           "paragraphs": [
             "Puedes ejercer tus derechos de Acceso, Rectificación, Cancelación y Oposición, revocar tu consentimiento o limitar el uso de tus datos enviando una solicitud a contacto@yekora.mx.",
-            "Tu solicitud debe incluir tu nombre, un medio para responderte, el documento que acredite tu identidad o la de tu representante, una descripción clara de los datos y del derecho que quieres ejercer. Te responderemos en los plazos que establece la ley."
+            "Tu solicitud debe incluir tu nombre, un medio para responderte, el documento que acredite tu identidad o la de tu representante, una descripción clara de los datos y del derecho que quieres ejercer. Te responderemos en los plazos que establece la ley.",
+            "Para una tarjeta guardada, puedes desvincularla tú mismo en Mi cuenta › Métodos de pago o pedirnos por correo que eliminemos el vínculo con tu cliente en Stripe. Tus pedidos anteriores se conservan por nuestras obligaciones fiscales."
           ]
         },
         {
@@ -254,7 +257,8 @@
             "Puedes comprar como invitado, sin crear una cuenta. Antes de pagar ves el precio de cada producto con IVA incluido, el costo de envío a tu estado y el total en pesos mexicanos (MXN). El total se calcula en nuestro servidor y es el monto que pagas.",
             "Formas de pago: tarjeta de crédito o débito y efectivo en OXXO, procesados por Stripe; transferencia SPEI y saldo de Mercado Pago, procesados por Mercado Pago. Pagas en la página segura del procesador; YĒKORA no recibe ni guarda los datos de tu tarjeta.",
             "Al iniciar el pago apartamos tus productos según el método: 60 minutos con tarjeta o saldo de Mercado Pago, 24 horas con SPEI y 72 horas con OXXO. Tu pedido queda confirmado cuando el procesador confirma el pago; si el plazo termina sin pago, el pedido vence y liberamos los productos sin ningún cargo.",
-            "Si un pago llega después de que el pedido venció, lo revisamos y te contactamos para entregarte el pedido o reembolsarte. Las condiciones de envío, cambios, devoluciones y garantías están en la página Envíos y devoluciones, conforme al capítulo VIII Bis de la Ley Federal de Protección al Consumidor y a la norma NMX-COE-001-SCFI-2018."
+            "Si un pago llega después de que el pedido venció, lo revisamos y te contactamos para entregarte el pedido o reembolsarte. Las condiciones de envío, cambios, devoluciones y garantías están en la página Envíos y devoluciones, conforme al capítulo VIII Bis de la Ley Federal de Protección al Consumidor y a la norma NMX-COE-001-SCFI-2018.",
+            "Tarjetas guardadas: si tienes una cuenta, puedes pedir que Stripe guarde tu tarjeta para próximas compras marcando una casilla al pagar o agregándola en Mi cuenta › Métodos de pago. Solo se guarda con tu consentimiento y puedes eliminarla cuando quieras. YĒKORA no recibe ni guarda el número ni el código de seguridad, y no hace cargos con una tarjeta guardada sin que tú confirmes la compra."
           ]
         },
         {
@@ -730,7 +734,9 @@
       "save": "Guardar este domicilio en mi cuenta",
       "loading": "Cargando tus domicilios…",
       "manage": "Administrar mis domicilios",
-      "profile": "Usamos tu nombre y tu teléfono de tu cuenta; puedes cambiarlos aquí solo para este pedido."
+      "profile": "Usamos tu nombre y tu teléfono de tu cuenta; puedes cambiarlos aquí solo para este pedido.",
+      "saveCard": "Guardar esta tarjeta en mi cuenta para próximas compras",
+      "saveCardHint": "La guarda Stripe, no YĒKORA. Puedes eliminarla cuando quieras en Mi cuenta › Métodos de pago."
     }
   },
   "account": {
@@ -861,7 +867,8 @@
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
       "profile": "Mi información",
-      "admin": "Administración"
+      "admin": "Administración",
+      "payment-methods": "Métodos de pago"
     },
     "orders": {
       "loading": "Cargando pedidos…",
@@ -1474,6 +1481,50 @@
         }
       }
     },
-    "sessionLoading": "Confirmando tu sesión…"
+    "sessionLoading": "Confirmando tu sesión…",
+    "paymentMethods": {
+      "title": "Tus tarjetas guardadas",
+      "intro": "Guarda una tarjeta para pagar más rápido. Tus datos de tarjeta los captura y conserva Stripe; YĒKORA nunca los recibe. Aquí solo mostramos la marca, los últimos 4 dígitos y el vencimiento.",
+      "loading": "Cargando tus tarjetas…",
+      "empty": "Todavía no tienes tarjetas guardadas.",
+      "cardName": "{brand} terminada en {last4}",
+      "expires": "Vence {month}/{year}",
+      "add": "Agregar tarjeta",
+      "adding": "Abriendo la página segura de Stripe…",
+      "addHint": "Te llevamos a la página segura de Stripe para escribir tu tarjeta. Al terminar regresas aquí.",
+      "remove": "Eliminar",
+      "removed": "Eliminamos la tarjeta de tu cuenta.",
+      "confirm": {
+        "title": "¿Eliminar esta tarjeta?",
+        "text": "Dejará de estar guardada en tu cuenta. Tus pedidos anteriores no cambian.",
+        "yes": "Sí, eliminar",
+        "no": "Conservar"
+      },
+      "mercadoPago": {
+        "title": "Mercado Pago",
+        "text": "Tus medios de pago y tu saldo de Mercado Pago se administran directamente dentro de Mercado Pago. Aquí no guardamos nada de esa cuenta."
+      },
+      "brands": {
+        "visa": "Visa",
+        "mastercard": "Mastercard",
+        "amex": "American Express",
+        "discover": "Discover",
+        "diners": "Diners Club",
+        "jcb": "JCB",
+        "unionpay": "UnionPay",
+        "other": "Tarjeta"
+      },
+      "errors": {
+        "PAYMENT_METHOD_NOT_FOUND": "Esa tarjeta ya no está en tu cuenta.",
+        "SERVICE_UNAVAILABLE": "No podemos consultar tus tarjetas en este momento. Intenta más tarde.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Entra de nuevo.",
+        "rate_limited": "Demasiados intentos. Espera un momento.",
+        "offline": "Sin conexión. Revisa tu internet e intenta de nuevo.",
+        "timeout": "La solicitud tardó demasiado. Intenta de nuevo.",
+        "server": "No pudimos completar la solicitud. Intenta de nuevo.",
+        "invalid": "No pudimos completar la solicitud. Intenta de nuevo.",
+        "unknown": "No pudimos completar la solicitud. Intenta de nuevo."
+      }
+    }
   }
 }

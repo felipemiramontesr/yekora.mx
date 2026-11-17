@@ -307,6 +307,42 @@ test('a signed-in buyer types another address and asks to keep it in their accou
   });
 });
 
+test('a signed-in buyer paying by card may ask Stripe to keep it, and only then (FC 054 T1.3)', async ({
+  page,
+}) => {
+  const seen = await signedInCheckout(page, [E2E_HOME]);
+  const form = page.locator('main form');
+  const keep = form.getByLabel('Guardar esta tarjeta en mi cuenta');
+  // Only the card can be kept: with another method the box is not there.
+  await form.getByRole('radio', { name: /Efectivo en OXXO/ }).check();
+  await expect(keep).toHaveCount(0);
+  await form
+    .getByRole('radio', { name: /Tarjeta de crédito o débito/ })
+    .check();
+  await expect(keep).not.toBeChecked();
+  await expect(form.getByText('La guarda Stripe, no YĒKORA.')).toBeVisible();
+  await keep.check();
+  await form.getByRole('checkbox', { name: /privacidad/i }).check();
+  await payButton(page).click();
+  await expect(page).toHaveURL(STRIPE_PAGE);
+  expect(seen.checkouts[0]).toMatchObject({
+    method: 'CARD',
+    savePaymentMethod: true,
+  });
+});
+
+test('a guest never sees the box to keep the card', async ({ page }) => {
+  await backend(page, {});
+  await withPack(page, '/checkout/');
+  const form = page.locator('main form');
+  await form
+    .getByRole('radio', { name: /Tarjeta de crédito o débito/ })
+    .check();
+  await expect(
+    form.getByLabel('Guardar esta tarjeta en mi cuenta')
+  ).toHaveCount(0);
+});
+
 test('SPEI goes to Mercado Pago; back from cancel, the same payment page is offered', async ({
   page,
 }) => {

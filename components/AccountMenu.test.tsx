@@ -119,7 +119,12 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['Mis pedidos', 'Mi información', 'Administración']);
+    ).toEqual([
+      'Mis pedidos',
+      'Mi información',
+      'Métodos de pago',
+      'Administración',
+    ]);
     expect(
       within(nav)
         .getByRole('link', { name: 'Administración' })
@@ -249,8 +254,13 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
         .map((link) => link.textContent);
       expect(names).toEqual(
         offered
-          ? ['Mis pedidos', 'Mi información', 'Administración']
-          : ['Mis pedidos', 'Mi información']
+          ? [
+              'Mis pedidos',
+              'Mi información',
+              'Métodos de pago',
+              'Administración',
+            ]
+          : ['Mis pedidos', 'Mi información', 'Métodos de pago']
       );
       // The consoles are no longer entries of the menu (FC 052 T1.1).
       for (const gone of ['Panel: pedidos', 'Catálogo', 'Administradores']) {

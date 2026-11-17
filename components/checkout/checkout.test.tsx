@@ -795,3 +795,95 @@ describe('CheckoutForm of a signed-in buyer (FC 051 T1.4, T2.5, T2.6)', () => {
     expect(screen.queryByLabelText(/Guardar este domicilio/)).toBeNull();
   });
 });
+
+describe('keeping the card for next time (FC 054 T1.3)', () => {
+  const ANA = {
+    id: 'f0000000-0000-4000-8000-000000000001',
+    email: 'ana@example.test',
+    fullName: 'Ana Pérez',
+    roles: ['customer'],
+    permissions: ['account:self'],
+    phone: '4929421780',
+    postalCode: '98612',
+    stateCode: 'ZAC',
+  };
+  const HOME: AddressView = {
+    id: 'a0000000-0000-4000-8000-000000000001',
+    isDefault: true,
+    isComplete: true,
+    stateCode: 'ZAC',
+    postalCode: '98612',
+    label: 'Casa',
+    name: 'Ana Pérez',
+    phone: '4929421780',
+    street: 'Av. Barones',
+    exteriorNumber: '209',
+    interiorNumber: null,
+    neighborhood: 'Las Américas',
+    municipality: 'Guadalupe',
+    references: null,
+  };
+  const KEEP = /Guardar esta tarjeta en mi cuenta/;
+  const payWithCard = async (keepIt: boolean) => {
+    fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
+    if (keepIt) fireEvent.click(screen.getByLabelText(KEEP));
+    fireEvent.click(screen.getByRole('checkbox', { name: /privacidad/i }));
+    submit.mockResolvedValue({ ok: true, session: SESSION });
+    fireEvent.click(payButton());
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    return submit.mock.calls[0][0];
+  };
+  const signedInBuyer = () => {
+    account.mockReturnValue({ firstName: 'Ana', user: ANA });
+    savedBook.mockResolvedValue({ ok: true, data: { items: [HOME], max: 5 } });
+  };
+
+  it('offers it only to a signed-in buyer who chose the card, and says Stripe keeps it', async () => {
+    signedInBuyer();
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    // Another method keeps nothing: there is no card to keep.
+    expect(screen.queryByLabelText(KEEP)).toBeNull();
+    fireEvent.click(screen.getByLabelText(/Efectivo en OXXO/));
+    expect(screen.queryByLabelText(KEEP)).toBeNull();
+    fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
+    expect(screen.getByLabelText(KEEP)).toHaveProperty('checked', false);
+    expect(screen.getByText(/La guarda Stripe, no YĒKORA/)).toBeTruthy();
+  });
+
+  it('never offers it to a guest', () => {
+    account.mockReturnValue({ firstName: null, user: null });
+    renderForm();
+    fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
+    expect(screen.queryByLabelText(KEEP)).toBeNull();
+  });
+
+  it('asks the API to keep the card only when the buyer ticked the box', async () => {
+    signedInBuyer();
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    const kept = await payWithCard(true);
+    expect(kept).toMatchObject({ method: 'CARD', savePaymentMethod: true });
+    cleanup();
+    submit.mockClear();
+    signedInBuyer();
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    const notKept = await payWithCard(false);
+    expect(notKept.savePaymentMethod).toBeUndefined();
+  });
+
+  it('does not send the wish when the buyer ticked it and then chose another method', async () => {
+    signedInBuyer();
+    renderForm();
+    await screen.findByLabelText(/Casa/);
+    fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
+    fireEvent.click(screen.getByLabelText(KEEP));
+    fireEvent.click(screen.getByLabelText(/Efectivo en OXXO/));
+    fireEvent.click(screen.getByRole('checkbox', { name: /privacidad/i }));
+    submit.mockResolvedValue({ ok: true, session: SESSION });
+    fireEvent.click(payButton());
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    expect(submit.mock.calls[0][0].savePaymentMethod).toBeUndefined();
+  });
+});

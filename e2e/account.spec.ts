@@ -1,7 +1,10 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import {
+  E2E_CARD_SETUP_PAGE,
   E2E_CODE,
   E2E_ORDER,
+  E2E_VISA,
   mockAccountApi,
   openAccountMenu,
 } from './support/accountApi';
@@ -211,6 +214,88 @@ const WATCH_VISITOR_SCREENS = () => {
   };
   requestAnimationFrame(sample);
 };
+
+test('a buyer sees their saved cards, adds one at Stripe’s page and removes one after confirming (FC 054 F1, T2.4, T2.6)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer', cards: [E2E_VISA] });
+  await page.route('https://checkout.stripe.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<h1>Stripe setup</h1>' })
+  );
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await openAccountMenu(page);
+  await page.getByRole('link', { name: 'Métodos de pago' }).click();
+  await expect(page).toHaveURL(/\/cuenta\/metodos-pago\/$/);
+  const crumbs = page.getByRole('navigation', {
+    name: 'Dónde estás en tu cuenta',
+  });
+  await expect(crumbs.getByText('Métodos de pago')).toHaveAttribute(
+    'aria-current',
+    'page'
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Visa terminada en 4242' })
+  ).toBeVisible();
+  await expect(page.getByText('Vence 03/2031')).toBeVisible();
+  // Mercado Pago manages its own methods: only a note, no card, no button (T2.4).
+  await expect(
+    page.getByRole('region', { name: 'Mercado Pago' })
+  ).toContainText('se administran directamente dentro de Mercado Pago');
+  // Every control is a 44 × 44 px target and says which card it acts on (T2.6).
+  for (const control of [
+    page.getByRole('button', { name: 'Eliminar: Visa terminada en 4242' }),
+    page.getByRole('button', { name: 'Agregar tarjeta' }),
+  ]) {
+    const box = await control.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+  // Nothing is removed until the person confirms. Axe sees the page with its dialog open (T2.6).
+  await page
+    .getByRole('button', { name: 'Eliminar: Visa terminada en 4242' })
+    .click();
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(violations.map((violation) => violation.id)).toEqual([]);
+  await page.getByRole('button', { name: 'Conservar' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Visa terminada en 4242' })
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Eliminar: Visa terminada en 4242' })
+    .click();
+  await page.getByRole('button', { name: 'Sí, eliminar' }).click();
+  await expect(
+    page.getByText('Eliminamos la tarjeta de tu cuenta.')
+  ).toBeVisible();
+  await expect(
+    page.getByText('Todavía no tienes tarjetas guardadas.')
+  ).toBeVisible();
+  // The card is typed on Stripe's own page, never here.
+  await page.getByRole('button', { name: 'Agregar tarjeta' }).click();
+  await expect(page).toHaveURL(E2E_CARD_SETUP_PAGE);
+});
+
+test('the saved cards are there in English too, at their own address (FC 054 F1)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer', cards: [E2E_VISA] });
+  await page.goto('/en/account/');
+  await expect(page.getByText('Hello, Ana E2E')).toBeVisible();
+  await openAccountMenu(page);
+  await page.getByRole('link', { name: 'Payment methods' }).click();
+  await expect(page).toHaveURL(/\/en\/account\/metodos-pago\/$/);
+  await expect(
+    page.getByRole('heading', { name: 'Visa ending in 4242' })
+  ).toBeVisible();
+  await expect(page.getByText('Expires 03/2031')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add a card' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Mercado Pago' })
+  ).toBeVisible();
+});
 
 test('with a session, switching language never shows the sign-in form nor the visitor header, in any frame (FC 053 T1.1, T2.1)', async ({
   page,

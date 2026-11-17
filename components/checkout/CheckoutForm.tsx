@@ -157,6 +157,8 @@ export function CheckoutForm({
   } | null>(null);
   const [choice, setChoice] = useState<string | null>(null);
   const [keep, setKeep] = useState(false);
+  // FC 054 T1.3: a signed-in buyer paying by card may ask Stripe to keep the card for next time.
+  const [keepCard, setKeepCard] = useState(false);
   const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
@@ -187,6 +189,9 @@ export function CheckoutForm({
     book !== null &&
     book.items.length < book.max &&
     (saved.length === 0 || choice === OTHER_ADDRESS);
+
+  /** Offered to a signed-in buyer who pays by card: nobody else has an account to keep it in. */
+  const canKeepCard = user !== null && method === 'CARD';
 
   function choose(next: string) {
     setChoice(next);
@@ -229,6 +234,7 @@ export function CheckoutForm({
       lines,
       expectedTotalMxnCents: total,
       saveAddress: keep && canKeep,
+      savePaymentMethod: keepCard && canKeepCard,
     });
     if (!check.ok) {
       setErrors(check.errors);
@@ -355,6 +361,26 @@ export function CheckoutForm({
           error={errorText('method')}
           messages={messages.method}
         />
+        {canKeepCard && (
+          <div className="flex flex-col gap-1">
+            <label className="flex min-h-11 items-center gap-3">
+              <input
+                type="checkbox"
+                checked={keepCard}
+                onChange={(event) => setKeepCard(event.target.checked)}
+                aria-describedby={`${base}-keep-card-hint`}
+                className="size-5 accent-petroleo"
+              />
+              {messages.saved.saveCard}
+            </label>
+            <p
+              id={`${base}-keep-card-hint`}
+              className="text-sm text-petroleo/80"
+            >
+              {messages.saved.saveCardHint}
+            </p>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <div className="flex items-start gap-3">
             <input

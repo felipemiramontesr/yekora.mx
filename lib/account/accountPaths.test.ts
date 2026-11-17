@@ -8,6 +8,7 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
     ['/cuenta/', { tab: 'orders', orderNumber: null }],
     [`/cuenta/${ORDER}/`, { tab: 'orders', orderNumber: ORDER }],
     ['/cuenta/datos/', { tab: 'profile', orderNumber: null }],
+    ['/cuenta/metodos-pago/', { tab: 'payment-methods', orderNumber: null }],
     ['/cuenta/panel/', { tab: 'panel', orderNumber: null }],
     [`/cuenta/panel/${ORDER}/`, { tab: 'panel', orderNumber: ORDER }],
     ['/cuenta/panel/not-an-order/', { tab: 'panel', orderNumber: null }],
@@ -22,6 +23,7 @@ describe('account area paths (FC 028 F2, T2.6c)', () => {
       { tab: 'orders', orderNumber: null },
       { tab: 'orders', orderNumber: ORDER },
       { tab: 'profile', orderNumber: null },
+      { tab: 'payment-methods', orderNumber: null },
       { tab: 'panel', orderNumber: null },
       { tab: 'panel', orderNumber: ORDER },
     ] as const) {
@@ -71,6 +73,20 @@ describe('data and addresses path (FC 051)', () => {
       expect(accountPath(area, { tab: 'profile', orderNumber: null })).toBe(
         `${area}datos/`
       );
+    }
+  });
+});
+
+describe('saved cards path (FC 054 F1)', () => {
+  it('reads and writes /metodos-pago/ in both languages, with no order in it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}metodos-pago/`, area)).toEqual({
+        tab: 'payment-methods',
+        orderNumber: null,
+      });
+      expect(
+        accountPath(area, { tab: 'payment-methods', orderNumber: null })
+      ).toBe(`${area}metodos-pago/`);
     }
   });
 });

@@ -32,6 +32,7 @@ import {
   listAdminUsers,
   updateAdminUser,
 } from '@/lib/api/adminUsersClient';
+import { listPaymentMethods } from '@/lib/api/paymentMethodsClient';
 import { AccountView } from '../views/AccountView';
 import { AccountApp } from './AccountApp';
 
@@ -57,6 +58,12 @@ vi.mock('@/lib/api/accountDataClient', () => ({
   createAddress: vi.fn(),
   updateAddress: vi.fn(),
   deleteAddress: vi.fn(),
+}));
+
+vi.mock('@/lib/api/paymentMethodsClient', () => ({
+  listPaymentMethods: vi.fn(),
+  startPaymentMethodSetup: vi.fn(),
+  detachPaymentMethod: vi.fn(),
 }));
 
 vi.mock('@/lib/api/adminUsersClient', () => ({
@@ -615,6 +622,38 @@ describe('account area · data and addresses (FC 051 T1.4, T2.6)', () => {
     fireEvent.submit(form);
     expect(await screen.findByText(account.data.profile.saved)).toBeTruthy();
     await screen.findByText('Hola, Ana P. Flores');
+  });
+});
+
+describe('account area · saved cards (FC 054 F1, T2.4, T2.6)', () => {
+  it('opens «Métodos de pago» by its address, under the breadcrumb, for any signed-in account', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    vi.mocked(listPaymentMethods).mockResolvedValue(
+      ok({
+        items: [
+          {
+            id: 'pm_1Visa000000001',
+            brand: 'visa',
+            last4: '4242',
+            expMonth: 3,
+            expYear: 2031,
+          },
+        ],
+        hasCustomer: true,
+      })
+    );
+    globalThis.history.replaceState(null, '', '/cuenta/metodos-pago/');
+    renderApp();
+    expect(
+      await screen.findByRole('heading', { name: 'Visa terminada en 4242' })
+    ).toBeTruthy();
+    const breadcrumb = screen.getByRole('navigation', {
+      name: account.dashboard.breadcrumb,
+    });
+    expect(
+      within(breadcrumb).getByText(account.dashboard['payment-methods'])
+    ).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Mercado Pago' })).toBeTruthy();
   });
 });
 

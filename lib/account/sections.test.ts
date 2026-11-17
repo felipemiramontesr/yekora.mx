@@ -5,7 +5,7 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
   it('offers a buyer their orders and their data', () => {
     expect(
       sectionsOf({ roles: ['customer'], permissions: ['account:self'] })
-    ).toEqual(['orders', 'profile']);
+    ).toEqual(['orders', 'profile', 'payment-methods']);
   });
 
   it('adds the panel and the catalog by permission, in order', () => {
@@ -14,18 +14,19 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
         roles: ['staff_orders'],
         permissions: ['catalog:write', 'orders:read'],
       })
-    ).toEqual(['orders', 'profile', 'admin']);
+    ).toEqual(['orders', 'profile', 'payment-methods', 'admin']);
   });
 
   it('offers the administrators console to the owner only, never by permission', () => {
     expect(sectionsOf({ roles: ['owner'], permissions: [] })).toEqual([
       'orders',
       'profile',
+      'payment-methods',
       'admin',
     ]);
     expect(
       sectionsOf({ roles: ['admin'], permissions: ['admins:write'] })
-    ).toEqual(['orders', 'profile']);
+    ).toEqual(['orders', 'profile', 'payment-methods']);
     expect(isOwner({ roles: ['owner'] })).toBe(true);
     expect(isOwner({ roles: ['admin'] })).toBe(false);
   });
@@ -42,6 +43,7 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
     }
     expect(canOpen(buyer, 'orders')).toBe(true);
     expect(canOpen(buyer, 'profile')).toBe(true);
+    expect(canOpen(buyer, 'payment-methods')).toBe(true);
   });
 
   it('gives each card of the administration hub to whoever holds its privilege and to no one else (T2.4)', () => {

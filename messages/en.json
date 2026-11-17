@@ -92,7 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Last updated",
-    "updated": "October 21, 2026",
+    "updated": "November 17, 2026",
     "privacy": {
       "metaTitle": "Privacy notice | YĒKORA",
       "title": "Privacy notice and personal data handling",
@@ -107,7 +107,8 @@
           "title": "Personal data we handle",
           "paragraphs": [
             "If you buy on the site, we ask for your full name, email, phone and delivery address, and for your express consent with a checkbox before paying. We do not ask for sensitive data. You enter your card or account details directly on the Stripe or Mercado Pago page, and they never reach YĒKORA.",
-            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use a single first-party technical cookie, described in the Cookie policy."
+            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use a single first-party technical cookie, described in the Cookie policy.",
+            "If you have an account and choose to save a card, Stripe, Inc. keeps it in your name through tokenization; YĒKORA stores only an opaque identifier of your customer at Stripe and asks it for the brand, the last four digits and the expiry solely to show them to you. YĒKORA does not receive, process or keep your full card number or its security code."
           ]
         },
         {
@@ -121,7 +122,8 @@
           "title": "Transfers",
           "paragraphs": [
             "To charge your order we use the payment processor you choose: Stripe for cards and cash at OXXO, and Mercado Pago for SPEI transfers and Mercado Pago balance. We only send them the order number and the amount; what you enter on their page is handled under their own privacy notices.",
-            "To deliver your order we share only your name, phone and delivery address with the courier company. The site's hosting provider acts as a processor and handles data on behalf of the controller. Beyond these cases we do not transfer your personal data to third parties."
+            "To deliver your order we share only your name, phone and delivery address with the courier company. The site's hosting provider acts as a processor and handles data on behalf of the controller. Beyond these cases we do not transfer your personal data to third parties.",
+            "If you save a card, Stripe, Inc. handles it as the controller of payment processing, which includes keeping it and transferring it outside Mexico under its own privacy notice. We only send Stripe the identifier of your customer account and what is needed to charge. You can remove the card at any time in My account › Payment methods."
           ]
         },
         {
@@ -135,7 +137,8 @@
           "title": "ARCO rights and withdrawal of consent",
           "paragraphs": [
             "You can exercise your rights of Access, Rectification, Cancellation and Opposition, withdraw your consent or limit the use of your data by sending a request to contacto@yekora.mx.",
-            "Your request must include your name, a way to reply to you, a document proving your identity or that of your representative, and a clear description of the data and the right you want to exercise. We will reply within the time limits set by law."
+            "Your request must include your name, a way to reply to you, a document proving your identity or that of your representative, and a clear description of the data and the right you want to exercise. We will reply within the time limits set by law.",
+            "For a saved card, you can unlink it yourself in My account › Payment methods or ask us by email to delete the link to your customer at Stripe. Your previous orders are kept for our tax obligations."
           ]
         },
         {
@@ -254,7 +257,8 @@
             "You can buy as a guest, without creating an account. Before paying you see each product's price with VAT included, the shipping cost to your state and the total in Mexican pesos (MXN). The total is calculated on our server and is the amount you pay.",
             "Payment methods: credit or debit card and cash at OXXO, processed by Stripe; SPEI bank transfer and Mercado Pago balance, processed by Mercado Pago. You pay on the processor's secure page; YĒKORA never receives or stores your card details.",
             "When you start the payment we hold your items according to the method: 60 minutes with a card or Mercado Pago balance, 24 hours with SPEI and 72 hours with OXXO. Your order is confirmed when the processor confirms the payment; if the time runs out without payment, the order expires and the items are released without any charge.",
-            "If a payment arrives after the order expired, we review it and contact you to either deliver the order or refund you. Shipping, exchange, return and warranty terms are on the Shipping and returns page, in line with chapter VIII Bis of the Federal Consumer Protection Law and standard NMX-COE-001-SCFI-2018."
+            "If a payment arrives after the order expired, we review it and contact you to either deliver the order or refund you. Shipping, exchange, return and warranty terms are on the Shipping and returns page, in line with chapter VIII Bis of the Federal Consumer Protection Law and standard NMX-COE-001-SCFI-2018.",
+            "Saved cards: if you have an account, you can ask Stripe to keep your card for future purchases by ticking a box when you pay or by adding it in My account › Payment methods. It is saved only with your consent and you can remove it whenever you like. YĒKORA does not receive or keep the number or the security code, and does not charge a saved card unless you confirm the purchase."
           ]
         },
         {
@@ -730,7 +734,9 @@
       "save": "Save this address to my account",
       "loading": "Loading your addresses…",
       "manage": "Manage my addresses",
-      "profile": "We use the name and phone of your account; you can change them here for this order only."
+      "profile": "We use the name and phone of your account; you can change them here for this order only.",
+      "saveCard": "Save this card to my account for future purchases",
+      "saveCardHint": "Stripe keeps it, not YĒKORA. You can remove it any time in My account › Payment methods."
     }
   },
   "account": {
@@ -861,7 +867,8 @@
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
       "profile": "My information",
-      "admin": "Administration"
+      "admin": "Administration",
+      "payment-methods": "Payment methods"
     },
     "orders": {
       "loading": "Loading orders…",
@@ -1474,6 +1481,50 @@
         }
       }
     },
-    "sessionLoading": "Confirming your session…"
+    "sessionLoading": "Confirming your session…",
+    "paymentMethods": {
+      "title": "Your saved cards",
+      "intro": "Save a card to pay faster. Stripe captures and keeps your card details; YĒKORA never receives them. We only show the brand, the last 4 digits and the expiry here.",
+      "loading": "Loading your cards…",
+      "empty": "You have no saved cards yet.",
+      "cardName": "{brand} ending in {last4}",
+      "expires": "Expires {month}/{year}",
+      "add": "Add a card",
+      "adding": "Opening Stripe’s secure page…",
+      "addHint": "We take you to Stripe’s secure page to enter your card. When you finish you come back here.",
+      "remove": "Remove",
+      "removed": "We removed the card from your account.",
+      "confirm": {
+        "title": "Remove this card?",
+        "text": "It will no longer be saved in your account. Your previous orders do not change.",
+        "yes": "Yes, remove",
+        "no": "Keep"
+      },
+      "mercadoPago": {
+        "title": "Mercado Pago",
+        "text": "Your Mercado Pago payment methods and balance are managed directly inside Mercado Pago. We keep nothing from that account here."
+      },
+      "brands": {
+        "visa": "Visa",
+        "mastercard": "Mastercard",
+        "amex": "American Express",
+        "discover": "Discover",
+        "diners": "Diners Club",
+        "jcb": "JCB",
+        "unionpay": "UnionPay",
+        "other": "Card"
+      },
+      "errors": {
+        "PAYMENT_METHOD_NOT_FOUND": "That card is no longer in your account.",
+        "SERVICE_UNAVAILABLE": "We cannot read your cards right now. Try again later.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts. Wait a moment.",
+        "offline": "No connection. Check your internet and try again.",
+        "timeout": "The request took too long. Try again.",
+        "server": "We could not complete the request. Try again.",
+        "invalid": "We could not complete the request. Try again.",
+        "unknown": "We could not complete the request. Try again."
+      }
+    }
   }
 }

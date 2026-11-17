@@ -3,7 +3,7 @@
  * by the area itself and by the account menu of the header, so the two can never disagree. The API
  * refuses what a person may not open anyway; this only decides what is offered.
  *
- * The menu offers three entries: «Mis pedidos», «Mi información» and, to whoever may open at least
+ * The menu offers four entries: «Mis pedidos», «Mi información», «Métodos de pago» (FC 054) and, to whoever may open at least
  * one console, «Administración», a page with a card for each console the account may open. The
  * consoles themselves (the panel's orders, the catalog, the administrators) are no longer entries
  * of the menu, but the area still opens them by their own address.
@@ -14,7 +14,13 @@ import type { MeResponse } from './authTypes';
 
 /** A section of the area. */
 type AccountSection =
-  'orders' | 'profile' | 'admin' | 'panel' | 'catalog' | 'admins';
+  | 'orders'
+  | 'profile'
+  | 'payment-methods'
+  | 'admin'
+  | 'panel'
+  | 'catalog'
+  | 'admins';
 
 /** The permission that opens the panel's orders. */
 const PANEL_PERMISSION = 'orders:read';
@@ -32,6 +38,7 @@ type Who = Pick<MeResponse, 'roles' | 'permissions'>;
 const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
   orders: () => true,
   profile: () => true,
+  'payment-methods': () => true,
   admin: (user) =>
     ACCESS.panel(user) || ACCESS.catalog(user) || ACCESS.admins(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
@@ -40,13 +47,18 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
 };
 
 /** The entries of the account menu, in order. */
-const MENU: readonly AccountSection[] = ['orders', 'profile', 'admin'];
+const MENU: readonly AccountSection[] = [
+  'orders',
+  'profile',
+  'payment-methods',
+  'admin',
+];
 
 /**
  * The entries the account menu offers.
  *
  * @param user - Its roles and permissions.
- * @returns «Mis pedidos» and «Mi información» always, and «Administración» when the account may open
+ * @returns «Mis pedidos», «Mi información» and «Métodos de pago» always, and «Administración» when the account may open
  *   at least one console (FC 052 T1.1: `orders:read` ∨ `catalog:write` ∨ the owner role).
  */
 export function sectionsOf(user: Who): AccountSection[] {

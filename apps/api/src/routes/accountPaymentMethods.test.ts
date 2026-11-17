@@ -22,7 +22,6 @@ const LUIS = 'f0000000-0000-4000-8000-000000000002';
 const sessionOf = (letter: string) =>
   `__Host-yekora_session=${letter.repeat(43)}`;
 const ANA_COOKIE = sessionOf('a');
-const LUIS_COOKIE = sessionOf('b');
 const USER_OF: Record<string, string> = { a: ANA, b: LUIS };
 
 /* ---------- the in-memory model ---------- */
