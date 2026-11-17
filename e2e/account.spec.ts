@@ -161,6 +161,122 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
 });
 
+/**
+ * FC 053 · What the person sees, frame by frame. A page samples the screen on every animation frame
+ * from the first one of each document and keeps a note of any frame in which a screen made for a
+ * visitor is visible: the sign-in form of the area, «Entrar» in the header, the invitation «Tu CP».
+ */
+const WATCH_VISITOR_SCREENS = () => {
+  const visible = (element: Element | null) => {
+    if (!element) return false;
+    // The content of a closed <details> has boxes but is not on screen.
+    const closed = element.closest('details:not([open])');
+    if (closed && !closed.querySelector('summary')?.contains(element)) {
+      return false;
+    }
+    const style = getComputedStyle(element);
+    return (
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      element.getClientRects().length > 0
+    );
+  };
+  const words = /^(Entrar|Sign in)$/;
+  const seen: string[] = JSON.parse(sessionStorage.getItem('__seen') ?? '[]');
+  let frames = Number(sessionStorage.getItem('__frames') ?? '0');
+  const sample = () => {
+    frames += 1;
+    sessionStorage.setItem('__frames', String(frames));
+    const offenders: string[] = [];
+    for (const heading of document.querySelectorAll('main h2')) {
+      if (words.test(heading.textContent?.trim() ?? '') && visible(heading)) {
+        offenders.push('sign-in form');
+      }
+    }
+    for (const word of document.querySelectorAll('header summary span')) {
+      if (words.test(word.textContent?.trim() ?? '') && visible(word)) {
+        offenders.push('header «Entrar»');
+      }
+    }
+    for (const link of document.querySelectorAll(
+      'header a[href*="register"]'
+    )) {
+      if (visible(link)) offenders.push('header «Tu CP»');
+    }
+    if (offenders.length > 0) {
+      seen.push(...offenders);
+      sessionStorage.setItem('__seen', JSON.stringify(seen));
+    }
+    requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+};
+
+test('with a session, switching language never shows the sign-in form nor the visitor header, in any frame (FC 053 T1.1, T2.1)', async ({
+  page,
+}) => {
+  // A slow API, as Hostinger's sleeping one: the worst case for the flash.
+  await mockAccountApi(page, { signedIn: 'buyer', latencyMs: 900 });
+  await page.addInitScript(() => {
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+  });
+  await page.addInitScript(WATCH_VISITOR_SCREENS);
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  for (const [from, to, greeting] of [
+    ['EN, English', /\/en\/account\/$/, 'Hello, Ana E2E'],
+    ['ES, Español', /\/cuenta\/$/, 'Hola, Ana E2E'],
+  ] as const) {
+    await page.evaluate(() => {
+      sessionStorage.setItem('__seen', '[]');
+      sessionStorage.setItem('__frames', '0');
+    });
+    await openAccountMenu(page);
+    await page
+      .getByRole('banner')
+      .getByRole('navigation', { name: /Idioma|Language/ })
+      .getByRole('link', { name: from })
+      .click();
+    await expect(page).toHaveURL(to);
+    await expect(page.getByText(greeting)).toBeVisible();
+    const watched = await page.evaluate(() => ({
+      seen: JSON.parse(sessionStorage.getItem('__seen') ?? '[]') as string[],
+      frames: Number(sessionStorage.getItem('__frames')),
+    }));
+    // The whole wait was watched, and no frame of it showed a visitor's screen.
+    expect(watched.frames).toBeGreaterThan(20);
+    expect(watched.seen).toEqual([]);
+  }
+});
+
+test('a visitor still sees the sign-in form and «Entrar» at once, and a stale hint gives way to the form once the API says there is no session (FC 053 T2.1, T2.4)', async ({
+  page,
+}) => {
+  await mockAccountApi(page);
+  await page.goto('/cuenta/');
+  await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+  await expect(page.locator('html')).not.toHaveAttribute('data-session', '');
+  // A hint with no session behind it: grey skeleton first, then the form, and the mark is gone.
+  await page.unrouteAll({ behavior: 'wait' });
+  await mockAccountApi(page, { latencyMs: 600 });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('stale-done')) {
+      localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+      sessionStorage.setItem('stale-done', '1');
+    }
+  });
+  await page.goto('/cuenta/');
+  await expect(page.locator('html')).toHaveAttribute('data-session', '');
+  await expect(page.getByRole('heading', { name: 'Entrar' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+  await expect(page.locator('html')).not.toHaveAttribute('data-session', '');
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem('yekora_session_first_name_v1')
+    )
+  ).toBeNull();
+});
+
 test('the language switch is only in the account menu, and each code is a target of 44 × 44 px (FC 052 T2.2, T2.3)', async ({
   page,
 }) => {

@@ -418,6 +418,8 @@ export async function mockAccountApi(
     persona?: Persona;
     addresses?: E2eAddress[];
     phone?: string | null;
+    /** How long the signed-in routes take to answer, as a sleeping API does (FC 053). */
+    latencyMs?: number;
   } = {}
 ): Promise<void> {
   let user: Persona | null = options.signedIn ?? null;
@@ -463,15 +465,18 @@ export async function mockAccountApi(
   );
   await page.route(
     'https://apiv1.yekora.mx/v1/account/**',
-    withCors((route) =>
-      answerAccount(
+    withCors(async (route) => {
+      if (options.latencyMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.latencyMs));
+      }
+      return answerAccount(
         route,
         () => user,
         () => (user = null),
         () => (trusted = false),
         data
-      )
-    )
+      );
+    })
   );
   await page.route(
     'https://apiv1.yekora.mx/v1/admin/**',

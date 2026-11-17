@@ -1,6 +1,7 @@
 import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
 import { getMessages, type Locale } from '@/app/i18n';
+import { SESSION_MARK_SCRIPT } from '@/lib/account/sessionHint';
 import '@/app/globals.css';
 import { CookieBanner } from '../CookieBanner';
 import { Footer } from '../Footer';
@@ -66,6 +67,12 @@ export function SiteShell({ locale, children }: Readonly<SiteShellProps>) {
       lang={locale}
       className={`${inter.variable} ${interExtended.variable}`}
     >
+      <head>
+        {/* FC 053: marks the document when the browser holds a session hint, before the first
+            paint, so the stylesheet can keep the signed-out screens out of sight (the static CSP
+            allows inline scripts). */}
+        <script dangerouslySetInnerHTML={{ __html: SESSION_MARK_SCRIPT }} />
+      </head>
       <body className="min-h-screen bg-marfil font-sans text-petroleo antialiased">
         <Header locale={locale} messages={messages} />
         <main>{children}</main>

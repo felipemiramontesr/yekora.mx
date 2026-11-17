@@ -63,6 +63,10 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
     expect(document.querySelector('summary')?.textContent).toBe(
       'EntrarMi cuenta'
     );
+    // «Entrar» is a visitor's word: the stylesheet hides it for whoever holds a session hint (FC 053).
+    expect(document.querySelector('summary [data-visitor]')?.textContent).toBe(
+      'Entrar'
+    );
     expect(
       screen.getByRole('link', { name: 'Entrar' }).getAttribute('href')
     ).toBe('/cuenta/');

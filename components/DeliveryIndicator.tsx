@@ -69,6 +69,7 @@ export function DeliveryIndicator({
   return (
     <Link
       href={registerHref}
+      data-visitor=""
       title={messages.guestHint}
       className={`${style} underline decoration-ocre underline-offset-4`}
     >

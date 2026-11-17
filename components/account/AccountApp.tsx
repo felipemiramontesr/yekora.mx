@@ -35,6 +35,7 @@ import {
 import { OrderDetailView, OrderList } from './AccountOrders';
 import { AccountAdminHub } from './AccountAdminHub';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
+import { SessionSkeleton } from './SessionSkeleton';
 import type { AdminUsersTexts } from './AdminUsersConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -210,15 +211,24 @@ export function AccountApp({
   return (
     <div className="flex flex-col gap-6">
       {stage.kind === 'signIn' && (
-        <SignInForm
-          messages={messages}
-          initialEmail={stage.email}
-          notice={stage.notice}
-          onChallenge={(challenge) => setStage({ kind: 'code', ...challenge })}
-          onSignedIn={() => void loadSession()}
-          onRegister={() => setStage({ kind: 'register' })}
-          onForgot={(email) => setStage({ kind: 'forgot', email })}
-        />
+        <>
+          {/* FC 053: with a session hint the form stays out of sight and this grey shape takes
+              its place until the API confirms the session (or says there is none). */}
+          <SessionSkeleton text={messages.sessionLoading} />
+          <div data-visitor-prerender="" className="contents">
+            <SignInForm
+              messages={messages}
+              initialEmail={stage.email}
+              notice={stage.notice}
+              onChallenge={(challenge) =>
+                setStage({ kind: 'code', ...challenge })
+              }
+              onSignedIn={() => void loadSession()}
+              onRegister={() => setStage({ kind: 'register' })}
+              onForgot={(email) => setStage({ kind: 'forgot', email })}
+            />
+          </div>
+        </>
       )}
       {stage.kind === 'forgot' && (
         <ForgotForm

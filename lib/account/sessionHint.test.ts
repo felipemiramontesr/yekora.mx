@@ -3,19 +3,88 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearSessionFirstName,
   firstNameOf,
+  markSession,
   readSessionFirstName,
   saveSessionFirstName,
+  SESSION_MARK_SCRIPT,
   subscribeSessionHint,
 } from './sessionHint';
 
 const KEY = 'yekora_session_first_name_v1';
 
+const marked = () => document.documentElement.hasAttribute('data-session');
+
 beforeEach(() => {
   localStorage.clear();
+  document.documentElement.removeAttribute('data-session');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('the mark of the document (FC 053 T1.1)', () => {
+  /** Runs the script of the head the way the browser does, before anything else. */
+  const runHeadScript = () => {
+    const script = document.createElement('script');
+    script.textContent = SESSION_MARK_SCRIPT;
+    document.head.append(script);
+    script.remove();
+  };
+
+  it('is set by the head script when the browser holds a hint, and left alone when it does not', () => {
+    runHeadScript();
+    expect(marked()).toBe(false);
+    localStorage.setItem(KEY, 'Ana');
+    runHeadScript();
+    expect(marked()).toBe(true);
+  });
+
+  it('is a plain, self-contained script: it reads one key, writes one attribute, and never throws', () => {
+    expect(SESSION_MARK_SCRIPT).toContain(KEY);
+    expect(SESSION_MARK_SCRIPT).toContain('data-session');
+    // No cookie, no network and no other storage than the hint.
+    for (const forbidden of [
+      'cookie',
+      'fetch',
+      'XMLHttpRequest',
+      'sessionStorage',
+    ]) {
+      expect(SESSION_MARK_SCRIPT).not.toContain(forbidden);
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    runHeadScript();
+    expect(marked()).toBe(false);
+  });
+
+  it('follows the hint: saved marks it, erased unmarks it, in this tab and from another', () => {
+    saveSessionFirstName('Rosa');
+    expect(marked()).toBe(true);
+    clearSessionFirstName();
+    expect(marked()).toBe(false);
+    const stop = subscribeSessionHint(() => undefined);
+    localStorage.setItem(KEY, 'Rosa');
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    expect(marked()).toBe(true);
+    // Another tab signs out: its storage event unmarks this one too.
+    localStorage.removeItem(KEY);
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    expect(marked()).toBe(false);
+    // An unrelated key says nothing about the session.
+    localStorage.setItem(KEY, 'Rosa');
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'other' }));
+    expect(marked()).toBe(false);
+    stop();
+  });
+
+  it('can be set and unset directly', () => {
+    markSession(true);
+    expect(marked()).toBe(true);
+    markSession(false);
+    expect(marked()).toBe(false);
+  });
 });
 
 describe('firstNameOf (FC 046 T2.2)', () => {

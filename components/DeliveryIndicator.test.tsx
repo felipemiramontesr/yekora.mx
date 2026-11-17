@@ -67,5 +67,17 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1)', () => {
     const link = screen.getByRole('link', { name: messages.guest });
     expect(link.getAttribute('href')).toBe('/cuenta/?action=register');
     expect(link.getAttribute('title')).toBe(messages.guestHint);
+    // A visitor's words, which the stylesheet keeps out of sight of whoever has a session hint
+    // (FC 053): the signed-in states carry no such mark.
+    expect(link.hasAttribute('data-visitor')).toBe(true);
+  });
+
+  it('marks nothing of the signed-in states as visitor words', () => {
+    account.mockReturnValue({
+      firstName: 'Ana',
+      user: { ...USER, postalCode: '98612' },
+    });
+    const { container } = renderIndicator();
+    expect(container.querySelector('[data-visitor]')).toBeNull();
   });
 });

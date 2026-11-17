@@ -11,3 +11,20 @@
     @apply inline-flex min-h-11 min-w-11 items-center;
   }
 }
+
+/* FC 053: while the browser holds a session hint (`<html data-session>`, set before the first
+   paint), the screens made for a visitor stay out of sight: the sign-in form prerendered in
+   /cuenta/ and the «Entrar» and «Tu CP» of the header. `visibility` keeps their space, so
+   nothing jumps when the real ones arrive. A skeleton takes the place of the form meanwhile. */
+[data-session-skeleton] {
+  display: none;
+}
+html[data-session] [data-session-skeleton] {
+  display: flex;
+}
+html[data-session] [data-visitor-prerender] {
+  display: none;
+}
+html[data-session] [data-visitor] {
+  visibility: hidden;
+}

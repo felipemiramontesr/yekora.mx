@@ -8,6 +8,7 @@ import {
   syncHeaderUser,
 } from '@/lib/account/headerSession';
 import {
+  markSession,
   readSessionFirstName,
   subscribeSessionHint,
 } from '@/lib/account/sessionHint';
@@ -39,7 +40,10 @@ export function useHeaderAccount(): HeaderAccount {
 
   useEffect(() => {
     const sync = () => {
-      setFirstName(readSessionFirstName());
+      const hint = readSessionFirstName();
+      // The head script marked the document from the raw value; this is the one that counts.
+      markSession(hint !== null);
+      setFirstName(hint);
       void syncHeaderUser();
     };
     sync();

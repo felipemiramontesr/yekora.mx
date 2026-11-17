@@ -10,11 +10,41 @@
  * expired. Signing in or out in one tab reaches the others through the `storage` event, and the
  * controls of the same tab through an event of the window.
  *
+ * FC 053: the document is marked `<html data-session>` while there is a hint, by a script of the
+ * `<head>` that runs before the first paint ({@link SESSION_MARK_SCRIPT}) and by the functions
+ * below afterwards. The stylesheet reads the mark to keep the signed-out screens (the sign-in
+ * form, «Entrar», «Tu CP») out of sight of someone who has a session, so a new document of the
+ * site never flashes them while the API confirms who is signed in. The mark is only as strong as
+ * the hint: it hides, it never proves.
+ *
  * @module
  */
 
 /** Where the first name is kept. */
 const KEY = 'yekora_session_first_name_v1';
+
+/** The attribute of `<html>` that says the browser holds a session hint. */
+const MARK = 'data-session';
+
+/**
+ * The script of the `<head>` (FC 053 T1.1): it marks the document before the browser paints,
+ * reading the hint exactly as it is stored. It touches no cookie and no network, and when storage
+ * is blocked it does nothing.
+ */
+export const SESSION_MARK_SCRIPT = `try{if(localStorage.getItem('yekora_session_first_name_v1'))document.documentElement.setAttribute('${MARK}','')}catch(e){}`;
+
+/**
+ * Marks or unmarks the document, so it says what the hint says.
+ *
+ * @param on - Whether there is a hint.
+ */
+export function markSession(on: boolean): void {
+  try {
+    globalThis.document.documentElement.toggleAttribute(MARK, on);
+  } catch {
+    // No document (a test of the server side): there is nothing to mark.
+  }
+}
 
 /** What the window hears when the hint changes in this tab. */
 const CHANGED = 'yekora:session-hint';
@@ -62,6 +92,7 @@ export function readSessionFirstName(): string | null {
 export function clearSessionFirstName(): void {
   try {
     globalThis.localStorage.removeItem(KEY);
+    markSession(false);
     announce();
   } catch {
     // Storage is blocked: there is nothing to erase and nobody to tell.
@@ -80,6 +111,7 @@ export function saveSessionFirstName(firstName: string): void {
   }
   try {
     globalThis.localStorage.setItem(KEY, firstName);
+    markSession(true);
     announce();
   } catch {
     // Storage is blocked: the header simply keeps showing the plain account link.
@@ -95,7 +127,9 @@ export function saveSessionFirstName(firstName: string): void {
 export function subscribeSessionHint(listener: () => void): () => void {
   const onStorage = (event: StorageEvent) => {
     // A cleared storage reports no key at all.
-    if (event.key === KEY || event.key === null) listener();
+    if (event.key !== KEY && event.key !== null) return;
+    markSession(readSessionFirstName() !== null);
+    listener();
   };
   globalThis.addEventListener(CHANGED, listener);
   globalThis.addEventListener('storage', onStorage);

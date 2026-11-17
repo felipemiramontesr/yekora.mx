@@ -1473,6 +1473,7 @@
           "description": "Invita, activa o retira a quienes administran la tienda. Solo el dueño."
         }
       }
-    }
+    },
+    "sessionLoading": "Confirmando tu sesión…"
   }
 }

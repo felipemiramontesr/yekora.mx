@@ -28,4 +28,18 @@ describe('SiteShell', () => {
     expect(html).toContain('<header');
     expect(html).toContain('<footer');
   });
+
+  it('marks the document from the session hint before the first paint, with a script in the head (FC 053 T1.1)', () => {
+    const html = renderToStaticMarkup(
+      <SiteShell locale="es-MX">
+        <p>child</p>
+      </SiteShell>
+    );
+    const head = /<head>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? '';
+    expect(head).toContain('<script>');
+    expect(head).toContain('yekora_session_first_name_v1');
+    expect(head).toContain('data-session');
+    // The script runs before anything of the body exists.
+    expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('<body'));
+  });
 });

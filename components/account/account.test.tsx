@@ -187,6 +187,26 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe('account area · session mark (FC 053 T1.1, T2.1)', () => {
+  it('prerenders the sign-in form inside a wrapper, with the grey skeleton beside it, so the stylesheet can swap them for whoever holds a session hint', () => {
+    renderApp();
+    const form = screen.getByRole('heading', { name: account.signIn.title });
+    expect(form.closest('[data-visitor-prerender]')).not.toBeNull();
+    const skeleton = document.querySelector('[data-session-skeleton]');
+    expect(skeleton?.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton?.textContent).toContain(account.sessionLoading);
+    expect(skeleton?.closest('[data-visitor-prerender]')).toBeNull();
+  });
+
+  it('leaves the stage of the form, and the skeleton with it, once the API confirms the session', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    await screen.findByText(/Hola, Ana Flores/);
+    expect(document.querySelector('[data-session-skeleton]')).toBeNull();
+    expect(document.querySelector('[data-visitor-prerender]')).toBeNull();
+  });
+});
+
 describe('account area · signing in (FC 028 F2)', () => {
   it('lets a late "no session" answer leave someone who moved on alone (cold start)', async () => {
     let answer!: (value: never) => void;

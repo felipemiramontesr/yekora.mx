@@ -98,7 +98,10 @@ export function AccountMenu({
             always the same words (WCAG 2.5.3, which axe checks). Below xl it is visually hidden
             but still read, so only the icon shows on a phone. */}
         <span className="flex flex-col text-left leading-tight max-xl:sr-only">
-          <span className="max-w-[9rem] truncate text-xs text-marfil/80">
+          <span
+            data-visitor={signedIn ? undefined : ''}
+            className="max-w-[9rem] truncate text-xs text-marfil/80"
+          >
             {signedIn ? fill(menu.greeting, { name: firstName }) : menu.enter}
           </span>
           <span className="flex items-center gap-1 text-sm font-semibold">

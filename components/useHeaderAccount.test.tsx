@@ -46,6 +46,22 @@ describe('account of the header (FC 047 T1.1)', () => {
     expect(api.me).toHaveBeenCalledTimes(1);
   });
 
+  it('marks the document while there is a hint, and drops a mark the raw value did not deserve (FC 053 T1.1)', async () => {
+    const marked = () => document.documentElement.hasAttribute('data-session');
+    // The head script marks from the raw value: a stored e-mail is no hint, and the hook says so.
+    document.documentElement.setAttribute('data-session', '');
+    localStorage.setItem('yekora_session_first_name_v1', 'ana@example.test');
+    renderHook(() => useHeaderAccount());
+    expect(marked()).toBe(false);
+    cleanup();
+    saveSessionFirstName('Ana');
+    document.documentElement.removeAttribute('data-session');
+    const { result } = renderHook(() => useHeaderAccount());
+    expect(result.current.firstName).toBe('Ana');
+    expect(marked()).toBe(true);
+    await waitFor(() => expect(result.current.user).toEqual(USER));
+  });
+
   it('follows the hint when someone signs in or out, in this tab or another', async () => {
     const { result } = renderHook(() => useHeaderAccount());
     act(() => saveSessionFirstName('Ana'));
