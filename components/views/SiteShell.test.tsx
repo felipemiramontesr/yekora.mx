@@ -29,6 +29,17 @@ describe('SiteShell', () => {
     expect(html).toContain('<footer');
   });
 
+  it('opens the connection to the API from the head while the page loads (FC 053 T1.2)', () => {
+    const html = renderToStaticMarkup(
+      <SiteShell locale="es-MX">
+        <p>child</p>
+      </SiteShell>
+    );
+    const head = /<head>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? '';
+    expect(head).toContain('rel="preconnect" href="https://apiv1.yekora.mx"');
+    expect(head).toContain('rel="dns-prefetch" href="https://apiv1.yekora.mx"');
+  });
+
   it('marks the document from the session hint before the first paint, with a script in the head (FC 053 T1.1)', () => {
     const html = renderToStaticMarkup(
       <SiteShell locale="es-MX">

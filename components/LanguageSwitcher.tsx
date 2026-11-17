@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { locales, type Locale, type Messages } from '@/app/i18n';
+import { prefetchPage } from '@/lib/navigation/prefetchPage';
 import { routeFor, translatePath } from '@/lib/routes';
 
 /** Props of {@link LanguageSwitcher}. */
@@ -20,6 +21,9 @@ interface LanguageSwitcherProps {
  * the same page in that language, so it works without JavaScript between the two root documents. Its accessible name is the visible
  * code followed by the full name of the language («ES, Español»): the code first, so a person who
  * says what they see («click ES») is understood (WCAG 2.5.3 Label in Name, which axe checks).
+ *
+ * FC 053 T1.2: when the person points at, touches or focuses the code of the other language, that
+ * page is fetched (and prerendered where the browser can) so the switch lands without a wait.
  */
 export function LanguageSwitcher({
   locale,
@@ -28,28 +32,35 @@ export function LanguageSwitcher({
   // Same page in the other language: Spanish and English slugs differ, so map through the route
   // table (a product page keeps its slug and swaps the catalog prefix).
   const pathname = usePathname() ?? routeFor('home', locale);
+  const warm = (href: string) => () => prefetchPage(href);
   return (
     <nav
       aria-label={messages.label}
       className="inline-flex h-[46px] items-center rounded-full border border-marfil/30 text-xs font-semibold tracking-wider"
     >
-      {locales.map((target) => (
-        <a
-          key={target}
-          href={translatePath(pathname, target)}
-          hrefLang={target}
-          lang={target}
-          aria-label={`${messages.codes[target]}, ${messages.names[target]}`}
-          aria-current={target === locale ? 'true' : undefined}
-          className={`flex h-full min-w-11 items-center justify-center rounded-full px-3 ${
-            target === locale
-              ? 'bg-marfil text-petroleo'
-              : 'text-marfil/80 hover:text-marfil'
-          }`}
-        >
-          {messages.codes[target]}
-        </a>
-      ))}
+      {locales.map((target) => {
+        const href = translatePath(pathname, target);
+        return (
+          <a
+            key={target}
+            href={href}
+            onPointerEnter={target === locale ? undefined : warm(href)}
+            onFocus={target === locale ? undefined : warm(href)}
+            onTouchStart={target === locale ? undefined : warm(href)}
+            hrefLang={target}
+            lang={target}
+            aria-label={`${messages.codes[target]}, ${messages.names[target]}`}
+            aria-current={target === locale ? 'true' : undefined}
+            className={`flex h-full min-w-11 items-center justify-center rounded-full px-3 ${
+              target === locale
+                ? 'bg-marfil text-petroleo'
+                : 'text-marfil/80 hover:text-marfil'
+            }`}
+          >
+            {messages.codes[target]}
+          </a>
+        );
+      })}
     </nav>
   );
 }

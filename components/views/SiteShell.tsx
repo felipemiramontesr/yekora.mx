@@ -2,6 +2,7 @@ import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
 import { getMessages, type Locale } from '@/app/i18n';
 import { SESSION_MARK_SCRIPT } from '@/lib/account/sessionHint';
+import { API_URL } from '@/lib/api/http';
 import '@/app/globals.css';
 import { CookieBanner } from '../CookieBanner';
 import { Footer } from '../Footer';
@@ -68,6 +69,10 @@ export function SiteShell({ locale, children }: Readonly<SiteShellProps>) {
       className={`${inter.variable} ${interExtended.variable}`}
     >
       <head>
+        {/* FC 053 T1.2: open the connection to the API while the page loads, so the first call
+            (who is signed in) does not wait for DNS, TCP and TLS. */}
+        <link rel="preconnect" href={API_URL} crossOrigin="" />
+        <link rel="dns-prefetch" href={API_URL} />
         {/* FC 053: marks the document when the browser holds a session hint, before the first
             paint, so the stylesheet can keep the signed-out screens out of sight (the static CSP
             allows inline scripts). */}

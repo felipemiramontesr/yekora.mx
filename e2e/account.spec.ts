@@ -467,3 +467,27 @@ test('the area shows only a breadcrumb: the sections are in the header menu (FC 
     header.getByRole('link', { name: 'Administración' })
   ).toHaveAttribute('aria-current', 'page');
 });
+
+test('pointing at the other language warms its page up, and the header opens the API connection early (FC 053 T1.2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer' });
+  await page.addInitScript(() => {
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+  });
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await expect(
+    page.locator('head link[rel="preconnect"][href="https://apiv1.yekora.mx"]')
+  ).toHaveCount(1);
+  await expect(page.locator('head link[rel="prefetch"]')).toHaveCount(0);
+  await openAccountMenu(page);
+  await page
+    .getByRole('banner')
+    .getByRole('navigation', { name: 'Idioma' })
+    .getByRole('link', { name: 'EN, English' })
+    .hover();
+  await expect(
+    page.locator('head link[rel="prefetch"][href="/en/account/"]')
+  ).toHaveCount(1);
+});

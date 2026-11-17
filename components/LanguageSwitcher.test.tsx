@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getMessages } from '@/app/i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -10,6 +10,32 @@ vi.mock('next/navigation', () => ({ usePathname: () => pathname.current }));
 afterEach(cleanup);
 
 describe('LanguageSwitcher', () => {
+  it('warms up the page of the other language when it is pointed at, touched or focused, never its own (FC 053 T1.2)', () => {
+    pathname.current = '/nosotros/';
+    for (const fire of [
+      fireEvent.pointerEnter,
+      fireEvent.focus,
+      fireEvent.touchStart,
+    ]) {
+      document.head.innerHTML = '';
+      render(
+        <LanguageSwitcher
+          locale="es-MX"
+          messages={getMessages('es-MX').languageSwitcher}
+        />
+      );
+      fire(screen.getByRole('link', { name: /Español/ }));
+      expect(
+        document.head.querySelectorAll('link[rel="prefetch"]')
+      ).toHaveLength(0);
+      fire(screen.getByRole('link', { name: /English/ }));
+      const links = document.head.querySelectorAll('link[rel="prefetch"]');
+      expect(links).toHaveLength(1);
+      expect(links[0]?.getAttribute('href')).toBe('/en/about/');
+      cleanup();
+    }
+  });
+
   it('links the same page in each language and marks the current one', () => {
     pathname.current = '/nosotros/';
     render(
