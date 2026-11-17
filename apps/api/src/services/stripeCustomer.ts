@@ -47,9 +47,17 @@ export async function ensureCustomer(
   const existing = await linkedCustomer(db, userId);
   if (existing !== null) return existing;
   const created = await cards.createCustomer(userId);
-  await db.query(
-    'INSERT INTO user_stripe_customers (user_id, stripe_customer_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE user_id = user_id',
-    [userId, created]
-  );
+  try {
+    await db.query(
+      'INSERT INTO user_stripe_customers (user_id, stripe_customer_id) VALUES (?, ?)',
+      [userId, created]
+    );
+  } catch (error) {
+    // Another request of the same account linked it first: that link is the answer. Anything else
+    // (a customer already linked to a different account, a lost connection) is a real failure.
+    const raced = await linkedCustomer(db, userId);
+    if (raced === null) throw error;
+    return raced;
+  }
   return created;
 }
