@@ -99611,6 +99611,11 @@ var checkoutRequestSchema = external_exports.strictObject({
    * T1.4). Ignored for a guest and when the account already holds five.
    */
   saveAddress: external_exports.boolean().optional(),
+  /**
+   * A signed-in buyer paying by card asks Stripe to keep it for later purchases (FC 054 T1.3).
+   * Ignored for a guest and for any other method.
+   */
+  savePaymentMethod: external_exports.boolean().optional(),
   /** Total with shipping the buyer saw, MXN cents: compared, never charged. */
   expectedTotalMxnCents: external_exports.number().int().nonnegative()
 });
@@ -99877,6 +99882,35 @@ var accountOrdersQuery = external_exports.strictObject(paging);
 var adminOrdersQuery = external_exports.strictObject({
   ...paging,
   status: external_exports.enum(ORDER_STATUS_CODES).optional()
+});
+
+// ../../lib/account/paymentMethodTypes.ts
+var paymentMethodParams = external_exports.object({
+  id: external_exports.string().regex(/^pm_[A-Za-z0-9]{8,64}$/)
+});
+var savedCardSchema = external_exports.object({
+  /** Stripe's id of the card (`pm_…`). */
+  id: external_exports.string().regex(/^pm_[A-Za-z0-9]{8,64}$/),
+  /** Brand of the card as Stripe names it (`visa`, `mastercard`, `amex`…). */
+  brand: external_exports.string().min(1).max(32),
+  /** The last four digits. */
+  last4: external_exports.string().regex(/^\d{4}$/),
+  /** Month of expiry, 1 to 12. */
+  expMonth: external_exports.number().int().min(1).max(12),
+  /** Year of expiry, four digits. */
+  expYear: external_exports.number().int().min(2e3).max(2200)
+});
+var paymentMethodListResponseSchema = external_exports.object({
+  items: external_exports.array(savedCardSchema),
+  /** Whether the account already has a customer at Stripe (no cards can exist before). */
+  hasCustomer: external_exports.boolean()
+});
+var paymentMethodSetupResponseSchema = external_exports.object({
+  /** The hosted page of Stripe where the person enters the card. */
+  redirectUrl: external_exports.url()
+});
+var paymentMethodDetachResponseSchema = external_exports.object({
+  detached: external_exports.literal(true)
 });
 
 // src/lib/language.ts
@@ -100896,6 +100930,31 @@ async function deleteAddress(tx, userId, addressId) {
   return null;
 }
 
+// src/services/stripeCustomer.ts
+async function linkedCustomer(db, userId) {
+  const [row2] = await db.query(
+    "SELECT stripe_customer_id FROM user_stripe_customers WHERE user_id = ?",
+    [userId]
+  );
+  return row2?.stripe_customer_id ?? null;
+}
+async function ensureCustomer(db, cards, userId) {
+  const existing = await linkedCustomer(db, userId);
+  if (existing !== null) return existing;
+  const created = await cards.createCustomer(userId);
+  try {
+    await db.query(
+      "INSERT INTO user_stripe_customers (user_id, stripe_customer_id) VALUES (?, ?)",
+      [userId, created]
+    );
+  } catch (error63) {
+    const raced = await linkedCustomer(db, userId);
+    if (raced === null) throw error63;
+    return raced;
+  }
+  return created;
+}
+
 // src/services/checkout.ts
 var PROCESSOR_OF = {
   CARD: "STRIPE",
@@ -101081,6 +101140,17 @@ async function persist(deps, admitted, quote, order2) {
     throw error63;
   }
 }
+async function customerToKeepCard(deps, admitted, userId) {
+  const cards = deps.cards;
+  if (userId === null || admitted.method !== "CARD" || admitted.request.savePaymentMethod !== true || !cards) {
+    return void 0;
+  }
+  try {
+    return await ensureCustomer(deps.db, cards, userId);
+  } catch {
+    return void 0;
+  }
+}
 async function createCheckout(deps, body, lang, userId = null) {
   const admitted = admit(deps, body);
   if ("ok" in admitted) return admitted;
@@ -101106,6 +101176,11 @@ async function createCheckout(deps, body, lang, userId = null) {
   const orderId = await persist(deps, admitted, quote, order2);
   if (typeof orderId !== "number") return orderId;
   const paths = CHECKOUT_RETURN_PATHS[lang];
+  const futureUsageCustomerId = await customerToKeepCard(
+    deps,
+    admitted,
+    userId
+  );
   const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
   const total = quote.summary.totalMxnCents;
   try {
@@ -101118,7 +101193,8 @@ async function createCheckout(deps, body, lang, userId = null) {
       now,
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
-      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`
+      notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`,
+      ...futureUsageCustomerId !== void 0 && { futureUsageCustomerId }
     });
     await deps.db.query(
       "UPDATE orders SET processor_reference = ? WHERE id = ?",
@@ -101580,6 +101656,44 @@ var ROUTE_CONTRACTS = [
       204: external_exports.null(),
       400: problemSchema,
       404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/payment-methods",
+    summary: "The cards the account keeps at Stripe: brand, last four and expiry, read from Stripe each time (FC 054)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: paymentMethodListResponseSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/payment-methods/setup",
+    summary: "Opens the hosted page of Stripe where the account adds a card; the card never reaches this API (FC 054)",
+    permission: "account:self",
+    request: { query: languageQuery, headers: mutationHeaders },
+    responses: {
+      201: paymentMethodSetupResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/payment-methods/:id",
+    summary: "Detaches a card of the account at Stripe; another account\u2019s card is a 404 (FC 054)",
+    permission: "account:self",
+    request: { params: paymentMethodParams, headers: mutationHeaders },
+    responses: {
+      200: paymentMethodDetachResponseSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS
     }
   },
@@ -102235,7 +102349,47 @@ function permissionGuard(deps) {
   };
 }
 
+// src/services/accountPaymentMethods.ts
+async function listSavedCards(db, cards, userId) {
+  const customerId = await linkedCustomer(db, userId);
+  if (customerId === null) return { items: [], hasCustomer: false };
+  return { items: await cards.listCards(customerId), hasCustomer: true };
+}
+async function startCardSetup(db, cards, userId, returnTo) {
+  const customerId = await ensureCustomer(db, cards, userId);
+  return cards.createSetupSession({ customerId, ...returnTo });
+}
+async function detachSavedCard(db, cards, userId, paymentMethodId) {
+  const customerId = await linkedCustomer(db, userId);
+  if (customerId === null) return "PAYMENT_METHOD_NOT_FOUND";
+  const owner = await cards.cardOwner(paymentMethodId);
+  if (owner !== customerId) return "PAYMENT_METHOD_NOT_FOUND";
+  await cards.detachCard(paymentMethodId);
+  return null;
+}
+
+// src/services/paymentPort.ts
+var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
+var PaymentProcessorError = class extends Error {
+  /**
+   * @param message - Safe description (processor and HTTP status at most).
+   * @param status - HTTP status the processor answered, when it did.
+   */
+  constructor(message, status = null) {
+    super(message);
+    this.status = status;
+    this.name = "PaymentProcessorError";
+  }
+};
+function remoteDeadline(expiresAt) {
+  return new Date(expiresAt.getTime() - REMOTE_EXPIRY_MARGIN_MS);
+}
+
 // src/routes/account.ts
+var CARDS_PAGE = {
+  "es-MX": "/cuenta/metodos-pago/",
+  en: "/en/account/metodos-pago/"
+};
 var ADDRESS_REFUSALS = {
   ADDRESS_NOT_FOUND: [404, "Not found"],
   ADDRESS_LIMIT_REACHED: [409, "The account already holds five addresses"]
@@ -102257,6 +102411,22 @@ function writeGate(deps, request, reply) {
   }
   return { key: key.key, pii: deps.piiKey };
 }
+function cardsWriteGate(deps, request, reply) {
+  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    refuse(reply, 400, "Idempotency-Key required", key.code);
+    return null;
+  }
+  if (deps.cards === null) {
+    refuse(reply, 503, "Cards cannot be kept right now", "SERVICE_UNAVAILABLE");
+    return null;
+  }
+  return { key: key.key, cards: deps.cards };
+}
+var stripeDown = () => ({
+  status: 503,
+  body: problem(503, "Stripe did not answer", "SERVICE_UNAVAILABLE")
+});
 function refusalOf(refusal) {
   const [status, title] = ADDRESS_REFUSALS[refusal];
   return { status, body: problem(status, title, refusal) };
@@ -102390,6 +102560,85 @@ function registerAccountRoutes(app, deps) {
         id: params.data.id
       });
       return { status: 204, body: null };
+    });
+  });
+  app.get("/v1/account/payment-methods", async (request, reply) => {
+    if (deps.cards === null) {
+      return refuse(
+        reply,
+        503,
+        "Cards cannot be read right now",
+        "SERVICE_UNAVAILABLE"
+      );
+    }
+    try {
+      const saved = await listSavedCards(
+        deps.db,
+        deps.cards,
+        request.user.userId
+      );
+      return paymentMethodListResponseSchema.parse(saved);
+    } catch (error63) {
+      if (!(error63 instanceof PaymentProcessorError)) throw error63;
+      return refuse(reply, 503, "Stripe did not answer", "SERVICE_UNAVAILABLE");
+    }
+  });
+  app.post("/v1/account/payment-methods/setup", async (request, reply) => {
+    const gate = cardsWriteGate(deps, request, reply);
+    if (gate === null) return reply;
+    const lang = request.query.lang === "en" ? "en" : "es-MX";
+    const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      try {
+        const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
+          successUrl: page,
+          cancelUrl: page
+        });
+        return {
+          status: 201,
+          body: paymentMethodSetupResponseSchema.parse({ redirectUrl })
+        };
+      } catch (error63) {
+        if (!(error63 instanceof PaymentProcessorError)) throw error63;
+        return stripeDown();
+      }
+    });
+  });
+  app.delete("/v1/account/payment-methods/:id", async (request, reply) => {
+    const gate = cardsWriteGate(deps, request, reply);
+    if (gate === null) return reply;
+    const params = paymentMethodParams.safeParse(request.params);
+    if (!params.success) {
+      return refuse(reply, 404, "Not found", "PAYMENT_METHOD_NOT_FOUND");
+    }
+    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      try {
+        const refusal = await detachSavedCard(
+          tx,
+          gate.cards,
+          userId,
+          params.data.id
+        );
+        if (refusal !== null) {
+          return { status: 404, body: problem(404, "Not found", refusal) };
+        }
+        await recordAudit(tx, {
+          userId,
+          action: "PAYMENT_METHOD_DETACHED",
+          entityType: "user_stripe_customers",
+          entityId: userId,
+          before: null,
+          after: null,
+          ip: request.ip
+        });
+        return {
+          status: 200,
+          body: paymentMethodDetachResponseSchema.parse({ detached: true })
+        };
+      } catch (error63) {
+        if (!(error63 instanceof PaymentProcessorError)) throw error63;
+        return stripeDown();
+      }
     });
   });
   app.post("/v1/account/forget-device", async (request, reply) => {
@@ -104171,23 +104420,6 @@ async function registerWebhookRoutes(app, deps) {
 
 // src/services/mercadoPagoAdapter.ts
 var import_node_crypto12 = require("node:crypto");
-
-// src/services/paymentPort.ts
-var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
-var PaymentProcessorError = class extends Error {
-  /**
-   * @param message - Safe description (processor and HTTP status at most).
-   */
-  constructor(message) {
-    super(message);
-    this.name = "PaymentProcessorError";
-  }
-};
-function remoteDeadline(expiresAt) {
-  return new Date(expiresAt.getTime() - REMOTE_EXPIRY_MARGIN_MS);
-}
-
-// src/services/mercadoPagoAdapter.ts
 var MP_API = "https://api.mercadopago.com";
 var TIMEOUT_MS2 = 1e4;
 var PAYMENT_TYPES = [
@@ -117732,6 +117964,10 @@ function sessionForm(request, expiresAt) {
   if (request.method === "OXXO") {
     form.set("payment_method_options[oxxo][expires_after_days]", "1");
   }
+  if (request.method === "CARD" && request.futureUsageCustomerId !== void 0) {
+    form.set("customer", request.futureUsageCustomerId);
+    form.set("payment_intent_data[setup_future_usage]", "off_session");
+  }
   return form;
 }
 function header2(headers, name2) {
@@ -117743,22 +117979,26 @@ function sameHex2(expected, given) {
   const b = Buffer.from(given, "hex");
   return a.length === b.length && a.length > 0 && (0, import_node_crypto20.timingSafeEqual)(a, b);
 }
-function createStripeAdapter(secrets, fetchImpl = fetch) {
-  async function call(path3, init) {
-    const answer = await fetchImpl(`${STRIPE_API}${path3}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${secrets.apiKey}`,
-        "Stripe-Version": STRIPE_VERSION,
-        ...init.headers
-      },
-      signal: AbortSignal.timeout(TIMEOUT_MS3)
-    });
-    if (!answer.ok) {
-      throw new PaymentProcessorError(`Stripe: HTTP ${answer.status}`);
-    }
-    return answer.json();
+async function stripeCall(secrets, fetchImpl, path3, init) {
+  const answer = await fetchImpl(`${STRIPE_API}${path3}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${secrets.apiKey}`,
+      "Stripe-Version": STRIPE_VERSION,
+      ...init.headers
+    },
+    signal: AbortSignal.timeout(TIMEOUT_MS3)
+  });
+  if (!answer.ok) {
+    throw new PaymentProcessorError(
+      `Stripe: HTTP ${answer.status}`,
+      answer.status
+    );
   }
+  return answer.json();
+}
+function createStripeAdapter(secrets, fetchImpl = fetch) {
+  const call = (path3, init) => stripeCall(secrets, fetchImpl, path3, init);
   return {
     async createSession(request) {
       if (request.method !== "CARD" && request.method !== "OXXO") {
@@ -117823,6 +118063,88 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
         processorStatus: status
       };
+    }
+  };
+}
+var textOrNull = (value) => typeof value === "string" && value !== "" ? value : null;
+function createStripeCards(secrets, fetchImpl = fetch) {
+  const call = (path3, init) => stripeCall(secrets, fetchImpl, path3, init);
+  const form = { "Content-Type": "application/x-www-form-urlencoded" };
+  return {
+    async createCustomer(userId) {
+      const body = await call("/customers", {
+        method: "POST",
+        headers: { ...form, "Idempotency-Key": `yekora-customer-${userId}` },
+        body: new URLSearchParams({ "metadata[user_id]": userId }).toString()
+      });
+      const id = textOrNull(body.id);
+      if (id === null) {
+        throw new PaymentProcessorError("Stripe: unexpected customer answer");
+      }
+      return id;
+    },
+    async listCards(customerId) {
+      const body = await call(
+        `/customers/${encodeURIComponent(customerId)}/payment_methods?type=card&limit=100`,
+        { method: "GET" }
+      );
+      const rows = Array.isArray(body.data) ? body.data : [];
+      return rows.flatMap((row2) => {
+        const method = row2;
+        const id = textOrNull(method.id);
+        const brand = textOrNull(method.card?.brand);
+        const last4 = textOrNull(method.card?.last4);
+        const month = method.card?.exp_month;
+        const year = method.card?.exp_year;
+        return id !== null && brand !== null && last4 !== null && Number.isInteger(month) && Number.isInteger(year) ? [
+          {
+            id,
+            brand,
+            last4,
+            expMonth: month,
+            expYear: year
+          }
+        ] : [];
+      });
+    },
+    async cardOwner(paymentMethodId) {
+      try {
+        const body = await call(
+          `/payment_methods/${encodeURIComponent(paymentMethodId)}`,
+          { method: "GET" }
+        );
+        return textOrNull(body.customer);
+      } catch (error63) {
+        if (error63 instanceof PaymentProcessorError && error63.status === 404) {
+          return null;
+        }
+        throw error63;
+      }
+    },
+    async detachCard(paymentMethodId) {
+      await call(
+        `/payment_methods/${encodeURIComponent(paymentMethodId)}/detach`,
+        { method: "POST", headers: form, body: "" }
+      );
+    },
+    async createSetupSession({ customerId, successUrl, cancelUrl }) {
+      const body = await call("/checkout/sessions", {
+        method: "POST",
+        headers: form,
+        body: new URLSearchParams({
+          mode: "setup",
+          currency: "mxn",
+          customer: customerId,
+          "payment_method_types[0]": "card",
+          success_url: successUrl,
+          cancel_url: cancelUrl
+        }).toString()
+      });
+      const url2 = textOrNull(body.url);
+      if (url2 === null) {
+        throw new PaymentProcessorError("Stripe: unexpected setup answer");
+      }
+      return url2;
     }
   };
 }
@@ -117901,11 +118223,14 @@ async function buildApp(deps) {
   registerCartRoutes(app, { db: deps.db, rate: deps.rate, shipping });
   registerExchangeRateRoute(app, deps.rate);
   const processors = deps.processors ?? configuredProcessors(deps.config);
+  const { stripe } = deps.config.payments;
+  const cards = deps.cards ?? (stripe ? createStripeCards(stripe) : null);
   registerCheckoutRoutes(app, {
     db: deps.db,
     rate: deps.rate,
     shipping,
     processors,
+    cards,
     payments: deps.config.payments,
     now
   });
@@ -117950,7 +118275,9 @@ async function buildApp(deps) {
   registerAccountRoutes(app, {
     db: deps.db,
     now,
-    piiKey: deps.config.payments.checkout?.piiKey ?? null
+    piiKey: deps.config.payments.checkout?.piiKey ?? null,
+    cards,
+    siteUrl: deps.config.payments.siteUrl
   });
   registerAdminRoutes(app, { db: deps.db, now });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
@@ -118272,7 +118599,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "41eeaf21babb10824883947777740c75a225954c" : void 0;
+var sha = true ? "3e552029b75be80f00c129a1c68d6487c195f37a" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
