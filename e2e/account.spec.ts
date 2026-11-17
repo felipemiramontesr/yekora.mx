@@ -504,12 +504,17 @@ test('a new document of the tab greets by name before the API answers, and the c
   const cache = await page.evaluate(() =>
     sessionStorage.getItem('yekora_session_cache_v1')
   );
-  expect(cache).toContain('Ana E2E');
+  expect(cache).toContain('"firstName":"Ana"');
+  expect(cache).not.toContain('E2E');
   expect(cache).not.toMatch(/ana@example|email|phone|postal|state|address/i);
   // Another document of the same tab: the name is there while the API is still being waited for.
   const slow = page.waitForResponse(/\/v1\/account\/me/);
   await page.goto('/en/account/');
-  await expect(page.getByText('Hello, Ana E2E')).toBeVisible({ timeout: 900 });
+  await expect(page.locator('[data-session-skeleton]')).toContainText(
+    'Hello, Ana',
+    { timeout: 900 }
+  );
   await slow;
+  await expect(page.getByText('Hello, Ana E2E')).toBeVisible();
   await expect(page.locator('[data-session-skeleton]')).toHaveCount(0);
 });

@@ -4,7 +4,8 @@
  * `sessionStorage`, so it dies with the tab, and it is never proof: the area asks the API
  * (`GET /v1/account/me`) every time it paints from here and replaces or erases what it shows.
  *
- * Only the id, the name and the roles and permissions of the account are kept. The e-mail, the
+ * Only the id, the first name and the roles and permissions of the account are kept (the set the
+ * FC 053 names: `userId`, `firstName`, `roles`, `permissions`). The e-mail, the
  * phone, the postal code, the state and the addresses never reach the browser's storage
  * (FC 053 T2.2, FC 047 T2.3, FC 051 T2.6): {@link saveSessionCache} copies four fields by name, so
  * a new field of the API can never end up here by accident.
@@ -19,9 +20,9 @@ const KEY = 'yekora_session_cache_v1';
 /** What is kept of the account: no contact data and no address. */
 export interface SessionCache {
   /** Id of the account. */
-  id: string;
-  /** Full name, as the greeting of the area says it. */
-  fullName: string;
+  userId: string;
+  /** First name, as the header greets. */
+  firstName: string;
   /** Roles of the account. */
   roles: string[];
   /** Permissions of the account. */
@@ -44,11 +45,12 @@ function isTextList(value: unknown): value is string[] {
  * Keeps the account in this tab, only the fields that carry no contact data.
  *
  * @param account - The account `GET /v1/account/me` confirmed.
+ * @param firstName - Its first name, as `firstNameOf` (lib/account/sessionHint.ts) cuts it.
  */
-export function saveSessionCache(account: MeResponse): void {
+export function saveSessionCache(account: MeResponse, firstName: string): void {
   const kept: SessionCache = {
-    id: account.id,
-    fullName: account.fullName,
+    userId: account.id,
+    firstName,
     roles: account.roles,
     permissions: account.permissions,
   };
@@ -71,13 +73,15 @@ export function readSessionCache(): SessionCache | null {
     if (raw === null) return null;
     const value: unknown = JSON.parse(raw);
     if (typeof value !== 'object' || value === null) return null;
-    const { id, fullName, roles, permissions } = value as Record<
+    const { userId, firstName, roles, permissions } = value as Record<
       string,
       unknown
     >;
-    if (typeof id !== 'string' || typeof fullName !== 'string') return null;
+    if (typeof userId !== 'string' || typeof firstName !== 'string') {
+      return null;
+    }
     if (!isTextList(roles) || !isTextList(permissions)) return null;
-    return { id, fullName, roles, permissions };
+    return { userId, firstName, roles, permissions };
   } catch {
     return null;
   }

@@ -73,8 +73,9 @@ export async function syncHeaderUser(): Promise<void> {
   try {
     const result = await me();
     if (result.ok) {
-      saveSessionFirstName(firstNameOf(result.data.fullName));
-      saveSessionCache(result.data);
+      const firstName = firstNameOf(result.data.fullName);
+      saveSessionFirstName(firstName);
+      saveSessionCache(result.data, firstName);
       publish(result.data);
     } else if (result.reason === 'SESSION_INVALID_OR_EXPIRED') {
       clearSessionFirstName();

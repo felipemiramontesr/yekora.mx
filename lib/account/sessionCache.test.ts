@@ -29,20 +29,23 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('the session cache (FC 053 F2)', () => {
   it('keeps and gives back the id, name, roles and permissions', () => {
-    saveSessionCache(account);
+    saveSessionCache(account, 'Ana');
     expect(readSessionCache()).toEqual({
-      id: account.id,
-      fullName: 'Ana Pérez',
+      userId: account.id,
+      firstName: 'Ana',
       roles: ['customer'],
       permissions: ['account:self'],
     });
   });
 
   it('never writes the e-mail, phone, postal code, state or an address (T2.2)', () => {
-    saveSessionCache({
-      ...account,
-      addresses: [{ street: 'Calle 1' }],
-    } as unknown as MeResponse);
+    saveSessionCache(
+      {
+        ...account,
+        addresses: [{ street: 'Calle 1' }],
+      } as unknown as MeResponse,
+      'Ana'
+    );
     const stored = sessionStorage.getItem(KEY) ?? '';
     for (const secret of [
       'ana@example.test',
@@ -59,18 +62,18 @@ describe('the session cache (FC 053 F2)', () => {
       expect(stored).not.toContain(secret);
     }
     expect(Object.keys(JSON.parse(stored)).sort()).toEqual([
-      'fullName',
-      'id',
+      'firstName',
       'permissions',
       'roles',
+      'userId',
     ]);
   });
 
   it('is erased on demand, and when the hint is erased: signing out or a 401 (T2.4)', () => {
-    saveSessionCache(account);
+    saveSessionCache(account, 'Ana');
     clearSessionCache();
     expect(readSessionCache()).toBeNull();
-    saveSessionCache(account);
+    saveSessionCache(account, 'Ana');
     saveSessionFirstName('Ana');
     clearSessionFirstName();
     expect(readSessionCache()).toBeNull();
@@ -83,10 +86,10 @@ describe('the session cache (FC 053 F2)', () => {
       'null',
       '3',
       '{}',
-      '{"id":1,"fullName":"a","roles":[],"permissions":[]}',
-      '{"id":"a","fullName":2,"roles":[],"permissions":[]}',
-      '{"id":"a","fullName":"a","roles":"x","permissions":[]}',
-      '{"id":"a","fullName":"a","roles":[],"permissions":[1]}',
+      '{"userId":1,"firstName":"a","roles":[],"permissions":[]}',
+      '{"userId":"a","firstName":2,"roles":[],"permissions":[]}',
+      '{"userId":"a","firstName":"a","roles":"x","permissions":[]}',
+      '{"userId":"a","firstName":"a","roles":[],"permissions":[1]}',
     ]) {
       sessionStorage.setItem(KEY, bad);
       expect(readSessionCache()).toBeNull();
@@ -100,7 +103,7 @@ describe('the session cache (FC 053 F2)', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blocked);
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(blocked);
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(blocked);
-    expect(() => saveSessionCache(account)).not.toThrow();
+    expect(() => saveSessionCache(account, 'Ana')).not.toThrow();
     expect(readSessionCache()).toBeNull();
     expect(() => clearSessionCache()).not.toThrow();
   });

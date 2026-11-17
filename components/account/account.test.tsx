@@ -218,8 +218,8 @@ describe('account area · session cache (FC 053 F2)', () => {
     sessionStorage.setItem(
       'yekora_session_cache_v1',
       JSON.stringify({
-        id: BUYER.id,
-        fullName: 'Ana Flores',
+        userId: BUYER.id,
+        firstName: 'Ana',
         roles: ['customer'],
         permissions: [],
       })
@@ -233,7 +233,8 @@ describe('account area · session cache (FC 053 F2)', () => {
     renderApp();
     const skeleton = await waitFor(() => {
       const found = document.querySelector('[data-session-skeleton]');
-      expect(found?.textContent).toContain('Hola, Ana Flores');
+      expect(found?.textContent).toContain('Hola, Ana');
+      expect(found?.textContent).not.toContain('Flores');
       return found;
     });
     expect(skeleton).not.toBeNull();
@@ -242,7 +243,8 @@ describe('account area · session cache (FC 053 F2)', () => {
     await act(async () => answer(ok(BUYER) as never));
     await screen.findByText(/Hola, Ana Flores/);
     const kept = sessionStorage.getItem('yekora_session_cache_v1') ?? '';
-    expect(kept).toContain('Ana Flores');
+    expect(kept).toContain('Ana');
+    expect(kept).not.toContain('Flores');
     expect(kept).not.toContain(BUYER.email);
   });
 
@@ -250,8 +252,8 @@ describe('account area · session cache (FC 053 F2)', () => {
     sessionStorage.setItem(
       'yekora_session_cache_v1',
       JSON.stringify({
-        id: BUYER.id,
-        fullName: 'Ana Flores',
+        userId: BUYER.id,
+        firstName: 'Ana',
         roles: [],
         permissions: [],
       })
@@ -261,7 +263,7 @@ describe('account area · session cache (FC 053 F2)', () => {
     await waitFor(() => expect(api.me).toHaveBeenCalled());
     expect(
       document.querySelector('[data-session-skeleton]')?.textContent
-    ).not.toContain('Ana Flores');
+    ).not.toContain('Hola, Ana');
     localStorage.setItem('yekora_session_first_name_v1', 'Ana');
     cleanup();
     renderApp();

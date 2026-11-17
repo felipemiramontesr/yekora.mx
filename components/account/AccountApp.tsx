@@ -157,8 +157,9 @@ export function AccountApp({
       const result = await me();
       if (result.ok) {
         // FC 046: the header greets by this first name; the API stays the proof.
-        saveSessionFirstName(firstNameOf(result.data.fullName));
-        saveSessionCache(result.data);
+        const firstName = firstNameOf(result.data.fullName);
+        saveSessionFirstName(firstName);
+        saveSessionCache(result.data, firstName);
         setStage({ kind: 'signedIn', user: result.data });
         return;
       }
@@ -229,7 +230,7 @@ export function AccountApp({
             greeting={
               cached === null
                 ? undefined
-                : fill(messages.dashboard.greeting, { name: cached.fullName })
+                : fill(messages.dashboard.greeting, { name: cached.firstName })
             }
           />
           <div data-visitor-prerender="" className="contents">
