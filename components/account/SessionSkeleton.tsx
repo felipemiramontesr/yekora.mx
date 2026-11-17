@@ -8,8 +8,13 @@
  * removes it by leaving the sign-in stage, and the mark goes when the hint does.
  *
  * @param text - What assistive technology hears while it waits (`account.sessionLoading`).
+ * @param greeting - The greeting of the area, when this tab already knows the name
+ * (lib/account/sessionCache.ts); it takes the place of the grey bar of the greeting.
  */
-export function SessionSkeleton({ text }: Readonly<{ text: string }>) {
+export function SessionSkeleton({
+  text,
+  greeting,
+}: Readonly<{ text: string; greeting?: string }>) {
   const bar = 'rounded bg-petroleo/10 motion-safe:animate-pulse';
   return (
     <output
@@ -20,7 +25,11 @@ export function SessionSkeleton({ text }: Readonly<{ text: string }>) {
       <span className="sr-only">{text}</span>
       <span aria-hidden="true" className="flex flex-col gap-3">
         <span className={`${bar} h-5 w-48`} />
-        <span className={`${bar} h-7 w-64`} />
+        {greeting === undefined ? (
+          <span className={`${bar} h-7 w-64`} />
+        ) : (
+          <span className="text-xl font-semibold">{greeting}</span>
+        )}
       </span>
       <span aria-hidden="true" className={`${bar} h-48 w-full max-w-3xl`} />
     </output>

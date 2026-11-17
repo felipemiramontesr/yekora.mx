@@ -11,6 +11,7 @@
  */
 import { logout, me } from '@/lib/api/accountClient';
 import type { MeResponse } from './authTypes';
+import { saveSessionCache } from './sessionCache';
 import {
   clearSessionFirstName,
   firstNameOf,
@@ -73,6 +74,7 @@ export async function syncHeaderUser(): Promise<void> {
     const result = await me();
     if (result.ok) {
       saveSessionFirstName(firstNameOf(result.data.fullName));
+      saveSessionCache(result.data);
       publish(result.data);
     } else if (result.reason === 'SESSION_INVALID_OR_EXPIRED') {
       clearSessionFirstName();

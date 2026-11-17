@@ -24,6 +24,15 @@ describe('session skeleton (FC 053 T1.1, T2.1)', () => {
     }
   });
 
+  it('says the greeting in place of the grey bar when the tab already knows the name (FC 053 F2)', () => {
+    const { container } = render(
+      <SessionSkeleton text="Confirmando…" greeting="Hola, Ana Flores" />
+    );
+    expect(container.textContent).toContain('Hola, Ana Flores');
+    const bare = render(<SessionSkeleton text="Confirmando…" />);
+    expect(bare.container.textContent).not.toContain('Hola');
+  });
+
   it('speaks both languages', () => {
     expect(getMessages('en').account.sessionLoading).toBe(
       'Confirming your session…'

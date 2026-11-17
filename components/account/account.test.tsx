@@ -207,6 +207,71 @@ describe('account area · session mark (FC 053 T1.1, T2.1)', () => {
   });
 });
 
+describe('account area · session cache (FC 053 F2)', () => {
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('paints the greeting of the tab in the skeleton while the API confirms, then keeps the confirmed account (T2.3)', async () => {
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+    sessionStorage.setItem(
+      'yekora_session_cache_v1',
+      JSON.stringify({
+        id: BUYER.id,
+        fullName: 'Ana Flores',
+        roles: ['customer'],
+        permissions: [],
+      })
+    );
+    let answer!: (value: never) => void;
+    api.me.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+    );
+    renderApp();
+    const skeleton = await waitFor(() => {
+      const found = document.querySelector('[data-session-skeleton]');
+      expect(found?.textContent).toContain('Hola, Ana Flores');
+      return found;
+    });
+    expect(skeleton).not.toBeNull();
+    // The API is asked regardless of the cache.
+    expect(api.me).toHaveBeenCalled();
+    await act(async () => answer(ok(BUYER) as never));
+    await screen.findByText(/Hola, Ana Flores/);
+    const kept = sessionStorage.getItem('yekora_session_cache_v1') ?? '';
+    expect(kept).toContain('Ana Flores');
+    expect(kept).not.toContain(BUYER.email);
+  });
+
+  it('ignores a cache without its hint, and erases it when the API says the session is gone (T2.4)', async () => {
+    sessionStorage.setItem(
+      'yekora_session_cache_v1',
+      JSON.stringify({
+        id: BUYER.id,
+        fullName: 'Ana Flores',
+        roles: [],
+        permissions: [],
+      })
+    );
+    api.me.mockResolvedValue(no('SESSION_INVALID_OR_EXPIRED'));
+    renderApp();
+    await waitFor(() => expect(api.me).toHaveBeenCalled());
+    expect(
+      document.querySelector('[data-session-skeleton]')?.textContent
+    ).not.toContain('Ana Flores');
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+    cleanup();
+    renderApp();
+    await waitFor(() =>
+      expect(sessionStorage.getItem('yekora_session_cache_v1')).toBeNull()
+    );
+    expect(localStorage.getItem('yekora_session_first_name_v1')).toBeNull();
+  });
+});
+
 describe('account area · signing in (FC 028 F2)', () => {
   it('lets a late "no session" answer leave someone who moved on alone (cold start)', async () => {
     let answer!: (value: never) => void;

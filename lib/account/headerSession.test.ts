@@ -56,6 +56,17 @@ describe('header session (FC 047 T1.1, T2.3)', () => {
     expect(heard).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a copy of the account for this tab without contact data, and erases it with the hint (FC 053 F2)', async () => {
+    saveSessionFirstName('Old');
+    api.me.mockResolvedValue(ok());
+    await syncHeaderUser();
+    const kept = sessionStorage.getItem('yekora_session_cache_v1') ?? '';
+    expect(kept).toContain('Ana');
+    expect(kept).not.toContain('98000');
+    await signOutFromHeader();
+    expect(sessionStorage.getItem('yekora_session_cache_v1')).toBeNull();
+  });
+
   it('asks once at a time, so two controls never ask twice', async () => {
     saveSessionFirstName('Ana');
     let answer!: (value: unknown) => void;

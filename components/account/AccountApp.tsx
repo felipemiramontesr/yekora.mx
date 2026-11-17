@@ -11,6 +11,11 @@ import {
 } from '@/lib/account/accountPaths';
 import type { MeResponse } from '@/lib/account/authTypes';
 import {
+  readSessionCache,
+  saveSessionCache,
+  type SessionCache,
+} from '@/lib/account/sessionCache';
+import {
   clearSessionFirstName,
   firstNameOf,
   readSessionFirstName,
@@ -134,6 +139,9 @@ export function AccountApp({
   // Waiting for the API first made the page jump from a loading line to the form, seconds
   // later when Hostinger had put the API to sleep.
   const [stage, setStage] = useState<Stage>(() => signedOut());
+  // FC 053 F2: what this tab kept of the account, read once mounted (the prerendered page has no
+  // tab yet). It only paints the greeting; the API still confirms the session behind it.
+  const [cached, setCached] = useState<SessionCache | null>(null);
   const [view, setView] = useState<AccountView>({
     tab: 'orders',
     orderNumber: null,
@@ -150,6 +158,7 @@ export function AccountApp({
       if (result.ok) {
         // FC 046: the header greets by this first name; the API stays the proof.
         saveSessionFirstName(firstNameOf(result.data.fullName));
+        saveSessionCache(result.data);
         setStage({ kind: 'signedIn', user: result.data });
         return;
       }
@@ -182,6 +191,7 @@ export function AccountApp({
     // at once, so it stays out of the history, of a shared screen and of any Referer.
     const token = resetTokenOf(globalThis.location.search);
     if (token === null) {
+      setCached(readSessionFirstName() === null ? null : readSessionCache());
       void loadSession(true);
     } else {
       globalThis.history.replaceState(null, '', area);
@@ -214,7 +224,14 @@ export function AccountApp({
         <>
           {/* FC 053: with a session hint the form stays out of sight and this grey shape takes
               its place until the API confirms the session (or says there is none). */}
-          <SessionSkeleton text={messages.sessionLoading} />
+          <SessionSkeleton
+            text={messages.sessionLoading}
+            greeting={
+              cached === null
+                ? undefined
+                : fill(messages.dashboard.greeting, { name: cached.fullName })
+            }
+          />
           <div data-visitor-prerender="" className="contents">
             <SignInForm
               messages={messages}

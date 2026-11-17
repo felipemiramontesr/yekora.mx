@@ -491,3 +491,25 @@ test('pointing at the other language warms its page up, and the header opens the
     page.locator('head link[rel="prefetch"][href="/en/account/"]')
   ).toHaveCount(1);
 });
+
+test('a new document of the tab greets by name before the API answers, and the cache holds no contact data (FC 053 F2, T2.2, T2.3)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer', latencyMs: 1500 });
+  await page.addInitScript(() => {
+    localStorage.setItem('yekora_session_first_name_v1', 'Ana');
+  });
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  const cache = await page.evaluate(() =>
+    sessionStorage.getItem('yekora_session_cache_v1')
+  );
+  expect(cache).toContain('Ana E2E');
+  expect(cache).not.toMatch(/ana@example|email|phone|postal|state|address/i);
+  // Another document of the same tab: the name is there while the API is still being waited for.
+  const slow = page.waitForResponse(/\/v1\/account\/me/);
+  await page.goto('/en/account/');
+  await expect(page.getByText('Hello, Ana E2E')).toBeVisible({ timeout: 900 });
+  await slow;
+  await expect(page.locator('[data-session-skeleton]')).toHaveCount(0);
+});

@@ -5,7 +5,8 @@
  *
  * It is a hint, never proof: the API decides who is signed in (143_AN B4), and the header checks
  * the hint against `GET /v1/account/me` whenever it shows it. Nothing else is stored: not the
- * surname, the e-mail, an id, the roles or the permissions. The hint is written when the area of
+ * surname, the e-mail, an id, the roles or the permissions (the tab keeps its own, shorter-lived
+ * copy of some of those in lib/account/sessionCache.ts, erased together with the hint). The hint is written when the area of
  * the account confirms a session, and erased when the person signs out or the session is found
  * expired. Signing in or out in one tab reaches the others through the `storage` event, and the
  * controls of the same tab through an event of the window.
@@ -19,6 +20,8 @@
  *
  * @module
  */
+
+import { clearSessionCache } from './sessionCache';
 
 /** Where the first name is kept. */
 const KEY = 'yekora_session_first_name_v1';
@@ -92,6 +95,7 @@ export function readSessionFirstName(): string | null {
 export function clearSessionFirstName(): void {
   try {
     globalThis.localStorage.removeItem(KEY);
+    clearSessionCache();
     markSession(false);
     announce();
   } catch {
