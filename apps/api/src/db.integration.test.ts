@@ -50,6 +50,7 @@ import {
   updateProfile,
 } from './services/accountAddresses';
 import { createDb } from './services/db';
+import { ensureCustomer, linkedCustomer } from './services/stripeCustomer';
 import { runIdempotent } from './services/idempotency';
 import { inspectMedia, readMedia, storeMedia } from './services/media';
 import {
@@ -2029,5 +2030,90 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
       "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME IN ('shipping_postal_code_enc', 'shipping_state')"
     );
     expect(Number(gone.n)).toBe(0);
+  });
+});
+
+describe('the link to the Stripe customer of an account on real SQL (migration 013, stripeCustomer.ts, FC 054 F0)', () => {
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const signUp = async (email: string) => {
+    await createCustomer(db, {
+      email,
+      passwordHash: ARGON,
+      fullName: 'Prueba',
+    });
+    return (
+      await db.query<{ id: string }>('SELECT id FROM users WHERE email = ?', [
+        email,
+      ])
+    )[0].id;
+  };
+  const cardsDouble = (customer: string) => {
+    const made: string[] = [];
+    return {
+      made,
+      port: {
+        async createCustomer(userId: string) {
+          made.push(userId);
+          return customer;
+        },
+        listCards: async () => [],
+        cardOwner: async () => null,
+        detachCard: async () => undefined,
+        createSetupSession: async () => 'https://checkout.stripe.com/c/x',
+      },
+    };
+  };
+
+  it('links an account to its customer once, and gives the same one back (T0.1)', async () => {
+    const id = await signUp('stripe-link@example.test');
+    expect(await linkedCustomer(db, id)).toBeNull();
+    const { port, made } = cardsDouble('cus_real_1');
+    expect(await ensureCustomer(db, port, id)).toBe('cus_real_1');
+    expect(await ensureCustomer(db, port, id)).toBe('cus_real_1');
+    expect(made).toEqual([id]);
+    expect(await linkedCustomer(db, id)).toBe('cus_real_1');
+  });
+
+  it('refuses a second account with the same customer, and a link for an account that does not exist', async () => {
+    const one = await signUp('stripe-one@example.test');
+    const two = await signUp('stripe-two@example.test');
+    await ensureCustomer(db, cardsDouble('cus_shared').port, one);
+    await expect(
+      ensureCustomer(db, cardsDouble('cus_shared').port, two)
+    ).rejects.toThrow();
+    await expect(
+      db.query(
+        'INSERT INTO user_stripe_customers (user_id, stripe_customer_id) VALUES (?, ?)',
+        ['00000000-0000-4000-8000-0000000000ff', 'cus_ghost']
+      )
+    ).rejects.toThrow();
+  });
+
+  it('takes the link with the account (ON DELETE CASCADE) and holds no card data in any column (T2.1)', async () => {
+    const id = await signUp('stripe-cascade@example.test');
+    await ensureCustomer(db, cardsDouble('cus_gone').port, id);
+    await db.query('DELETE FROM users WHERE id = ?', [id]);
+    expect(await linkedCustomer(db, id)).toBeNull();
+    const columns = await db.query<{ name: string }>(
+      "SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_stripe_customers' ORDER BY ORDINAL_POSITION"
+    );
+    expect(columns.map((column) => column.name)).toEqual([
+      'user_id',
+      'stripe_customer_id',
+      'created_at',
+      'updated_at',
+    ]);
+  });
+
+  it('leaves the owner without a link, and no order refers to the table (T0.1, T2.3)', async () => {
+    const [owners] = await db.query<{ linked: number }>(
+      "SELECT COUNT(*) AS linked FROM user_stripe_customers c JOIN user_roles r ON r.user_id = c.user_id AND r.role_id = 'owner'"
+    );
+    expect(Number(owners.linked)).toBe(0);
+    const [refs] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'user_stripe_customers'"
+    );
+    expect(Number(refs.n)).toBe(0);
   });
 });

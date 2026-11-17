@@ -80,6 +80,12 @@ import {
   orderDetailSchema,
   orderPageSchema,
 } from '../../../lib/account/orderTypes';
+import {
+  paymentMethodDetachResponseSchema,
+  paymentMethodListResponseSchema,
+  paymentMethodParams,
+  paymentMethodSetupResponseSchema,
+} from '../../../lib/account/paymentMethodTypes';
 import { languageQuery } from './lib/language';
 import {
   adminCreateRequestSchema,
@@ -486,6 +492,47 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       204: z.null(),
       400: problemSchema,
       404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/payment-methods',
+    summary:
+      'The cards the account keeps at Stripe: brand, last four and expiry, read from Stripe each time (FC 054)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: paymentMethodListResponseSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/payment-methods/setup',
+    summary:
+      'Opens the hosted page of Stripe where the account adds a card; the card never reaches this API (FC 054)',
+    permission: 'account:self',
+    request: { query: languageQuery, headers: mutationHeaders },
+    responses: {
+      201: paymentMethodSetupResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/payment-methods/:id',
+    summary:
+      'Detaches a card of the account at Stripe; another account’s card is a 404 (FC 054)',
+    permission: 'account:self',
+    request: { params: paymentMethodParams, headers: mutationHeaders },
+    responses: {
+      200: paymentMethodDetachResponseSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

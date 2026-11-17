@@ -38,6 +38,11 @@ export interface SessionRequest {
   cancelUrl: string;
   /** Webhook endpoint of this processor in Yekora's API. */
   notificationUrl: string;
+  /**
+   * FC 054 T1.3: the processor's customer of the signed-in buyer who ticked «save this card»; the
+   * session then ties the card to that customer for later purchases. Only Stripe's CARD uses it.
+   */
+  futureUsageCustomerId?: string;
 }
 
 /** A hosted session ready for the buyer. */
@@ -114,8 +119,12 @@ export interface PaymentProcessorPort {
 export class PaymentProcessorError extends Error {
   /**
    * @param message - Safe description (processor and HTTP status at most).
+   * @param status - HTTP status the processor answered, when it did.
    */
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly status: number | null = null
+  ) {
     super(message);
     this.name = 'PaymentProcessorError';
   }

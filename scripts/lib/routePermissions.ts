@@ -42,11 +42,12 @@ const onlyRefuses = (route: PermissionedRoute) =>
   Object.keys(route.responses ?? {}).join() === '405';
 
 /**
- * The only DELETE routes that do something (FC 051): a holder deleting a row of their own
- * personal data. Named one by one, never by pattern, so a new one is a decision of the contract.
+ * The only DELETE routes that do something (FC 051, FC 054): a holder deleting a row of their own
+ * personal data, or detaching a card of their own at Stripe. Named one by one, never by pattern, so a new one is a decision of the contract.
  */
 const OWN_DATA_DELETES: ReadonlySet<string> = new Set([
   'DELETE /v1/account/addresses/:id',
+  'DELETE /v1/account/payment-methods/:id',
 ]);
 
 /** What the session guard may answer before a guarded route runs (lib/guard.ts). */

@@ -43,6 +43,8 @@ import {
 import type { Db, Transactional, TxQuery } from './db';
 import type { CurrentRate } from './exchangeRate';
 import type { PaymentMethodCode, PaymentProcessorPort } from './paymentPort';
+import type { StripeCardsPort } from './stripeAdapter';
+import { ensureCustomer } from './stripeCustomer';
 import type { ShippingRateProvider } from './shippingPort';
 
 /** Processors by `payment_processors.code`. */
@@ -66,6 +68,8 @@ export interface CheckoutDeps {
   shipping: ShippingRateProvider;
   /** Configured processors; a missing one makes its methods unavailable (K). */
   processors: Partial<Record<ProcessorCode, PaymentProcessorPort>>;
+  /** The saved-cards client of Stripe, or null without a Stripe key (FC 054 T1.3). */
+  cards?: StripeCardsPort | null;
   /** Mode, URLs and checkout secrets. */
   payments: PaymentsConfig;
   /** Clock, injectable for tests. */
@@ -358,6 +362,34 @@ async function persist(
 }
 
 /**
+ * The Stripe customer a card paid now should be kept for (FC 054 T1.3): only for a signed-in buyer
+ * paying by card who ticked the box. If Stripe cannot give the customer, the buyer pays all the
+ * same and the card is simply not kept: saving it is never a reason to refuse a purchase.
+ *
+ * @returns The customer id, or undefined when no card is to be kept.
+ */
+async function customerToKeepCard(
+  deps: CheckoutDeps,
+  admitted: Admitted,
+  userId: string | null
+): Promise<string | undefined> {
+  const cards = deps.cards;
+  if (
+    userId === null ||
+    admitted.method !== 'CARD' ||
+    admitted.request.savePaymentMethod !== true ||
+    !cards
+  ) {
+    return undefined;
+  }
+  try {
+    return await ensureCustomer(deps.db, cards, userId);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Runs one checkout: validation, quote, reservation, order and hosted session.
  *
  * @param deps - Database, rates, processors, configuration and clock.
@@ -399,6 +431,11 @@ export async function createCheckout(
   if (typeof orderId !== 'number') return orderId;
 
   const paths = CHECKOUT_RETURN_PATHS[lang];
+  const futureUsageCustomerId = await customerToKeepCard(
+    deps,
+    admitted,
+    userId
+  );
   const webhook =
     admitted.processorCode === 'STRIPE' ? 'stripe' : 'mercadopago';
   const total = quote.summary.totalMxnCents;
@@ -413,6 +450,7 @@ export async function createCheckout(
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
       notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook}`,
+      ...(futureUsageCustomerId !== undefined && { futureUsageCustomerId }),
     });
     await deps.db.query(
       'UPDATE orders SET processor_reference = ? WHERE id = ?',

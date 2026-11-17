@@ -9,6 +9,7 @@ import {
 import { decryptPii, tokenHash } from './checkoutCrypto';
 import type { Db, Transactional, TxQuery } from './db';
 import type { PaymentProcessorPort, SessionRequest } from './paymentPort';
+import type { StripeCardsPort } from './stripeAdapter';
 import type { ShipmentQuote, ShippingRateProvider } from './shippingPort';
 
 const NOW = new Date('2026-10-21T19:00:00Z');
@@ -63,6 +64,8 @@ interface State {
   methods: { code: string; id: number; hold: number; active: boolean }[];
   /** The rows of `user_addresses` the checkout inserted (FC 051 T1.4): their parameters. */
   addresses: { params: unknown[] }[];
+  /** user_stripe_customers: account id → Stripe customer id (FC 054). */
+  links: Record<string, string>;
 }
 
 /**
@@ -101,6 +104,7 @@ function memoryDb(
       { code: 'MERCADO_PAGO_BALANCE', id: 4, hold: 60, active: false },
     ],
     addresses: [],
+    links: {},
     ...seed,
   };
   let snapshot: State | null = null;
@@ -218,6 +222,20 @@ function memoryDb(
       },
     ],
     ['UPDATE users SET default_address_id', () => ({ affectedRows: 1 })],
+    [
+      'SELECT stripe_customer_id FROM user_stripe_customers',
+      ([userId]) =>
+        state.links[userId as string] === undefined
+          ? []
+          : [{ stripe_customer_id: state.links[userId as string] }],
+    ],
+    [
+      'INSERT INTO user_stripe_customers',
+      ([userId, customer]) => {
+        state.links[userId as string] ??= customer as string;
+        return { affectedRows: 1 };
+      },
+    ],
     [
       'INSERT INTO order_items',
       // Multi-row insert: the only parameter is the array of rows.
@@ -800,5 +818,134 @@ describe('the address a signed-in buyer asks to keep (FC 051 T1.4, T2.5)', () =>
     const outcome = await createCheckout(deps(db), keep(), 'es-MX', BUYER);
     expect(outcome).toMatchObject({ ok: true });
     expect(state().addresses).toHaveLength(5);
+  });
+});
+
+describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () => {
+  const BUYER = 'b0000000-0000-4000-8000-000000000001';
+  const cardsDouble = (failing = false) => {
+    const made: string[] = [];
+    const port: StripeCardsPort = {
+      async createCustomer(userId) {
+        if (failing) throw new Error('Stripe: HTTP 500');
+        made.push(userId);
+        return 'cus_buyer';
+      },
+      listCards: vi.fn(),
+      cardOwner: vi.fn(),
+      detachCard: vi.fn(),
+      createSetupSession: vi.fn(),
+    };
+    return { port, made };
+  };
+  const run = async (
+    over: Record<string, unknown>,
+    userId: string | null,
+    cards: StripeCardsPort | null | undefined,
+    links: Record<string, string> = {}
+  ) => {
+    const { db, state } = memoryDb({ links });
+    const stripe = processor();
+    const outcome = await createCheckout(
+      deps(db, {
+        processors: { STRIPE: stripe.port, MERCADO_PAGO: processor().port },
+        ...(cards !== undefined && { cards }),
+      }),
+      body(over),
+      'es-MX',
+      userId
+    );
+    return { outcome, request: stripe.requests[0], state: state() };
+  };
+
+  it('A ⊤ S ⊤ C ⊤ F ⊤: the session is tied to the customer, created and linked on the way (201)', async () => {
+    const { port, made } = cardsDouble();
+    const { outcome, request, state } = await run(
+      { savePaymentMethod: true },
+      BUYER,
+      port
+    );
+    expect(outcome).toMatchObject({ ok: true });
+    expect(request.futureUsageCustomerId).toBe('cus_buyer');
+    expect(made).toEqual([BUYER]);
+    expect(state.links[BUYER]).toBe('cus_buyer');
+  });
+
+  it('reuses the customer the account already has', async () => {
+    const { port, made } = cardsDouble();
+    const { request } = await run({ savePaymentMethod: true }, BUYER, port, {
+      [BUYER]: 'cus_old',
+    });
+    expect(request.futureUsageCustomerId).toBe('cus_old');
+    expect(made).toEqual([]);
+  });
+
+  it.each([
+    ['A ⊤ S ⊤ C ⊤ F ⊥', BUYER, { savePaymentMethod: false }],
+    ['A ⊤ S ⊤ C ⊤ F ⊥ (box absent)', BUYER, {}],
+    ['A ⊤ S ⊤ C ⊥ F ⊤ (a guest)', null, { savePaymentMethod: true }],
+    ['A ⊤ S ⊤ C ⊥ F ⊥', null, {}],
+  ])(
+    '%s: NO_FUTURE_USAGE, the order and its session are created all the same (201)',
+    async (_row, userId, over) => {
+      const { port, made } = cardsDouble();
+      const { outcome, request } = await run(over, userId, port);
+      expect(outcome).toMatchObject({ ok: true });
+      expect(request.futureUsageCustomerId).toBeUndefined();
+      expect(made).toEqual([]);
+    }
+  );
+
+  it.each([
+    ['A ⊤ S ⊥ C ⊤ F ⊤', BUYER, { method: 'OXXO', savePaymentMethod: true }],
+    ['A ⊤ S ⊥ C ⊤ F ⊥', BUYER, { method: 'OXXO' }],
+    ['A ⊤ S ⊥ C ⊥ F ⊤', null, { method: 'OXXO', savePaymentMethod: true }],
+    ['A ⊤ S ⊥ C ⊥ F ⊥', null, { method: 'OXXO' }],
+  ])(
+    '%s: NON_STRIPE_PAYMENT, nothing is kept (201)',
+    async (_row, userId, over) => {
+      const { port, made } = cardsDouble();
+      const { outcome, request } = await run(over, userId, port);
+      expect(outcome).toMatchObject({ ok: true });
+      expect(request.futureUsageCustomerId).toBeUndefined();
+      expect(made).toEqual([]);
+    }
+  );
+
+  it('A ⊥: an invalid order is 400 whatever the other three say, and no customer is created', async () => {
+    for (const userId of [BUYER, null]) {
+      const { port, made } = cardsDouble();
+      const { outcome } = await run(
+        { savePaymentMethod: true, items: [] },
+        userId,
+        port
+      );
+      expect(outcome).toMatchObject({ ok: false, status: 400 });
+      expect(made).toEqual([]);
+    }
+  });
+
+  it('without a Stripe key the buyer pays all the same and the card is simply not kept', async () => {
+    for (const cards of [null, undefined]) {
+      const { outcome, request } = await run(
+        { savePaymentMethod: true },
+        BUYER,
+        cards
+      );
+      expect(outcome).toMatchObject({ ok: true });
+      expect(request.futureUsageCustomerId).toBeUndefined();
+    }
+  });
+
+  it('when Stripe cannot give the customer, the purchase is never refused for it', async () => {
+    const { port } = cardsDouble(true);
+    const { outcome, request, state } = await run(
+      { savePaymentMethod: true },
+      BUYER,
+      port
+    );
+    expect(outcome).toMatchObject({ ok: true });
+    expect(request.futureUsageCustomerId).toBeUndefined();
+    expect(state.links).toEqual({});
   });
 });

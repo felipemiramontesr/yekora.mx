@@ -47,7 +47,11 @@ import {
 } from './services/outboxDispatcher';
 import { breachVerdict } from './services/pwnedPasswords';
 import { createTableRateProvider } from './services/shippingRates';
-import { createStripeAdapter } from './services/stripeAdapter';
+import {
+  createStripeAdapter,
+  createStripeCards,
+  type StripeCardsPort,
+} from './services/stripeAdapter';
 
 /** Everything the application needs, injected by index.ts or by tests. */
 interface AppDeps {
@@ -61,6 +65,8 @@ interface AppDeps {
   logger: boolean;
   /** Payment processors; by default built from the configured secrets (tests inject doubles). */
   processors?: CheckoutDeps['processors'];
+  /** The saved-cards client of Stripe; by default built from its key (tests inject a double). */
+  cards?: StripeCardsPort;
   /** Clock of the checkout; the real one by default. */
   now?: () => Date;
   /** Mail sender of the outbox; by default SMTP from the configured mailbox (tests inject one). */
@@ -167,11 +173,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerExchangeRateRoute(app, deps.rate);
   // FC 012: checkout and the buyer's order view; closed (503) while payments are not configured.
   const processors = deps.processors ?? configuredProcessors(deps.config);
+  // FC 054: the cards live at Stripe; without its key the saved-cards routes answer 503 and the
+  // checkout never offers to keep a card.
+  const { stripe } = deps.config.payments;
+  const cards = deps.cards ?? (stripe ? createStripeCards(stripe) : null);
   registerCheckoutRoutes(app, {
     db: deps.db,
     rate: deps.rate,
     shipping,
     processors,
+    cards,
     payments: deps.config.payments,
     now,
   });
@@ -226,6 +237,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     db: deps.db,
     now,
     piiKey: deps.config.payments.checkout?.piiKey ?? null,
+    cards,
+    siteUrl: deps.config.payments.siteUrl,
   });
   registerAdminRoutes(app, { db: deps.db, now });
   // FC 044 F1: the owner's console of administrators.

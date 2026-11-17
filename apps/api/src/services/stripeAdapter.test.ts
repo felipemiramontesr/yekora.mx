@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { type SessionRequest } from './paymentPort';
-import { createStripeAdapter } from './stripeAdapter';
+import { createStripeAdapter, createStripeCards } from './stripeAdapter';
 
 // The 30-minute margin of FC 012 T2 (1 800 s).
 const REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1000;
@@ -322,5 +322,157 @@ describe('verifyWebhook with a bare v1', () => {
         now: NOW,
       })
     ).toBeNull();
+  });
+});
+
+describe('createSession keeps the card for later (FC 054 T1.3)', () => {
+  const create = async (over: Partial<SessionRequest>) => {
+    const fetchMock = answering({
+      id: 'cs_test_1',
+      url: 'https://checkout.stripe.com/c/pay/cs_test_1',
+    });
+    await createStripeAdapter(SECRETS, fetchMock).createSession(request(over));
+    return sentForm(fetchMock);
+  };
+
+  it('ties the session to the customer and asks Stripe to keep the card, for a card payment', async () => {
+    const form = await create({ futureUsageCustomerId: 'cus_ana' });
+    expect(form.get('customer')).toBe('cus_ana');
+    expect(form.get('payment_intent_data[setup_future_usage]')).toBe(
+      'off_session'
+    );
+  });
+
+  it('sends neither without the customer, nor for OXXO', async () => {
+    for (const over of [
+      {},
+      {
+        method: 'OXXO' as const,
+        // An OXXO voucher is held 72 hours.
+        expiresAt: new Date(NOW.getTime() + 72 * 60 * MIN),
+        futureUsageCustomerId: 'cus_ana',
+      },
+    ]) {
+      const form = await create(over);
+      expect(form.has('customer')).toBe(false);
+      expect(form.has('payment_intent_data[setup_future_usage]')).toBe(false);
+    }
+  });
+});
+
+describe('createStripeCards (FC 054: the cards live at Stripe)', () => {
+  const urlOf = (mock: ReturnType<typeof answering>, call = 0) =>
+    String(mock.mock.calls[call][0]);
+  const initOf = (mock: ReturnType<typeof answering>, call = 0) =>
+    mock.mock.calls[call][1] as RequestInit;
+
+  it('creates the customer of an account with its id as the only reference, and a key that makes a retry give the same one', async () => {
+    const mock = answering({ id: 'cus_123' });
+    const id = await createStripeCards(SECRETS, mock).createCustomer('user-1');
+    expect(id).toBe('cus_123');
+    expect(urlOf(mock)).toBe('https://api.stripe.com/v1/customers');
+    expect(String(initOf(mock).body)).toBe('metadata%5Buser_id%5D=user-1');
+    expect(
+      (initOf(mock).headers as Record<string, string>)['Idempotency-Key']
+    ).toBe('yekora-customer-user-1');
+    await expect(
+      createStripeCards(SECRETS, answering({})).createCustomer('user-1')
+    ).rejects.toThrow('unexpected customer answer');
+  });
+
+  it('lists only brand, last four and expiry of the cards, skipping anything incomplete', async () => {
+    const mock = answering({
+      data: [
+        {
+          id: 'pm_1',
+          card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2030 },
+          billing_details: { name: 'Ana Pérez', email: 'ana@example.test' },
+        },
+        { id: 'pm_2', card: { brand: 'visa', last4: '1111' } },
+        {
+          card: { brand: 'visa', last4: '1111', exp_month: 1, exp_year: 2031 },
+        },
+      ],
+    });
+    const found = await createStripeCards(SECRETS, mock).listCards('cus_123');
+    expect(found).toEqual([
+      { id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+    ]);
+    expect(urlOf(mock)).toBe(
+      'https://api.stripe.com/v1/customers/cus_123/payment_methods?type=card&limit=100'
+    );
+    expect(JSON.stringify(found)).not.toContain('ana@example.test');
+    expect(
+      await createStripeCards(SECRETS, answering({})).listCards('cus_123')
+    ).toEqual([]);
+  });
+
+  it('says whose card it is, and nobody’s when it does not exist (404) or belongs to no customer', async () => {
+    expect(
+      await createStripeCards(
+        SECRETS,
+        answering({ customer: 'cus_9' })
+      ).cardOwner('pm_1')
+    ).toBe('cus_9');
+    expect(
+      await createStripeCards(SECRETS, answering({ customer: null })).cardOwner(
+        'pm_1'
+      )
+    ).toBeNull();
+    expect(
+      await createStripeCards(SECRETS, answering({}, 404)).cardOwner('pm_1')
+    ).toBeNull();
+    await expect(
+      createStripeCards(SECRETS, answering({}, 500)).cardOwner('pm_1')
+    ).rejects.toThrow('Stripe: HTTP 500');
+    await expect(
+      createStripeCards(SECRETS, () =>
+        Promise.reject(new TypeError('net'))
+      ).cardOwner('pm_1')
+    ).rejects.toThrow('net');
+  });
+
+  it('detaches a card with a POST to its own address', async () => {
+    const mock = answering({ id: 'pm_1' });
+    await createStripeCards(SECRETS, mock).detachCard('pm_1');
+    expect(urlOf(mock)).toBe(
+      'https://api.stripe.com/v1/payment_methods/pm_1/detach'
+    );
+    expect(initOf(mock).method).toBe('POST');
+  });
+
+  it('opens a setup session in MXN for cards only, and answers only its hosted address', async () => {
+    const mock = answering({
+      url: 'https://checkout.stripe.com/c/pay/cs_setup',
+    });
+    const url = await createStripeCards(SECRETS, mock).createSetupSession({
+      customerId: 'cus_123',
+      successUrl: 'https://yekora.mx/cuenta/metodos-pago/',
+      cancelUrl: 'https://yekora.mx/cuenta/metodos-pago/',
+    });
+    expect(url).toBe('https://checkout.stripe.com/c/pay/cs_setup');
+    const form = new URLSearchParams(String(initOf(mock).body));
+    expect(Object.fromEntries(form)).toEqual({
+      mode: 'setup',
+      currency: 'mxn',
+      customer: 'cus_123',
+      'payment_method_types[0]': 'card',
+      success_url: 'https://yekora.mx/cuenta/metodos-pago/',
+      cancel_url: 'https://yekora.mx/cuenta/metodos-pago/',
+    });
+    await expect(
+      createStripeCards(SECRETS, answering({})).createSetupSession({
+        customerId: 'cus_123',
+        successUrl: 'https://yekora.mx/a/',
+        cancelUrl: 'https://yekora.mx/a/',
+      })
+    ).rejects.toThrow('unexpected setup answer');
+  });
+
+  it('never sends a card number or a security code: it has no way to', () => {
+    const source = Object.keys(
+      createStripeCards(SECRETS, answering({}))
+    ).join();
+    expect(source).not.toMatch(/number|cvc|cvv|pan/i);
   });
 });

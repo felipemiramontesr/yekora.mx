@@ -60,6 +60,11 @@ export const checkoutRequestSchema = z.strictObject({
    * T1.4). Ignored for a guest and when the account already holds five.
    */
   saveAddress: z.boolean().optional(),
+  /**
+   * A signed-in buyer paying by card asks Stripe to keep it for later purchases (FC 054 T1.3).
+   * Ignored for a guest and for any other method.
+   */
+  savePaymentMethod: z.boolean().optional(),
   /** Total with shipping the buyer saw, MXN cents: compared, never charged. */
   expectedTotalMxnCents: z.number().int().nonnegative(),
 });

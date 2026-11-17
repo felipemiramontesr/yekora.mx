@@ -105,6 +105,15 @@ function sessionForm(
   if (request.method === 'OXXO') {
     form.set('payment_method_options[oxxo][expires_after_days]', '1');
   }
+  // FC 054 T1.3: a buyer who asked to keep the card pays as the customer of their account, and
+  // Stripe ties the card to it when the charge succeeds.
+  if (
+    request.method === 'CARD' &&
+    request.futureUsageCustomerId !== undefined
+  ) {
+    form.set('customer', request.futureUsageCustomerId);
+    form.set('payment_intent_data[setup_future_usage]', 'off_session');
+  }
   return form;
 }
 
@@ -124,6 +133,39 @@ function sameHex(expected: string, given: string): boolean {
 }
 
 /**
+ * One call to Stripe, always against the fixed host, with the pinned version and a timeout.
+ *
+ * @param secrets - API key of this environment.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @param path - Path under `https://api.stripe.com/v1`.
+ * @param init - Method, headers and body.
+ * @returns The parsed answer; rejects with {@link PaymentProcessorError} on any non-2xx status.
+ */
+async function stripeCall(
+  secrets: StripeSecrets,
+  fetchImpl: typeof fetch,
+  path: string,
+  init: RequestInit
+): Promise<unknown> {
+  const answer = await fetchImpl(`${STRIPE_API}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${secrets.apiKey}`,
+      'Stripe-Version': STRIPE_VERSION,
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!answer.ok) {
+    throw new PaymentProcessorError(
+      `Stripe: HTTP ${answer.status}`,
+      answer.status
+    );
+  }
+  return answer.json();
+}
+
+/**
  * Creates the Stripe adapter.
  *
  * @param secrets - API key and webhook signing secret of this environment.
@@ -134,21 +176,8 @@ export function createStripeAdapter(
   secrets: StripeSecrets,
   fetchImpl: typeof fetch = fetch
 ): PaymentProcessorPort {
-  async function call(path: string, init: RequestInit): Promise<unknown> {
-    const answer = await fetchImpl(`${STRIPE_API}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${secrets.apiKey}`,
-        'Stripe-Version': STRIPE_VERSION,
-        ...init.headers,
-      },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!answer.ok) {
-      throw new PaymentProcessorError(`Stripe: HTTP ${answer.status}`);
-    }
-    return answer.json();
-  }
+  const call = (path: string, init: RequestInit) =>
+    stripeCall(secrets, fetchImpl, path, init);
 
   return {
     async createSession(request): Promise<CreatedSession> {
@@ -245,6 +274,174 @@ export function createStripeAdapter(
             : null,
         processorStatus: status,
       };
+    },
+  };
+}
+
+/** The card facts Stripe gives back, and nothing else (FC 054 T2.1). */
+interface StripeCard {
+  /** Stripe's id of the card (`pm_…`). */
+  id: string;
+  /** Brand as Stripe names it. */
+  brand: string;
+  /** Last four digits. */
+  last4: string;
+  /** Month of expiry. */
+  expMonth: number;
+  /** Year of expiry. */
+  expYear: number;
+}
+
+/** What the account area needs from Stripe to keep cards for later purchases (FC 054). */
+export interface StripeCardsPort {
+  /**
+   * Creates the Stripe customer of an account. Retrying with the same account gives back the same
+   * customer (Stripe's idempotency), so two requests never leave two customers.
+   *
+   * @param userId - Id of the account, kept as the customer's reference (no name, no e-mail).
+   * @returns The customer id (`cus_…`).
+   */
+  createCustomer(userId: string): Promise<string>;
+  /**
+   * Lists the cards of a customer.
+   *
+   * @param customerId - Stripe customer.
+   * @returns Brand, last four and expiry of each card.
+   */
+  listCards(customerId: string): Promise<StripeCard[]>;
+  /**
+   * Says which customer a card belongs to.
+   *
+   * @param paymentMethodId - Stripe id of the card.
+   * @returns The customer id, or null when the card does not exist or is not attached to anyone.
+   */
+  cardOwner(paymentMethodId: string): Promise<string | null>;
+  /**
+   * Detaches a card from its customer.
+   *
+   * @param paymentMethodId - Stripe id of the card.
+   */
+  detachCard(paymentMethodId: string): Promise<void>;
+  /**
+   * Opens the hosted page where the person enters a card, to keep it for later purchases.
+   *
+   * @param input - Customer and the pages Stripe returns the person to.
+   * @returns The address of the hosted page.
+   */
+  createSetupSession(input: {
+    customerId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<string>;
+}
+
+/** The string, or null when it is anything else. */
+const textOrNull = (value: unknown): string | null =>
+  typeof value === 'string' && value !== '' ? value : null;
+
+/**
+ * Creates the saved-cards client of Stripe (FC 054): `fetch` against the fixed host, no SDK. The
+ * card number and the security code never pass through here: the person types them on Stripe's
+ * hosted page, and only brand, last four and expiry come back, to be shown and forgotten.
+ *
+ * @param secrets - API key of this environment.
+ * @param fetchImpl - `fetch`, injectable for tests (CI never reaches the network).
+ * @returns A {@link StripeCardsPort}.
+ */
+export function createStripeCards(
+  secrets: StripeSecrets,
+  fetchImpl: typeof fetch = fetch
+): StripeCardsPort {
+  const call = (path: string, init: RequestInit) =>
+    stripeCall(secrets, fetchImpl, path, init);
+  const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
+
+  return {
+    async createCustomer(userId) {
+      const body = (await call('/customers', {
+        method: 'POST',
+        headers: { ...form, 'Idempotency-Key': `yekora-customer-${userId}` },
+        body: new URLSearchParams({ 'metadata[user_id]': userId }).toString(),
+      })) as { id?: unknown };
+      const id = textOrNull(body.id);
+      if (id === null) {
+        throw new PaymentProcessorError('Stripe: unexpected customer answer');
+      }
+      return id;
+    },
+
+    async listCards(customerId) {
+      const body = (await call(
+        `/customers/${encodeURIComponent(customerId)}/payment_methods?type=card&limit=100`,
+        { method: 'GET' }
+      )) as { data?: unknown };
+      const rows = Array.isArray(body.data) ? body.data : [];
+      return rows.flatMap((row: unknown) => {
+        const method = row as { id?: unknown; card?: Record<string, unknown> };
+        const id = textOrNull(method.id);
+        const brand = textOrNull(method.card?.brand);
+        const last4 = textOrNull(method.card?.last4);
+        const month = method.card?.exp_month;
+        const year = method.card?.exp_year;
+        return id !== null &&
+          brand !== null &&
+          last4 !== null &&
+          Number.isInteger(month) &&
+          Number.isInteger(year)
+          ? [
+              {
+                id,
+                brand,
+                last4,
+                expMonth: month as number,
+                expYear: year as number,
+              },
+            ]
+          : [];
+      });
+    },
+
+    async cardOwner(paymentMethodId) {
+      try {
+        const body = (await call(
+          `/payment_methods/${encodeURIComponent(paymentMethodId)}`,
+          { method: 'GET' }
+        )) as { customer?: unknown };
+        return textOrNull(body.customer);
+      } catch (error) {
+        // A card that does not exist is not an error of ours: it simply belongs to no one.
+        if (error instanceof PaymentProcessorError && error.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+
+    async detachCard(paymentMethodId) {
+      await call(
+        `/payment_methods/${encodeURIComponent(paymentMethodId)}/detach`,
+        { method: 'POST', headers: form, body: '' }
+      );
+    },
+
+    async createSetupSession({ customerId, successUrl, cancelUrl }) {
+      const body = (await call('/checkout/sessions', {
+        method: 'POST',
+        headers: form,
+        body: new URLSearchParams({
+          mode: 'setup',
+          currency: 'mxn',
+          customer: customerId,
+          'payment_method_types[0]': 'card',
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        }).toString(),
+      })) as { url?: unknown };
+      const url = textOrNull(body.url);
+      if (url === null) {
+        throw new PaymentProcessorError('Stripe: unexpected setup answer');
+      }
+      return url;
     },
   };
 }
