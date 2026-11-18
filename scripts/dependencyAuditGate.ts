@@ -12,18 +12,9 @@ import { type AcceptedException, judgeAudit } from './lib/dependencyAuditGate';
 // Widening it needs a signed FC (O/R/Ω). Empty since FC 036: the braces advisory (1240992) is
 // no longer reported, so its exception was retired.
 // 2026-11-17 (FC 054, Ω authorized it in the chat): picomatch ReDoS through repeated extglobs
-// (GHSA-fc5q-39xc-vjpf), reported for every version up to 4.0.7 with no patched release. It only
-// reaches the build tools (vite, vitest, tinyglobby, eslint, tailwind) and no code of the site or
-// the API matches user input with it. Remove it as soon as picomatch 4.0.8 or later is published.
-const ACCEPTED_EXCEPTIONS: readonly AcceptedException[] = [
-  {
-    packageName: 'picomatch',
-    advisoryId: 1247710,
-    reason:
-      'No patched release (GHSA-fc5q-39xc-vjpf, <= 4.0.7); build tools only, no user input reaches it.',
-    reviewBy: '2026-12-01',
-  },
-];
+// (GHSA-fc5q-39xc-vjpf) was excepted while it had no patched release. 2026-11-18: the advisory is
+// no longer reported, so the exception was retired (the gate itself demands it: a stale one fails).
+const ACCEPTED_EXCEPTIONS: readonly AcceptedException[] = [];
 
 // process.execPath is the bun binary running this script: no lookup through PATH.
 const result = spawnSync(process.execPath, ['audit', '--json'], {
