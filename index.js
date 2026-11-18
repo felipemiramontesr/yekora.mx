@@ -102560,7 +102560,10 @@ function registerAccountRoutes(app, deps) {
       return paymentMethodListResponseSchema.parse(saved);
     } catch (error63) {
       if (!(error63 instanceof PaymentProcessorError)) throw error63;
-      request.log.warn({ err: error63 }, "saved cards: Stripe refused the list");
+      request.log.warn(
+        { err: error63 },
+        `saved cards: Stripe refused the list: ${error63.message}`
+      );
       return refuse(reply, 503, "Stripe did not answer", "SERVICE_UNAVAILABLE");
     }
   });
@@ -102583,7 +102586,7 @@ function registerAccountRoutes(app, deps) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
         request.log.warn(
           { err: error63 },
-          "saved cards: Stripe refused the setup"
+          `saved cards: Stripe refused the setup: ${error63.message}`
         );
         return stripeDown();
       }
@@ -102624,7 +102627,7 @@ function registerAccountRoutes(app, deps) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
         request.log.warn(
           { err: error63 },
-          "saved cards: Stripe refused the detach"
+          `saved cards: Stripe refused the detach: ${error63.message}`
         );
         return stripeDown();
       }
@@ -118584,7 +118587,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "856decd7a9927c27762c08595446be91f5678e91" : void 0;
+var sha = true ? "b8a0654889d62a37099186cb98e49082de17b9ab" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
