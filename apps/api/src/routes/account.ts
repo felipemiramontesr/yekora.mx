@@ -344,7 +344,10 @@ export function registerAccountRoutes(
       return paymentMethodListResponseSchema.parse(saved);
     } catch (error) {
       if (!(error instanceof PaymentProcessorError)) throw error;
-      request.log.warn({ err: error }, 'saved cards: Stripe refused the list');
+      request.log.warn(
+        { err: error },
+        `saved cards: Stripe refused the list: ${error.message}`
+      );
       return refuse(reply, 503, 'Stripe did not answer', 'SERVICE_UNAVAILABLE');
     }
   });
@@ -369,7 +372,7 @@ export function registerAccountRoutes(
         if (!(error instanceof PaymentProcessorError)) throw error;
         request.log.warn(
           { err: error },
-          'saved cards: Stripe refused the setup'
+          `saved cards: Stripe refused the setup: ${error.message}`
         );
         return stripeDown();
       }
@@ -412,7 +415,7 @@ export function registerAccountRoutes(
         if (!(error instanceof PaymentProcessorError)) throw error;
         request.log.warn(
           { err: error },
-          'saved cards: Stripe refused the detach'
+          `saved cards: Stripe refused the detach: ${error.message}`
         );
         return stripeDown();
       }
