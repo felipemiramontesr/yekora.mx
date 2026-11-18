@@ -99757,10 +99757,11 @@ var registerRequestSchema = external_exports.strictObject({
   password: newPasswordField,
   fullName: external_exports.string().trim().min(2).max(150),
   /**
-   * Delivery postal code (FC 047 T1.3): optional, five digits inside a Mexican block; a
-   * malformed one is a 400 INVALID_POSTAL_CODE, and an empty one is the same as none.
+   * Obsolete (FC 055 T0.2, T2.3): sign-up no longer takes a postal code, which lives only in the
+   * book of addresses. A web bundle cached before that still sends it, so it is accepted, whatever
+   * it holds, and ignored: never validated, stored or refused for it.
    */
-  postalCode: external_exports.string().trim().max(10).optional(),
+  postalCode: external_exports.string().optional(),
   altcha: altchaField
 });
 var forgotPasswordRequestSchema = external_exports.strictObject({
@@ -100823,13 +100824,7 @@ async function insertAddress(tx, key, userId, address) {
   const id = (0, import_node_crypto4.randomUUID)();
   await tx.query(
     "INSERT INTO user_addresses (id, user_id, state_code, is_complete, address_enc) VALUES (?, ?, ?, ?, ?)",
-    [
-      id,
-      userId,
-      address.stateCode,
-      address.isComplete ? 1 : 0,
-      sealed(key, userId, id, address.content)
-    ]
+    [id, userId, address.stateCode, 1, sealed(key, userId, id, address.content)]
   );
   if (address.makeDefault) {
     await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
@@ -100837,15 +100832,7 @@ async function insertAddress(tx, key, userId, address) {
       userId
     ]);
   }
-  return { id, isDefault: address.makeDefault, isComplete: address.isComplete };
-}
-async function insertSignUpAddress(tx, key, userId, place) {
-  await insertAddress(tx, key, userId, {
-    stateCode: place.stateCode,
-    content: { postalCode: place.postalCode },
-    isComplete: false,
-    makeDefault: true
-  });
+  return { id, isDefault: address.makeDefault, isComplete: true };
 }
 async function createAddress(tx, key, userId, input2, wantsDefault) {
   await tx.query("SELECT id FROM users WHERE id = ? FOR UPDATE", [userId]);
@@ -100857,7 +100844,6 @@ async function createAddress(tx, key, userId, input2, wantsDefault) {
   return insertAddress(tx, key, userId, {
     stateCode: input2.stateCode,
     content: input2,
-    isComplete: true,
     makeDefault: wantsDefault || Number(placed) === 0
   });
 }
@@ -101532,7 +101518,7 @@ var ROUTE_CONTRACTS = [
   // FC 028: sign-up and sign-in are public by nature; everything signed-in is /v1/account.
   auth(
     "/v1/auth/register",
-    "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); an optional delivery postal code is kept encrypted, a malformed one is a 400 INVALID_POSTAL_CODE (FC 047)",
+    "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); the account is born without an address (FC 055); an obsolete postalCode is accepted and ignored",
     registerRequestSchema,
     { 202: registeredSchema }
   ),
@@ -102091,12 +102077,6 @@ function createCustomer(db, user) {
       "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
       [id, user.email, user.passwordHash, user.fullName]
     );
-    if (user.postal) {
-      await insertSignUpAddress(tx, user.postal.key, id, {
-        postalCode: user.postal.code,
-        stateCode: user.postal.state
-      });
-    }
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
       [id]
@@ -103210,9 +103190,7 @@ var TITLES2 = {
   PASSWORD_SYMBOL: "The password needs a symbol",
   PASSWORD_PERSONAL: "The password must not contain your e-mail or name",
   PASSWORD_COMMON: "The password is too common",
-  PASSWORD_BREACHED: "The password appears in a known data breach",
-  INVALID_POSTAL_CODE: "The postal code is not valid",
-  POSTAL_CODE_UNAVAILABLE: "The postal code cannot be saved right now"
+  PASSWORD_BREACHED: "The password appears in a known data breach"
 };
 function refuse3(reply, status, code2) {
   return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code2], code2));
@@ -103330,19 +103308,10 @@ function registerAuthRoutes(app, deps) {
     if (!await strongEnough(body.password, body, reply, deps.breach)) {
       return reply;
     }
-    const postalCode = body.postalCode || void 0;
-    const state = postalCode ? stateOfPostalCode(postalCode) : null;
-    if (postalCode && state === null) {
-      return refuse3(reply, 400, "INVALID_POSTAL_CODE");
-    }
-    if (postalCode && deps.piiKey === null) {
-      return refuse3(reply, 503, "POSTAL_CODE_UNAVAILABLE");
-    }
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
-      fullName: body.fullName,
-      postal: postalCode && state && deps.piiKey ? { code: postalCode, state, key: deps.piiKey } : void 0
+      fullName: body.fullName
     });
     return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
   });
@@ -118269,8 +118238,7 @@ async function buildApp(deps) {
     mailReady: dispatcher !== null,
     now,
     wait: deps.wait,
-    breach: (password) => breachVerdict(password, deps.pwnedFetch),
-    piiKey: deps.config.payments.checkout?.piiKey ?? null
+    breach: (password) => breachVerdict(password, deps.pwnedFetch)
   });
   registerAccountRoutes(app, {
     db: deps.db,
@@ -118599,7 +118567,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "957a4023f5977fffef841754eae19dc4c76bda8f" : void 0;
+var sha = true ? "b920710cf4a013445123e8f8028d36e39b9bcb1c" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
