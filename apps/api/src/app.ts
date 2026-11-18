@@ -231,7 +231,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     now,
     wait: deps.wait,
     breach: (password) => breachVerdict(password, deps.pwnedFetch),
-    piiKey: deps.config.payments.checkout?.piiKey ?? null,
   });
   registerAccountRoutes(app, {
     db: deps.db,

@@ -64,7 +64,6 @@ import {
   type PasswordContext,
   passwordViolation,
 } from '../../../../lib/account/passwordPolicy';
-import { stateOfPostalCode } from '../../../../lib/cart/postalRanges';
 import type { AuthSecrets } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
@@ -130,8 +129,6 @@ interface AuthDeps {
   wait?: (ms: number) => Promise<void>;
   /** FC 042 Enmienda 2: the breach range's verdict on a new password (services/pwnedPasswords). */
   breach: (password: string) => Promise<BreachVerdict>;
-  /** CHECKOUT_PII_KEY, or null when the checkout secrets are not configured (FC 047). */
-  piiKey: Buffer | null;
 }
 
 /**
@@ -171,8 +168,6 @@ const TITLES: Record<string, string> = {
   PASSWORD_PERSONAL: 'The password must not contain your e-mail or name',
   PASSWORD_COMMON: 'The password is too common',
   PASSWORD_BREACHED: 'The password appears in a known data breach',
-  INVALID_POSTAL_CODE: 'The postal code is not valid',
-  POSTAL_CODE_UNAVAILABLE: 'The postal code cannot be saved right now',
 };
 
 /** An RFC 7807 refusal whose detail is its machine code. */
@@ -361,24 +356,12 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     if (!(await strongEnough(body.password, body, reply, deps.breach))) {
       return reply;
     }
-    // FC 047 T1.3: a postal code that comes must be five digits in a Mexican block, and is kept
-    // only encrypted; none at all (or an empty one) is the sign-up of before.
-    const postalCode = body.postalCode || undefined;
-    const state = postalCode ? stateOfPostalCode(postalCode) : null;
-    if (postalCode && state === null) {
-      return refuse(reply, 400, 'INVALID_POSTAL_CODE');
-    }
-    if (postalCode && deps.piiKey === null) {
-      return refuse(reply, 503, 'POSTAL_CODE_UNAVAILABLE');
-    }
+    // FC 055: the account is born without an address. A `postalCode` from a cached web bundle is
+    // not read at all: the postal code is only ever part of an address of the book.
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
       fullName: body.fullName,
-      postal:
-        postalCode && state && deps.piiKey
-          ? { code: postalCode, state, key: deps.piiKey }
-          : undefined,
     });
     return reply.code(202).send(registeredSchema.parse({ status: 'accepted' }));
   });

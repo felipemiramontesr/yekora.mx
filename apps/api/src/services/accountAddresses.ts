@@ -212,20 +212,13 @@ async function insertAddress(
   address: {
     stateCode: string;
     content: Record<string, unknown>;
-    isComplete: boolean;
     makeDefault: boolean;
   }
 ): Promise<AddressSaved> {
   const id = randomUUID();
   await tx.query(
     'INSERT INTO user_addresses (id, user_id, state_code, is_complete, address_enc) VALUES (?, ?, ?, ?, ?)',
-    [
-      id,
-      userId,
-      address.stateCode,
-      address.isComplete ? 1 : 0,
-      sealed(key, userId, id, address.content),
-    ]
+    [id, userId, address.stateCode, 1, sealed(key, userId, id, address.content)]
   );
   if (address.makeDefault) {
     await tx.query('UPDATE users SET default_address_id = ? WHERE id = ?', [
@@ -233,29 +226,7 @@ async function insertAddress(
       userId,
     ]);
   }
-  return { id, isDefault: address.makeDefault, isComplete: address.isComplete };
-}
-
-/**
- * The first address of a new account: the postal code given at sign-up, incomplete, the default.
- *
- * @param tx - Transaction that creates the account.
- * @param key - CHECKOUT_PII_KEY.
- * @param userId - The new account.
- * @param place - The postal code and the state derived from it.
- */
-export async function insertSignUpAddress(
-  tx: TxQuery,
-  key: Buffer,
-  userId: string,
-  place: { postalCode: string; stateCode: string }
-): Promise<void> {
-  await insertAddress(tx, key, userId, {
-    stateCode: place.stateCode,
-    content: { postalCode: place.postalCode },
-    isComplete: false,
-    makeDefault: true,
-  });
+  return { id, isDefault: address.makeDefault, isComplete: true };
 }
 
 /**
@@ -285,7 +256,6 @@ export async function createAddress(
   return insertAddress(tx, key, userId, {
     stateCode: input.stateCode,
     content: input,
-    isComplete: true,
     makeDefault: wantsDefault || Number(placed) === 0,
   });
 }

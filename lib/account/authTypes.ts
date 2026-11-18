@@ -29,10 +29,11 @@ export const registerRequestSchema = z.strictObject({
   password: newPasswordField,
   fullName: z.string().trim().min(2).max(150),
   /**
-   * Delivery postal code (FC 047 T1.3): optional, five digits inside a Mexican block; a
-   * malformed one is a 400 INVALID_POSTAL_CODE, and an empty one is the same as none.
+   * Obsolete (FC 055 T0.2, T2.3): sign-up no longer takes a postal code, which lives only in the
+   * book of addresses. A web bundle cached before that still sends it, so it is accepted, whatever
+   * it holds, and ignored: never validated, stored or refused for it.
    */
-  postalCode: z.string().trim().max(10).optional(),
+  postalCode: z.string().optional(),
   altcha: altchaField,
 });
 

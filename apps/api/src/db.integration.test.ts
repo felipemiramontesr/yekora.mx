@@ -6,6 +6,7 @@
  * The payment processors are stand-ins: they live outside the database, and what is under test
  * is the SQL around them. The tests share one database and run in order.
  */
+import { randomUUID } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
@@ -28,6 +29,7 @@ import {
   listProducts,
 } from './services/catalog';
 import { createCheckout, expireOverdueOrders } from './services/checkout';
+import { encryptPii } from './services/checkoutCrypto';
 import {
   codeHash,
   decryptTotpSecret,
@@ -1824,14 +1826,40 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
         email,
       ])
     )[0].id;
-  const signUp = async (email: string, code?: string) => {
+  const signUp = async (email: string) => {
     await createCustomer(db, {
       email,
       passwordHash: ARGON,
       fullName: 'Prueba',
-      postal: code ? { code, state: 'ZAC', key: KEY } : undefined,
     });
     return idOf(email);
+  };
+  /**
+   * An account from before FC 055, whose sign-up wrote its postal code as a first address,
+   * incomplete and the default: they keep it untouched (T2.5), and the book still completes it.
+   */
+  const legacySignUp = async (email: string, code: string) => {
+    const id = await signUp(email);
+    const addressId = randomUUID();
+    await db.query(
+      'INSERT INTO user_addresses (id, user_id, state_code, is_complete, address_enc) VALUES (?, ?, ?, 0, ?)',
+      [
+        addressId,
+        id,
+        'ZAC',
+        encryptPii(
+          KEY,
+          `${id}|${addressId}`,
+          'user_address',
+          JSON.stringify({ postalCode: code })
+        ),
+      ]
+    );
+    await db.query('UPDATE users SET default_address_id = ? WHERE id = ?', [
+      addressId,
+      id,
+    ]);
+    return id;
   };
   const casa = (label: string, postalCode = '98612') => ({
     label,
@@ -1856,8 +1884,8 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
       )
     )[0].default_address_id;
 
-  it('stores the postal code of the sign-up as the first address: incomplete, the default, only as ciphertext (T2.4, T2.2)', async () => {
-    const id = await signUp('postal@example.test', '98612');
+  it('keeps the incomplete address an account from before FC 055 was given at sign-up: the default, only as ciphertext, readable only by its account (T2.5)', async () => {
+    const id = await legacySignUp('postal@example.test', '98612');
     const rows = await db.query<{
       id: string;
       state_code: string;
@@ -1897,7 +1925,7 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
     await expect(accountDelivery(db, KEY, other)).rejects.toThrow();
   });
 
-  it('writes no address for an account without a postal code, and reads none', async () => {
+  it('writes no address at sign-up and leaves no default, and reads none (FC 055 T2.1)', async () => {
     const id = await signUp('nopostal@example.test');
     expect(await listAddresses(db, KEY, id)).toEqual([]);
     expect(await defaultOf(id)).toBeNull();
@@ -1945,7 +1973,7 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
   });
 
   it('completes an address, makes another the default, and moves the default when it is deleted (T1.3, T2.4)', async () => {
-    const id = await signUp('moves@example.test', '98612');
+    const id = await legacySignUp('moves@example.test', '98612');
     const [signUpAddress] = await listAddresses(db, KEY, id);
     expect(signUpAddress).toMatchObject({ isComplete: false, street: null });
     await expect(
@@ -2009,7 +2037,7 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
   });
 
   it('takes the addresses with the account (ON DELETE CASCADE) and leaves the owner untouched (T2.1)', async () => {
-    const id = await signUp('cascade@example.test', '98612');
+    const id = await legacySignUp('cascade@example.test', '98612');
     await db.query('DELETE FROM users WHERE id = ?', [id]);
     expect(
       (

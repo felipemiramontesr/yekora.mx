@@ -15,7 +15,6 @@
 import { randomUUID } from 'node:crypto';
 import { isPrivileged } from '../lib/permissions';
 import { codeHash, newToken, tokenHash } from './authCrypto';
-import { insertSignUpAddress } from './accountAddresses';
 import type { Db, Transactional } from './db';
 
 /** Lifetime of a sign-in challenge. */
@@ -120,22 +119,12 @@ export async function emailOf(db: Db, userId: string): Promise<string> {
   return row.email;
 }
 
-/** The delivery postal code given at sign-up, with the state derived from it (FC 047, FC 051). */
-interface SignUpPostal {
-  /** Five digits, already validated. */
-  code: string;
-  /** State code derived from it (informational). */
-  state: string;
-  /** CHECKOUT_PII_KEY: the code is stored only as ciphertext bound to the new address. */
-  key: Buffer;
-}
-
 /**
- * Creates a buyer account (role `customer`), unless the e-mail is taken.
+ * Creates a buyer account (role `customer`), unless the e-mail is taken. The account is born
+ * without an address (FC 055): its book starts empty and the postal code only ever lives in it.
  *
  * @param db - Database with transactions.
- * @param user - Canonical e-mail, Argon2id hash and full name, and optionally the delivery
- *   postal code, which becomes the account's first address and is encrypted before it is stored.
+ * @param user - Canonical e-mail, Argon2id hash and full name.
  * @returns True when created; false when the e-mail already had an account.
  */
 export function createCustomer(
@@ -144,7 +133,6 @@ export function createCustomer(
     email: string;
     passwordHash: string;
     fullName: string;
-    postal?: SignUpPostal;
   }
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
@@ -158,14 +146,6 @@ export function createCustomer(
       'INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
       [id, user.email, user.passwordHash, user.fullName]
     );
-    // FC 051: the postal code given at sign-up is the account's first address, incomplete, and
-    // the default; it is the only place the account keeps a postal code.
-    if (user.postal) {
-      await insertSignUpAddress(tx, user.postal.key, id, {
-        postalCode: user.postal.code,
-        stateCode: user.postal.state,
-      });
-    }
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
       [id]

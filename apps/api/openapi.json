@@ -1981,7 +1981,7 @@
     },
     "/v1/auth/register": {
       "post": {
-        "summary": "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); an optional delivery postal code is kept encrypted, a malformed one is a 400 INVALID_POSTAL_CODE (FC 047)",
+        "summary": "Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); the account is born without an address (FC 055); an obsolete postalCode is accepted and ignored",
         "x-permission": "public",
         "parameters": [],
         "requestBody": {
@@ -2005,8 +2005,7 @@
                     "maxLength": 150
                   },
                   "postalCode": {
-                    "type": "string",
-                    "maxLength": 10
+                    "type": "string"
                   },
                   "altcha": {
                     "type": "string",

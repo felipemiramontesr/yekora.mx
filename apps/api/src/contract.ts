@@ -363,7 +363,7 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   // FC 028: sign-up and sign-in are public by nature; everything signed-in is /v1/account.
   auth(
     '/v1/auth/register',
-    'Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); an optional delivery postal code is kept encrypted, a malformed one is a 400 INVALID_POSTAL_CODE (FC 047)',
+    'Creates a buyer account; never says whether the e-mail existed. A password breaking the policy is a 400 naming the rule (FC 042); the account is born without an address (FC 055); an obsolete postalCode is accepted and ignored',
     registerRequestSchema,
     { 202: registeredSchema }
   ),

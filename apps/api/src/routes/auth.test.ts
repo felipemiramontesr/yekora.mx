@@ -11,7 +11,7 @@ import { loadConfig } from '../config';
 import { createHash, createHmac } from 'node:crypto';
 import { sha1 } from 'hash-wasm';
 import { base32, decryptTotpSecret, tokenHash } from '../services/authCrypto';
-import { decryptPii, encryptPii } from '../services/checkoutCrypto';
+import { encryptPii } from '../services/checkoutCrypto';
 import type { Db, Transactional, TxQuery } from '../services/db';
 
 const NOW = new Date('2026-11-02T18:00:00Z');
@@ -589,6 +589,28 @@ function cookieOf(response: LightMyRequestResponse): string {
   return header.split(';')[0];
 }
 
+/**
+ * Gives an account the address a sign-up before FC 055 wrote: its postal code, incomplete and the
+ * default. New accounts are born without one; the ones that already have it keep reading it back.
+ */
+function legacyAddress(userId: string, postalCode = '98612') {
+  const id = 'a0000000-0000-4000-8000-000000000001';
+  store.addresses.set(id, {
+    id,
+    user_id: userId,
+    state_code: 'ZAC',
+    is_complete: 0,
+    address_enc: encryptPii(
+      PII_KEY,
+      `${userId}|${id}`,
+      'user_address',
+      JSON.stringify({ postalCode })
+    ),
+  });
+  const user = [...store.users.values()].find((row) => row.id === userId);
+  if (user) user.default_address_id = id;
+}
+
 async function register(
   email: string,
   fullName = 'Ana Prueba',
@@ -693,59 +715,56 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.userRoles).toEqual([[user.id, 'customer']]);
   });
 
-  it('FC 051 T2.4 · the postal code becomes the first address, incomplete and the default, sealed for it, with the state derived', async () => {
+  it('FC 055 T2.1 · the account is born without an address: none written, no default', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
-    const response = await register('ana@example.test', 'Ana', ' 98612 ');
-    expect(response.statusCode).toBe(202);
+    expect((await register('ana@example.test')).statusCode).toBe(202);
     const [user] = [...store.users.values()];
-    const [address] = [...store.addresses.values()];
-    expect(store.addresses.size).toBe(1);
-    expect(address).toMatchObject({
-      user_id: user.id,
-      state_code: 'ZAC',
-      is_complete: 0,
-    });
-    expect(user.default_address_id).toBe(address.id);
-    const stored = address.address_enc as Buffer;
-    expect(stored.includes(Buffer.from('98612'))).toBe(false);
-    expect(
-      JSON.parse(
-        decryptPii(PII_KEY, `${user.id}|${address.id}`, 'user_address', stored)
-      )
-    ).toEqual({ postalCode: '98612' });
-  });
-
-  it('FC 047 T1.3 · an omitted or empty postal code is the sign-up of before: no address is written', async () => {
-    await start({ ...KEYS, ...MAIL, ...CHECKOUT });
-    await register('ana@example.test');
-    await register('luis@example.test', 'Luis', '');
-    for (const user of store.users.values()) {
-      expect(user.default_address_id).toBeNull();
-    }
+    expect(store.users.size).toBe(1);
     expect(store.addresses.size).toBe(0);
-    expect(store.users.size).toBe(2);
+    expect(user.default_address_id).toBeNull();
   });
 
-  it.each(['1234', 'abcde', '986123', '17000'])(
-    'FC 047 T1.3 · refuses the postal code %s with INVALID_POSTAL_CODE and creates nothing',
+  it.each(['98612', ' 98612 ', '1234', 'abcde', '986123', '17000', ''])(
+    'FC 055 T2.3 · a postal code from a cached bundle (%j) is ignored: 202, nothing stored, even without the checkout secrets',
     async (postalCode) => {
-      await start({ ...KEYS, ...MAIL, ...CHECKOUT });
+      await start();
       const response = await register('ana@example.test', 'Ana', postalCode);
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({ detail: 'INVALID_POSTAL_CODE' });
-      expect(store.users.size).toBe(0);
+      expect(response.statusCode).toBe(202);
+      expect(response.json()).toEqual({ status: 'accepted' });
+      expect(store.users.size).toBe(1);
+      expect(store.addresses.size).toBe(0);
+      expect([...store.users.values()][0].default_address_id).toBeNull();
     }
   );
 
-  it('FC 047 T2.3 · without the checkout secrets a postal code is refused (503) instead of stored in clear', async () => {
+  it('FC 055 T2.3 · a postal code never changes the refusals of the gate: a repeated e-mail, a weak password and a missing proof keep their answers', async () => {
     await start();
-    const response = await register('ana@example.test', 'Ana', '98612');
-    expect(response.statusCode).toBe(503);
-    expect(response.json()).toMatchObject({
-      detail: 'POSTAL_CODE_UNAVAILABLE',
+    await register('ana@example.test', 'Ana');
+    const repeated = await register('ana@example.test', 'Ana', '98612');
+    expect([repeated.statusCode, repeated.json()]).toEqual([
+      202,
+      { status: 'accepted' },
+    ]);
+    expect(store.users.size).toBe(1);
+    const weak = await post('/v1/auth/register', {
+      email: 'luis@example.test',
+      password: 'corta',
+      fullName: 'Luis',
+      postalCode: '98612',
+      altcha: await solved(),
     });
-    expect(store.users.size).toBe(0);
-    expect((await register('luis@example.test', 'Luis')).statusCode).toBe(202);
+    expect(weak.statusCode).toBe(400);
+    expect(weak.json()).toMatchObject({ detail: 'PASSWORD_LENGTH' });
+    const unproven = await post('/v1/auth/register', {
+      email: 'luis@example.test',
+      password: PASSWORD,
+      fullName: 'Luis',
+      postalCode: '98612',
+    });
+    expect(unproven.statusCode).toBe(400);
+    expect(unproven.json()).toMatchObject({ detail: 'BOT_CHALLENGE_REQUIRED' });
+    expect(store.users.size).toBe(1);
+    expect(store.addresses.size).toBe(0);
   });
 
   it('OWASP-A07 · refuses unknown fields (400), before any work', async () => {
@@ -1009,7 +1028,8 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
 
   it('FC 047 T2.3 · gives the holder their own postal code back, and no one else', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
-    await register('ana@example.test', 'Ana', '98612');
+    await register('ana@example.test', 'Ana');
+    legacyAddress(String([...store.users.values()][0].id));
     const { cookie } = await signedInBuyer('ana@example.test');
     const me = await app.inject({ url: '/v1/account/me', headers: { cookie } });
     expect(me.json()).toMatchObject({ postalCode: '98612', stateCode: 'ZAC' });
@@ -1028,7 +1048,8 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
 
   it('FC 047 T2.3 · a stored value that does not authenticate is left out and never breaks the account area', async () => {
     await start({ ...KEYS, ...MAIL, ...CHECKOUT });
-    await register('ana@example.test', 'Ana', '98612');
+    await register('ana@example.test', 'Ana');
+    legacyAddress(String([...store.users.values()][0].id));
     const { cookie } = await signedInBuyer('ana@example.test');
     const [address] = [...store.addresses.values()];
     // Moved to another account: the additional data no longer matches.
