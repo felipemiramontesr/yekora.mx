@@ -105,6 +105,22 @@ function registerRequested(search: string): boolean {
   return new URLSearchParams(search).get('action') === 'register';
 }
 
+/**
+ * The form a visitor's click in the header asks for (FC 056 T1.1): the header's «Crear cuenta» is
+ * `?action=register`, and «Entrar» is the area's own address with nothing after it.
+ *
+ * @param current - What the person is looking at.
+ * @param asked - `register` or `signIn`, the intention of the click.
+ * @returns The next stage. A signed-in person is left alone (the header offers them no such
+ *   links), and so are the backup codes: they are shown once, and a click in the menu must never
+ *   take them away before they are saved (T2.3).
+ */
+function stageAsked(current: Stage, asked: 'register' | 'signIn'): Stage {
+  if (current.kind === 'signedIn' || current.kind === 'backup') return current;
+  if (current.kind === asked) return current;
+  return asked === 'register' ? { kind: 'register' } : signedOut();
+}
+
 /** The token of a mailed reset link (FC 042): `?action=reset-password&token=<64 hex>`. */
 const RESET_TOKEN = /^[0-9a-f]{64}$/;
 
@@ -179,13 +195,16 @@ export function AccountApp({
 
   useEffect(() => {
     const read = () => {
-      setView(parseAccountPath(globalThis.location.pathname, area));
-      // FC 047: «Crear cuenta» of the header, from inside the area, asks for the sign-up form.
-      if (registerRequested(globalThis.location.search)) {
+      const { pathname, search } = globalThis.location;
+      setView(parseAccountPath(pathname, area));
+      // FC 047, FC 056: the header's «Crear cuenta» and «Entrar», from inside the area, ask for the
+      // sign-up or the sign-in form, whichever form the visitor was in (the forms are not
+      // addresses, so the address alone could not tell).
+      if (registerRequested(search)) {
         globalThis.history.replaceState(null, '', area);
-        setStage((current) =>
-          current.kind === 'signIn' ? { kind: 'register' } : current
-        );
+        setStage((current) => stageAsked(current, 'register'));
+      } else if (pathname === area && search === '') {
+        setStage((current) => stageAsked(current, 'signIn'));
       }
     };
     read();

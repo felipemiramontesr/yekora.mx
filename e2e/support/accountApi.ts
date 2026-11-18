@@ -311,6 +311,18 @@ export const E2E_HOME: E2eAddress = {
   references: null,
 };
 
+/** The eight codes the authenticator's enrolment shows once (FC 056). */
+export const E2E_BACKUP_CODES = [
+  '10000001',
+  '10000002',
+  '10000003',
+  '10000004',
+  '10000005',
+  '10000006',
+  '10000007',
+  '10000008',
+];
+
 /** One saved card as the API shows it: brand, last four digits and expiry, nothing else (FC 054). */
 export interface E2eCard {
   id: string;
@@ -428,6 +440,30 @@ function answerData(route: Route, data: AccountData) {
 }
 
 /**
+ * The authenticator's enrolment (FC 056): its secret, and the first code that turns it on, which
+ * signs in and shows the backup codes once.
+ *
+ * @returns The answer, or null when the path is not one of the enrolment's.
+ */
+function answerEnrolment(
+  route: Route,
+  path: string,
+  body: Record<string, unknown>,
+  confirmed: () => void
+) {
+  if (path === '/v1/auth/totp/enroll') {
+    return json(route, 200, {
+      secret: 'JBSWY3DPEHPK3PXP',
+      otpauthUri: 'otpauth://totp/Yekora:luis?secret=JBSWY3DPEHPK3PXP',
+    });
+  }
+  if (path !== '/v1/auth/totp/confirm') return null;
+  if (body.code !== E2E_CODE) return problem(route, 401, 'INVALID_CODE');
+  confirmed();
+  return json(route, 200, { backupCodes: E2E_BACKUP_CODES });
+}
+
+/**
  * Intercepts the account API of a page.
  *
  * @param page - The page under test.
@@ -445,10 +481,13 @@ export async function mockAccountApi(
     phone?: string | null;
     /** How long the signed-in routes take to answer, as a sleeping API does (FC 053). */
     latencyMs?: number;
+    /** The account has not turned its authenticator on yet: signing in goes through enrolment (FC 056). */
+    enrollment?: boolean;
   } = {}
 ): Promise<void> {
   let user: Persona | null = options.signedIn ?? null;
   let trusted = false;
+  let enrolled = !options.enrollment;
   const data: AccountData = {
     fullName: null,
     phone: options.phone ?? null,
@@ -482,10 +521,16 @@ export async function mockAccountApi(
       if (password) return password(route, body);
       if (path === '/v1/auth/verify') {
         if (body.code !== E2E_CODE) return problem(route, 401, 'INVALID_CODE');
+        if (!enrolled) return problem(route, 403, 'TOTP_NOT_ENROLLED');
         user = persona;
         trusted = trusted || body.rememberDevice === true;
         return json(route, 200, { status: 'signed_in' });
       }
+      const enrolment = answerEnrolment(route, path, body, () => {
+        enrolled = true;
+        user = persona;
+      });
+      if (enrolment) return enrolment;
       return problem(route, 404, 'NOT_FOUND');
     })
   );

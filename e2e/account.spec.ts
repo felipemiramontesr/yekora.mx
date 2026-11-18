@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import {
+  E2E_BACKUP_CODES,
   E2E_CARD_SETUP_PAGE,
   E2E_CODE,
   E2E_ORDER,
@@ -297,6 +298,73 @@ test('the saved cards are there in English too, at their own address (FC 054 F1)
   await expect(
     page.getByRole('region', { name: 'Mercado Pago' })
   ).toBeVisible();
+});
+
+test('the header takes a visitor from «Crear cuenta» and «Olvidé mi contraseña» to «Entrar», and from «Olvidé» to «Crear cuenta» (FC 056 T2.1, T2.2)', async ({
+  page,
+}) => {
+  await mockAccountApi(page);
+  await page.goto('/cuenta/');
+  const header = page.getByRole('banner');
+  const main = page.getByRole('main');
+
+  await page
+    .getByRole('button', { name: '¿No tienes cuenta? Crea una' })
+    .click();
+  await expect(
+    main.getByRole('heading', { name: 'Crear cuenta' })
+  ).toBeVisible();
+  await openAccountMenu(page);
+  await header.getByRole('link', { name: 'Entrar' }).click();
+  await expect(main.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+
+  await page.getByRole('button', { name: '¿Olvidaste tu contraseña?' }).click();
+  await expect(
+    main.getByRole('heading', { name: 'Restablecer tu contraseña' })
+  ).toBeVisible();
+  await openAccountMenu(page);
+  await header.getByRole('link', { name: 'Entrar' }).click();
+  await expect(main.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+
+  await page.getByRole('button', { name: '¿Olvidaste tu contraseña?' }).click();
+  await openAccountMenu(page);
+  await header.getByRole('link', { name: 'Crear cuenta' }).click();
+  await expect(
+    main.getByRole('heading', { name: 'Crear cuenta' })
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/cuenta\/$/);
+});
+
+test('the header never takes away the backup codes of the authenticator before they are saved (FC 056 T2.3)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { persona: 'staff', enrollment: true });
+  await page.goto('/cuenta/');
+  const main = page.getByRole('main');
+  await page.getByLabel('Correo electrónico').fill('luis@example.test');
+  await page
+    .getByLabel('Contraseña', { exact: true })
+    .fill('correct horse battery');
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByLabel('Código').fill(E2E_CODE);
+  await page.getByRole('button', { name: 'Confirmar' }).click();
+  await expect(
+    main.getByRole('heading', { name: 'Activa la verificación en dos pasos' })
+  ).toBeVisible();
+  await page.getByLabel('Código que muestra tu app').fill(E2E_CODE);
+  await page.getByRole('button', { name: 'Activar', exact: true }).click();
+  const codes = main.getByRole('list', {
+    name: 'Códigos de respaldo',
+  });
+  await expect(codes).toContainText(E2E_BACKUP_CODES[0]);
+  for (const link of ['Entrar', 'Crear cuenta']) {
+    await openAccountMenu(page);
+    await page.getByRole('banner').getByRole('link', { name: link }).click();
+    await expect(codes).toContainText(E2E_BACKUP_CODES[7]);
+    await expect(
+      main.getByRole('heading', { name: 'Guarda tus códigos de respaldo' })
+    ).toBeVisible();
+  }
 });
 
 test('with a session, switching language never shows the sign-in form nor the visitor header, in any frame (FC 053 T1.1, T2.1)', async ({

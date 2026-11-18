@@ -588,6 +588,157 @@ describe('account area · trusted device (FC 028 Enmienda 1, E2)', () => {
   });
 });
 
+describe('account area · the header switches the visitor between forms (FC 056)', () => {
+  type Form = 'signIn' | 'register' | 'forgot' | 'code' | 'enroll' | 'reset';
+
+  /** What the header does inside the area: push the address and tell the area, as AccountMenu does. */
+  const headerGo = (url: string) => {
+    globalThis.history.pushState(null, '', url);
+    act(() => {
+      globalThis.dispatchEvent(new PopStateEvent('popstate'));
+    });
+  };
+
+  /** The heading each form shows. */
+  const HEADING: Record<Form | 'backup', string> = {
+    signIn: account.signIn.title,
+    register: account.register.title,
+    forgot: account.forgot.title,
+    code: account.code.titleEmail,
+    enroll: account.enroll.title,
+    reset: account.reset.title,
+    backup: account.backup.title,
+  };
+
+  /** Walks a visitor to a form, the way they would get there. */
+  async function reach(form: Form | 'backup') {
+    if (form === 'reset') {
+      globalThis.history.replaceState(
+        null,
+        '',
+        `/cuenta/?action=reset-password&token=${'a'.repeat(64)}`
+      );
+      api.checkReset.mockResolvedValueOnce(
+        ok({ email: BUYER.email, fullName: BUYER.fullName })
+      );
+    }
+    renderApp();
+    await screen.findByRole('heading', {
+      name: form === 'reset' ? account.reset.title : account.signIn.title,
+    });
+    if (form === 'register') press(account.signIn.toRegister);
+    if (form === 'forgot') press(account.signIn.forgot);
+    if (form === 'code' || form === 'enroll' || form === 'backup') {
+      api.login.mockResolvedValueOnce(
+        ok({ challengeId: CHALLENGE, next: 'verify', channel: 'email' })
+      );
+      type(account.signIn.email, 'luis@example.test');
+      type(account.signIn.password, 'correct horse battery');
+      press(account.signIn.submit);
+      await screen.findByRole('heading', { name: account.code.titleEmail });
+    }
+    if (form === 'enroll' || form === 'backup') {
+      api.verify.mockResolvedValueOnce(no('TOTP_NOT_ENROLLED'));
+      api.enroll.mockResolvedValueOnce(
+        ok({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri: 'otpauth://totp/Y:luis?secret=JBSWY3DPEHPK3PXP',
+        })
+      );
+      type(account.code.label, '123456');
+      press(account.code.submit);
+      await screen.findByAltText(account.enroll.qrAlt);
+    }
+    if (form === 'backup') {
+      api.confirm.mockResolvedValueOnce(
+        ok({ backupCodes: Array.from({ length: 8 }, (_, i) => `1234567${i}`) })
+      );
+      type(account.enroll.label, '654321');
+      press(account.enroll.submit);
+    }
+    await screen.findByRole('heading', { name: HEADING[form] });
+  }
+
+  it.each(['register', 'forgot', 'code', 'enroll', 'reset'] as const)(
+    '«Entrar» of the header takes a visitor from the %s form to the sign-in form, empty (T2.1)',
+    async (form) => {
+      await reach(form);
+      headerGo('/cuenta/');
+      await screen.findByRole('heading', { name: account.signIn.title });
+      expect(
+        (screen.getByLabelText(account.signIn.email) as HTMLInputElement).value
+      ).toBe('');
+      expect(screen.queryByRole('heading', { name: HEADING[form] })).toBeNull();
+    }
+  );
+
+  it.each(['signIn', 'forgot', 'code', 'enroll', 'reset'] as const)(
+    '«Crear cuenta» of the header takes a visitor from the %s form to the sign-up form and cleans the address (T2.2)',
+    async (form) => {
+      await reach(form);
+      headerGo('/cuenta/?action=register');
+      await screen.findByRole('heading', { name: account.register.title });
+      expect(globalThis.location.search).toBe('');
+    }
+  );
+
+  it('leaves the form alone when the header asks for the one the visitor is already in', async () => {
+    await reach('register');
+    type(account.register.fullName, 'Ana Flores');
+    headerGo('/cuenta/?action=register');
+    expect(
+      (screen.getByLabelText(account.register.fullName) as HTMLInputElement)
+        .value
+    ).toBe('Ana Flores');
+    cleanup();
+    await reach('signIn');
+    type(account.signIn.email, 'ana@example.test');
+    headerGo('/cuenta/');
+    expect(
+      (screen.getByLabelText(account.signIn.email) as HTMLInputElement).value
+    ).toBe('ana@example.test');
+  });
+
+  it.each(['/cuenta/', '/cuenta/?action=register'])(
+    'never takes the backup codes away with the header (%s): they are shown once (T2.3)',
+    async (url) => {
+      await reach('backup');
+      const codes = screen.getByRole('list', {
+        name: account.backup.listLabel,
+      });
+      headerGo(url);
+      expect(
+        screen.getByRole('heading', { name: account.backup.title })
+      ).toBeTruthy();
+      expect(screen.getByRole('list', { name: account.backup.listLabel })).toBe(
+        codes
+      );
+      expect(codes.textContent).toContain('12345670');
+      expect(globalThis.location.search).toBe('');
+    }
+  );
+
+  it('does not move a visitor who goes to a section address: only the two intentions of the header count', async () => {
+    await reach('register');
+    headerGo('/cuenta/datos/');
+    expect(
+      screen.getByRole('heading', { name: account.register.title })
+    ).toBeTruthy();
+  });
+
+  it('leaves a signed-in person where they are when the address changes (T2.4)', async () => {
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    await screen.findByText('Hola, Ana Flores');
+    headerGo('/cuenta/?action=register');
+    headerGo('/cuenta/');
+    expect(screen.getByText('Hola, Ana Flores')).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: account.register.title })
+    ).toBeNull();
+  });
+});
+
 describe('account area · data and addresses (FC 051 T1.4, T2.6)', () => {
   it('opens «Datos y domicilios» by its address, and asks who is signed in again after saving the profile', async () => {
     api.me.mockResolvedValue(ok(BUYER));
