@@ -102560,6 +102560,7 @@ function registerAccountRoutes(app, deps) {
       return paymentMethodListResponseSchema.parse(saved);
     } catch (error63) {
       if (!(error63 instanceof PaymentProcessorError)) throw error63;
+      request.log.warn({ err: error63 }, "saved cards: Stripe refused the list");
       return refuse(reply, 503, "Stripe did not answer", "SERVICE_UNAVAILABLE");
     }
   });
@@ -102580,6 +102581,10 @@ function registerAccountRoutes(app, deps) {
         };
       } catch (error63) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
+        request.log.warn(
+          { err: error63 },
+          "saved cards: Stripe refused the setup"
+        );
         return stripeDown();
       }
     });
@@ -102617,6 +102622,10 @@ function registerAccountRoutes(app, deps) {
         };
       } catch (error63) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
+        request.log.warn(
+          { err: error63 },
+          "saved cards: Stripe refused the detach"
+        );
         return stripeDown();
       }
     });
@@ -117948,6 +117957,12 @@ function sameHex2(expected, given) {
   const b = Buffer.from(given, "hex");
   return a.length === b.length && a.length > 0 && (0, import_node_crypto20.timingSafeEqual)(a, b);
 }
+async function refusalReason(answer) {
+  const body = await answer.json().catch(() => null);
+  const error63 = body?.error;
+  if (typeof error63 !== "object" || error63 === null) return "";
+  return [error63.type, error63.code, error63.param].filter((part) => typeof part === "string" && part !== "").join(" ");
+}
 async function stripeCall(secrets, fetchImpl, path3, init) {
   const answer = await fetchImpl(`${STRIPE_API}${path3}`, {
     ...init,
@@ -117959,8 +117974,10 @@ async function stripeCall(secrets, fetchImpl, path3, init) {
     signal: AbortSignal.timeout(TIMEOUT_MS3)
   });
   if (!answer.ok) {
+    const reason = await refusalReason(answer);
+    const said = reason === "" ? "" : " (" + reason + ")";
     throw new PaymentProcessorError(
-      `Stripe: HTTP ${answer.status}`,
+      `Stripe: HTTP ${answer.status}${said}`,
       answer.status
     );
   }
@@ -118567,7 +118584,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "a29403c0e33e4e3e58a8ace45137178b5da34806" : void 0;
+var sha = true ? "856decd7a9927c27762c08595446be91f5678e91" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {

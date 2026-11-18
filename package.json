@@ -3,7 +3,7 @@
   "version": "0.8.6",
   "private": true,
   "type": "commonjs",
-  "description": "YEKORA API release a29403c0e33e4e3e58a8ace45137178b5da34806, built by CI. Do not edit: the next deploy replaces it.",
+  "description": "YEKORA API release 856decd7a9927c27762c08595446be91f5678e91, built by CI. Do not edit: the next deploy replaces it.",
   "engines": {
     "node": ">=24.0.0"
   },
