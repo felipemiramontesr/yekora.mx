@@ -377,22 +377,12 @@ describe('account area · signing in (FC 028 F2)', () => {
     expect(submit().disabled).toBe(true);
     type(account.register.confirm, STRONG);
     expect(submit().disabled).toBe(false);
-    // FC 047 T1.3: the postal code of the delivery address is given with the account, five digits
-    // inside a Mexican block; nothing is sent while it is missing or cannot be one.
-    for (const wrong of ['', '1234', 'abcde', '17000']) {
-      type(account.register.postalCode.label, wrong);
-      press(account.register.submit);
-      expect(screen.getByRole('alert').textContent).toBe(
-        account.register.postalCode.error
-      );
-      expect(
-        screen
-          .getByLabelText(account.register.postalCode.label)
-          .getAttribute('aria-invalid')
-      ).toBe('true');
-    }
+    // FC 055 T2.2: the form asks for identity only; the postal code lives in the book of addresses.
+    expect(screen.queryByLabelText(/código postal/i)).toBeNull();
+    expect(
+      screen.getAllByRole('textbox').map((box) => box.getAttribute('name'))
+    ).not.toContain('postalCode');
     expect(api.register).not.toHaveBeenCalled();
-    type(account.register.postalCode.label, ' 98000 ');
     api.register.mockResolvedValueOnce(no('PASSWORD_COMMON'));
     press(account.register.submit);
     await waitFor(() =>
@@ -408,7 +398,6 @@ describe('account area · signing in (FC 028 F2)', () => {
       email: 'ana@example.test',
       password: STRONG,
       fullName: 'Ana Flores',
-      postalCode: '98000',
     });
     expect(
       (screen.getByLabelText(account.signIn.email) as HTMLInputElement).value

@@ -84,7 +84,6 @@ describe('account client (FC 028 F2)', () => {
       email: 'a@b.mx',
       password: 'x'.repeat(12),
       fullName: 'A',
-      postalCode: '98000',
     };
     expect(await register(body, { fetchImpl })).toEqual({
       ok: true,

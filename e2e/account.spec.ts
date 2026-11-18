@@ -106,6 +106,8 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
     name: /Agregar CP|Enviar al código postal/,
   });
   await expect(delivery).toHaveText(/Agregar CP/);
+  // FC 055 T2.4: an account without an address is invited to add one, where the book lives.
+  await expect(delivery).toHaveAttribute('href', /\/cuenta\/datos\/$/);
   await openAccountMenu(page);
   await page.getByRole('link', { name: 'Mi información' }).click();
   await expect(page).toHaveURL(/\/cuenta\/datos\/$/);
