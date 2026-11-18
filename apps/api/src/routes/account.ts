@@ -344,6 +344,7 @@ export function registerAccountRoutes(
       return paymentMethodListResponseSchema.parse(saved);
     } catch (error) {
       if (!(error instanceof PaymentProcessorError)) throw error;
+      request.log.warn({ err: error }, 'saved cards: Stripe refused the list');
       return refuse(reply, 503, 'Stripe did not answer', 'SERVICE_UNAVAILABLE');
     }
   });
@@ -366,6 +367,10 @@ export function registerAccountRoutes(
         };
       } catch (error) {
         if (!(error instanceof PaymentProcessorError)) throw error;
+        request.log.warn(
+          { err: error },
+          'saved cards: Stripe refused the setup'
+        );
         return stripeDown();
       }
     });
@@ -405,6 +410,10 @@ export function registerAccountRoutes(
         };
       } catch (error) {
         if (!(error instanceof PaymentProcessorError)) throw error;
+        request.log.warn(
+          { err: error },
+          'saved cards: Stripe refused the detach'
+        );
         return stripeDown();
       }
     });

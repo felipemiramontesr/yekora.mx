@@ -170,6 +170,50 @@ describe('createSession (Checkout Session, fixed host)', () => {
     }
   });
 
+  it('names what Stripe objected to (type, code, parameter) and never its free text, which may echo a key', async () => {
+    const refused = {
+      error: {
+        type: 'invalid_request_error',
+        code: 'parameter_invalid_empty',
+        param: 'success_url',
+        message: 'Invalid API Key provided: sk_test_key',
+      },
+    };
+    const error = await createStripeCards(SECRETS, answering(refused, 400))
+      .createSetupSession({
+        customerId: 'cus_1',
+        successUrl: 'https://yekora.mx/cuenta/metodos-pago/',
+        cancelUrl: 'https://yekora.mx/cuenta/metodos-pago/',
+      })
+      .catch((e: Error) => e);
+    expect(error).toMatchObject({
+      name: 'PaymentProcessorError',
+      status: 400,
+      message:
+        'Stripe: HTTP 400 (invalid_request_error parameter_invalid_empty success_url)',
+    });
+    expect(String(error)).not.toContain('sk_test_key');
+    // Only the parts that exist are named; an answer that is not Stripe's shape adds nothing.
+    await expect(
+      createStripeCards(
+        SECRETS,
+        answering({ error: { type: 'api_error' } }, 500)
+      ).createCustomer('u')
+    ).rejects.toThrow('Stripe: HTTP 500 (api_error)');
+    for (const body of [{ error: 'boom' }, { error: null }, []]) {
+      await expect(
+        createStripeCards(SECRETS, answering(body, 502)).createCustomer('u')
+      ).rejects.toMatchObject({ message: 'Stripe: HTTP 502' });
+    }
+    // A gateway page, not JSON at all: still only the status.
+    const gateway = vi.fn<typeof fetch>(
+      async () => new Response('<html>Bad gateway</html>', { status: 502 })
+    );
+    await expect(
+      createStripeCards(SECRETS, gateway).createCustomer('u')
+    ).rejects.toMatchObject({ message: 'Stripe: HTTP 502' });
+  });
+
   it('reports an HTTP error or an unexpected answer without leaking the key', async () => {
     const error = await createStripeAdapter(SECRETS, answering({}, 401))
       .createSession(request())

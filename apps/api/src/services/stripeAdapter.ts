@@ -141,6 +141,25 @@ function sameHex(expected: string, given: string): boolean {
  * @param init - Method, headers and body.
  * @returns The parsed answer; rejects with {@link PaymentProcessorError} on any non-2xx status.
  */
+/**
+ * What Stripe said about a refusal: its error type, code and the parameter it objected to, such as
+ * `invalid_request_error parameter_invalid_empty success_url`. Its free-text message is left out on
+ * purpose (it can echo part of a key), and nothing of ours or of a card is ever in these three.
+ *
+ * @param answer - The refused response.
+ * @returns The words, or an empty string when the body is not Stripe's error shape.
+ */
+async function refusalReason(answer: Response): Promise<string> {
+  const body = (await answer.json().catch(() => null)) as {
+    error?: Record<string, unknown>;
+  } | null;
+  const error = body?.error;
+  if (typeof error !== 'object' || error === null) return '';
+  return [error.type, error.code, error.param]
+    .filter((part): part is string => typeof part === 'string' && part !== '')
+    .join(' ');
+}
+
 async function stripeCall(
   secrets: StripeSecrets,
   fetchImpl: typeof fetch,
@@ -157,8 +176,10 @@ async function stripeCall(
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!answer.ok) {
+    const reason = await refusalReason(answer);
+    const said = reason === '' ? '' : ' (' + reason + ')';
     throw new PaymentProcessorError(
-      `Stripe: HTTP ${answer.status}`,
+      `Stripe: HTTP ${answer.status}${said}`,
       answer.status
     );
   }
