@@ -11,7 +11,7 @@ interface LegalViewProps {
 
 /**
  * Privacy notice, cookie policy or terms, shared by the Spanish and English routes.
- * The cookie policy also renders the table of cookies the site sets (exactly one, FC 003).
+ * The cookie policy also renders the table of cookies the site sets (FC 003; the second one, of the location, FC 055).
  */
 export function LegalView({ locale, document }: Readonly<LegalViewProps>) {
   const { legal } = getMessages(locale);
@@ -41,7 +41,7 @@ export function LegalView({ locale, document }: Readonly<LegalViewProps>) {
         <tbody>
           {table.rows.map((row) => (
             <tr key={row.name} className="border-b border-petroleo/15">
-              <td className="py-2 pr-4 font-mono">{row.name}</td>
+              <td className="break-all py-2 pr-4 font-mono">{row.name}</td>
               <td className="py-2 pr-4">{row.purpose}</td>
               <td className="py-2">{row.duration}</td>
             </tr>

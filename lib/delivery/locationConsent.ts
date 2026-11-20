@@ -21,9 +21,7 @@ const LOCATION_CONSENT_EVENT = 'yekora:location-consent';
 export function hasLocationConsent(
   cookies: string = globalThis.document?.cookie ?? ''
 ): boolean {
-  return cookies
-    .split('; ')
-    .some((entry) => entry === `${LOCATION_CONSENT_COOKIE}=1`);
+  return cookies.split('; ').includes(`${LOCATION_CONSENT_COOKIE}=1`);
 }
 
 /** Records the «yes» for a year and tells the page. */
