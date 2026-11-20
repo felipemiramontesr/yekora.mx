@@ -30,7 +30,7 @@ describe('postalCodeOf (FC 055 T2.6, Enmienda 1)', () => {
     );
     expect(fetcher).toHaveBeenCalledOnce();
     const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('https://api.bigdatacloud.net/');
+    expect(url).toContain('https://api-bdc.io/');
     expect(url).toContain('latitude=19.4326');
     expect(url).toContain('longitude=-99.1332');
     expect(init.credentials).toBe('omit');

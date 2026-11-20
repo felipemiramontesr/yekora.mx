@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
  * is never asked before that «yes»; and a refusal leaves the header silent, with no question.
  * The geocoder is emulated, so no real position or service is involved.
  */
-const GEOCODER = 'https://api.bigdatacloud.net/**';
+const GEOCODER = 'https://api-bdc.io/**';
 const MEXICO_CITY = { latitude: 19.4326, longitude: -99.1332 };
 
 test('a visitor who allows the location sees the postal code of the browser, resolved once per tab', async ({

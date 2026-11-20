@@ -47,7 +47,7 @@ test('every answer carries the Content-Security-Policy of FC 008 and FC 029', as
   request,
 }) => {
   const policy =
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx https://api.bigdatacloud.net https://nominatim.openstreetmap.org; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx https://api-bdc.io https://nominatim.openstreetmap.org; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
   for (const path of ['/', '/catalogo/', '/en/catalog/', '/no-existe/']) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect(response.headers()['content-security-policy']).toBe(policy);

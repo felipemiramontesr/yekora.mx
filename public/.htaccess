@@ -27,10 +27,10 @@ AddType application/manifest+json .webmanifest
   </FilesMatch>
 
   # Content Security Policy (FC 008, OWASP A05), on every answer including the 404 page.
-  # Everything is served from this origin; the other origins are the catalog API and, from the browser, the two reverse-geocoding services of the delivery postal code (FC 055 T2.6: BigDataCloud and Nominatim), and the location of the browser is allowed for this origin only. Next.js
+  # Everything is served from this origin; the other origins are the catalog API and, from the browser, the two reverse-geocoding services of the delivery postal code (FC 055 T2.6: BigDataCloud, whose old host api.bigdatacloud.net answers a 307 to api-bdc.io that CSP would block, so the new one is named, and Nominatim), and the location of the browser is allowed for this origin only. Next.js
   # inlines its bootstrap scripts and styles in the static export, hence 'unsafe-inline'.
   # scripts/serveStatic.ts reads this exact line, so the local E2E runs under the same policy.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx https://api.bigdatacloud.net https://nominatim.openstreetmap.org; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx https://api-bdc.io https://nominatim.openstreetmap.org; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
   # Transport and browser hardening (FC 010, OWASP A02/A05), also on every answer.
   # HTTP → HTTPS is already a 301 at Hostinger's CDN, in front of Apache, so there is no rewrite

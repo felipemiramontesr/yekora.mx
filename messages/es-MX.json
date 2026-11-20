@@ -154,7 +154,7 @@
           "title": "Tu ubicación y el código postal de entrega",
           "paragraphs": [
             "Con tu consentimiento, que das en el aviso de cookies al elegir «Permitir ubicación», y con el permiso que tu navegador te pide, usamos tu ubicación aproximada solo para mostrar en el encabezado el código postal de entrega. No es necesaria para comprar y el sitio funciona igual sin ella.",
-            "Para convertir tus coordenadas en un código postal, tu navegador las envía directamente a BigDataCloud (api.bigdatacloud.net) y, como respaldo, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), proveedores de geocodificación inversa que reciben esas coordenadas y tu dirección IP. Las coordenadas no pasan por los servidores de YĒKORA ni se guardan en nuestra base de datos ni en nuestros registros.",
+            "Para convertir tus coordenadas en un código postal, tu navegador las envía directamente a BigDataCloud (api-bdc.io) y, como respaldo, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), proveedores de geocodificación inversa que reciben esas coordenadas y tu dirección IP. Las coordenadas no pasan por los servidores de YĒKORA ni se guardan en nuestra base de datos ni en nuestros registros.",
             "Conservamos el código postal resultante solo en el almacenamiento de sesión de tu pestaña, hasta que la cierres. Puedes retirar tu consentimiento en cualquier momento borrando las cookies y los datos del sitio, o negando el permiso en tu navegador. Si ya tienes un domicilio de entrega en tu cuenta, mostramos el suyo y no usamos tu ubicación."
           ]
         },
@@ -201,7 +201,7 @@
           "title": "Tu ubicación y el código postal de entrega",
           "paragraphs": [
             "Si eliges «Permitir ubicación» en el aviso de cookies, el sitio le pide a tu navegador tu ubicación aproximada para mostrar, en el encabezado, el código postal de entrega, como lo hacen otras tiendas en línea. Tu navegador te pide además su propio permiso antes de compartirla, y puedes negarlo: el sitio funciona igual y simplemente no muestra un código postal.",
-            "Tus coordenadas viajan desde tu navegador al servicio BigDataCloud (api.bigdatacloud.net) o, si este no responde, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), que las convierten en un código postal. Nunca pasan por los servidores de YĒKORA y no las guardamos.",
+            "Tus coordenadas viajan desde tu navegador al servicio BigDataCloud (api-bdc.io) o, si este no responde, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), que las convierten en un código postal. Nunca pasan por los servidores de YĒKORA y no las guardamos.",
             "El código postal resultante se conserva solo en el almacenamiento de sesión de esa pestaña, bajo el nombre «yekora_delivery_postal_v1», y se borra al cerrarla. Tu permiso se recuerda con la cookie «yekora_location_consent»; puedes retirarlo borrando las cookies o los datos del sitio en tu navegador."
           ]
         },

@@ -154,7 +154,7 @@
           "title": "Your location and the delivery postal code",
           "paragraphs": [
             "With your consent, which you give in the cookie notice by choosing “Allow location”, and with the permission your browser asks for, we use your approximate location only to show the delivery postal code in the header. It is not needed to buy and the site works the same without it.",
-            "To turn your coordinates into a postal code, your browser sends them directly to BigDataCloud (api.bigdatacloud.net) and, as a fallback, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), reverse-geocoding providers that receive those coordinates and your IP address. The coordinates do not pass through YĒKORA’s servers and are not stored in our database or our logs.",
+            "To turn your coordinates into a postal code, your browser sends them directly to BigDataCloud (api-bdc.io) and, as a fallback, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), reverse-geocoding providers that receive those coordinates and your IP address. The coordinates do not pass through YĒKORA’s servers and are not stored in our database or our logs.",
             "We keep the resulting postal code only in your tab’s session storage, until you close it. You can withdraw your consent at any time by deleting the cookies and site data, or by refusing the permission in your browser. If your account already has a delivery address, we show its code and do not use your location."
           ]
         },
@@ -201,7 +201,7 @@
           "title": "Your location and the delivery postal code",
           "paragraphs": [
             "If you choose “Allow location” in the cookie notice, the site asks your browser for your approximate location to show the delivery postal code in the header, as other online stores do. Your browser also asks for its own permission before sharing it, and you can refuse: the site works the same and simply does not show a postal code.",
-            "Your coordinates travel from your browser to the BigDataCloud service (api.bigdatacloud.net) or, if it does not answer, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), which turn them into a postal code. They never pass through YĒKORA’s servers and we do not store them.",
+            "Your coordinates travel from your browser to the BigDataCloud service (api-bdc.io) or, if it does not answer, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), which turn them into a postal code. They never pass through YĒKORA’s servers and we do not store them.",
             "The resulting postal code is kept only in that tab’s session storage, under the name “yekora_delivery_postal_v1”, and is deleted when you close it. Your permission is remembered with the “yekora_location_consent” cookie; you can withdraw it by deleting the cookies or the site data in your browser."
           ]
         },

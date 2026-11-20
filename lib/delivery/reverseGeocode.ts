@@ -9,8 +9,7 @@
 
 /** A Mexican postal code: exactly five digits. */
 const POSTAL_CODE = /^\d{5}$/;
-const BIGDATACLOUD_URL =
-  'https://api.bigdatacloud.net/data/reverse-geocode-client';
+const BIGDATACLOUD_URL = 'https://api-bdc.io/data/reverse-geocode-client';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 /** A point on the earth, as the browser reports it. */
