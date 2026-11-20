@@ -20,7 +20,8 @@ import { useHeaderAccount } from './useHeaderAccount';
  *   they allowed it in the cookie notice and the browser agreed (useDeliveryLocation): the postal
  *   code or, where no service knows one (the countryside), the state by its usual abbreviation
  *   («Enviar a Zac.», FC 055 T2.9), which is only a reference and fixes no shipping (T2.10).
- * - If there is nothing, nothing is shown: no link, no invitation, no alert.
+ * - While the location is being resolved a placeholder holds the place; if there is nothing in
+ *   the end, nothing is shown: no link, no invitation, no alert.
  *
  * @param accountHref - Where the delivery addresses are kept, in the page's language: the data and
  *   addresses of the account area (FC 051), which is where an account changes its postal code.
@@ -39,7 +40,7 @@ export function DeliveryIndicator({
   const { firstName, user } = useHeaderAccount();
   // The location is only asked when no address will answer: a confirmed account without a
   // postal code, or a visitor (no hint of a session).
-  const located = useDeliveryLocation(
+  const { place: located, resolving } = useDeliveryLocation(
     user ? !user.postalCode : firstName === null
   );
   const pin = (
@@ -73,8 +74,9 @@ export function DeliveryIndicator({
       </span>
     );
   }
-  if (firstName !== null && !user) {
-    // The session is being confirmed: hold the place of the code without announcing anything.
+  if ((firstName !== null && !user) || resolving) {
+    // The session is being confirmed, or the location is being resolved right after the «yes»:
+    // hold the place of the code without announcing anything, so the bar does not look frozen.
     return (
       <span aria-hidden="true" className={`${style} opacity-60`}>
         {pin}

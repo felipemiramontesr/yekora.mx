@@ -32,9 +32,7 @@ test('a visitor who allows the location sees the postal code of the browser, res
   );
   expect(geocoderCalls).toHaveLength(0);
 
-  await page
-    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Acepto', exact: true }).click();
   await expect(
     header.getByText('Enviar al código postal 06600')
   ).toBeAttached();
@@ -62,7 +60,7 @@ test('not agreeing never asks the browser for its position', async ({
     };
   });
   await page.goto('/nosotros/');
-  await page.getByRole('button', { name: 'No estoy de acuerdo' }).click();
+  await page.getByRole('button', { name: 'No acepto' }).click();
   await expect(
     page.getByRole('region', { name: 'Aviso de cookies' })
   ).toBeHidden();
@@ -91,9 +89,7 @@ test('a refused permission leaves the header silent: no code, no link, no alert'
     route.fulfill({ json: { postcode: '06600' } })
   );
   await page.goto('/nosotros/');
-  await page
-    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Acepto', exact: true }).click();
   await expect(
     page.getByRole('region', { name: 'Aviso de cookies' })
   ).toBeHidden();
@@ -115,7 +111,7 @@ test('in English the code is announced in English', async ({
     route.fulfill({ json: { postcode: '06600' } })
   );
   await page.goto('/en/about/');
-  await page.getByRole('button', { name: 'I agree', exact: true }).click();
+  await page.getByRole('button', { name: 'I accept', exact: true }).click();
   await expect(
     page.getByRole('banner').getByText('Deliver to postal code 06600')
   ).toBeAttached();
@@ -140,9 +136,7 @@ test('where no service knows a postal code the header shows the state, abbreviat
     route.fulfill({ json: { address: {} } })
   );
   await page.goto('/nosotros/');
-  await page
-    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Acepto', exact: true }).click();
   const header = page.getByRole('banner');
   await expect(header.getByText('Zac.', { exact: true })).toBeVisible();
   await expect(header.getByText('Enviar a Zacatecas')).toBeAttached();

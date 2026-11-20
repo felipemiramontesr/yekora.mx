@@ -59,10 +59,11 @@ describe('CookieBanner', () => {
     for (const word of ['ubicación', 'BigDataCloud', 'Nominatim', 'retirar']) {
       expect(banner.textContent).toContain(word);
     }
+    // The text names the two choices exactly as the buttons do.
+    expect(banner.textContent).toContain('«Acepto»');
+    expect(banner.textContent).toContain('«No acepto»');
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'No estoy de acuerdo' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'No acepto' }));
 
     expect(screen.queryByRole('region')).toBeNull();
     expect(written).toEqual([
@@ -95,7 +96,7 @@ describe('CookieBanner', () => {
     reserve();
     expect(root.style.getPropertyValue('--cookie-banner-height')).toBe('240px');
 
-    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
+    fireEvent.click(screen.getByRole('button', { name: 'I do not accept' }));
     expect(disconnect).toHaveBeenCalled();
     expect(root.style.getPropertyValue('--cookie-banner-height')).toBe('');
     height.mockRestore();
@@ -111,7 +112,7 @@ describe('CookieBanner', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Estoy de acuerdo$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Acepto$/ }));
 
     expect(screen.queryByRole('region')).toBeNull();
     expect(written).toEqual([
@@ -122,11 +123,11 @@ describe('CookieBanner', () => {
     globalThis.removeEventListener('yekora:location-consent', heard);
   });
 
-  it('never records the location when the visitor does not agree (FC 055 T2.8)', () => {
+  it('never records the location when the visitor does not accept (FC 055 T2.8)', () => {
     render(
       <CookieBanner locale="en" messages={getMessages('en').cookieBanner} />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
+    fireEvent.click(screen.getByRole('button', { name: 'I do not accept' }));
     expect(written.join(';')).not.toContain('location');
   });
 
@@ -135,7 +136,7 @@ describe('CookieBanner', () => {
     render(
       <CookieBanner locale="en" messages={getMessages('en').cookieBanner} />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
+    fireEvent.click(screen.getByRole('button', { name: 'I do not accept' }));
     expect(written[0]).toMatch(/; Secure$/);
   });
 

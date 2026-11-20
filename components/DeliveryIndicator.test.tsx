@@ -27,7 +27,7 @@ const renderIndicator = (locale: 'es-MX' | 'en' = 'es-MX') =>
     />
   );
 
-beforeEach(() => location.mockReturnValue(null));
+beforeEach(() => location.mockReturnValue({ place: null, resolving: false }));
 afterEach(cleanup);
 
 describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4, T2.7)', () => {
@@ -51,7 +51,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
       firstName: 'Ana',
       user: { ...USER, postalCode: null },
     });
-    location.mockReturnValue('06600');
+    location.mockReturnValue({ place: '06600', resolving: false });
     renderIndicator();
     const link = screen.getByRole('link', {
       name: 'Enviar al código postal 06600',
@@ -84,7 +84,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
 
   it('shows a visitor the code of the browser as plain text, named for assistive technology', () => {
     account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue('98000');
+    location.mockReturnValue({ place: '98000', resolving: false });
     const { container } = renderIndicator();
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.textContent).toContain('Enviar al código postal 98000');
@@ -92,6 +92,25 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
       'svg'
     );
     expect(location).toHaveBeenLastCalledWith(true);
+  });
+
+  it('holds the place with a placeholder while the location is being resolved, then shows nothing if it ends with none (no freeze, no question)', () => {
+    account.mockReturnValue({ firstName: null, user: null });
+    location.mockReturnValue({ place: null, resolving: true });
+    const { container, rerender } = renderIndicator();
+    expect(container.firstElementChild?.getAttribute('aria-hidden')).toBe(
+      'true'
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+    location.mockReturnValue({ place: null, resolving: false });
+    rerender(
+      <DeliveryIndicator
+        accountHref="/cuenta/"
+        locale="es-MX"
+        messages={getMessages('es-MX').header.delivery}
+      />
+    );
+    expect(container.innerHTML).toBe('');
   });
 
   it('shows a visitor nothing, with no link and no question, when there is no code', () => {
@@ -103,7 +122,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
 
   it('shows a visitor the state by its abbreviation, with its full name for assistive technology, when there is no postal code (FC 055 T2.9)', () => {
     account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue('ZAC');
+    location.mockReturnValue({ place: 'ZAC', resolving: false });
     const { container } = renderIndicator();
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.textContent).toContain('Enviar a Zacatecas');
@@ -112,7 +131,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
 
   it('says it in English too, and names the state in English', () => {
     account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue('MEX');
+    location.mockReturnValue({ place: 'MEX', resolving: false });
     const { container } = renderIndicator('en');
     expect(container.textContent).toContain('Deliver to State of Mexico');
     expect(screen.getByText('Edomex')).toBeTruthy();
@@ -123,7 +142,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
       firstName: 'Ana',
       user: { ...USER, postalCode: null },
     });
-    location.mockReturnValue('CMX');
+    location.mockReturnValue({ place: 'CMX', resolving: false });
     renderIndicator();
     const link = screen.getByRole('link', {
       name: 'Enviar a Ciudad de México',
@@ -137,7 +156,7 @@ describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4
       firstName: 'Ana',
       user: { ...USER, postalCode: '98000' },
     });
-    location.mockReturnValue('ZAC');
+    location.mockReturnValue({ place: 'ZAC', resolving: false });
     renderIndicator();
     expect(screen.getByRole('link').textContent).toBe('98000');
   });

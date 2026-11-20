@@ -4,7 +4,8 @@
  * never to YĒKORA's servers, and nothing here keeps them. BigDataCloud answers first (at its own
  * host, api-bdc.io: the old one redirects there and the CSP would block the hop); OpenStreetMap's
  * Nominatim is the fallback. The place is the five-digit postal code and, where neither service
- * knows one (the countryside), the Mexican state.
+ * knows one (the countryside), the Mexican state. Both services are asked at once and each is
+ * cut off after four seconds, so the header answers as fast as the quicker useful one.
  *
  * @module
  */
@@ -14,6 +15,8 @@ import { asStateCode } from './stateAbbreviations';
 const POSTAL_CODE = /^\d{5}$/;
 const BIGDATACLOUD_URL = 'https://api-bdc.io/data/reverse-geocode-client';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+/** Longest one service may take before the header goes on without it. */
+const REQUEST_TIMEOUT_MS = 4000;
 
 /** A point on the earth, as the browser reports it. */
 interface Coordinates {
@@ -51,9 +54,14 @@ async function getJson(
   fetcher: Fetcher,
   signal: AbortSignal | undefined
 ): Promise<unknown> {
+  // One controller per request: the caller's signal and the time limit both cancel it.
+  const request = new AbortController();
+  const cancel = () => request.abort();
+  const limit = setTimeout(cancel, REQUEST_TIMEOUT_MS);
+  signal?.addEventListener('abort', cancel, { once: true });
   try {
     const response = await fetcher(url, {
-      signal,
+      signal: request.signal,
       headers: { Accept: 'application/json' },
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
@@ -61,6 +69,9 @@ async function getJson(
     return response.ok ? ((await response.json()) as unknown) : null;
   } catch {
     return null; // offline, blocked, timed out or not JSON: the caller falls back or stays silent
+  } finally {
+    clearTimeout(limit);
+    signal?.removeEventListener('abort', cancel);
   }
 }
 
@@ -141,8 +152,19 @@ export async function placeOf(
   signal?: AbortSignal,
   fetcher: Fetcher = (url, init) => fetch(url, init)
 ): Promise<string | null> {
-  const first = await fromBigDataCloud(coordinates, fetcher, signal);
-  if (first.postalCode !== null) return first.postalCode;
-  const second = await fromNominatim(coordinates, fetcher, signal);
-  return second.postalCode ?? first.state ?? second.state;
+  // Both services start now; the second one only waits when the first knows no postal code.
+  const backup = new AbortController();
+  const stopBackup = () => backup.abort();
+  signal?.addEventListener('abort', stopBackup, { once: true });
+  const firstAnswer = fromBigDataCloud(coordinates, fetcher, signal);
+  const secondAnswer = fromNominatim(coordinates, fetcher, backup.signal);
+  try {
+    const first = await firstAnswer;
+    if (first.postalCode !== null) return first.postalCode;
+    const other = await secondAnswer;
+    return other.postalCode ?? first.state ?? other.state;
+  } finally {
+    stopBackup();
+    signal?.removeEventListener('abort', stopBackup);
+  }
 }

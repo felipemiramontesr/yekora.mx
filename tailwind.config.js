@@ -9,6 +9,9 @@ export default {
         petroleo: '#213C41',
         marfil: '#F8F5EE',
         ocre: '#AD843E',
+        // Green of the same family as petroleo, for the one affirmative button of the cookie notice
+        // (FC 055): marfil text on it is 5.6:1.
+        musgo: '#3D6B5C',
         negro: '#000000',
       },
       fontFamily: {

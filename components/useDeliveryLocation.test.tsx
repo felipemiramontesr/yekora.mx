@@ -42,14 +42,14 @@ afterEach(() => {
 describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
   it('never asks the browser for the position before the visitor said yes', () => {
     const { result } = renderHook(() => useDeliveryLocation(true));
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
     expect(ask).not.toHaveBeenCalled();
   });
 
   it('never asks while it is not enabled, even with the yes', () => {
     allow();
     const { result } = renderHook(() => useDeliveryLocation(false));
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
     expect(ask).not.toHaveBeenCalled();
   });
 
@@ -66,7 +66,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
       maximumAge: 600_000,
     });
     act(() => grant());
-    await waitFor(() => expect(result.current).toBe('06600'));
+    await waitFor(() => expect(result.current.place).toBe('06600'));
     expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBe('06600');
     // The coordinates went to the geocoder and nowhere else.
     expect(geocode.mock.calls[0]?.[0]).toEqual({
@@ -76,12 +76,46 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     expect(JSON.stringify(sessionStorage)).not.toContain('19.4');
   });
 
+  it('says it is resolving from the yes until the position and the geocoders answer, so the bar can show work in progress', async () => {
+    allow();
+    let finish: { resolve?: (place: string | null) => void } = {};
+    geocode.mockReturnValue(
+      new Promise<string | null>((resolve) => {
+        finish = { resolve };
+      })
+    );
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    expect(result.current.resolving).toBe(true);
+    act(() => grant());
+    expect(result.current.resolving).toBe(true);
+    await act(async () => {
+      finish.resolve?.('06600');
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(result.current).toEqual({ place: '06600', resolving: false })
+    );
+  });
+
+  it('stops resolving, silently, when the permission is denied', () => {
+    allow();
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    expect(result.current.resolving).toBe(true);
+    act(() => deny());
+    expect(result.current).toEqual({ place: null, resolving: false });
+  });
+
+  it('is not resolving before the yes or while it is not enabled', () => {
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    expect(result.current.resolving).toBe(false);
+  });
+
   it('keeps the state when no service knows a postal code, and reuses it in this tab', async () => {
     allow();
     geocode.mockResolvedValue('ZAC');
     const { result } = renderHook(() => useDeliveryLocation(true));
     act(() => grant());
-    await waitFor(() => expect(result.current).toBe('ZAC'));
+    await waitFor(() => expect(result.current.place).toBe('ZAC'));
     expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBe('ZAC');
   });
 
@@ -89,7 +123,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     allow();
     sessionStorage.setItem('yekora_delivery_place_v1', '98000');
     const { result } = renderHook(() => useDeliveryLocation(true));
-    expect(result.current).toBe('98000');
+    expect(result.current.place).toBe('98000');
     expect(ask).not.toHaveBeenCalled();
   });
 
@@ -98,7 +132,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     const { result } = renderHook(() => useDeliveryLocation(true));
     expect(ask).toHaveBeenCalledOnce();
     act(() => deny());
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
     expect(geocode).not.toHaveBeenCalled();
   });
 
@@ -108,7 +142,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     const { result } = renderHook(() => useDeliveryLocation(true));
     act(() => grant());
     await waitFor(() => expect(geocode).toHaveBeenCalledOnce());
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
     expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBeNull();
   });
 
@@ -116,7 +150,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     allow();
     Reflect.deleteProperty(globalThis.navigator, 'geolocation');
     const { result } = renderHook(() => useDeliveryLocation(true));
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
   });
 
   it('drops the answer of a geocoder that comes back after the page is gone', async () => {
@@ -134,7 +168,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
       late.resolve?.('06600');
       await Promise.resolve();
     });
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
     expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBeNull();
   });
 
@@ -145,8 +179,8 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
       ({ enabled }) => useDeliveryLocation(enabled),
       { initialProps: { enabled: true } }
     );
-    expect(result.current).toBe('98000');
+    expect(result.current.place).toBe('98000');
     rerender({ enabled: false });
-    expect(result.current).toBeNull();
+    expect(result.current.place).toBeNull();
   });
 });

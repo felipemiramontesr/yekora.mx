@@ -31,7 +31,8 @@ describe('placeOf (FC 055 T2.6, T2.9, Enmienda 1)', () => {
   it('asks BigDataCloud first, at its own host, from the browser, with no credentials, and stops at a postal code', async () => {
     const fetcher = vi.fn().mockResolvedValue(json({ postcode: '06600' }));
     await expect(placeOf(POINT, undefined, fetcher)).resolves.toBe('06600');
-    expect(fetcher).toHaveBeenCalledOnce();
+    // The backup is asked at the same time, and dropped once the first answers.
+    expect(fetcher).toHaveBeenCalledTimes(2);
     const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('https://api-bdc.io/');
     expect(url).toContain('latitude=19.4326');
@@ -128,12 +129,63 @@ describe('placeOf (FC 055 T2.6, T2.9, Enmienda 1)', () => {
     await expect(placeOf(POINT, undefined, nothing)).resolves.toBeNull();
   });
 
-  it('passes the cancel signal to every request', async () => {
+  it('cancels every request when the caller does, and answers null', async () => {
     const controller = new AbortController();
-    const fetcher = vi.fn().mockResolvedValue(json({}));
-    await placeOf(POINT, controller.signal, fetcher);
-    for (const call of fetcher.mock.calls) {
-      expect((call[1] as RequestInit).signal).toBe(controller.signal);
+    const hanging = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          );
+        })
+    );
+    const pending = placeOf(POINT, controller.signal, hanging);
+    controller.abort();
+    await expect(pending).resolves.toBeNull();
+    expect(hanging).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks both services at once, so the slower one does not add to the wait', async () => {
+    const order: string[] = [];
+    const fetcher = vi.fn((url: string) => {
+      order.push(new URL(url).host);
+      return Promise.resolve(
+        json(url.includes('api-bdc') ? COUNTRYSIDE : { address: {} })
+      );
+    });
+    await placeOf(POINT, undefined, fetcher);
+    expect(order).toEqual(['api-bdc.io', 'nominatim.openstreetmap.org']);
+  });
+
+  it('stops waiting for the second service once the first gives a postal code', async () => {
+    let backup: AbortSignal | undefined;
+    const fetcher = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes('nominatim')) {
+        backup = init?.signal ?? undefined;
+        return new Promise<Response>(() => undefined);
+      }
+      return Promise.resolve(json({ postcode: '06600' }));
+    });
+    await expect(placeOf(POINT, undefined, fetcher)).resolves.toBe('06600');
+    expect(backup?.aborted).toBe(true);
+  });
+
+  it('cuts a service off after four seconds and goes on without it', async () => {
+    vi.useFakeTimers();
+    try {
+      const slow = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('timeout', 'AbortError'))
+            );
+          })
+      );
+      const pending = placeOf(POINT, undefined, slow);
+      await vi.advanceTimersByTimeAsync(4000);
+      await expect(pending).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
     }
   });
 

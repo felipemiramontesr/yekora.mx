@@ -153,7 +153,7 @@
         {
           "title": "Your location and the delivery postal code",
           "paragraphs": [
-            "With your consent, which you give in the cookie notice by choosing “I agree”, and with the permission your browser asks for, we use your approximate location only to show the delivery postal code in the header or, if there is none, your state. It is not needed to buy and the site works the same without it.",
+            "With your consent, which you give in the cookie notice by choosing “I accept”, and with the permission your browser asks for, we use your approximate location only to show the delivery postal code in the header or, if there is none, your state. It is not needed to buy and the site works the same without it.",
             "To turn your coordinates into a postal code or a state, your browser sends them directly to BigDataCloud (api-bdc.io) and, as a fallback, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), reverse-geocoding providers that receive those coordinates and your IP address. The coordinates do not pass through YĒKORA’s servers and are not stored in our database or our logs.",
             "We keep the resulting postal code or state only in your tab’s session storage, until you close it. You can withdraw your consent at any time by deleting the cookies and site data, or by refusing the permission in your browser. If your account already has a delivery address, we show its code and do not use your location."
           ]
@@ -200,7 +200,7 @@
         {
           "title": "Your location and the delivery postal code",
           "paragraphs": [
-            "If you choose “I agree” in the cookie notice, the site asks your browser for your approximate location to show the delivery postal code in the header or, if no service knows one in your area, your state abbreviated (for example, “Zac.”), as other online stores do. Your browser also asks for its own permission before sharing it, and you can refuse: the site works the same and simply does not show your location.",
+            "If you choose “I accept” in the cookie notice, the site asks your browser for your approximate location to show the delivery postal code in the header or, if no service knows one in your area, your state abbreviated (for example, “Zac.”), as other online stores do. Your browser also asks for its own permission before sharing it, and you can refuse: the site works the same and simply does not show your location.",
             "Your coordinates travel from your browser to the BigDataCloud service (api-bdc.io) or, if it does not answer, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), which turn them into a postal code or a state. They never pass through YĒKORA’s servers and we do not store them.",
             "The resulting postal code or state is kept only in that tab’s session storage, under the name “yekora_delivery_place_v1”, and is deleted when you close it. Your permission is remembered with the “yekora_location_consent” cookie; you can withdraw it by deleting the cookies or the site data in your browser."
           ]
@@ -448,12 +448,13 @@
   },
   "cookieBanner": {
     "label": "Cookie notice",
-    "text": "We use two technical cookies of our own: one remembers this notice and the other, only if you agree, that you agreed to use your browser’s location to show your delivery postal code or state. Your browser sends your coordinates to BigDataCloud and OpenStreetMap Nominatim; we do not store them. No analytics or third-party cookies. You can withdraw your consent at any time. More in the",
-    "policy": "Cookie policy",
+    "text": "We use two technical cookies of our own: one remembers this notice and the other, only if you accept, your permission to use your browser’s location to show your delivery postal code or state.",
+    "parties": "Your browser sends your coordinates to BigDataCloud and OpenStreetMap Nominatim; we do not store them. No analytics or third-party cookies.",
+    "choice": "“I accept” allows the location; “I do not accept” keeps only this notice’s cookie and the site works the same. You can withdraw your consent at any time.",
     "privacy": "Privacy notice",
-    "and": "and the",
-    "agree": "I agree",
-    "disagree": "I do not agree"
+    "policy": "Cookie policy",
+    "agree": "I accept",
+    "disagree": "I do not accept"
   },
   "languageSwitcher": {
     "label": "Language",

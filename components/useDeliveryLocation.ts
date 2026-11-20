@@ -26,10 +26,16 @@ const POSITION_MAX_AGE_MS = 10 * 60 * 1000;
  * storage; the coordinates are handed to the geocoder and then dropped.
  *
  * @param enabled - False while the account, if any, still has a postal code of its own or is being confirmed.
- * @returns Five digits (a postal code), the code of a state of the closed list (`ZAC`), or null.
+ * @returns `place`: five digits (a postal code), the code of a state of the closed list (`ZAC`), or
+ *   null; and `resolving`: true from the visitor's «yes» until the position and the geocoders have
+ *   answered, so the header can show that it is working instead of looking frozen.
  */
-export function useDeliveryLocation(enabled: boolean): string | null {
+export function useDeliveryLocation(enabled: boolean): {
+  place: string | null;
+  resolving: boolean;
+} {
   const [place, setPlace] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
@@ -40,6 +46,7 @@ export function useDeliveryLocation(enabled: boolean): string | null {
   useEffect(() => {
     if (!enabled || !allowed) {
       setPlace(null);
+      setResolving(false);
       return;
     }
     const remembered = recallDeliveryPlace();
@@ -49,19 +56,27 @@ export function useDeliveryLocation(enabled: boolean): string | null {
     }
     if (!('geolocation' in globalThis.navigator)) return;
     const controller = new AbortController();
+    setResolving(true);
+    const done = () => {
+      if (!controller.signal.aborted) setResolving(false);
+    };
     globalThis.navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         void placeOf(coords, controller.signal).then((found) => {
-          if (found === null || controller.signal.aborted) return;
-          rememberDeliveryPlace(found);
-          setPlace(found);
+          if (found !== null && !controller.signal.aborted) {
+            rememberDeliveryPlace(found);
+            setPlace(found);
+          }
+          done();
         });
       },
-      () => undefined, // denied or unavailable: silent, no question
+      done, // denied or unavailable: silent, no question
       { timeout: POSITION_TIMEOUT_MS, maximumAge: POSITION_MAX_AGE_MS }
     );
     return () => controller.abort();
   }, [enabled, allowed]);
 
-  return enabled && allowed ? place : null;
+  return enabled && allowed
+    ? { place, resolving }
+    : { place: null, resolving: false };
 }
