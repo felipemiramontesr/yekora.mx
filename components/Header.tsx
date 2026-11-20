@@ -82,7 +82,6 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
                 tab: 'profile',
                 orderNumber: null,
               })}
-              registerHref={`${routeFor('account', locale)}?action=register`}
               messages={messages.header.delivery}
             />
           </div>

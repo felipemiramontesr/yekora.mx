@@ -99,14 +99,14 @@ test('switching language opens the same page in the other language, with no cook
   expect(await context.cookies()).toEqual([]);
 });
 
-test('the cookie notice describes its single technical cookie and stays dismissed', async ({
+test('the cookie notice describes its two technical cookies, sets only the one of the notice by default and stays dismissed', async ({
   page,
   context,
 }) => {
   await page.goto('/');
   const banner = page.getByRole('region', { name: 'Aviso de cookies' });
-  await expect(banner).toContainText('solo usa una cookie técnica');
-  await banner.getByRole('button', { name: 'Entendido' }).click();
+  await expect(banner).toContainText('dos cookies técnicas propias');
+  await banner.getByRole('button', { name: 'Solo lo necesario' }).click();
   await expect(banner).toBeHidden();
   const cookies = await context.cookies();
   expect(cookies.map((cookie) => cookie.name)).toEqual([
@@ -138,6 +138,9 @@ test('legal pages are reachable from the footer in both languages', async ({
     .click();
   await expect(page).toHaveURL(/\/en\/cookies\/$/);
   await expect(page.getByRole('table')).toContainText('yekora_cookie_consent');
+  await expect(page.getByRole('table')).toContainText(
+    'yekora_location_consent'
+  );
   await expect(page.getByRole('table')).not.toContainText('yekora_locale');
 
   await page.goto('/terminos/');

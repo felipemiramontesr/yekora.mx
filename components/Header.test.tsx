@@ -25,10 +25,9 @@ describe('Header', () => {
     expect(html).toMatch(/aria-label="YĒKORA, go to home"[^>]*href="\/en\/"/);
   });
 
-  it('lays the bar out from left to right: logo, delivery, search, account, cart (FC 047 T2.1)', () => {
+  it('lays the bar out from left to right: logo, search, account, cart; the delivery place is filled in the browser (FC 047 T2.1, FC 055 T2.4)', () => {
     const order = [
       'YĒKORA, go to home',
-      'Your ZIP',
       'role="search"',
       'My account',
       'Open your pack',
@@ -37,9 +36,10 @@ describe('Header', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('shows a visitor the invitation to create an account for the postal code, in the same language', () => {
-    expect(html).toContain('href="/en/account/?action=register"');
-    expect(spanish).toContain('href="/cuenta/?action=register"');
+  it('prerenders no invitation and no question about the postal code for a visitor (FC 055 T2.4)', () => {
+    for (const markup of [html, spanish]) {
+      expect(markup).not.toMatch(/Your ZIP|Tu CP|Agregar CP|Add postal code/);
+    }
   });
 
   it('sends the search to the catalog of the language and loads its index from there', () => {

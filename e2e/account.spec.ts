@@ -103,12 +103,14 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await mockAccountApi(page, { signedIn: 'buyer' });
   await page.goto('/cuenta/');
   await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  // FC 055 T2.4: an account without an address is never invited, or asked, to add one in the
+  // header: with no location allowed the place of the code stays empty.
+  await expect(
+    page.getByRole('banner').getByText(/Agregar CP|Tu CP|código postal/)
+  ).toHaveCount(0);
   const delivery = page.getByRole('banner').getByRole('link', {
-    name: /Agregar CP|Enviar al código postal/,
+    name: /Enviar al código postal/,
   });
-  await expect(delivery).toHaveText(/Agregar CP/);
-  // FC 055 T2.4: an account without an address is invited to add one, where the book lives.
-  await expect(delivery).toHaveAttribute('href', /\/cuenta\/datos\/$/);
   await openAccountMenu(page);
   await page.getByRole('link', { name: 'Mi información' }).click();
   await expect(page).toHaveURL(/\/cuenta\/datos\/$/);
@@ -170,7 +172,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
 /**
  * FC 053 · What the person sees, frame by frame. A page samples the screen on every animation frame
  * from the first one of each document and keeps a note of any frame in which a screen made for a
- * visitor is visible: the sign-in form of the area, «Entrar» in the header, the invitation «Tu CP».
+ * visitor is visible: the sign-in form of the area, and «Entrar» in the header.
  */
 const WATCH_VISITOR_SCREENS = () => {
   const visible = (element: Element | null) => {
@@ -203,11 +205,6 @@ const WATCH_VISITOR_SCREENS = () => {
       if (words.test(word.textContent?.trim() ?? '') && visible(word)) {
         offenders.push('header «Entrar»');
       }
-    }
-    for (const link of document.querySelectorAll(
-      'header a[href*="register"]'
-    )) {
-      if (visible(link)) offenders.push('header «Tu CP»');
     }
     if (offenders.length > 0) {
       seen.push(...offenders);

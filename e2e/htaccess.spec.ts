@@ -40,13 +40,14 @@ test('the service worker and manifest are never cached by HTTP', async ({
   );
 });
 
-// FC 008 (OWASP A05): the exact policy of the FC, on pages and on the 404 alike. FC 029 T0.1 and
+// FC 008 (OWASP A05): the exact policy of the FC, on pages and on the 404 alike. FC 055 T2.6 adds the two
+// reverse-geocoding origins to connect-src. FC 029 T0.1 and
 // T2.2d: img-src admits the API origin, where product images are served by digest.
 test('every answer carries the Content-Security-Policy of FC 008 and FC 029', async ({
   request,
 }) => {
   const policy =
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apiv1.yekora.mx; font-src 'self'; connect-src 'self' https://apiv1.yekora.mx https://api.bigdatacloud.net https://nominatim.openstreetmap.org; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
   for (const path of ['/', '/catalogo/', '/en/catalog/', '/no-existe/']) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect(response.headers()['content-security-policy']).toBe(policy);
@@ -65,7 +66,7 @@ test('every answer carries the hardening headers of FC 010', async ({
     expect(headers['x-content-type-options']).toBe('nosniff');
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['permissions-policy']).toBe(
-      'camera=(), microphone=(), geolocation=()'
+      'camera=(), microphone=(), geolocation=(self)'
     );
   }
 });

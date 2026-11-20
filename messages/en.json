@@ -107,7 +107,7 @@
           "title": "Personal data we handle",
           "paragraphs": [
             "If you buy on the site, we ask for your full name, email, phone and delivery address, and for your express consent with a checkbox before paying. We do not ask for sensitive data. You enter your card or account details directly on the Stripe or Mercado Pago page, and they never reach YĒKORA.",
-            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use a single first-party technical cookie, described in the Cookie policy.",
+            "When you browse, your browser sends technical data (such as your IP address and browser type) that the hosting server logs for security. We also use two first-party technical cookies, described in the Cookie policy.",
             "If you have an account and choose to save a card, Stripe, Inc. keeps it in your name through tokenization; YĒKORA stores only an opaque identifier of your customer at Stripe and asks it for the brand, the last four digits and the expiry solely to show them to you. YĒKORA does not receive, process or keep your full card number or its security code."
           ]
         },
@@ -151,6 +151,14 @@
           ]
         },
         {
+          "title": "Your location and the delivery postal code",
+          "paragraphs": [
+            "With your consent, which you give in the cookie notice by choosing “Allow location”, and with the permission your browser asks for, we use your approximate location only to show the delivery postal code in the header. It is not needed to buy and the site works the same without it.",
+            "To turn your coordinates into a postal code, your browser sends them directly to BigDataCloud (api.bigdatacloud.net) and, as a fallback, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), reverse-geocoding providers that receive those coordinates and your IP address. The coordinates do not pass through YĒKORA’s servers and are not stored in our database or our logs.",
+            "We keep the resulting postal code only in your tab’s session storage, until you close it. You can withdraw your consent at any time by deleting the cookies and site data, or by refusing the permission in your browser. If your account already has a delivery address, we show its code and do not use your location."
+          ]
+        },
+        {
           "title": "Changes to this notice",
           "paragraphs": [
             "When this notice changes, we will publish the new version on this page with its update date."
@@ -171,7 +179,7 @@
         {
           "title": "Cookies we use",
           "paragraphs": [
-            "We only use first-party technical cookies, needed for the site to work as you expect. We use no analytics, advertising or third-party cookies."
+            "We only use technical cookies of our own, needed for the site to work as you expect: one that remembers you read the cookie notice and another that remembers, if you allowed it, the use of your browser’s location. We use no analytics, advertising or third-party cookies."
           ]
         },
         {
@@ -190,9 +198,17 @@
           ]
         },
         {
+          "title": "Your location and the delivery postal code",
+          "paragraphs": [
+            "If you choose “Allow location” in the cookie notice, the site asks your browser for your approximate location to show the delivery postal code in the header, as other online stores do. Your browser also asks for its own permission before sharing it, and you can refuse: the site works the same and simply does not show a postal code.",
+            "Your coordinates travel from your browser to the BigDataCloud service (api.bigdatacloud.net) or, if it does not answer, to OpenStreetMap’s Nominatim (nominatim.openstreetmap.org), which turn them into a postal code. They never pass through YĒKORA’s servers and we do not store them.",
+            "The resulting postal code is kept only in that tab’s session storage, under the name “yekora_delivery_postal_v1”, and is deleted when you close it. Your permission is remembered with the “yekora_location_consent” cookie; you can withdraw it by deleting the cookies or the site data in your browser."
+          ]
+        },
+        {
           "title": "Local storage for offline use",
           "paragraphs": [
-            "Besides the technical cookie, the site keeps a copy of its files in your browser (Cache Storage, through a service worker) so it loads faster and shows the pages you already visited when you are offline.",
+            "Besides the technical cookies, the site keeps a copy of its files in your browser (Cache Storage, through a service worker) so it loads faster and shows the pages you already visited when you are offline.",
             "That copy holds no personal data, is not used to track you, and is renewed automatically with each version of the site. You can delete it from your browser settings, under site data."
           ]
         },
@@ -218,6 +234,11 @@
           {
             "name": "yekora_cookie_consent",
             "purpose": "Remember that you read the cookie notice.",
+            "duration": "1 year"
+          },
+          {
+            "name": "yekora_location_consent",
+            "purpose": "Remember that you allowed the use of your browser’s location to show your delivery postal code.",
             "duration": "1 year"
           }
         ]
@@ -265,6 +286,12 @@
           "title": "Consumer rights",
           "paragraphs": [
             "Your consumer rights are protected by Mexico's Federal Consumer Protection Law. You can contact the Federal Consumer Protection Agency (PROFECO) with any complaint."
+          ]
+        },
+        {
+          "title": "Location and delivery postal code",
+          "paragraphs": [
+            "The postal code shown in the header is a reference: it may come from your account’s default address or, if you allowed it in the cookie notice, from your browser’s approximate location. It does not set shipping or its cost; both are calculated from the address you enter at checkout."
           ]
         },
         {
@@ -344,10 +371,6 @@
     },
     "delivery": {
       "label": "Deliver to",
-      "guest": "Your ZIP",
-      "guestHint": "Create your account with your postal code to see where we deliver",
-      "add": "Add postal code",
-      "addHint": "Add your delivery address in your account",
       "to": "Deliver to postal code {code}"
     },
     "accountMenu": {
@@ -424,9 +447,10 @@
   },
   "cookieBanner": {
     "label": "Cookie notice",
-    "text": "This site only uses one technical cookie, to remember that you read this notice. We use no analytics and no third-party cookies.",
+    "text": "This site uses two technical cookies of its own: one remembers that you read this notice and the other, only if you allow it, that you agreed to use your browser’s location to show you your delivery postal code. We use no analytics and no third-party cookies.",
     "policy": "Read the cookie policy",
-    "accept": "Got it"
+    "accept": "Only what is needed",
+    "allowLocation": "Allow location"
   },
   "languageSwitcher": {
     "label": "Language",

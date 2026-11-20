@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
+import { grantLocationConsent } from '@/lib/delivery/locationConsent';
 import { routeFor } from '@/lib/routes';
 
 // Technical cookie, declared in /cookies. Only records that the notice was read.
@@ -28,8 +29,10 @@ function hasConsent(): boolean {
 }
 
 /**
- * Cookie notice (LFPDPPP transparency). The site sets a single technical cookie, the one that
- * records this notice was read, so there is nothing to opt into: the button only dismisses.
+ * Cookie notice (LFPDPPP transparency). The site sets one technical cookie, the one that records
+ * this notice was read, and, only after an explicit «Permitir ubicación», a second one that records
+ * the permission to use the location of the browser for the delivery postal code (FC 055 T2.8).
+ * «Solo lo necesario» only dismisses.
  *
  * FC 043 T2.1 (327_AN, option A): the notice is in the static HTML, `hidden`, followed by a
  * one-line inline script that reveals it before the first paint when the cookie is missing. So a
@@ -52,15 +55,45 @@ export function CookieBanner({
     setMounted(true);
   }, []);
 
+  // The notice is fixed over the bottom of the screen and, with its two choices, it is tall: while
+  // it is open the page keeps its height as space at the end (`--cookie-banner-height`, used by
+  // `body` in globals.css), so the links of the footer can always be scrolled out from under it.
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = section.current;
+    if (!mounted || read || element === null) return;
+    const root = document.documentElement;
+    const reserve = () =>
+      root.style.setProperty(
+        '--cookie-banner-height',
+        `${element.offsetHeight}px`
+      );
+    reserve();
+    const observer = new ResizeObserver(reserve);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--cookie-banner-height');
+    };
+  }, [mounted, read]);
+
   function accept() {
     const secure = globalThis.location.protocol === 'https:' ? '; Secure' : '';
     document.cookie = `${CONSENT_COOKIE}=1; Max-Age=${ONE_YEAR_SECONDS}; Path=/; SameSite=Lax${secure}`;
     setRead(true);
   }
 
+  // FC 055 T2.8: the location is used only after this explicit «yes», which also closes the
+  // notice; the browser then asks its own permission. «Only what is needed» leaves it off.
+  function allowLocation() {
+    grantLocationConsent();
+    accept();
+  }
+
   return (
     <>
       <section
+        ref={section}
         aria-label={messages.label}
         hidden={!mounted || read}
         // The inline script below changes `hidden` before hydration, on purpose.
@@ -77,14 +110,24 @@ export function CookieBanner({
               {messages.policy}
             </Link>
           </p>
-          <button
-            type="button"
-            onClick={accept}
-            disabled={!mounted}
-            className="min-h-11 self-start rounded-md bg-marfil px-4 py-2 text-sm font-semibold text-petroleo sm:self-auto"
-          >
-            {messages.accept}
-          </button>
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={allowLocation}
+              disabled={!mounted}
+              className="min-h-11 rounded-md bg-marfil px-4 py-2 text-sm font-semibold text-petroleo"
+            >
+              {messages.allowLocation}
+            </button>
+            <button
+              type="button"
+              onClick={accept}
+              disabled={!mounted}
+              className="min-h-11 rounded-md border border-marfil px-4 py-2 text-sm font-semibold text-marfil"
+            >
+              {messages.accept}
+            </button>
+          </div>
         </div>
       </section>
       <script>{REVEAL_SCRIPT}</script>

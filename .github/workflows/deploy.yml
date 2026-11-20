@@ -995,7 +995,7 @@ jobs:
             'strict-transport-security: max-age=31536000; includesubdomains' \
             'x-content-type-options: nosniff' \
             'referrer-policy: strict-origin-when-cross-origin' \
-            'permissions-policy: camera=(), microphone=(), geolocation=()'; do
+            'permissions-policy: camera=(), microphone=(), geolocation=(self)'; do
             grep -qxF "$header" /tmp/headers.txt || { echo "FATAL: missing '$header'"; exit 1; }
           done
           echo "[OK] yekora.mx serves $GITHUB_SHA in Spanish and English, its favicon, the branded 404, HTTPS only and its hardening headers."

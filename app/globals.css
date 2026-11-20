@@ -4,6 +4,12 @@
 
 /* Protocol L — Tailwind only (do not mix with Bootstrap) */
 
+/* While the cookie notice (fixed, at the bottom) is open it measures itself into this variable, and
+   the page keeps that much space at its end, so the footer links are never stuck under it. */
+body {
+  padding-bottom: var(--cookie-banner-height, 0);
+}
+
 @layer components {
   /* Mobile First: every tap target is at least 44 × 44 px (WCAG 2.5.5).
      e2e/responsive.spec.ts fails the build when one is smaller. */

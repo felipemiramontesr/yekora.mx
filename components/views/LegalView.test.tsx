@@ -13,19 +13,38 @@ describe('LegalView', () => {
     expect(html).toContain('es Ana Karen Flores Baca, con domicilio en');
     expect(html).toContain('C.P. 98612, Guadalupe, Zacatecas');
     expect(html).toContain('enviando una solicitud a contacto@yekora.mx');
-    expect(html).toContain('una sola cookie técnica');
+    expect(html).toContain('dos cookies técnicas propias');
     expect(html).not.toContain('INAI');
     expect(html).not.toContain('<table');
   });
 
-  it('cookie policy lists exactly the one technical cookie the site sets', () => {
+  it('cookie policy lists exactly the technical cookies the site sets', () => {
     const html = renderToStaticMarkup(
       <LegalView locale="es-MX" document="cookies" />
     );
     expect(html).toContain('<table');
     expect(html).toContain('yekora_cookie_consent');
+    expect(html).toContain('yekora_location_consent');
     expect(html).not.toContain('yekora_locale');
-    expect(html.match(/<tr /g)).toHaveLength(2);
+    expect(html.match(/<tr /g)).toHaveLength(3);
+  });
+
+  it('cookie, privacy and terms name the geocoders and the session storage of the postal code (FC 055 T2.6, T2.8)', () => {
+    for (const document of ['cookies', 'privacy', 'terms'] as const) {
+      for (const locale of ['es-MX', 'en'] as const) {
+        const html = renderToStaticMarkup(
+          <LegalView locale={locale} document={document} />
+        );
+        if (document !== 'terms') {
+          expect(html).toContain('BigDataCloud');
+          expect(html).toContain('Nominatim');
+        }
+        expect(html.toLowerCase()).toMatch(/ubicaci|location/);
+        if (document === 'cookies') {
+          expect(html).toContain('yekora_delivery_postal_v1');
+        }
+      }
+    }
   });
 
   it('terms ground the site in Mexican consumer law, in English too', () => {

@@ -107,7 +107,7 @@
           "title": "Datos personales que tratamos",
           "paragraphs": [
             "Si compras en el sitio, te pedimos tu nombre completo, correo electrónico, teléfono y dirección de entrega, y tu consentimiento expreso con una casilla antes de pagar. No te pedimos datos sensibles. Los datos de tu tarjeta o de tu cuenta los capturas directamente en la página de Stripe o de Mercado Pago y nunca llegan a YĒKORA.",
-            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos una sola cookie técnica propia, descrita en la Política de cookies.",
+            "Al navegar, tu navegador envía datos técnicos (como la dirección IP y el tipo de navegador) que el servidor de alojamiento registra por seguridad. Además usamos dos cookies técnicas propias, descritas en la Política de cookies.",
             "Si tienes una cuenta y decides guardar una tarjeta, Stripe, Inc. la conserva a tu nombre mediante tokenización; YĒKORA guarda solo un identificador opaco de tu cliente en Stripe y le consulta la marca, los últimos cuatro dígitos y el vencimiento únicamente para mostrártelos. YĒKORA no recibe, procesa ni conserva el número completo de tu tarjeta ni su código de seguridad."
           ]
         },
@@ -151,6 +151,14 @@
           ]
         },
         {
+          "title": "Tu ubicación y el código postal de entrega",
+          "paragraphs": [
+            "Con tu consentimiento, que das en el aviso de cookies al elegir «Permitir ubicación», y con el permiso que tu navegador te pide, usamos tu ubicación aproximada solo para mostrar en el encabezado el código postal de entrega. No es necesaria para comprar y el sitio funciona igual sin ella.",
+            "Para convertir tus coordenadas en un código postal, tu navegador las envía directamente a BigDataCloud (api.bigdatacloud.net) y, como respaldo, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), proveedores de geocodificación inversa que reciben esas coordenadas y tu dirección IP. Las coordenadas no pasan por los servidores de YĒKORA ni se guardan en nuestra base de datos ni en nuestros registros.",
+            "Conservamos el código postal resultante solo en el almacenamiento de sesión de tu pestaña, hasta que la cierres. Puedes retirar tu consentimiento en cualquier momento borrando las cookies y los datos del sitio, o negando el permiso en tu navegador. Si ya tienes un domicilio de entrega en tu cuenta, mostramos el suyo y no usamos tu ubicación."
+          ]
+        },
+        {
           "title": "Cambios a este aviso",
           "paragraphs": [
             "Cuando cambie este aviso publicaremos la nueva versión en esta página con su fecha de actualización."
@@ -171,7 +179,7 @@
         {
           "title": "Cookies que usamos",
           "paragraphs": [
-            "Solo usamos cookies técnicas propias, necesarias para que el sitio funcione como esperas. No usamos cookies de analítica, de publicidad ni de terceros."
+            "Solo usamos cookies técnicas propias, necesarias para que el sitio funcione como esperas: una que recuerda que leíste el aviso de cookies y otra que recuerda, si lo permitiste, el uso de la ubicación de tu navegador. No usamos cookies de analítica, de publicidad ni de terceros."
           ]
         },
         {
@@ -190,9 +198,17 @@
           ]
         },
         {
+          "title": "Tu ubicación y el código postal de entrega",
+          "paragraphs": [
+            "Si eliges «Permitir ubicación» en el aviso de cookies, el sitio le pide a tu navegador tu ubicación aproximada para mostrar, en el encabezado, el código postal de entrega, como lo hacen otras tiendas en línea. Tu navegador te pide además su propio permiso antes de compartirla, y puedes negarlo: el sitio funciona igual y simplemente no muestra un código postal.",
+            "Tus coordenadas viajan desde tu navegador al servicio BigDataCloud (api.bigdatacloud.net) o, si este no responde, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), que las convierten en un código postal. Nunca pasan por los servidores de YĒKORA y no las guardamos.",
+            "El código postal resultante se conserva solo en el almacenamiento de sesión de esa pestaña, bajo el nombre «yekora_delivery_postal_v1», y se borra al cerrarla. Tu permiso se recuerda con la cookie «yekora_location_consent»; puedes retirarlo borrando las cookies o los datos del sitio en tu navegador."
+          ]
+        },
+        {
           "title": "Almacenamiento local para uso sin conexión",
           "paragraphs": [
-            "Además de la cookie técnica, el sitio guarda en tu navegador una copia de sus archivos (Cache Storage, mediante un service worker) para cargar más rápido y mostrarte las páginas que ya visitaste cuando no tienes conexión.",
+            "Además de las cookies técnicas, el sitio guarda en tu navegador una copia de sus archivos (Cache Storage, mediante un service worker) para cargar más rápido y mostrarte las páginas que ya visitaste cuando no tienes conexión.",
             "Esa copia no contiene datos personales ni sirve para rastrearte, y se renueva automáticamente con cada versión del sitio. Puedes borrarla desde la configuración de tu navegador, en los datos del sitio."
           ]
         },
@@ -218,6 +234,11 @@
           {
             "name": "yekora_cookie_consent",
             "purpose": "Recordar que ya leíste el aviso de cookies.",
+            "duration": "1 año"
+          },
+          {
+            "name": "yekora_location_consent",
+            "purpose": "Recordar que permitiste usar la ubicación de tu navegador para mostrar tu código postal de entrega.",
             "duration": "1 año"
           }
         ]
@@ -265,6 +286,12 @@
           "title": "Derechos del consumidor",
           "paragraphs": [
             "Tus derechos como consumidor están protegidos por la Ley Federal de Protección al Consumidor. Puedes acudir a la Procuraduría Federal del Consumidor (PROFECO) para cualquier reclamación."
+          ]
+        },
+        {
+          "title": "Ubicación y código postal de entrega",
+          "paragraphs": [
+            "El código postal que se muestra en el encabezado es una referencia: puede provenir del domicilio predeterminado de tu cuenta o, si lo permitiste en el aviso de cookies, de la ubicación aproximada de tu navegador. No fija el envío ni el costo; ambos se calculan con el domicilio que captures al pagar."
           ]
         },
         {
@@ -344,10 +371,6 @@
     },
     "delivery": {
       "label": "Enviar a",
-      "guest": "Tu CP",
-      "guestHint": "Crea tu cuenta con tu código postal para ver a dónde enviamos",
-      "add": "Agregar CP",
-      "addHint": "Agrega tu domicilio de entrega en tu cuenta",
       "to": "Enviar al código postal {code}"
     },
     "accountMenu": {
@@ -424,9 +447,10 @@
   },
   "cookieBanner": {
     "label": "Aviso de cookies",
-    "text": "Este sitio solo usa una cookie técnica, para recordar que ya leíste este aviso. No usamos analítica ni cookies de terceros.",
+    "text": "Este sitio usa dos cookies técnicas propias: una recuerda que leíste este aviso y otra, solo si lo permites, que aceptaste usar la ubicación de tu navegador para mostrarte tu código postal de entrega. No usamos analítica ni cookies de terceros.",
     "policy": "Ver política de cookies",
-    "accept": "Entendido"
+    "accept": "Solo lo necesario",
+    "allowLocation": "Permitir ubicación"
   },
   "languageSwitcher": {
     "label": "Idioma",
