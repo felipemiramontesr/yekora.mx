@@ -44,7 +44,7 @@ describe('CookieBanner', () => {
       />
     );
     const banner = screen.getByRole('region', { name: 'Aviso de cookies' });
-    expect(banner.textContent).toContain('dos cookies técnicas propias');
+    expect(banner.textContent).toContain('cookies técnicas propias');
     expect(
       screen
         .getByRole('link', { name: 'Política de cookies' })
@@ -55,10 +55,9 @@ describe('CookieBanner', () => {
         .getByRole('link', { name: 'Aviso de privacidad' })
         .getAttribute('href')
     ).toBe('/privacidad/');
-    // The notice says what is agreed to: the cookies, the location and who receives it.
-    for (const word of ['ubicación', 'BigDataCloud', 'Nominatim', 'retirar']) {
-      expect(banner.textContent).toContain(word);
-    }
+    // Short on purpose: the providers and the withdrawal are in the policy pages the links open.
+    expect(banner.textContent).toContain('ubicación');
+    expect(banner.textContent?.length).toBeLessThan(330);
     // The text names the two choices exactly as the buttons do.
     expect(banner.textContent).toContain('«Acepto»');
     expect(banner.textContent).toContain('«No acepto»');
@@ -149,7 +148,7 @@ describe('CookieBanner', () => {
     );
     expect(html).toMatch(/<section aria-label="Aviso de cookies" hidden=""/);
     expect(html).toMatch(/<button type="button" disabled=""/);
-    expect(html).toContain('dos cookies técnicas propias');
+    expect(html).toContain('cookies técnicas propias');
   });
 
   it.each([

@@ -144,13 +144,16 @@ async function fromNominatim(
  * @param coordinates - Where the browser says the person is.
  * @param signal - Cancels both requests, for example when the page goes away.
  * @param fetcher - `fetch`, injectable for tests.
+ * @param onState - Called at once with the state when the first service knows it but no postal
+ *   code, so the header shows something while the second service is still answering.
  * @returns A five-digit postal code; failing that, the code of a Mexican state of the closed list
  *   (`ZAC`); or null when no service could name either.
  */
 export async function placeOf(
   coordinates: Coordinates,
   signal?: AbortSignal,
-  fetcher: Fetcher = (url, init) => fetch(url, init)
+  fetcher: Fetcher = (url, init) => fetch(url, init),
+  onState?: (state: string) => void
 ): Promise<string | null> {
   // Both services start now; the second one only waits when the first knows no postal code.
   const backup = new AbortController();
@@ -161,6 +164,7 @@ export async function placeOf(
   try {
     const first = await firstAnswer;
     if (first.postalCode !== null) return first.postalCode;
+    if (first.state !== null) onState?.(first.state);
     const other = await secondAnswer;
     return other.postalCode ?? first.state ?? other.state;
   } finally {

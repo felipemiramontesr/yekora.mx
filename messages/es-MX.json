@@ -448,9 +448,7 @@
   },
   "cookieBanner": {
     "label": "Aviso de cookies",
-    "text": "Usamos dos cookies técnicas propias: una recuerda este aviso y otra, solo si aceptas, tu permiso para usar la ubicación de tu navegador y mostrarte tu código postal o estado de entrega.",
-    "parties": "Tu navegador envía tus coordenadas a BigDataCloud y OpenStreetMap Nominatim; nosotros no las guardamos. Sin analítica ni cookies de terceros.",
-    "choice": "«Acepto» permite la ubicación; «No acepto» guarda solo la cookie de este aviso y el sitio funciona igual. Puedes retirar tu consentimiento cuando quieras.",
+    "text": "Usamos cookies técnicas propias, sin analítica ni cookies de terceros. Con «Acepto» usamos además la ubicación de tu navegador para mostrar tu código postal o estado de entrega; con «No acepto» solo guardamos la cookie de este aviso.",
     "privacy": "Aviso de privacidad",
     "policy": "Política de cookies",
     "agree": "Acepto",

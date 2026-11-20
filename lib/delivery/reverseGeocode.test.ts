@@ -61,6 +61,31 @@ describe('placeOf (FC 055 T2.6, T2.9, Enmienda 1)', () => {
     await expect(placeOf(POINT, undefined, fetcher)).resolves.toBe('ZAC');
   });
 
+  it('hands the state over at once, before the second service answers, and the postal code replaces it', async () => {
+    let late: ((response: Response) => void) | undefined;
+    const fetcher = vi.fn((url: string) =>
+      url.includes('nominatim')
+        ? new Promise<Response>((resolve) => {
+            late = resolve;
+          })
+        : Promise.resolve(json(COUNTRYSIDE))
+    );
+    const early = vi.fn();
+    const pending = placeOf(POINT, undefined, fetcher, early);
+    await vi.waitFor(() => expect(early).toHaveBeenCalledWith('ZAC'));
+    late?.(json({ address: { postcode: '99820' } }));
+    await expect(pending).resolves.toBe('99820');
+  });
+
+  it('does not hand over a state when the first service already knows the postal code or no state', async () => {
+    const early = vi.fn();
+    const withCode = vi.fn().mockResolvedValue(json({ postcode: '06600' }));
+    await placeOf(POINT, undefined, withCode, early);
+    const nothing = vi.fn().mockResolvedValue(json({}));
+    await placeOf(POINT, undefined, nothing, early);
+    expect(early).not.toHaveBeenCalled();
+  });
+
   it('gives the state of Nominatim when BigDataCloud fails and neither knows a postal code', async () => {
     const fetcher = vi
       .fn()

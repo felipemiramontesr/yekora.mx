@@ -448,9 +448,7 @@
   },
   "cookieBanner": {
     "label": "Cookie notice",
-    "text": "We use two technical cookies of our own: one remembers this notice and the other, only if you accept, your permission to use your browser’s location to show your delivery postal code or state.",
-    "parties": "Your browser sends your coordinates to BigDataCloud and OpenStreetMap Nominatim; we do not store them. No analytics or third-party cookies.",
-    "choice": "“I accept” allows the location; “I do not accept” keeps only this notice’s cookie and the site works the same. You can withdraw your consent at any time.",
+    "text": "We use technical cookies of our own, with no analytics or third-party cookies. With “I accept” we also use your browser’s location to show your delivery postal code or state; with “I do not accept” we only keep this notice’s cookie.",
     "privacy": "Privacy notice",
     "policy": "Cookie policy",
     "agree": "I accept",

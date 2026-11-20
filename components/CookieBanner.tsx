@@ -104,8 +104,6 @@ export function CookieBanner({
         <div className="mx-auto flex max-h-[35vh] w-[90%] flex-col gap-4 py-5 sm:max-h-none sm:flex-row sm:items-center sm:justify-between sm:gap-8">
           <div className="min-h-0 space-y-2 overflow-y-auto text-sm leading-relaxed sm:overflow-visible">
             <p>{messages.text}</p>
-            <p>{messages.parties}</p>
-            <p>{messages.choice}</p>
             <p className="flex flex-wrap gap-x-6">
               <Link
                 href={routeFor('privacy', locale)}
@@ -126,7 +124,7 @@ export function CookieBanner({
               type="button"
               onClick={agree}
               disabled={!mounted}
-              className="min-h-11 rounded-md border border-marfil/40 bg-musgo px-6 py-2 text-sm font-semibold text-marfil"
+              className="min-h-11 rounded-md border border-marfil px-6 py-2 text-sm font-semibold text-marfil"
             >
               {messages.agree}
             </button>
@@ -134,7 +132,7 @@ export function CookieBanner({
               type="button"
               onClick={accept}
               disabled={!mounted}
-              className="min-h-11 rounded-md border border-marfil px-6 py-2 text-sm font-semibold text-marfil"
+              className="min-h-11 rounded-md border border-marfil/40 bg-musgo px-6 py-2 text-sm font-semibold text-marfil"
             >
               {messages.disagree}
             </button>

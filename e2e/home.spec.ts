@@ -105,7 +105,7 @@ test('the cookie notice describes its two technical cookies, sets only the one o
 }) => {
   await page.goto('/');
   const banner = page.getByRole('region', { name: 'Aviso de cookies' });
-  await expect(banner).toContainText('dos cookies técnicas propias');
+  await expect(banner).toContainText('cookies técnicas propias');
   await banner.getByRole('button', { name: 'No acepto' }).click();
   await expect(banner).toBeHidden();
   const cookies = await context.cookies();

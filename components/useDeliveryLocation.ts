@@ -62,13 +62,21 @@ export function useDeliveryLocation(enabled: boolean): {
     };
     globalThis.navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        void placeOf(coords, controller.signal).then((found) => {
-          if (found !== null && !controller.signal.aborted) {
-            rememberDeliveryPlace(found);
-            setPlace(found);
+        // A state known at once is shown at once; a postal code that follows replaces it.
+        const early = (state: string) => {
+          if (controller.signal.aborted) return;
+          setPlace(state);
+          setResolving(false);
+        };
+        void placeOf(coords, controller.signal, undefined, early).then(
+          (found) => {
+            if (found !== null && !controller.signal.aborted) {
+              rememberDeliveryPlace(found);
+              setPlace(found);
+            }
+            done();
           }
-          done();
-        });
+        );
       },
       done, // denied or unavailable: silent, no question
       { timeout: POSITION_TIMEOUT_MS, maximumAge: POSITION_MAX_AGE_MS }

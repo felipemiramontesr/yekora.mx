@@ -97,6 +97,41 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     );
   });
 
+  it('shows the state as soon as it is known and lets the postal code replace it', async () => {
+    allow();
+    let early: ((state: string) => void) | undefined;
+    let finish: ((place: string | null) => void) | undefined;
+    geocode.mockImplementation((_coords, _signal, _fetcher, onState) => {
+      early = onState;
+      return new Promise<string | null>((resolve) => {
+        finish = resolve;
+      });
+    });
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    act(() => grant());
+    act(() => early?.('ZAC'));
+    expect(result.current).toEqual({ place: 'ZAC', resolving: false });
+    await act(async () => {
+      finish?.('99820');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.place).toBe('99820'));
+  });
+
+  it('drops an early state that arrives after the page is gone', () => {
+    allow();
+    let early: ((state: string) => void) | undefined;
+    geocode.mockImplementation((_coords, _signal, _fetcher, onState) => {
+      early = onState;
+      return new Promise<string | null>(() => undefined);
+    });
+    const { result, unmount } = renderHook(() => useDeliveryLocation(true));
+    act(() => grant());
+    unmount();
+    act(() => early?.('ZAC'));
+    expect(result.current.place).toBeNull();
+  });
+
   it('stops resolving, silently, when the permission is denied', () => {
     allow();
     const { result } = renderHook(() => useDeliveryLocation(true));
