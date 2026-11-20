@@ -2,8 +2,10 @@
 
 import { MapPin } from 'lucide-react';
 import Link from 'next/link';
-import type { Messages } from '@/app/i18n';
+import type { Locale, Messages } from '@/app/i18n';
+import { MEXICAN_STATES } from '@/lib/cart/mxStates';
 import { fill } from '@/lib/catalog/format';
+import { abbreviationOf } from '@/lib/delivery/stateAbbreviations';
 import { useDeliveryLocation } from './useDeliveryLocation';
 import { useHeaderAccount } from './useHeaderAccount';
 
@@ -14,19 +16,24 @@ import { useHeaderAccount } from './useHeaderAccount';
  * - An account with a default delivery address shows that address's code, as `GET /v1/account/me`
  *   hands it back; it is never kept in the browser (FC 047 T2.3). Until the API confirms the
  *   session a placeholder holds its place so the bar does not jump.
- * - Anyone else (an account without an address, or a visitor) sees the code of where the browser
- *   is, when they allowed it in the cookie notice and the browser agreed (useDeliveryLocation).
- * - If there is no code, nothing is shown: no link, no invitation, no alert.
+ * - Anyone else (an account without an address, or a visitor) sees where the browser is, when
+ *   they allowed it in the cookie notice and the browser agreed (useDeliveryLocation): the postal
+ *   code or, where no service knows one (the countryside), the state by its usual abbreviation
+ *   («Enviar a Zac.», FC 055 T2.9), which is only a reference and fixes no shipping (T2.10).
+ * - If there is nothing, nothing is shown: no link, no invitation, no alert.
  *
  * @param accountHref - Where the delivery addresses are kept, in the page's language: the data and
  *   addresses of the account area (FC 051), which is where an account changes its postal code.
+ * @param locale - Language of the page, for the full name of a state.
  * @param messages - `header.delivery` texts.
  */
 export function DeliveryIndicator({
   accountHref,
+  locale,
   messages,
 }: Readonly<{
   accountHref: string;
+  locale: Locale;
   messages: Messages['header']['delivery'];
 }>) {
   const { firstName, user } = useHeaderAccount();
@@ -39,26 +46,30 @@ export function DeliveryIndicator({
     <MapPin aria-hidden="true" size={20} className="shrink-0 text-ocre" />
   );
   const style = 'tap-target gap-1.5 text-sm font-semibold';
-  const code = user?.postalCode ?? located;
+  // A postal code is five digits; anything else here is the code of a state of the closed list.
+  const place = user?.postalCode ?? located;
+  const state = place
+    ? MEXICAN_STATES.find(({ code }) => code === place)
+    : undefined;
+  const visible = state ? abbreviationOf(state.code) : place;
+  const spoken = state
+    ? fill(messages.toState, { state: state[locale === 'en' ? 'en' : 'es'] })
+    : fill(messages.to, { code: place ?? '' });
 
-  if (code && user) {
+  if (visible && user) {
     return (
-      <Link
-        href={accountHref}
-        aria-label={fill(messages.to, { code })}
-        className={style}
-      >
+      <Link href={accountHref} aria-label={spoken} className={style}>
         {pin}
-        <span aria-hidden="true">{code}</span>
+        <span aria-hidden="true">{visible}</span>
       </Link>
     );
   }
-  if (code) {
+  if (visible) {
     return (
       <span className={style}>
         {pin}
-        <span className="sr-only">{fill(messages.to, { code })}</span>
-        <span aria-hidden="true">{code}</span>
+        <span className="sr-only">{spoken}</span>
+        <span aria-hidden="true">{visible}</span>
       </span>
     );
   }

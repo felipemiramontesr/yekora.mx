@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { postalCodeOf } from '@/lib/delivery/reverseGeocode';
+import { placeOf } from '@/lib/delivery/reverseGeocode';
 import { useDeliveryLocation } from './useDeliveryLocation';
 
 vi.mock('@/lib/delivery/reverseGeocode', async (original) => ({
   ...(await original<typeof import('@/lib/delivery/reverseGeocode')>()),
-  postalCodeOf: vi.fn(),
+  placeOf: vi.fn(),
 }));
-const geocode = vi.mocked(postalCodeOf);
+const geocode = vi.mocked(placeOf);
 
 type Success = (position: { coords: object }) => void;
 let ask: ReturnType<typeof vi.fn>;
@@ -67,7 +67,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     });
     act(() => grant());
     await waitFor(() => expect(result.current).toBe('06600'));
-    expect(sessionStorage.getItem('yekora_delivery_postal_v1')).toBe('06600');
+    expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBe('06600');
     // The coordinates went to the geocoder and nowhere else.
     expect(geocode.mock.calls[0]?.[0]).toEqual({
       latitude: 19.4,
@@ -76,9 +76,18 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     expect(JSON.stringify(sessionStorage)).not.toContain('19.4');
   });
 
+  it('keeps the state when no service knows a postal code, and reuses it in this tab', async () => {
+    allow();
+    geocode.mockResolvedValue('ZAC');
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    act(() => grant());
+    await waitFor(() => expect(result.current).toBe('ZAC'));
+    expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBe('ZAC');
+  });
+
   it('reuses the code of this tab without asking the browser again', () => {
     allow();
-    sessionStorage.setItem('yekora_delivery_postal_v1', '98000');
+    sessionStorage.setItem('yekora_delivery_place_v1', '98000');
     const { result } = renderHook(() => useDeliveryLocation(true));
     expect(result.current).toBe('98000');
     expect(ask).not.toHaveBeenCalled();
@@ -100,7 +109,7 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     act(() => grant());
     await waitFor(() => expect(geocode).toHaveBeenCalledOnce());
     expect(result.current).toBeNull();
-    expect(sessionStorage.getItem('yekora_delivery_postal_v1')).toBeNull();
+    expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBeNull();
   });
 
   it('stays silent when the browser has no geolocation', () => {
@@ -126,12 +135,12 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
       await Promise.resolve();
     });
     expect(result.current).toBeNull();
-    expect(sessionStorage.getItem('yekora_delivery_postal_v1')).toBeNull();
+    expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBeNull();
   });
 
   it('forgets the code when it stops being enabled, so an account with an address shows its own', () => {
     allow();
-    sessionStorage.setItem('yekora_delivery_postal_v1', '98000');
+    sessionStorage.setItem('yekora_delivery_place_v1', '98000');
     const { result, rerender } = renderHook(
       ({ enabled }) => useDeliveryLocation(enabled),
       { initialProps: { enabled: true } }

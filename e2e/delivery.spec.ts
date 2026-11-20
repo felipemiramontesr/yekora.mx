@@ -32,7 +32,9 @@ test('a visitor who allows the location sees the postal code of the browser, res
   );
   expect(geocoderCalls).toHaveLength(0);
 
-  await page.getByRole('button', { name: 'Permitir ubicación' }).click();
+  await page
+    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
+    .click();
   await expect(
     header.getByText('Enviar al código postal 06600')
   ).toBeAttached();
@@ -47,7 +49,7 @@ test('a visitor who allows the location sees the postal code of the browser, res
   expect(geocoderCalls).toHaveLength(1);
 });
 
-test('keeping only what is needed never asks the browser for its position', async ({
+test('not agreeing never asks the browser for its position', async ({
   page,
   context,
 }) => {
@@ -60,7 +62,7 @@ test('keeping only what is needed never asks the browser for its position', asyn
     };
   });
   await page.goto('/nosotros/');
-  await page.getByRole('button', { name: 'Solo lo necesario' }).click();
+  await page.getByRole('button', { name: 'No estoy de acuerdo' }).click();
   await expect(
     page.getByRole('region', { name: 'Aviso de cookies' })
   ).toBeHidden();
@@ -89,7 +91,9 @@ test('a refused permission leaves the header silent: no code, no link, no alert'
     route.fulfill({ json: { postcode: '06600' } })
   );
   await page.goto('/nosotros/');
-  await page.getByRole('button', { name: 'Permitir ubicación' }).click();
+  await page
+    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
+    .click();
   await expect(
     page.getByRole('region', { name: 'Aviso de cookies' })
   ).toBeHidden();
@@ -111,8 +115,43 @@ test('in English the code is announced in English', async ({
     route.fulfill({ json: { postcode: '06600' } })
   );
   await page.goto('/en/about/');
-  await page.getByRole('button', { name: 'Allow location' }).click();
+  await page.getByRole('button', { name: 'I agree', exact: true }).click();
   await expect(
     page.getByRole('banner').getByText('Deliver to postal code 06600')
   ).toBeAttached();
+});
+
+test('where no service knows a postal code the header shows the state, abbreviated, and says it whole (FC 055 T2.9)', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 22.77, longitude: -102.58 });
+  await page.route(GEOCODER, (route) =>
+    route.fulfill({
+      json: {
+        postcode: '',
+        countryCode: 'MX',
+        principalSubdivisionCode: 'MX-ZAC',
+      },
+    })
+  );
+  await page.route('https://nominatim.openstreetmap.org/**', (route) =>
+    route.fulfill({ json: { address: {} } })
+  );
+  await page.goto('/nosotros/');
+  await page
+    .getByRole('button', { name: 'Estoy de acuerdo', exact: true })
+    .click();
+  const header = page.getByRole('banner');
+  await expect(header.getByText('Zac.', { exact: true })).toBeVisible();
+  await expect(header.getByText('Enviar a Zacatecas')).toBeAttached();
+  // The state is only a reference: it leaves no postal code and no choice of shipping behind.
+  await expect(header.getByText(/código postal/)).toHaveCount(0);
+  const stored = await page.evaluate(() => ({
+    local: Object.values({ ...localStorage }).join(' '),
+    session: Object.values({ ...sessionStorage }).join(' '),
+  }));
+  expect(stored.local).not.toContain('ZAC');
+  expect(stored.session).toContain('ZAC');
 });

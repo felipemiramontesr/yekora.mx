@@ -41,7 +41,7 @@ describe('LegalView', () => {
         }
         expect(html.toLowerCase()).toMatch(/ubicaci|location/);
         if (document === 'cookies') {
-          expect(html).toContain('yekora_delivery_postal_v1');
+          expect(html).toContain('yekora_delivery_place_v1');
         }
       }
     }

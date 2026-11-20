@@ -82,6 +82,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
                 tab: 'profile',
                 orderNumber: null,
               })}
+              locale={locale}
               messages={messages.header.delivery}
             />
           </div>

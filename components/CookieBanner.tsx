@@ -14,7 +14,7 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 interface CookieBannerProps {
   /** Language of the page; picks the cookie policy link. */
   locale: Locale;
-  /** Localized notice text, link label and button label. */
+  /** Localized notice text, link labels and the two button labels. */
   messages: Messages['cookieBanner'];
 }
 
@@ -30,16 +30,17 @@ function hasConsent(): boolean {
 
 /**
  * Cookie notice (LFPDPPP transparency). The site sets one technical cookie, the one that records
- * this notice was read, and, only after an explicit «Permitir ubicación», a second one that records
+ * this notice was read, and, only after an explicit «Estoy de acuerdo», a second one that records
  * the permission to use the location of the browser for the delivery postal code (FC 055 T2.8).
- * «Solo lo necesario» only dismisses.
+ * «No estoy de acuerdo» only dismisses.
  *
  * FC 043 T2.1 (327_AN, option A): the notice is in the static HTML, `hidden`, followed by a
  * one-line inline script that reveals it before the first paint when the cookie is missing. So a
  * first visit sees it with the page, not after hydration (it was the LCP of /cuenta/), a returning
  * visitor never sees it flash, and without JavaScript it stays hidden, as before. Its button is
  * disabled until hydration, so a click before React is not lost (FC 043 T1.1).
- * The cookie lasts one year, SameSite=Lax, Secure on HTTPS.
+ * The cookie lasts one year, SameSite=Lax, Secure on HTTPS. On a phone the notice takes at most a
+ * third of the screen: its text scrolls inside it and the two buttons stay in sight.
  */
 export function CookieBanner({
   locale,
@@ -83,9 +84,9 @@ export function CookieBanner({
     setRead(true);
   }
 
-  // FC 055 T2.8: the location is used only after this explicit «yes», which also closes the
-  // notice; the browser then asks its own permission. «Only what is needed» leaves it off.
-  function allowLocation() {
+  // FC 055 T2.8: the location is used only after this explicit «I agree», which also closes the
+  // notice; the browser then asks its own permission. «I do not agree» leaves it off.
+  function agree() {
     grantLocationConsent();
     accept();
   }
@@ -100,24 +101,32 @@ export function CookieBanner({
         suppressHydrationWarning
         className="fixed inset-x-0 bottom-0 z-50 border-t border-ocre/40 bg-petroleo text-marfil"
       >
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm">
+        <div className="mx-auto flex max-h-[35vh] max-w-6xl flex-col gap-3 px-4 py-4 sm:max-h-none sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-h-0 overflow-y-auto text-sm sm:overflow-visible">
             {messages.text}{' '}
+            <Link
+              href={routeFor('privacy', locale)}
+              className="tap-target underline underline-offset-4"
+            >
+              {messages.privacy}
+            </Link>{' '}
+            {messages.and}{' '}
             <Link
               href={routeFor('cookies', locale)}
               className="tap-target underline underline-offset-4"
             >
               {messages.policy}
             </Link>
+            .
           </p>
-          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
             <button
               type="button"
-              onClick={allowLocation}
+              onClick={agree}
               disabled={!mounted}
               className="min-h-11 rounded-md bg-marfil px-4 py-2 text-sm font-semibold text-petroleo"
             >
-              {messages.allowLocation}
+              {messages.agree}
             </button>
             <button
               type="button"
@@ -125,7 +134,7 @@ export function CookieBanner({
               disabled={!mounted}
               className="min-h-11 rounded-md border border-marfil px-4 py-2 text-sm font-semibold text-marfil"
             >
-              {messages.accept}
+              {messages.disagree}
             </button>
           </div>
         </div>

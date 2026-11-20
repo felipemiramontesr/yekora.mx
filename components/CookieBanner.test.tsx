@@ -47,11 +47,22 @@ describe('CookieBanner', () => {
     expect(banner.textContent).toContain('dos cookies técnicas propias');
     expect(
       screen
-        .getByRole('link', { name: 'Ver política de cookies' })
+        .getByRole('link', { name: 'Política de cookies' })
         .getAttribute('href')
     ).toBe('/cookies/');
+    expect(
+      screen
+        .getByRole('link', { name: 'Aviso de privacidad' })
+        .getAttribute('href')
+    ).toBe('/privacidad/');
+    // The notice says what is agreed to: the cookies, the location and who receives it.
+    for (const word of ['ubicación', 'BigDataCloud', 'Nominatim', 'retirar']) {
+      expect(banner.textContent).toContain(word);
+    }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Solo lo necesario' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'No estoy de acuerdo' })
+    );
 
     expect(screen.queryByRole('region')).toBeNull();
     expect(written).toEqual([
@@ -84,9 +95,7 @@ describe('CookieBanner', () => {
     reserve();
     expect(root.style.getPropertyValue('--cookie-banner-height')).toBe('240px');
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Only what is needed' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
     expect(disconnect).toHaveBeenCalled();
     expect(root.style.getPropertyValue('--cookie-banner-height')).toBe('');
     height.mockRestore();
@@ -102,7 +111,7 @@ describe('CookieBanner', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Permitir ubicación' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Estoy de acuerdo$/ }));
 
     expect(screen.queryByRole('region')).toBeNull();
     expect(written).toEqual([
@@ -113,13 +122,11 @@ describe('CookieBanner', () => {
     globalThis.removeEventListener('yekora:location-consent', heard);
   });
 
-  it('never records the location when the visitor keeps only what is needed (FC 055 T2.8)', () => {
+  it('never records the location when the visitor does not agree (FC 055 T2.8)', () => {
     render(
       <CookieBanner locale="en" messages={getMessages('en').cookieBanner} />
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Only what is needed' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
     expect(written.join(';')).not.toContain('location');
   });
 
@@ -128,9 +135,7 @@ describe('CookieBanner', () => {
     render(
       <CookieBanner locale="en" messages={getMessages('en').cookieBanner} />
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Only what is needed' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'I do not agree' }));
     expect(written[0]).toMatch(/; Secure$/);
   });
 
