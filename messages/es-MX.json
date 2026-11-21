@@ -291,7 +291,7 @@
         {
           "title": "Ubicación y código postal de entrega",
           "paragraphs": [
-            "El código postal, o el estado abreviado, que se muestra en el encabezado es una referencia: puede provenir del domicilio predeterminado de tu cuenta o, si lo permitiste en el aviso de cookies, de la ubicación aproximada de tu navegador. No fija el envío ni el costo; ambos se calculan con el domicilio que captures al pagar."
+            "El código postal, o el estado abreviado, que se muestra en el encabezado es una referencia: puede provenir del domicilio predeterminado de tu cuenta o, si lo permitiste en el aviso de cookies, de la ubicación aproximada de tu navegador. Para obtenerlo, tu navegador envía tus coordenadas a BigDataCloud y a OpenStreetMap Nominatim, como explica el Aviso de privacidad. No fija el envío ni el costo; ambos se calculan con el domicilio que captures al pagar."
           ]
         },
         {

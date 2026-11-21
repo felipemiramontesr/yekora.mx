@@ -35,10 +35,9 @@ describe('LegalView', () => {
         const html = renderToStaticMarkup(
           <LegalView locale={locale} document={document} />
         );
-        if (document !== 'terms') {
-          expect(html).toContain('BigDataCloud');
-          expect(html).toContain('Nominatim');
-        }
+        // FC 055 T2.8: the three documents name both providers.
+        expect(html).toContain('BigDataCloud');
+        expect(html).toContain('Nominatim');
         expect(html.toLowerCase()).toMatch(/ubicaci|location/);
         if (document === 'cookies') {
           expect(html).toContain('yekora_delivery_place_v1');

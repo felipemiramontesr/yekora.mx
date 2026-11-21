@@ -291,7 +291,7 @@
         {
           "title": "Location and delivery postal code",
           "paragraphs": [
-            "The postal code, or the abbreviated state, shown in the header is a reference: it may come from your account’s default address or, if you allowed it in the cookie notice, from your browser’s approximate location. It does not set shipping or its cost; both are calculated from the address you enter at checkout."
+            "The postal code, or the abbreviated state, shown in the header is a reference: it may come from your account’s default address or, if you allowed it in the cookie notice, from your browser’s approximate location. To get it, your browser sends your coordinates to BigDataCloud and to OpenStreetMap Nominatim, as the Privacy notice explains. It does not set shipping or its cost; both are calculated from the address you enter at checkout."
           ]
         },
         {
