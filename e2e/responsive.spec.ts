@@ -103,3 +103,81 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+/**
+ * FC 059 · The content keeps half of the side margins a fixed 72 rem (1152 px) box left: from
+ * 1152 px up each margin is (w - 1152) / 4, and below it nothing changes (the box is the whole
+ * screen). Measured on the containers of the header, the pages and the footer, with no horizontal
+ * scroll.
+ */
+const ADAPTIVE_PATHS = ['/', '/catalogo/', '/cuenta/', '/en/'];
+
+function containerMargins(page: Page) {
+  return page.evaluate(() => {
+    const width = window.innerWidth;
+    return [...document.querySelectorAll('.max-w-adaptive')].map((element) => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, right: width - box.right, width: box.width };
+    });
+  });
+}
+
+for (const width of [2544, 1920, 1440, 1152]) {
+  test(`at ${width} px each side margin is (w - 1152) / 4 and nothing scrolls sideways (FC 059 T2.1, T2.2)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockAccountApi(page);
+    const expected = (width - 1152) / 4;
+    for (const path of ADAPTIVE_PATHS) {
+      await page.goto(path);
+      const boxes = await containerMargins(page);
+      expect(boxes.length, path).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(
+          Math.abs(box.left - expected),
+          `${path} left`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(box.right - expected),
+          `${path} right`
+        ).toBeLessThanOrEqual(1);
+      }
+      expect(await horizontalOverflow(page), path).toBeLessThanOrEqual(
+        H_SCROLL_TOLERANCE_PX
+      );
+    }
+  });
+}
+
+for (const width of [320, 375, 768, 1024]) {
+  test(`at ${width} px the content is the whole screen, as before (FC 059 T2.3)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await mockAccountApi(page);
+    for (const path of ADAPTIVE_PATHS) {
+      await page.goto(path);
+      for (const box of await containerMargins(page)) {
+        expect(box.left, path).toBeLessThanOrEqual(1);
+        expect(box.right, path).toBeLessThanOrEqual(1);
+        expect(box.width, path).toBeGreaterThanOrEqual(width - 2);
+      }
+    }
+  });
+}
+
+test('on a 4K screen the content grows to (w + 1152) / 2 and nothing scrolls sideways (FC 059 T2.2)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 3840, height: 1200 });
+  await mockAccountApi(page);
+  await page.goto('/');
+  const boxes = await containerMargins(page);
+  for (const box of boxes) {
+    expect(Math.abs(box.width - (3840 + 1152) / 2)).toBeLessThanOrEqual(2);
+  }
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(
+    H_SCROLL_TOLERANCE_PX
+  );
+});

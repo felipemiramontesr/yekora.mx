@@ -11,7 +11,7 @@ import { AccountApp } from '../account/AccountApp';
 export function AccountView({ locale }: Readonly<{ locale: Locale }>) {
   const { account, checkout } = getMessages(locale);
   return (
-    <div className="mx-auto max-w-5xl px-4 py-16">
+    <div className="mx-auto max-w-adaptive px-4 py-16">
       <h1 className="text-4xl font-semibold">{account.title}</h1>
       <div className="mt-8">
         <AccountApp

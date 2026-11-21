@@ -11,6 +11,15 @@ body {
 }
 
 @layer components {
+  /* FC 059: the width of the content of every page, centred. Up to 72 rem (1152 px) it is the whole
+     screen, as before; beyond it the side margins are half of what a fixed 72 rem box left:
+     width (100vw + 72rem) / 2 = 50vw + 36rem, so each margin is (w - 1152) / 4. `min(100%, ...)`
+     keeps it from ever being wider than its parent, so there is no horizontal scroll. */
+  .max-w-adaptive {
+    margin-inline: auto;
+    max-width: min(100%, calc(50vw + 36rem));
+  }
+
   /* Mobile First: every tap target is at least 44 × 44 px (WCAG 2.5.5).
      e2e/responsive.spec.ts fails the build when one is smaller. */
   .tap-target {

@@ -16,7 +16,7 @@ const PILLARS = ['seleccion', 'confianza', 'accesibilidad'] as const;
 export function BrandBanner({ messages }: Readonly<BrandBannerProps>) {
   return (
     <section id="filosofia" className="scroll-mt-24 bg-petroleo text-marfil">
-      <div className="mx-auto max-w-6xl px-4 py-16">
+      <div className="mx-auto max-w-adaptive px-4 py-16">
         <h2 className="text-3xl font-semibold">{messages.title}</h2>
         <p className="mt-3 max-w-2xl text-marfil/90">{messages.lede}</p>
         <ul className="mt-10 grid gap-6 sm:grid-cols-3">

@@ -31,7 +31,7 @@ export function ProductView({
   const price = priceText(product, locale);
   const gallery = product.images.length > 0 ? product.images : [null];
   return (
-    <article className="mx-auto max-w-6xl px-4 py-12">
+    <article className="mx-auto max-w-adaptive px-4 py-12">
       <Link
         href={routeFor('catalog', locale)}
         className="tap-target gap-2 text-sm underline-offset-4 hover:underline"

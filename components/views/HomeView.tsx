@@ -71,7 +71,7 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
         className="relative isolate overflow-hidden bg-petroleo text-marfil"
       >
         <HeroBackdrop />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 md:grid-cols-[1fr_auto]">
+        <div className="mx-auto grid max-w-adaptive items-center gap-12 px-4 py-20 md:grid-cols-[1fr_auto]">
           <div>
             <p className="inline-block border-b-2 border-ocre pb-1 text-sm uppercase tracking-widest">
               {hero.eyebrow}
@@ -110,7 +110,7 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
 
       <section
         id="disciplinas"
-        className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20"
+        className="mx-auto max-w-adaptive scroll-mt-24 px-4 py-20"
       >
         <h2 className="text-3xl font-semibold">
           {messages.home.disciplines.title}
@@ -134,7 +134,7 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
 
       <section
         id="marcas-mexicanas"
-        className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20"
+        className="mx-auto max-w-adaptive scroll-mt-24 px-4 py-20"
       >
         <h2 className="text-3xl font-semibold">{mexicanTalent.title}</h2>
         <p className="mt-3 max-w-3xl text-petroleo/80">{mexicanTalent.lede}</p>

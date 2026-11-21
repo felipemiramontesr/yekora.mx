@@ -68,7 +68,7 @@ export function CatalogView({
   const { catalog } = getMessages(locale);
   const products = snapshot.products[locale];
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16">
+    <div className="mx-auto max-w-adaptive px-4 py-16">
       <h1 className="text-4xl font-semibold">{catalog.title}</h1>
       <p className="mt-4 max-w-3xl text-lg text-petroleo/80">{catalog.lede}</p>
       {products.length === 0 ? (

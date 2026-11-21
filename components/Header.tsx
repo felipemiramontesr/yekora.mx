@@ -26,7 +26,7 @@ function DisciplineBar({ locale, messages }: Readonly<HeaderProps>) {
       aria-label={messages.header.disciplinesLabel}
       className="bg-petroleo text-marfil"
     >
-      <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 text-sm [mask-image:linear-gradient(to_right,black_90%,transparent)] [scrollbar-width:none] md:[mask-image:none]">
+      <ul className="mx-auto flex max-w-adaptive gap-1 overflow-x-auto px-4 text-sm [mask-image:linear-gradient(to_right,black_90%,transparent)] [scrollbar-width:none] md:[mask-image:none]">
         {disciplines.map((discipline) => (
           <li key={discipline} className="shrink-0">
             <Link
@@ -55,7 +55,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <>
       <header className="sticky top-0 z-40 bg-petroleo text-marfil">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 md:flex-nowrap md:gap-x-4">
+        <div className="mx-auto flex max-w-adaptive flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 md:flex-nowrap md:gap-x-4">
           <Link
             href={routeFor('home', locale)}
             aria-label={messages.brand.homeLink}

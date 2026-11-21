@@ -25,7 +25,7 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
   ];
   return (
     <footer className="bg-petroleo text-marfil">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 md:grid-cols-4">
+      <div className="mx-auto grid max-w-adaptive gap-10 px-4 py-14 md:grid-cols-4">
         <div className="flex flex-col gap-4">
           {/* Horizontal lockup from the client's individual elements: isotype, then name over descriptor. */}
           <div className="flex items-center gap-4">

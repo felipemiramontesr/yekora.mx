@@ -12,7 +12,7 @@ import { OrderStatus } from '../checkout/OrderStatus';
 export function CheckoutView({ locale }: Readonly<{ locale: Locale }>) {
   const { checkout, cart, catalog } = getMessages(locale);
   return (
-    <div className="mx-auto max-w-5xl px-4 py-16">
+    <div className="mx-auto max-w-adaptive px-4 py-16">
       <h1 className="text-4xl font-semibold">{checkout.title}</h1>
       <p className="mt-3 text-petroleo/80">{checkout.intro}</p>
       <div className="mt-8">

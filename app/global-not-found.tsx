@@ -63,7 +63,7 @@ export default function GlobalNotFound() {
   return (
     <SiteShell locale="es-MX">
       <section className="bg-petroleo text-marfil">
-        <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-20 md:flex-row md:items-center">
+        <div className="mx-auto flex max-w-adaptive flex-col gap-12 px-4 py-20 md:flex-row md:items-center">
           {/* Client isotype, decorative: the heading below carries the message. */}
           <img
             src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"
