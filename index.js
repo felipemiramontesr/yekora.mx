@@ -99910,6 +99910,11 @@ var paymentMethodSetupResponseSchema = external_exports.object({
   /** The hosted page of Stripe where the person enters the card. */
   redirectUrl: external_exports.url()
 });
+var paymentMethodSettleResponseSchema = external_exports.object({
+  /** `saved` when it is the account's first card, `replaced` when it took the place of another. */
+  status: external_exports.enum(["saved", "replaced"]),
+  paymentMethod: savedCardSchema
+});
 var paymentMethodDetachResponseSchema = external_exports.object({
   detached: external_exports.literal(true)
 });
@@ -101670,6 +101675,20 @@ var ROUTE_CONTRACTS = [
     }
   },
   {
+    method: "POST",
+    path: "/v1/account/payment-methods/settle",
+    summary: "Leaves the account with its newest card at Stripe and detaches the older ones: one card per account (FC 057)",
+    permission: "account:self",
+    request: { headers: mutationHeaders },
+    responses: {
+      200: paymentMethodSettleResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
     method: "DELETE",
     path: "/v1/account/payment-methods/:id",
     summary: "Detaches a card of the account at Stripe; another account\u2019s card is a 404 (FC 054)",
@@ -102329,24 +102348,8 @@ function permissionGuard(deps) {
   };
 }
 
-// src/services/accountPaymentMethods.ts
-async function listSavedCards(db, cards, userId) {
-  const customerId = await linkedCustomer(db, userId);
-  if (customerId === null) return { items: [], hasCustomer: false };
-  return { items: await cards.listCards(customerId), hasCustomer: true };
-}
-async function startCardSetup(db, cards, userId, returnTo) {
-  const customerId = await ensureCustomer(db, cards, userId);
-  return cards.createSetupSession({ customerId, ...returnTo });
-}
-async function detachSavedCard(db, cards, userId, paymentMethodId) {
-  const customerId = await linkedCustomer(db, userId);
-  if (customerId === null) return "PAYMENT_METHOD_NOT_FOUND";
-  const owner = await cards.cardOwner(paymentMethodId);
-  if (owner !== customerId) return "PAYMENT_METHOD_NOT_FOUND";
-  await cards.detachCard(paymentMethodId);
-  return null;
-}
+// src/routes/account.ts
+var import_node_crypto8 = require("node:crypto");
 
 // src/services/paymentPort.ts
 var REMOTE_EXPIRY_MARGIN_MS = 30 * 60 * 1e3;
@@ -102365,7 +102368,55 @@ function remoteDeadline(expiresAt) {
   return new Date(expiresAt.getTime() - REMOTE_EXPIRY_MARGIN_MS);
 }
 
+// src/services/accountPaymentMethods.ts
+async function listSavedCards(db, cards, userId) {
+  const customerId = await linkedCustomer(db, userId);
+  if (customerId === null) return { items: [], hasCustomer: false };
+  const held = await cards.listCards(customerId);
+  return {
+    items: [...held].sort((first, second) => second.created - first.created),
+    hasCustomer: true
+  };
+}
+async function startCardSetup(db, cards, userId, returnTo) {
+  const customerId = await ensureCustomer(db, cards, userId);
+  return cards.createSetupSession({ customerId, ...returnTo });
+}
+async function detachSavedCard(db, cards, userId, paymentMethodId) {
+  const customerId = await linkedCustomer(db, userId);
+  if (customerId === null) return "PAYMENT_METHOD_NOT_FOUND";
+  const owner = await cards.cardOwner(paymentMethodId);
+  if (owner !== customerId) return "PAYMENT_METHOD_NOT_FOUND";
+  await cards.detachCard(paymentMethodId);
+  return null;
+}
+async function settleSavedCards(db, cards, userId) {
+  const customerId = await linkedCustomer(db, userId);
+  if (customerId === null) return "CARD_ATTACH_FAILED";
+  const held = await cards.listCards(customerId);
+  const [newest, ...older] = [...held].sort(
+    (first, second) => second.created - first.created
+  );
+  if (newest === void 0) return "CARD_ATTACH_FAILED";
+  try {
+    await Promise.all(older.map((card) => cards.detachCard(card.id)));
+  } catch (error63) {
+    if (!(error63 instanceof PaymentProcessorError)) throw error63;
+    return "GATEWAY_DETACH_FAILED";
+  }
+  const { id, brand, last4, expMonth, expYear } = newest;
+  return {
+    card: { id, brand, last4, expMonth, expYear },
+    replaced: older.map((card) => card.id)
+  };
+}
+
 // src/routes/account.ts
+var CARDS_LIMIT = {
+  config: { rateLimit: { max: 10, timeWindow: "1 minute" } }
+};
+var CARD_ADDED_MARK = "?setup=done";
+var fingerprint = (id) => (0, import_node_crypto8.createHash)("sha256").update(id).digest("hex").slice(0, 16);
 var CARDS_PAGE = {
   "es-MX": "/cuenta/metodos-pago/",
   en: "/en/account/metodos-pago/"
@@ -102542,97 +102593,170 @@ function registerAccountRoutes(app, deps) {
       return { status: 204, body: null };
     });
   });
-  app.get("/v1/account/payment-methods", async (request, reply) => {
-    if (deps.cards === null) {
-      return refuse(
-        reply,
-        503,
-        "Cards cannot be read right now",
-        "SERVICE_UNAVAILABLE"
-      );
-    }
-    try {
-      const saved = await listSavedCards(
-        deps.db,
-        deps.cards,
-        request.user.userId
-      );
-      return paymentMethodListResponseSchema.parse(saved);
-    } catch (error63) {
-      if (!(error63 instanceof PaymentProcessorError)) throw error63;
-      request.log.warn(
-        { err: error63 },
-        `saved cards: Stripe refused the list: ${error63.message}`
-      );
-      return refuse(reply, 503, "Stripe did not answer", "SERVICE_UNAVAILABLE");
-    }
-  });
-  app.post("/v1/account/payment-methods/setup", async (request, reply) => {
-    const gate = cardsWriteGate(deps, request, reply);
-    if (gate === null) return reply;
-    const lang = request.query.lang === "en" ? "en" : "es-MX";
-    const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+  app.get(
+    "/v1/account/payment-methods",
+    CARDS_LIMIT,
+    async (request, reply) => {
+      if (deps.cards === null) {
+        return refuse(
+          reply,
+          503,
+          "Cards cannot be read right now",
+          "SERVICE_UNAVAILABLE"
+        );
+      }
       try {
-        const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
-          successUrl: page,
-          cancelUrl: page
-        });
-        return {
-          status: 201,
-          body: paymentMethodSetupResponseSchema.parse({ redirectUrl })
-        };
+        const saved = await listSavedCards(
+          deps.db,
+          deps.cards,
+          request.user.userId
+        );
+        return paymentMethodListResponseSchema.parse(saved);
       } catch (error63) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
         request.log.warn(
           { err: error63 },
-          `saved cards: Stripe refused the setup: ${error63.message}`
+          `saved cards: Stripe refused the list: ${error63.message}`
         );
-        return stripeDown();
+        return refuse(
+          reply,
+          503,
+          "Stripe did not answer",
+          "SERVICE_UNAVAILABLE"
+        );
       }
-    });
-  });
-  app.delete("/v1/account/payment-methods/:id", async (request, reply) => {
-    const gate = cardsWriteGate(deps, request, reply);
-    if (gate === null) return reply;
-    const params = paymentMethodParams.safeParse(request.params);
-    if (!params.success) {
-      return refuse(reply, 404, "Not found", "PAYMENT_METHOD_NOT_FOUND");
     }
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
-      try {
-        const refusal = await detachSavedCard(
-          tx,
-          gate.cards,
-          userId,
-          params.data.id
-        );
-        if (refusal !== null) {
-          return { status: 404, body: problem(404, "Not found", refusal) };
+  );
+  app.post(
+    "/v1/account/payment-methods/setup",
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      const lang = request.query.lang === "en" ? "en" : "es-MX";
+      const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
+            successUrl: `${page}${CARD_ADDED_MARK}`,
+            cancelUrl: page
+          });
+          return {
+            status: 201,
+            body: paymentMethodSetupResponseSchema.parse({ redirectUrl })
+          };
+        } catch (error63) {
+          if (!(error63 instanceof PaymentProcessorError)) throw error63;
+          request.log.warn(
+            { err: error63 },
+            `saved cards: Stripe refused the setup: ${error63.message}`
+          );
+          return stripeDown();
         }
-        await recordAudit(tx, {
-          userId,
-          action: "PAYMENT_METHOD_DETACHED",
-          entityType: "user_stripe_customers",
-          entityId: userId,
-          before: null,
-          after: null,
-          ip: request.ip
-        });
-        return {
-          status: 200,
-          body: paymentMethodDetachResponseSchema.parse({ detached: true })
-        };
-      } catch (error63) {
-        if (!(error63 instanceof PaymentProcessorError)) throw error63;
-        request.log.warn(
-          { err: error63 },
-          `saved cards: Stripe refused the detach: ${error63.message}`
-        );
-        return stripeDown();
+      });
+    }
+  );
+  app.delete(
+    "/v1/account/payment-methods/:id",
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      const params = paymentMethodParams.safeParse(request.params);
+      if (!params.success) {
+        return refuse(reply, 404, "Not found", "PAYMENT_METHOD_NOT_FOUND");
       }
-    });
-  });
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const refusal = await detachSavedCard(
+            tx,
+            gate.cards,
+            userId,
+            params.data.id
+          );
+          if (refusal !== null) {
+            return { status: 404, body: problem(404, "Not found", refusal) };
+          }
+          await recordAudit(tx, {
+            userId,
+            action: "PAYMENT_METHOD_DETACHED",
+            entityType: "user_stripe_customers",
+            entityId: userId,
+            before: null,
+            after: null,
+            ip: request.ip
+          });
+          return {
+            status: 200,
+            body: paymentMethodDetachResponseSchema.parse({ detached: true })
+          };
+        } catch (error63) {
+          if (!(error63 instanceof PaymentProcessorError)) throw error63;
+          request.log.warn(
+            { err: error63 },
+            `saved cards: Stripe refused the detach: ${error63.message}`
+          );
+          return stripeDown();
+        }
+      });
+    }
+  );
+  app.post(
+    "/v1/account/payment-methods/settle",
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const settled = await settleSavedCards(tx, gate.cards, userId);
+          if (settled === "CARD_ATTACH_FAILED") {
+            return {
+              status: 400,
+              body: problem(400, "No card was saved", settled)
+            };
+          }
+          if (settled === "GATEWAY_DETACH_FAILED") {
+            return {
+              status: 502,
+              body: problem(502, "The previous card was not detached", settled)
+            };
+          }
+          const replaced = settled.replaced.length > 0;
+          await recordAudit(tx, {
+            userId,
+            action: replaced ? "PAYMENT_METHOD_REPLACED" : "PAYMENT_METHOD_SAVED",
+            entityType: "user_stripe_customers",
+            entityId: userId,
+            before: null,
+            after: {
+              new_payment_method_id: fingerprint(settled.card.id),
+              ...replaced && {
+                replaced_payment_method_id: fingerprint(
+                  settled.replaced.join(",")
+                )
+              }
+            },
+            ip: request.ip
+          });
+          return {
+            status: 200,
+            body: paymentMethodSettleResponseSchema.parse({
+              status: replaced ? "replaced" : "saved",
+              paymentMethod: settled.card
+            })
+          };
+        } catch (error63) {
+          if (!(error63 instanceof PaymentProcessorError)) throw error63;
+          request.log.warn(
+            { err: error63 },
+            `saved cards: Stripe refused the settle: ${error63.message}`
+          );
+          return stripeDown();
+        }
+      });
+    }
+  );
   app.post("/v1/account/forget-device", async (request, reply) => {
     const token = readDeviceToken(request.headers.cookie);
     if (token !== null) {
@@ -102697,10 +102821,10 @@ function registerAdminRoutes(app, deps) {
 }
 
 // src/services/adminUsers.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 
 // src/services/passwordResets.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // src/services/outbox.ts
 async function enqueueMail(tx, event) {
@@ -102714,7 +102838,7 @@ async function enqueueMail(tx, event) {
 // src/services/passwordResets.ts
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
   await tx.query(
     "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
@@ -102730,7 +102854,7 @@ async function mailResetLink(tx, userId, totpKey, now) {
   });
 }
 function decoyReset(totpKey) {
-  const token = (0, import_node_crypto8.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
     totpKey,
     tokenHash2(token),
@@ -102785,7 +102909,7 @@ function completeReset(db, reset, passwordHash, now, ip) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -102797,7 +102921,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto9.randomBytes)(16),
+    salt: (0, import_node_crypto10.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -102809,11 +102933,11 @@ async function verifyPassword(hash2, password) {
   }
 }
 function unmatchableHash() {
-  return hashPassword((0, import_node_crypto9.randomBytes)(64).toString("hex"));
+  return hashPassword((0, import_node_crypto10.randomBytes)(64).toString("hex"));
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto9.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto10.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -102852,7 +102976,7 @@ async function createAdmin(tx, input2, actor) {
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto10.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto11.randomUUID)();
   if (existing) {
     const roles = await lockedRoles(tx, id);
     if (roles.includes("owner")) return "OWNER_IMMUTABLE";
@@ -103116,7 +103240,7 @@ var PASSWORD_PROBLEMS = {
 };
 
 // src/services/botChallenge.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -103127,16 +103251,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto11.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto12.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto11.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto12.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto11.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto11.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto12.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto12.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto11.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto11.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto12.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto12.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -104400,7 +104524,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 var MP_API = "https://api.mercadopago.com";
 var TIMEOUT_MS2 = 1e4;
 var PAYMENT_TYPES = [
@@ -104528,9 +104652,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto12.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto13.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto12.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto13.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -108148,7 +108272,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto13 = __toESM(require("node:crypto"), 1);
+var import_node_crypto14 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 var import_node_url2 = __toESM(require("node:url"), 1);
@@ -109881,7 +110005,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto13.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto14.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -111058,8 +111182,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto13.default.randomBytes(len).toString("hex"),
-      import_node_crypto13.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto14.default.randomBytes(len).toString("hex"),
+      import_node_crypto14.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -111747,7 +111871,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -111758,7 +111882,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto14.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto15.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -111868,7 +111992,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -111883,7 +112007,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto15.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto16.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -111950,7 +112074,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -111963,7 +112087,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto16.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto17.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -112573,7 +112697,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 var Mail = class extends import_node_events.EventEmitter {
   constructor(transporter, options, defaults) {
@@ -112891,7 +113015,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto17.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto18.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -112926,7 +113050,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -113091,7 +113215,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto18.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto19.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -114439,7 +114563,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto18.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto19.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -114773,7 +114897,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto19 = __toESM(require("node:crypto"), 1);
+var import_node_crypto20 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -115096,7 +115220,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto19.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto20.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -117891,7 +118015,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto20 = require("node:crypto");
+var import_node_crypto21 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -117958,7 +118082,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto20.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto21.timingSafeEqual)(a, b);
 }
 async function refusalReason(answer) {
   const body = await answer.json().catch(() => null);
@@ -118021,7 +118145,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto20.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto21.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -118091,7 +118215,8 @@ function createStripeCards(secrets, fetchImpl = fetch) {
             brand,
             last4,
             expMonth: month,
-            expYear: year
+            expYear: year,
+            created: Number.isInteger(method.created) ? method.created : 0
           }
         ] : [];
       });
@@ -118587,7 +118712,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "ab9ce4cb4206c8b8285b853c77f2f5990034bd5b" : void 0;
+var sha = true ? "21567ee4882a195822fcf35081f417b6d71921a8" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
