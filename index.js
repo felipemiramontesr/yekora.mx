@@ -99951,6 +99951,63 @@ var adminUserListSchema = external_exports.object({
   items: external_exports.array(adminUserSchema)
 });
 
+// ../../lib/account/shippingAdminTypes.ts
+var ZONE_RATE_STRATEGY_ID = 2;
+var STATE_COUNT = 32;
+var MAX_CENTS = 1e7;
+var cents2 = external_exports.number().int().min(0).max(MAX_CENTS);
+var shippingConfigRequestSchema = external_exports.strictObject({
+  strategyId: external_exports.number().int().min(1).max(5),
+  isFreeShippingActive: external_exports.boolean(),
+  freeShippingThresholdMxnCents: cents2.nullable()
+}).refine(
+  (body) => body.isFreeShippingActive ? body.freeShippingThresholdMxnCents !== null && body.freeShippingThresholdMxnCents > 0 : body.freeShippingThresholdMxnCents === null
+);
+var ruleSchema = external_exports.strictObject({
+  zoneId: external_exports.number().int().min(1).max(STATE_COUNT),
+  rateMxnCents: cents2
+});
+var shippingRulesRequestSchema = external_exports.strictObject({
+  rules: external_exports.array(ruleSchema).length(STATE_COUNT).refine(
+    (rules) => new Set(rules.map((rule) => rule.zoneId)).size === STATE_COUNT
+  )
+});
+var shippingAdminViewSchema = external_exports.object({
+  config: external_exports.object({
+    strategyId: external_exports.number().int(),
+    isFreeShippingActive: external_exports.boolean(),
+    freeShippingThresholdMxnCents: external_exports.number().int().nullable()
+  }),
+  strategies: external_exports.array(
+    external_exports.object({
+      id: external_exports.number().int(),
+      code: external_exports.string(),
+      nameEs: external_exports.string(),
+      nameEn: external_exports.string(),
+      /** Whether this console edits the rates of the strategy (only `ZONE_RATE`, FC 061 T1.2). */
+      administrable: external_exports.boolean()
+    })
+  ),
+  classes: external_exports.array(
+    external_exports.object({
+      id: external_exports.number().int(),
+      slug: external_exports.string(),
+      nameEs: external_exports.string(),
+      nameEn: external_exports.string()
+    })
+  ),
+  zones: external_exports.array(
+    external_exports.object({
+      id: external_exports.number().int(),
+      code: external_exports.string(),
+      nameEs: external_exports.string(),
+      nameEn: external_exports.string()
+    })
+  ),
+  /** The active `ZONE_RATE` rate of each state that has one. */
+  rules: external_exports.array(ruleSchema)
+});
+
 // src/lib/problem.ts
 var problemSchema = external_exports.object({
   /** Problem type; `about:blank` means "see the status". */
@@ -101808,6 +101865,40 @@ var ROUTE_CONTRACTS = [
       ...SIGNED_IN_REFUSALS
     }
   },
+  // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
+  {
+    method: "GET",
+    path: "/v1/admin/shipping",
+    summary: "The shipping configuration, its catalogs and the rate of each of the 32 states",
+    permission: "shipping:manage",
+    request: {},
+    responses: { 200: shippingAdminViewSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "PUT",
+    path: "/v1/admin/shipping/config",
+    summary: "Sets the active strategy and free shipping (audited)",
+    permission: "shipping:manage",
+    request: { headers: mutationHeaders, body: shippingConfigRequestSchema },
+    responses: {
+      200: shippingAdminViewSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PUT",
+    path: "/v1/admin/shipping/rules",
+    summary: "Replaces the ZONE_RATE rate of the 32 states atomically (audited)",
+    permission: "shipping:manage",
+    request: { headers: mutationHeaders, body: shippingRulesRequestSchema },
+    responses: {
+      200: shippingAdminViewSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
   // FC 029 F2: the catalog backoffice. Every write needs catalog:write and an Idempotency-Key.
   {
     method: "POST",
@@ -101958,7 +102049,8 @@ var PERMISSIONS = [
   "orders:read",
   "catalog:write",
   "users:manage",
-  "audit:read"
+  "audit:read",
+  "shipping:manage"
 ];
 function isPrivileged(roles) {
   return roles.some((role) => role !== "customer");
@@ -102822,6 +102914,188 @@ function registerAdminRoutes(app, deps) {
   });
 }
 
+// src/services/shippingAdmin.ts
+async function readConfig(db) {
+  const [row2] = await db.query(
+    "SELECT active_strategy_id, is_free_shipping_active, free_shipping_threshold_mxn_cents FROM shipping_configs WHERE id = 1"
+  );
+  return {
+    strategyId: row2?.active_strategy_id ?? ZONE_RATE_STRATEGY_ID,
+    isFreeShippingActive: Number(row2?.is_free_shipping_active ?? 0) === 1,
+    freeShippingThresholdMxnCents: row2?.free_shipping_threshold_mxn_cents ?? null
+  };
+}
+async function readRules(db) {
+  const rows = await db.query(
+    `SELECT zone_id, MIN(rate_mxn_cents) AS rate_mxn_cents
+     FROM shipping_rules WHERE strategy_id = ? AND is_active = 1 AND zone_id IS NOT NULL
+     GROUP BY zone_id ORDER BY zone_id`,
+    [ZONE_RATE_STRATEGY_ID]
+  );
+  return rows.map((row2) => ({
+    zoneId: row2.zone_id,
+    rateMxnCents: Number(row2.rate_mxn_cents)
+  }));
+}
+async function readShippingAdmin(db) {
+  const [config2, strategies, classes, zones, rules] = await Promise.all([
+    readConfig(db),
+    db.query(
+      "SELECT id, code, name_es, name_en FROM shipping_strategies WHERE is_active = 1 ORDER BY id"
+    ),
+    db.query(
+      "SELECT id, slug, name_es, name_en FROM shipping_classes WHERE is_active = 1 ORDER BY class_rank"
+    ),
+    db.query(
+      "SELECT id, code, name_es, name_en FROM shipping_zones WHERE is_active = 1 ORDER BY sort_order"
+    ),
+    readRules(db)
+  ]);
+  return {
+    config: config2,
+    strategies: strategies.map((row2) => ({
+      id: row2.id,
+      code: row2.code,
+      nameEs: row2.name_es,
+      nameEn: row2.name_en,
+      administrable: row2.id === ZONE_RATE_STRATEGY_ID
+    })),
+    classes: classes.map((row2) => ({
+      id: row2.id,
+      slug: row2.slug,
+      nameEs: row2.name_es,
+      nameEn: row2.name_en
+    })),
+    zones: zones.map((row2) => ({
+      id: row2.id,
+      code: row2.code,
+      nameEs: row2.name_es,
+      nameEn: row2.name_en
+    })),
+    rules
+  };
+}
+async function updateShippingConfig(tx, body, actor) {
+  const usable = await tx.query(
+    `SELECT r.id FROM shipping_strategies s
+     JOIN shipping_rules r ON r.strategy_id = s.id AND r.is_active = 1
+     WHERE s.id = ? AND s.is_active = 1 LIMIT 1`,
+    [body.strategyId]
+  );
+  if (usable.length === 0) return "SHIPPING_STRATEGY_UNAVAILABLE";
+  const before = await readConfig(tx);
+  await tx.query(
+    `INSERT INTO shipping_configs (id, active_strategy_id, is_free_shipping_active, free_shipping_threshold_mxn_cents)
+     VALUES (1, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE active_strategy_id = VALUES(active_strategy_id),
+       is_free_shipping_active = VALUES(is_free_shipping_active),
+       free_shipping_threshold_mxn_cents = VALUES(free_shipping_threshold_mxn_cents)`,
+    [
+      body.strategyId,
+      body.isFreeShippingActive ? 1 : 0,
+      body.freeShippingThresholdMxnCents
+    ]
+  );
+  const view = await readShippingAdmin(tx);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "SHIPPING_CONFIG_UPDATED",
+    entityType: "shipping_configs",
+    entityId: "1",
+    before,
+    after: view.config,
+    ip: actor.ip
+  });
+  return view;
+}
+async function updateShippingRules(tx, body, actor) {
+  const zones = await tx.query(
+    "SELECT id FROM shipping_zones WHERE is_active = 1"
+  );
+  const known = new Set(zones.map((zone) => zone.id));
+  if (!body.rules.every((rule) => known.has(rule.zoneId))) {
+    return "SHIPPING_ZONE_UNKNOWN";
+  }
+  const before = await readRules(tx);
+  await tx.query("DELETE FROM shipping_rules WHERE strategy_id = ?", [
+    ZONE_RATE_STRATEGY_ID
+  ]);
+  await Promise.all(
+    body.rules.map(
+      (rule) => tx.query(
+        "INSERT INTO shipping_rules (strategy_id, zone_id, rate_mxn_cents) VALUES (?, ?, ?)",
+        [ZONE_RATE_STRATEGY_ID, rule.zoneId, rule.rateMxnCents]
+      )
+    )
+  );
+  const view = await readShippingAdmin(tx);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "SHIPPING_RULES_UPDATED",
+    entityType: "shipping_rules",
+    entityId: "*",
+    before,
+    after: view.rules,
+    ip: actor.ip
+  });
+  return view;
+}
+
+// src/routes/adminShipping.ts
+var REFUSALS2 = {
+  SHIPPING_STRATEGY_UNAVAILABLE: [409, "The strategy has no active rates"],
+  SHIPPING_ZONE_UNKNOWN: [400, "Unknown state"]
+};
+function answerOf(outcome) {
+  if (typeof outcome !== "string") return { status: 200, body: outcome };
+  const [status, title] = REFUSALS2[outcome];
+  return { status, body: problem(status, title, outcome) };
+}
+function registerAdminShippingRoutes(app, deps) {
+  app.get(
+    "/v1/admin/shipping",
+    async () => shippingAdminViewSchema.parse(await readShippingAdmin(deps.db))
+  );
+  app.put("/v1/admin/shipping/config", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = shippingConfigRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx, userId) => answerOf(
+        await updateShippingConfig(tx, body.data, { userId, ip: request.ip })
+      )
+    );
+  });
+  app.put("/v1/admin/shipping/rules", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = shippingRulesRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx, userId) => answerOf(
+        await updateShippingRules(tx, body.data, { userId, ip: request.ip })
+      )
+    );
+  });
+}
+
 // src/services/adminUsers.ts
 var import_node_crypto11 = require("node:crypto");
 
@@ -103045,7 +103319,7 @@ async function updateAdmin(tx, input2, actor) {
 }
 
 // src/routes/adminUsers.ts
-var REFUSALS2 = {
+var REFUSALS3 = {
   OWNER_IMMUTABLE: [403, "The owner account cannot be changed"],
   ADMIN_ALREADY_EXISTS: [409, "Already an administrator"],
   ADMIN_NOT_FOUND: [404, "Not found"]
@@ -103057,11 +103331,11 @@ var notOwner = (reply) => refuse(
   "Only the owner manages administrators",
   "OWNER_ROLE_REQUIRED"
 );
-function answerOf(outcome, created) {
+function answerOf2(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS2[outcome];
+  const [status, title] = REFUSALS3[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminUserRoutes(app, deps) {
@@ -103085,7 +103359,7 @@ function registerAdminUserRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf(
+      async (tx, userId) => answerOf2(
         await createAdmin(
           tx,
           {
@@ -103118,7 +103392,7 @@ function registerAdminUserRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf(
+      async (tx, userId) => answerOf2(
         await updateAdmin(
           tx,
           { id: params.data.id, ...body.data },
@@ -118312,7 +118586,7 @@ async function buildApp(deps) {
   await app.register(import_helmet.default);
   await app.register(import_cors.default, {
     origin: deps.config.corsOrigins,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true
   });
   await app.register(import_rate_limit.default, { max: 120, timeWindow: "1 minute" });
@@ -118396,6 +118670,7 @@ async function buildApp(deps) {
   });
   registerAdminRoutes(app, { db: deps.db, now });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAdminShippingRoutes(app, { db: deps.db, now });
   registerCatalogAdminRoutes(app, {
     db: deps.db,
     now,
@@ -118714,7 +118989,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "6fb56f4b0856752aa0bc6ce305016ba0fdd964a4" : void 0;
+var sha = true ? "bc91c33cef1c2faeb7718b997c283fc5451d2e7e" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
