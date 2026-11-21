@@ -439,6 +439,8 @@ describe('DELETE /v1/account/payment-methods/:id (T1.2 K, S, O, M)', () => {
     expect(model.audit).toHaveLength(1);
     const audited = JSON.stringify(model.audit[0]);
     expect(audited).toContain('PAYMENT_METHOD_DETACHED');
+    // The fingerprint says which card went (T2.6); nothing of the card itself is in the trail.
+    expect(audited).toContain('detached_payment_method_id');
     for (const card of [VISA.id, VISA.last4, 'visa', 'cus_ana']) {
       expect(audited).not.toContain(card);
     }

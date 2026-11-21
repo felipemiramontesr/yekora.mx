@@ -428,14 +428,16 @@ export function registerAccountRoutes(
           if (refusal !== null) {
             return { status: 404, body: problem(404, 'Not found', refusal) };
           }
-          // The audit trail says a card was detached, never which one or anything about it.
+          // The audit trail says a card was detached and leaves its fingerprint, never the card.
           await recordAudit(tx, {
             userId,
             action: 'PAYMENT_METHOD_DETACHED',
             entityType: 'user_stripe_customers',
             entityId: userId,
             before: null,
-            after: null,
+            after: {
+              detached_payment_method_id: fingerprint(params.data.id),
+            },
             ip: request.ip,
           });
           return {

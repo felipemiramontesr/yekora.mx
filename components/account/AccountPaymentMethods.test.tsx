@@ -73,6 +73,11 @@ const listing = (items: SavedCard[]) =>
 
 const replaceState = vi.fn();
 
+/** jsdom has no <dialog> methods: showModal only has to open it, as the browser does. */
+const showModal = vi.fn(function (this: HTMLDialogElement) {
+  this.setAttribute('open', '');
+});
+
 /** The address of the page, with what Stripe may have put in it. */
 function openedAt(search = '') {
   vi.stubGlobal('location', {
@@ -83,6 +88,7 @@ function openedAt(search = '') {
 }
 
 beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = showModal;
   openedAt();
   vi.stubGlobal('history', { replaceState });
 });
@@ -365,6 +371,29 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
       await screen.findByText('Todavía no tienes tarjetas guardadas.')
     ).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('asks in a modal dialog the browser traps focus in, and Escape keeps the card (FC 057 T2.9)', async () => {
+    listing([VISA]);
+    renderCards();
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Eliminar tarjeta: Visa terminada en 4242',
+      })
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: '¿Eliminar esta tarjeta?',
+    });
+    // Opened as a modal, not left open in the flow of the page; «Conservar» takes the focus.
+    expect(showModal).toHaveBeenCalledOnce();
+    expect(dialog.className).toContain('backdrop:');
+    expect(dialog.className).not.toContain('static');
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(api.detach).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', { name: 'Visa terminada en 4242' })
+    ).toBeTruthy();
   });
 
   it('keeps the card when the person changes their mind', async () => {

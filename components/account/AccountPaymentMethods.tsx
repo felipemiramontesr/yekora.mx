@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { Locale, Messages } from '@/app/i18n';
 import type { SavedCard } from '@/lib/account/paymentMethodTypes';
 import {
@@ -248,34 +248,70 @@ function CardRow({
         </button>
       </div>
       {confirming && (
-        <dialog
-          open
-          aria-labelledby={`confirm-${card.id}`}
-          className="static m-0 flex w-full flex-col gap-2 rounded-lg border border-red-800/40 bg-white p-4 text-petroleo"
-        >
-          <p id={`confirm-${card.id}`} className="font-semibold">
-            {texts.confirm.title}
-          </p>
-          <p>{texts.confirm.text}</p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onRemove}
-              className="tap-target rounded-lg bg-red-800 px-5 font-semibold text-white"
-            >
-              {texts.confirm.yes}
-            </button>
-            <button
-              type="button"
-              onClick={onKeep}
-              className="tap-target underline"
-            >
-              {texts.confirm.no}
-            </button>
-          </div>
-        </dialog>
+        <RemoveConfirmation
+          id={card.id}
+          texts={texts}
+          busy={busy}
+          onRemove={onRemove}
+          onKeep={onKeep}
+        />
       )}
     </li>
+  );
+}
+
+/**
+ * The confirmation before a card is removed (FC 057 T2.9): a native modal `<dialog>`, so the
+ * browser traps the focus inside, dims the page behind and closes it with Escape. Focus starts on
+ * «Conservar», the safe answer, and nothing is detached until «Sí, eliminar».
+ */
+function RemoveConfirmation({
+  id,
+  texts,
+  busy,
+  onRemove,
+  onKeep,
+}: Readonly<{
+  id: string;
+  texts: CardTexts;
+  busy: boolean;
+  onRemove: () => void;
+  onKeep: () => void;
+}>) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      aria-labelledby={`confirm-${id}`}
+      // Escape closes a modal dialog: the card is kept.
+      onCancel={onKeep}
+      className="m-auto w-[min(28rem,calc(100%-2rem))] flex-col gap-3 rounded-lg border border-red-800/40 bg-white p-5 text-petroleo open:flex backdrop:bg-petroleo/60"
+    >
+      <p id={`confirm-${id}`} className="font-semibold">
+        {texts.confirm.title}
+      </p>
+      <p>{texts.confirm.text}</p>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRemove}
+          className="tap-target rounded-lg bg-red-800 px-5 font-semibold text-white"
+        >
+          {texts.confirm.yes}
+        </button>
+        <button
+          type="button"
+          autoFocus
+          onClick={onKeep}
+          className="tap-target underline"
+        >
+          {texts.confirm.no}
+        </button>
+      </div>
+    </dialog>
   );
 }
