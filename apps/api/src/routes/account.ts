@@ -23,6 +23,7 @@
  *
  * @module
  */
+import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   addressListSchema,
@@ -37,6 +38,7 @@ import {
 import { meResponseSchema } from '../../../../lib/account/authTypes';
 import {
   paymentMethodDetachResponseSchema,
+  paymentMethodSettleResponseSchema,
   paymentMethodListResponseSchema,
   paymentMethodParams,
   paymentMethodSetupResponseSchema,
@@ -70,6 +72,7 @@ import { listOrders } from '../services/orderReads';
 import {
   detachSavedCard,
   listSavedCards,
+  settleSavedCards,
   startCardSetup,
 } from '../services/accountPaymentMethods';
 import { PaymentProcessorError } from '../services/paymentPort';
@@ -91,6 +94,18 @@ interface AccountDeps {
   /** Public site, where Stripe returns the person after adding a card. */
   siteUrl: string;
 }
+
+/** FC 057 T2.5: the routes of the cards answer 10 requests a minute from one address. */
+const CARDS_LIMIT = {
+  config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+};
+
+/** What the person finds in the address when Stripe sends them back after adding a card (FC 057). */
+const CARD_ADDED_MARK = '?setup=done';
+
+/** A fingerprint of a Stripe card id for the audit trail: it identifies the card, never says which. */
+const fingerprint = (id: string) =>
+  createHash('sha256').update(id).digest('hex').slice(0, 16);
 
 /** Where Stripe sends the person back to, by language (FC 054 T2.4). */
 const CARDS_PAGE = {
@@ -326,101 +341,178 @@ export function registerAccountRoutes(
     });
   });
 
-  app.get('/v1/account/payment-methods', async (request, reply) => {
-    if (deps.cards === null) {
-      return refuse(
-        reply,
-        503,
-        'Cards cannot be read right now',
-        'SERVICE_UNAVAILABLE'
-      );
-    }
-    try {
-      const saved = await listSavedCards(
-        deps.db,
-        deps.cards,
-        (request.user as SessionUser).userId
-      );
-      return paymentMethodListResponseSchema.parse(saved);
-    } catch (error) {
-      if (!(error instanceof PaymentProcessorError)) throw error;
-      request.log.warn(
-        { err: error },
-        `saved cards: Stripe refused the list: ${error.message}`
-      );
-      return refuse(reply, 503, 'Stripe did not answer', 'SERVICE_UNAVAILABLE');
-    }
-  });
-
-  app.post('/v1/account/payment-methods/setup', async (request, reply) => {
-    const gate = cardsWriteGate(deps, request, reply);
-    if (gate === null) return reply;
-    const lang =
-      (request.query as { lang?: unknown }).lang === 'en' ? 'en' : 'es-MX';
-    const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+  app.get(
+    '/v1/account/payment-methods',
+    CARDS_LIMIT,
+    async (request, reply) => {
+      if (deps.cards === null) {
+        return refuse(
+          reply,
+          503,
+          'Cards cannot be read right now',
+          'SERVICE_UNAVAILABLE'
+        );
+      }
       try {
-        const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
-          successUrl: page,
-          cancelUrl: page,
-        });
-        return {
-          status: 201,
-          body: paymentMethodSetupResponseSchema.parse({ redirectUrl }),
-        };
+        const saved = await listSavedCards(
+          deps.db,
+          deps.cards,
+          (request.user as SessionUser).userId
+        );
+        return paymentMethodListResponseSchema.parse(saved);
       } catch (error) {
         if (!(error instanceof PaymentProcessorError)) throw error;
         request.log.warn(
           { err: error },
-          `saved cards: Stripe refused the setup: ${error.message}`
+          `saved cards: Stripe refused the list: ${error.message}`
         );
-        return stripeDown();
+        return refuse(
+          reply,
+          503,
+          'Stripe did not answer',
+          'SERVICE_UNAVAILABLE'
+        );
       }
-    });
-  });
-
-  app.delete('/v1/account/payment-methods/:id', async (request, reply) => {
-    const gate = cardsWriteGate(deps, request, reply);
-    if (gate === null) return reply;
-    const params = paymentMethodParams.safeParse(request.params);
-    if (!params.success) {
-      return refuse(reply, 404, 'Not found', 'PAYMENT_METHOD_NOT_FOUND');
     }
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
-      try {
-        const refusal = await detachSavedCard(
-          tx,
-          gate.cards,
-          userId,
-          params.data.id
-        );
-        if (refusal !== null) {
-          return { status: 404, body: problem(404, 'Not found', refusal) };
+  );
+
+  app.post(
+    '/v1/account/payment-methods/setup',
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      const lang =
+        (request.query as { lang?: unknown }).lang === 'en' ? 'en' : 'es-MX';
+      const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
+            successUrl: `${page}${CARD_ADDED_MARK}`,
+            cancelUrl: page,
+          });
+          return {
+            status: 201,
+            body: paymentMethodSetupResponseSchema.parse({ redirectUrl }),
+          };
+        } catch (error) {
+          if (!(error instanceof PaymentProcessorError)) throw error;
+          request.log.warn(
+            { err: error },
+            `saved cards: Stripe refused the setup: ${error.message}`
+          );
+          return stripeDown();
         }
-        // The audit trail says a card was detached, never which one or anything about it.
-        await recordAudit(tx, {
-          userId,
-          action: 'PAYMENT_METHOD_DETACHED',
-          entityType: 'user_stripe_customers',
-          entityId: userId,
-          before: null,
-          after: null,
-          ip: request.ip,
-        });
-        return {
-          status: 200,
-          body: paymentMethodDetachResponseSchema.parse({ detached: true }),
-        };
-      } catch (error) {
-        if (!(error instanceof PaymentProcessorError)) throw error;
-        request.log.warn(
-          { err: error },
-          `saved cards: Stripe refused the detach: ${error.message}`
-        );
-        return stripeDown();
+      });
+    }
+  );
+
+  app.delete(
+    '/v1/account/payment-methods/:id',
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      const params = paymentMethodParams.safeParse(request.params);
+      if (!params.success) {
+        return refuse(reply, 404, 'Not found', 'PAYMENT_METHOD_NOT_FOUND');
       }
-    });
-  });
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const refusal = await detachSavedCard(
+            tx,
+            gate.cards,
+            userId,
+            params.data.id
+          );
+          if (refusal !== null) {
+            return { status: 404, body: problem(404, 'Not found', refusal) };
+          }
+          // The audit trail says a card was detached, never which one or anything about it.
+          await recordAudit(tx, {
+            userId,
+            action: 'PAYMENT_METHOD_DETACHED',
+            entityType: 'user_stripe_customers',
+            entityId: userId,
+            before: null,
+            after: null,
+            ip: request.ip,
+          });
+          return {
+            status: 200,
+            body: paymentMethodDetachResponseSchema.parse({ detached: true }),
+          };
+        } catch (error) {
+          if (!(error instanceof PaymentProcessorError)) throw error;
+          request.log.warn(
+            { err: error },
+            `saved cards: Stripe refused the detach: ${error.message}`
+          );
+          return stripeDown();
+        }
+      });
+    }
+  );
+
+  app.post(
+    '/v1/account/payment-methods/settle',
+    CARDS_LIMIT,
+    async (request, reply) => {
+      const gate = cardsWriteGate(deps, request, reply);
+      if (gate === null) return reply;
+      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+        try {
+          const settled = await settleSavedCards(tx, gate.cards, userId);
+          if (settled === 'CARD_ATTACH_FAILED') {
+            return {
+              status: 400,
+              body: problem(400, 'No card was saved', settled),
+            };
+          }
+          if (settled === 'GATEWAY_DETACH_FAILED') {
+            return {
+              status: 502,
+              body: problem(502, 'The previous card was not detached', settled),
+            };
+          }
+          const replaced = settled.replaced.length > 0;
+          // The trail says a card was saved or replaced, by fingerprints only, never by card data.
+          await recordAudit(tx, {
+            userId,
+            action: replaced
+              ? 'PAYMENT_METHOD_REPLACED'
+              : 'PAYMENT_METHOD_SAVED',
+            entityType: 'user_stripe_customers',
+            entityId: userId,
+            before: null,
+            after: {
+              new_payment_method_id: fingerprint(settled.card.id),
+              ...(replaced && {
+                replaced_payment_method_id: fingerprint(
+                  settled.replaced.join(',')
+                ),
+              }),
+            },
+            ip: request.ip,
+          });
+          return {
+            status: 200,
+            body: paymentMethodSettleResponseSchema.parse({
+              status: replaced ? 'replaced' : 'saved',
+              paymentMethod: settled.card,
+            }),
+          };
+        } catch (error) {
+          if (!(error instanceof PaymentProcessorError)) throw error;
+          request.log.warn(
+            { err: error },
+            `saved cards: Stripe refused the settle: ${error.message}`
+          );
+          return stripeDown();
+        }
+      });
+    }
+  );
 
   app.post('/v1/account/forget-device', async (request, reply) => {
     const token = readDeviceToken(request.headers.cookie);

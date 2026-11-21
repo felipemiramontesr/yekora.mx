@@ -43,6 +43,7 @@ const INVENTORY = [
   '├── /v1/account/profile (PATCH)',
   '├── /v1/account/payment-methods (GET, HEAD)',
   '│   ├── /setup (POST)',
+  '│   ├── /settle (POST)',
   '│   └── /:id (DELETE)',
   '├── /v1/account/addresses (GET, HEAD, POST)',
   '│   └── /:id (PATCH, DELETE)',

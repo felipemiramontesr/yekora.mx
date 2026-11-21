@@ -84,6 +84,7 @@ import {
   paymentMethodDetachResponseSchema,
   paymentMethodListResponseSchema,
   paymentMethodParams,
+  paymentMethodSettleResponseSchema,
   paymentMethodSetupResponseSchema,
 } from '../../../lib/account/paymentMethodTypes';
 import { languageQuery } from './lib/language';
@@ -518,6 +519,21 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       201: paymentMethodSetupResponseSchema,
       400: problemSchema,
       409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/payment-methods/settle',
+    summary:
+      'Leaves the account with its newest card at Stripe and detaches the older ones: one card per account (FC 057)',
+    permission: 'account:self',
+    request: { headers: mutationHeaders },
+    responses: {
+      200: paymentMethodSettleResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

@@ -159,6 +159,13 @@
           ]
         },
         {
+          "title": "Saved card, Stripe Link and digital wallets",
+          "paragraphs": [
+            "YĒKORA lets you save at most one card per account to speed up your future purchases: adding a new one replaces the previous one. The store does not store your card details or have access to the full number or the security code: Stripe, Inc. captures and keeps them, and YĒKORA only keeps the opaque identifier of your customer at Stripe.",
+            "Stripe Link and digital wallets (Apple Pay and Google Pay) are services operated independently by Stripe, Inc. and by device manufacturers. Removing or replacing your card at YĒKORA does not modify or delete the payment methods saved in your Link profile or on your device, which you must manage directly in Link (“Edit wallet”) or in your device’s settings."
+          ]
+        },
+        {
           "title": "Changes to this notice",
           "paragraphs": [
             "When this notice changes, we will publish the new version on this page with its update date."
@@ -292,6 +299,13 @@
           "title": "Location and delivery postal code",
           "paragraphs": [
             "The postal code, or the abbreviated state, shown in the header is a reference: it may come from your account’s default address or, if you allowed it in the cookie notice, from your browser’s approximate location. To get it, your browser sends your coordinates to BigDataCloud and to OpenStreetMap Nominatim, as the Privacy notice explains. It does not set shipping or its cost; both are calculated from the address you enter at checkout."
+          ]
+        },
+        {
+          "title": "Saved card, Stripe Link and digital wallets",
+          "paragraphs": [
+            "YĒKORA lets you save at most one card per account to speed up your future purchases: adding a new one replaces the previous one. The store does not store your card details or have access to the full number or the security code: Stripe, Inc. captures and keeps them, and YĒKORA only keeps the opaque identifier of your customer at Stripe.",
+            "Stripe Link and digital wallets (Apple Pay and Google Pay) are services operated independently by Stripe, Inc. and by device manufacturers. Removing or replacing your card at YĒKORA does not modify or delete the payment methods saved in your Link profile or on your device, which you must manage directly in Link (“Edit wallet”) or in your device’s settings."
           ]
         },
         {
@@ -1502,7 +1516,7 @@
     "sessionLoading": "Confirming your session…",
     "paymentMethods": {
       "title": "Your saved cards",
-      "intro": "Save a card to pay faster. Stripe captures and keeps your card details; YĒKORA never receives them. We only show the brand, the last 4 digits and the expiry here.",
+      "intro": "You can save one card to pay faster; if you add another, it replaces the previous one. Stripe captures and keeps your card details; YĒKORA never receives them. Here we only show the brand, the last 4 digits and the expiry.",
       "loading": "Loading your cards…",
       "empty": "You have no saved cards yet.",
       "cardName": "{brand} ending in {last4}",
@@ -1510,7 +1524,7 @@
       "add": "Add a card",
       "adding": "Opening Stripe’s secure page…",
       "addHint": "We take you to Stripe’s secure page to enter your card. When you finish you come back here.",
-      "remove": "Remove",
+      "remove": "Remove card",
       "removed": "We removed the card from your account.",
       "confirm": {
         "title": "Remove this card?",
@@ -1541,7 +1555,16 @@
         "timeout": "The request took too long. Try again.",
         "server": "We could not complete the request. Try again.",
         "invalid": "We could not complete the request. Try again.",
-        "unknown": "We could not complete the request. Try again."
+        "unknown": "We could not complete the request. Try again.",
+        "CARD_ATTACH_FAILED": "We did not find a new card. Try adding it again.",
+        "GATEWAY_DETACH_FAILED": "We saved your new card, but could not remove the previous one. Try again in a moment."
+      },
+      "replace": "Replace card",
+      "saved": "We saved your card.",
+      "replaced": "Your new card replaced the previous one.",
+      "wallets": {
+        "title": "Stripe Link and digital wallets",
+        "text": "Stripe Link and digital wallets (Apple Pay and Google Pay) are independent services of Stripe, Inc. and of your device’s manufacturer. Removing or replacing your card at YĒKORA does not delete the cards you saved in Link or on your device: manage them from Link (“Edit wallet”) or from your device’s settings."
       }
     }
   }

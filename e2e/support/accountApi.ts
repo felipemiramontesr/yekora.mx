@@ -341,6 +341,15 @@ export const E2E_VISA: E2eCard = {
   expYear: 2031,
 };
 
+/** The card a person types on Stripe's page in the emulated «add a card» (FC 057). */
+export const E2E_NEW_CARD: E2eCard = {
+  id: 'pm_1E2eMaster0002',
+  brand: 'mastercard',
+  last4: '5100',
+  expMonth: 11,
+  expYear: 2032,
+};
+
 /** Where the emulated «add a card» sends the browser: Stripe's own host, which a test intercepts. */
 export const E2E_CARD_SETUP_PAGE =
   'https://checkout.stripe.com/c/setup/cs_test_e2e';
@@ -603,18 +612,36 @@ function answerAccount(
   return answerOrders(route);
 }
 
-/** Answers `/v1/account/payment-methods`: list, open Stripe's page to add one, detach one (FC 054). */
+/**
+ * Answers `/v1/account/payment-methods`: list (the newest first), open Stripe's page to add one
+ * (where the person «types» a new card, so it is already at Stripe when they come back), settle the
+ * account to its newest card, and detach one (FC 054, FC 057).
+ */
 function answerCards(route: Route, data: AccountData) {
   const request = route.request();
   const path = new URL(request.url()).pathname;
   if (request.method() === 'GET') {
     return json(route, 200, {
-      items: data.cards,
+      items: [...data.cards].reverse(),
       hasCustomer: data.cards.length > 0,
     });
   }
   if (path.endsWith('/setup')) {
+    data.cards.push({
+      ...E2E_NEW_CARD,
+      id: `pm_1E2eAdded${data.cards.length}`,
+    });
     return json(route, 201, { redirectUrl: E2E_CARD_SETUP_PAGE });
+  }
+  if (path.endsWith('/settle')) {
+    const newest = data.cards.at(-1);
+    if (newest === undefined) return problem(route, 400, 'CARD_ATTACH_FAILED');
+    const replaced = data.cards.length > 1;
+    data.cards = [newest];
+    return json(route, 200, {
+      status: replaced ? 'replaced' : 'saved',
+      paymentMethod: newest,
+    });
   }
   const id = path.split('/').pop();
   const found = data.cards.some((card) => card.id === id);

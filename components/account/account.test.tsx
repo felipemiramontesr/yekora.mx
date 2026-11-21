@@ -62,6 +62,7 @@ vi.mock('@/lib/api/accountDataClient', () => ({
 
 vi.mock('@/lib/api/paymentMethodsClient', () => ({
   listPaymentMethods: vi.fn(),
+  settlePaymentMethods: vi.fn(),
   startPaymentMethodSetup: vi.fn(),
   detachPaymentMethod: vi.fn(),
 }));

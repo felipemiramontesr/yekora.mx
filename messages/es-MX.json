@@ -159,6 +159,13 @@
           ]
         },
         {
+          "title": "Tarjeta guardada, Stripe Link y carteras digitales",
+          "paragraphs": [
+            "YĒKORA permite guardar como máximo una tarjeta por cuenta para agilizar tus compras futuras: al agregar una nueva, reemplaza a la anterior. La tienda no almacena datos de tu tarjeta ni tiene acceso al número completo ni al código de seguridad: los captura y conserva Stripe, Inc. y YĒKORA solo guarda el identificador opaco de tu cliente en Stripe.",
+            "Stripe Link y las carteras digitales (Apple Pay y Google Pay) son servicios operados de forma independiente por Stripe, Inc. y por los fabricantes de los dispositivos. Eliminar o reemplazar tu tarjeta en YĒKORA no modifica ni elimina los métodos de pago guardados en tu perfil de Link ni en tu dispositivo, que debes administrar directamente en Link («Edit wallet») o en los ajustes de tu dispositivo."
+          ]
+        },
+        {
           "title": "Cambios a este aviso",
           "paragraphs": [
             "Cuando cambie este aviso publicaremos la nueva versión en esta página con su fecha de actualización."
@@ -292,6 +299,13 @@
           "title": "Ubicación y código postal de entrega",
           "paragraphs": [
             "El código postal, o el estado abreviado, que se muestra en el encabezado es una referencia: puede provenir del domicilio predeterminado de tu cuenta o, si lo permitiste en el aviso de cookies, de la ubicación aproximada de tu navegador. Para obtenerlo, tu navegador envía tus coordenadas a BigDataCloud y a OpenStreetMap Nominatim, como explica el Aviso de privacidad. No fija el envío ni el costo; ambos se calculan con el domicilio que captures al pagar."
+          ]
+        },
+        {
+          "title": "Tarjeta guardada, Stripe Link y carteras digitales",
+          "paragraphs": [
+            "YĒKORA permite guardar como máximo una tarjeta por cuenta para agilizar tus compras futuras: al agregar una nueva, reemplaza a la anterior. La tienda no almacena datos de tu tarjeta ni tiene acceso al número completo ni al código de seguridad: los captura y conserva Stripe, Inc. y YĒKORA solo guarda el identificador opaco de tu cliente en Stripe.",
+            "Stripe Link y las carteras digitales (Apple Pay y Google Pay) son servicios operados de forma independiente por Stripe, Inc. y por los fabricantes de los dispositivos. Eliminar o reemplazar tu tarjeta en YĒKORA no modifica ni elimina los métodos de pago guardados en tu perfil de Link ni en tu dispositivo, que debes administrar directamente en Link («Edit wallet») o en los ajustes de tu dispositivo."
           ]
         },
         {
@@ -1502,7 +1516,7 @@
     "sessionLoading": "Confirmando tu sesión…",
     "paymentMethods": {
       "title": "Tus tarjetas guardadas",
-      "intro": "Guarda una tarjeta para pagar más rápido. Tus datos de tarjeta los captura y conserva Stripe; YĒKORA nunca los recibe. Aquí solo mostramos la marca, los últimos 4 dígitos y el vencimiento.",
+      "intro": "Puedes guardar una tarjeta para pagar más rápido; si agregas otra, reemplaza a la anterior. Tus datos de tarjeta los captura y conserva Stripe; YĒKORA nunca los recibe. Aquí solo mostramos la marca, los últimos 4 dígitos y el vencimiento.",
       "loading": "Cargando tus tarjetas…",
       "empty": "Todavía no tienes tarjetas guardadas.",
       "cardName": "{brand} terminada en {last4}",
@@ -1510,7 +1524,7 @@
       "add": "Agregar tarjeta",
       "adding": "Abriendo la página segura de Stripe…",
       "addHint": "Te llevamos a la página segura de Stripe para escribir tu tarjeta. Al terminar regresas aquí.",
-      "remove": "Eliminar",
+      "remove": "Eliminar tarjeta",
       "removed": "Eliminamos la tarjeta de tu cuenta.",
       "confirm": {
         "title": "¿Eliminar esta tarjeta?",
@@ -1541,7 +1555,16 @@
         "timeout": "La solicitud tardó demasiado. Intenta de nuevo.",
         "server": "No pudimos completar la solicitud. Intenta de nuevo.",
         "invalid": "No pudimos completar la solicitud. Intenta de nuevo.",
-        "unknown": "No pudimos completar la solicitud. Intenta de nuevo."
+        "unknown": "No pudimos completar la solicitud. Intenta de nuevo.",
+        "CARD_ATTACH_FAILED": "No encontramos una tarjeta nueva. Intenta agregarla de nuevo.",
+        "GATEWAY_DETACH_FAILED": "Guardamos tu tarjeta nueva, pero no pudimos quitar la anterior. Intenta de nuevo en un momento."
+      },
+      "replace": "Reemplazar tarjeta",
+      "saved": "Guardamos tu tarjeta.",
+      "replaced": "Tu tarjeta nueva reemplazó a la anterior.",
+      "wallets": {
+        "title": "Stripe Link y carteras digitales",
+        "text": "Stripe Link y las carteras digitales (Apple Pay y Google Pay) son servicios independientes de Stripe, Inc. y de los fabricantes de tu dispositivo. Eliminar o reemplazar tu tarjeta en YĒKORA no borra las tarjetas que hayas guardado en Link o en tu dispositivo: adminístralas desde Link («Edit wallet») o desde los ajustes de tu dispositivo."
       }
     }
   }

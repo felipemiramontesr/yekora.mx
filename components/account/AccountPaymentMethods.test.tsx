@@ -13,6 +13,7 @@ import type { SavedCard } from '@/lib/account/paymentMethodTypes';
 import {
   detachPaymentMethod,
   listPaymentMethods,
+  settlePaymentMethods,
   startPaymentMethodSetup,
 } from '@/lib/api/paymentMethodsClient';
 import { AccountPaymentMethods } from './AccountPaymentMethods';
@@ -20,12 +21,14 @@ import { AccountPaymentMethods } from './AccountPaymentMethods';
 vi.mock('@/lib/api/paymentMethodsClient', () => ({
   detachPaymentMethod: vi.fn(),
   listPaymentMethods: vi.fn(),
+  settlePaymentMethods: vi.fn(),
   startPaymentMethodSetup: vi.fn(),
 }));
 
 const api = {
   detach: vi.mocked(detachPaymentMethod),
   list: vi.mocked(listPaymentMethods),
+  settle: vi.mocked(settlePaymentMethods),
   setup: vi.mocked(startPaymentMethodSetup),
 };
 
@@ -68,8 +71,20 @@ function renderCards(locale: Locale = 'es-MX') {
 const listing = (items: SavedCard[]) =>
   api.list.mockResolvedValue(ok({ items, hasCustomer: items.length > 0 }));
 
+const replaceState = vi.fn();
+
+/** The address of the page, with what Stripe may have put in it. */
+function openedAt(search = '') {
+  vi.stubGlobal('location', {
+    assign,
+    search,
+    pathname: '/cuenta/metodos-pago/',
+  });
+}
+
 beforeEach(() => {
-  vi.stubGlobal('location', { assign });
+  openedAt();
+  vi.stubGlobal('history', { replaceState });
 });
 
 afterEach(() => {
@@ -79,8 +94,8 @@ afterEach(() => {
 });
 
 describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
-  it('shows each card with its brand, last four digits and expiry, and nothing else', async () => {
-    listing([VISA, AMEX, UNKNOWN]);
+  it('shows the one card with its brand, last four digits and expiry, and nothing else, with no default selector and no list', async () => {
+    listing([VISA]);
     renderCards();
     expect(screen.getByText('Cargando tus tarjetas…')).toBeTruthy();
     expect(
@@ -88,18 +103,142 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
     ).toBeTruthy();
     expect(screen.getByText('Vence 03/2031')).toBeTruthy();
     expect(
+      screen.queryByText('Todavía no tienes tarjetas guardadas.')
+    ).toBeNull();
+    expect(screen.queryByText(/predeterminad/i)).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('names a brand the page does not list as a card, never an empty name', async () => {
+    listing([UNKNOWN]);
+    renderCards();
+    expect(
+      await screen.findByRole('heading', { name: 'Tarjeta terminada en 1111' })
+    ).toBeTruthy();
+  });
+
+  it('offers to replace the card, not to add another, when there is one (FC 057 T2.1)', async () => {
+    listing([VISA]);
+    renderCards();
+    expect(
+      await screen.findByRole('button', { name: 'Reemplazar tarjeta' })
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Agregar tarjeta' })
+    ).toBeNull();
+  });
+
+  it('says Stripe Link and the wallets are independent services, in both languages (FC 057 T2.4)', async () => {
+    listing([VISA]);
+    renderCards();
+    const section = await screen.findByRole('region', {
+      name: 'Stripe Link y carteras digitales',
+    });
+    expect(within(section).getByText(/servicios independientes/)).toBeTruthy();
+    expect(within(section).getByText(/no borra las tarjetas/)).toBeTruthy();
+    cleanup();
+    listing([VISA]);
+    renderCards('en');
+    const english = await screen.findByRole('region', {
+      name: 'Stripe Link and digital wallets',
+    });
+    expect(within(english).getByText(/independent services/)).toBeTruthy();
+    expect(within(english).getByText(/does not delete/)).toBeTruthy();
+  });
+
+  it('settles a card just added when Stripe sends the person back, tells it, and clears the mark from the address', async () => {
+    openedAt('?setup=done');
+    api.settle.mockResolvedValue(
+      ok({ status: 'replaced' as const, paymentMethod: AMEX })
+    );
+    listing([AMEX]);
+    renderCards();
+    expect(
+      await screen.findByText('Tu tarjeta nueva reemplazó a la anterior.')
+    ).toBeTruthy();
+    expect(api.settle).toHaveBeenCalledOnce();
+    expect(replaceState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/cuenta/metodos-pago/'
+    );
+    expect(
+      await screen.findByRole('heading', {
+        name: 'American Express terminada en 0005',
+      })
+    ).toBeTruthy();
+  });
+
+  it('says the card was saved when it is the first one', async () => {
+    openedAt('?a=1&setup=done');
+    api.settle.mockResolvedValue(
+      ok({ status: 'saved' as const, paymentMethod: VISA })
+    );
+    listing([VISA]);
+    renderCards();
+    expect(await screen.findByText('Guardamos tu tarjeta.')).toBeTruthy();
+  });
+
+  it('says why the new card could not be settled, and lets the person try again', async () => {
+    openedAt('?setup=done');
+    api.settle.mockResolvedValue(no('CARD_ATTACH_FAILED'));
+    listing([]);
+    renderCards();
+    expect(
+      await screen.findByText(
+        'No encontramos una tarjeta nueva. Intenta agregarla de nuevo.'
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Agregar tarjeta' })
+    ).toBeTruthy();
+  });
+
+  it('does not settle when the person comes back without the mark, or after giving up at Stripe', async () => {
+    openedAt('?other=1');
+    listing([VISA]);
+    renderCards();
+    await screen.findByRole('heading', { name: 'Visa terminada en 4242' });
+    expect(api.settle).not.toHaveBeenCalled();
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it('leaves only the newest card when Stripe still holds more than one, and says so', async () => {
+    api.list
+      .mockResolvedValueOnce(ok({ items: [AMEX, VISA], hasCustomer: true }))
+      .mockResolvedValueOnce(ok({ items: [AMEX], hasCustomer: true }));
+    api.settle.mockResolvedValue(
+      ok({ status: 'replaced' as const, paymentMethod: AMEX })
+    );
+    renderCards();
+    expect(
+      await screen.findByText('Tu tarjeta nueva reemplazó a la anterior.')
+    ).toBeTruthy();
+    expect(api.settle).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'American Express terminada en 0005',
+      })
+    ).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('says why the older card could not be removed and still shows only the newest', async () => {
+    api.list.mockResolvedValue(ok({ items: [AMEX, VISA], hasCustomer: true }));
+    api.settle.mockResolvedValue(no('GATEWAY_DETACH_FAILED'));
+    renderCards();
+    expect(
+      await screen.findByText(
+        'Guardamos tu tarjeta nueva, pero no pudimos quitar la anterior. Intenta de nuevo en un momento.'
+      )
+    ).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(
       screen.getByRole('heading', {
         name: 'American Express terminada en 0005',
       })
     ).toBeTruthy();
-    expect(screen.getByText('Vence 11/2029')).toBeTruthy();
-    // A brand the page does not list is still a card, never an empty name.
-    expect(
-      screen.getByRole('heading', { name: 'Tarjeta terminada en 1111' })
-    ).toBeTruthy();
-    expect(
-      screen.queryByText('Todavía no tienes tarjetas guardadas.')
-    ).toBeNull();
   });
 
   it('says there are no cards, in English too, and explains where the card is typed', async () => {
@@ -112,6 +251,9 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
       screen.getByText(/Stripe captures and keeps your card details/)
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add a card' })).toBeTruthy();
+    expect(
+      screen.getByText(/if you add another, it replaces the previous one/)
+    ).toBeTruthy();
   });
 
   it('tells that Mercado Pago manages its own methods and keeps nothing here (T2.4)', async () => {
@@ -190,13 +332,13 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
 
   it('asks before removing, removes only after the yes, and tells it through the live region', async () => {
     api.list
-      .mockResolvedValueOnce(ok({ items: [VISA, AMEX], hasCustomer: true }))
-      .mockResolvedValueOnce(ok({ items: [AMEX], hasCustomer: true }));
+      .mockResolvedValueOnce(ok({ items: [VISA], hasCustomer: true }))
+      .mockResolvedValueOnce(ok({ items: [], hasCustomer: false }));
     api.detach.mockResolvedValue(ok({ detached: true as const }));
     renderCards();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Eliminar: Visa terminada en 4242',
+        name: 'Eliminar tarjeta: Visa terminada en 4242',
       })
     );
     expect(api.detach).not.toHaveBeenCalled();
@@ -220,9 +362,7 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
       screen.queryByRole('heading', { name: 'Visa terminada en 4242' })
     ).toBeNull();
     expect(
-      screen.getByRole('heading', {
-        name: 'American Express terminada en 0005',
-      })
+      await screen.findByText('Todavía no tienes tarjetas guardadas.')
     ).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -232,7 +372,7 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
     renderCards();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Eliminar: Visa terminada en 4242',
+        name: 'Eliminar tarjeta: Visa terminada en 4242',
       })
     );
     fireEvent.click(screen.getByRole('button', { name: 'Conservar' }));
@@ -251,7 +391,7 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
     renderCards();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Eliminar: Visa terminada en 4242',
+        name: 'Eliminar tarjeta: Visa terminada en 4242',
       })
     );
     fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
@@ -269,7 +409,7 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
     renderCards();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Eliminar: Visa terminada en 4242',
+        name: 'Eliminar tarjeta: Visa terminada en 4242',
       })
     );
     fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
@@ -301,11 +441,11 @@ describe('AccountPaymentMethods (FC 054 F1, T2.4, T2.6)', () => {
     listing([VISA]);
     renderCards();
     const remove = await screen.findByRole('button', {
-      name: 'Eliminar: Visa terminada en 4242',
+      name: 'Eliminar tarjeta: Visa terminada en 4242',
     });
     expect(remove.className).toContain('tap-target');
     expect(
-      screen.getByRole('button', { name: 'Agregar tarjeta' }).className
+      screen.getByRole('button', { name: 'Reemplazar tarjeta' }).className
     ).toContain('tap-target');
     fireEvent.click(remove);
     for (const name of ['Sí, eliminar', 'Conservar']) {

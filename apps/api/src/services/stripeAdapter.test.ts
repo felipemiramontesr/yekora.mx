@@ -429,8 +429,13 @@ describe('createStripeCards (FC 054: the cards live at Stripe)', () => {
       data: [
         {
           id: 'pm_1',
+          created: 1_700_000_000,
           card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2030 },
           billing_details: { name: 'Ana Pérez', email: 'ana@example.test' },
+        },
+        {
+          id: 'pm_3',
+          card: { brand: 'visa', last4: '4444', exp_month: 1, exp_year: 2031 },
         },
         { id: 'pm_2', card: { brand: 'visa', last4: '1111' } },
         {
@@ -439,8 +444,25 @@ describe('createStripeCards (FC 054: the cards live at Stripe)', () => {
       ],
     });
     const found = await createStripeCards(SECRETS, mock).listCards('cus_123');
+    // Stripe says when each card was attached (the newest one is the card an account keeps, FC 057);
+    // one that says nothing counts as the oldest.
     expect(found).toEqual([
-      { id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+      {
+        id: 'pm_1',
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 12,
+        expYear: 2030,
+        created: 1_700_000_000,
+      },
+      {
+        id: 'pm_3',
+        brand: 'visa',
+        last4: '4444',
+        expMonth: 1,
+        expYear: 2031,
+        created: 0,
+      },
     ]);
     expect(urlOf(mock)).toBe(
       'https://api.stripe.com/v1/customers/cus_123/payment_methods?type=card&limit=100'

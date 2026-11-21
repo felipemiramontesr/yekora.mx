@@ -311,6 +311,8 @@ interface StripeCard {
   expMonth: number;
   /** Year of expiry. */
   expYear: number;
+  /** When Stripe attached it, in seconds since 1970: the newest card is the one an account keeps. */
+  created: number;
 }
 
 /** What the account area needs from Stripe to keep cards for later purchases (FC 054). */
@@ -398,7 +400,11 @@ export function createStripeCards(
       )) as { data?: unknown };
       const rows = Array.isArray(body.data) ? body.data : [];
       return rows.flatMap((row: unknown) => {
-        const method = row as { id?: unknown; card?: Record<string, unknown> };
+        const method = row as {
+          id?: unknown;
+          created?: unknown;
+          card?: Record<string, unknown>;
+        };
         const id = textOrNull(method.id);
         const brand = textOrNull(method.card?.brand);
         const last4 = textOrNull(method.card?.last4);
@@ -416,6 +422,9 @@ export function createStripeCards(
                 last4,
                 expMonth: month as number,
                 expYear: year as number,
+                created: Number.isInteger(method.created)
+                  ? (method.created as number)
+                  : 0,
               },
             ]
           : [];

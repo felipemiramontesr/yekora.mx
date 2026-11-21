@@ -46,6 +46,37 @@ describe('LegalView', () => {
     }
   });
 
+  it('privacy notice and terms say one card is kept, that Stripe holds it, and that Link and the wallets are independent, in both languages (FC 057 T2.4)', () => {
+    const expected = {
+      'es-MX': [
+        'como máximo una tarjeta',
+        'Stripe Link',
+        'Apple Pay',
+        'Google Pay',
+        'no modifica ni elimina',
+        'Edit wallet',
+      ],
+      en: [
+        'at most one card',
+        'Stripe Link',
+        'Apple Pay',
+        'Google Pay',
+        'does not modify or delete',
+        'Edit wallet',
+      ],
+    } as const;
+    for (const locale of ['es-MX', 'en'] as const) {
+      for (const document of ['privacy', 'terms'] as const) {
+        const html = renderToStaticMarkup(
+          <LegalView locale={locale} document={document} />
+        );
+        for (const phrase of expected[locale]) {
+          expect(html, `${locale} ${document}`).toContain(phrase);
+        }
+      }
+    }
+  });
+
   it('terms ground the site in Mexican consumer law, in English too', () => {
     const spanish = renderToStaticMarkup(
       <LegalView locale="es-MX" document="terms" />

@@ -7,6 +7,7 @@ import {
   detachPaymentMethod,
   listPaymentMethods,
   type PaymentMethodsFailure,
+  settlePaymentMethods,
   startPaymentMethodSetup,
 } from '@/lib/api/paymentMethodsClient';
 import { fill } from '@/lib/catalog/format';
@@ -14,6 +15,9 @@ import { isGatewayUrl } from '@/lib/checkout/gateway';
 
 /** `account.paymentMethods` texts. */
 type CardTexts = Messages['account']['paymentMethods'];
+
+/** What Stripe's page puts in the address when it sends the person back after adding a card. */
+const CARD_ADDED = /[?&]setup=done(?:&|$)/;
 
 /** What the page says after an action: a confirmation or the refusal. */
 type Note = { kind: 'ok' | 'error'; text: string } | null;
@@ -30,11 +34,14 @@ function brandName(texts: CardTexts, brand: string): string {
 }
 
 /**
- * «Métodos de pago» of the account area (FC 054 T2.4, T2.6): the cards the account keeps at Stripe
- * with their brand, last four digits and expiry, a button that opens Stripe's own page to add one,
- * a confirmed «Eliminar» for each, and a card that says Mercado Pago manages its own methods. The
- * card itself never touches this page or the API: it is typed on Stripe's hosted page (PCI DSS
- * SAQ A), and what is shown here is read from Stripe each time and forgotten.
+ * «Métodos de pago» of the account area (FC 054 T2.4, T2.6; FC 057): the one card the account keeps
+ * at Stripe, with its brand, last four digits and expiry, a «Reemplazar tarjeta» (or «Agregar
+ * tarjeta» when there is none) that opens Stripe's own page, a confirmed «Eliminar tarjeta», what
+ * Stripe Link and the wallets are (independent of this store), and a card that says Mercado Pago
+ * manages its own methods. When Stripe sends the person back with a new card, or the page finds
+ * more than one, the account is settled to the newest. The card itself never touches this page or
+ * the API: it is typed on Stripe's hosted page (PCI DSS SAQ A), and what is shown here is read from
+ * Stripe each time and forgotten.
  *
  * @param messages - `account` texts.
  * @param locale - Language of the page, where Stripe sends the person back to.
@@ -45,6 +52,7 @@ export function AccountPaymentMethods({
 }: Readonly<{ messages: Messages['account']; locale: Locale }>) {
   const texts = messages.paymentMethods;
   const mercadoPagoId = useId();
+  const walletsId = useId();
   const [cards, setCards] = useState<SavedCard[] | null>(null);
   const [note, setNote] = useState<Note>(null);
   // Stripe's id of the card whose removal is being confirmed, or none.
@@ -53,11 +61,24 @@ export function AccountPaymentMethods({
   // Stripe's page is being opened: the button says so and stays off, also once the page is leaving.
   const [opening, setOpening] = useState(false);
 
-  /** Reads the cards from Stripe through the API. */
+  // With a card the button replaces it; without one it adds the first.
+  const actionName =
+    cards !== null && cards.length > 0 ? texts.replace : texts.add;
+
+  /** Reads the card from Stripe through the API; more than one is settled to the newest first. */
   const load = useCallback(async () => {
-    const result = await listPaymentMethods();
+    let result = await listPaymentMethods();
+    if (result.ok && result.data.items.length > 1) {
+      const settled = await settlePaymentMethods();
+      setNote(
+        settled.ok
+          ? { kind: 'ok', text: texts.replaced }
+          : { kind: 'error', text: failureText(texts, settled.reason) }
+      );
+      result = await listPaymentMethods();
+    }
     if (result.ok) {
-      setCards(result.data.items);
+      setCards(result.data.items.slice(0, 1));
       return;
     }
     setCards([]);
@@ -65,8 +86,28 @@ export function AccountPaymentMethods({
   }, [texts]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // Stripe's page sends the person back with the mark of a card just added: it leaves the
+    // address at once, so a reload does not settle twice, and the account is left with that card.
+    const returned = CARD_ADDED.test(globalThis.location.search);
+    void (async () => {
+      if (returned) {
+        globalThis.history.replaceState(null, '', globalThis.location.pathname);
+        const settled = await settlePaymentMethods();
+        setNote(
+          settled.ok
+            ? {
+                kind: 'ok',
+                text:
+                  settled.data.status === 'replaced'
+                    ? texts.replaced
+                    : texts.saved,
+              }
+            : { kind: 'error', text: failureText(texts, settled.reason) }
+        );
+      }
+      await load();
+    })();
+  }, [load, texts]);
 
   async function add() {
     setOpening(true);
@@ -136,11 +177,20 @@ export function AccountPaymentMethods({
               onClick={() => void add()}
               className="tap-target self-start rounded-lg bg-petroleo px-5 font-semibold text-marfil disabled:opacity-60"
             >
-              {opening ? texts.adding : texts.add}
+              {opening ? texts.adding : actionName}
             </button>
             <p className="text-sm text-petroleo/80">{texts.addHint}</p>
           </>
         )}
+      </section>
+      <section
+        aria-labelledby={walletsId}
+        className="flex flex-col gap-2 rounded-lg border border-petroleo/20 p-4"
+      >
+        <h2 id={walletsId} className="text-lg font-semibold">
+          {texts.wallets.title}
+        </h2>
+        <p>{texts.wallets.text}</p>
       </section>
       <section
         aria-labelledby={mercadoPagoId}

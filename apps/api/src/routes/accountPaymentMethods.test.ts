@@ -127,7 +127,7 @@ const VISA: SavedCard = {
 };
 const stripe = {
   customers: new Map<string, string>(),
-  cards: [] as { card: SavedCard; customer: string }[],
+  cards: [] as { card: SavedCard; customer: string; created: number }[],
   setups: [] as string[],
   detached: [] as string[],
   failing: false,
@@ -146,7 +146,7 @@ const cards: StripeCardsPort = {
     guard();
     return stripe.cards
       .filter((entry) => entry.customer === customerId)
-      .map((entry) => entry.card);
+      .map((entry) => ({ ...entry.card, created: entry.created }));
   },
   async cardOwner(paymentMethodId) {
     guard();
@@ -214,29 +214,46 @@ beforeEach(() => {
 });
 
 let counter = 0;
+// Every request comes from its own address unless a test fixes one, so the limit of ten requests a
+// minute (FC 057 T2.5) only ever trips in the tests that mean it to.
+let addresses = 0;
+const freshAddress = () => {
+  const n = addresses++;
+  return `10.${Math.floor(n / 250)}.${n % 250}.7`;
+};
 const send = (
   instance: FastifyInstance,
   method: 'POST' | 'DELETE',
   url: string,
   headers: Record<string, string> = {},
-  cookie: string | null = ANA_COOKIE
+  cookie: string | null = ANA_COOKIE,
+  remoteAddress: string = freshAddress()
 ) =>
   instance.inject({
     method,
     url,
+    remoteAddress,
     headers: {
       ...(cookie !== null && { cookie }),
       'idempotency-key': `k-${++counter}`,
       ...headers,
     },
   });
-const read = (instance: FastifyInstance, cookie: string | null = ANA_COOKIE) =>
+const read = (
+  instance: FastifyInstance,
+  cookie: string | null = ANA_COOKIE,
+  remoteAddress: string = freshAddress()
+) =>
   instance.inject({
+    remoteAddress,
     url: '/v1/account/payment-methods',
     ...(cookie !== null && { headers: { cookie } }),
   });
+// Each card Stripe holds is attached a second later than the one before.
+let clock = 1_700_000_000;
 const own = (customer: string, card: SavedCard = VISA) => {
-  stripe.cards.push({ card, customer });
+  clock += 1;
+  stripe.cards.push({ card, customer, created: clock });
 };
 const linkAna = () => model.links.set(ANA, 'cus_ana');
 
@@ -260,6 +277,17 @@ describe('GET /v1/account/payment-methods', () => {
       'expYear',
       'id',
       'last4',
+    ]);
+  });
+
+  it('lists the newest card first when Stripe still holds more than one (FC 057)', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', { ...VISA, id: 'pm_mastercard01', brand: 'mastercard' });
+    const res = await read(app);
+    expect(res.json().items.map((card: { id: string }) => card.id)).toEqual([
+      'pm_mastercard01',
+      VISA.id,
     ]);
   });
 
@@ -304,8 +332,9 @@ describe('POST /v1/account/payment-methods/setup (T1.1 K, S, V)', () => {
       redirectUrl: 'https://checkout.stripe.com/c/pay/cs_test_setup',
     });
     expect(model.links.get(ANA)).toBe(`cus_${ANA.slice(-4)}`);
+    // Stripe sends the person back with the mark that tells the page to settle the cards (FC 057).
     expect(stripe.setups).toEqual([
-      `cus_${ANA.slice(-4)} https://yekora.mx/cuenta/metodos-pago/`,
+      `cus_${ANA.slice(-4)} https://yekora.mx/cuenta/metodos-pago/?setup=done`,
     ]);
   });
 
@@ -318,7 +347,7 @@ describe('POST /v1/account/payment-methods/setup (T1.1 K, S, V)', () => {
     );
     expect(res.statusCode).toBe(201);
     expect(stripe.setups[0]).toContain(
-      'https://yekora.mx/en/account/metodos-pago/'
+      'https://yekora.mx/en/account/metodos-pago/?setup=done'
     );
   });
 
@@ -497,6 +526,216 @@ describe('DELETE /v1/account/payment-methods/:id (T1.2 K, S, O, M)', () => {
     expect(again.statusCode).toBe(200);
     expect(again.json()).toEqual(first.json());
     expect(stripe.detached).toEqual([VISA.id]);
+  });
+});
+
+const MASTERCARD: SavedCard = {
+  ...VISA,
+  id: 'pm_mastercard01',
+  brand: 'mastercard',
+  last4: '5100',
+};
+const settle = (
+  instance = app,
+  headers = {},
+  cookie = ANA_COOKIE,
+  remoteAddress?: string
+) =>
+  send(
+    instance,
+    'POST',
+    '/v1/account/payment-methods/settle',
+    headers,
+    cookie,
+    remoteAddress
+  );
+
+describe('POST /v1/account/payment-methods/settle (FC 057 T1.1 S, V, D)', () => {
+  it('S V D: the first card of an account stays, nothing is detached, and it is audited as saved', async () => {
+    linkAna();
+    own('cus_ana');
+    const res = await settle();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: 'saved', paymentMethod: VISA });
+    expect(stripe.detached).toEqual([]);
+    expect(JSON.stringify(model.audit[0])).toContain('PAYMENT_METHOD_SAVED');
+  });
+
+  it('S V D: a new card replaces the previous one: the newest stays, the older is detached, and it is audited as replaced (T2.1, T2.6)', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    const res = await settle();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: 'replaced',
+      paymentMethod: MASTERCARD,
+    });
+    expect(stripe.detached).toEqual([VISA.id]);
+    expect((await read(app)).json().items).toEqual([MASTERCARD]);
+    const audited = JSON.stringify(model.audit[0]);
+    expect(audited).toContain('PAYMENT_METHOD_REPLACED');
+    expect(audited).toContain('replaced_payment_method_id');
+    expect(audited).toContain('new_payment_method_id');
+    // Fingerprints only: no card id, last four, brand or customer in the trail.
+    for (const secret of [VISA.id, MASTERCARD.id, '4242', '5100', 'cus_ana']) {
+      expect(audited).not.toContain(secret);
+    }
+  });
+
+  it('keeps one card out of many and detaches all the others', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    own('cus_ana', { ...VISA, id: 'pm_amex000000001', brand: 'amex' });
+    const res = await settle();
+    expect(res.json().paymentMethod.id).toBe('pm_amex000000001');
+    expect([...stripe.detached].sort()).toEqual(
+      [VISA.id, MASTERCARD.id].sort()
+    );
+  });
+
+  it('can be repeated: a second call finds nothing more to detach', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    await settle();
+    const again = await settle();
+    expect(again.statusCode).toBe(200);
+    expect(stripe.detached).toEqual([VISA.id]);
+  });
+
+  it('S ⊥V: with no card at Stripe, or no customer yet, it is 400 CARD_ATTACH_FAILED', async () => {
+    const noCustomer = await settle();
+    linkAna();
+    const noCard = await settle();
+    for (const res of [noCustomer, noCard]) {
+      expect(res.statusCode).toBe(400);
+      expect(res.json().detail).toBe('CARD_ATTACH_FAILED');
+    }
+    expect(model.audit).toEqual([]);
+  });
+
+  it('S V ⊥D: when an older card cannot be detached it is 502 GATEWAY_DETACH_FAILED, nothing is audited, and the next call finishes the job', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    const original = cards.detachCard;
+    cards.detachCard = async () => {
+      throw new PaymentProcessorError('Stripe: HTTP 500', 500);
+    };
+    const failed = await settle();
+    cards.detachCard = original;
+    expect(failed.statusCode).toBe(502);
+    expect(failed.json().detail).toBe('GATEWAY_DETACH_FAILED');
+    expect(model.audit).toEqual([]);
+    const retried = await settle();
+    expect(retried.statusCode).toBe(200);
+    expect(stripe.detached).toEqual([VISA.id]);
+  });
+
+  it('⊥S: without a session it is 401', async () => {
+    expect((await settle(app, {}, null as never)).statusCode).toBe(401);
+  });
+
+  it('never reaches the card of another account (T2.3)', async () => {
+    linkAna();
+    model.links.set(LUIS, 'cus_luis');
+    own('cus_luis');
+    const res = await settle();
+    expect(res.statusCode).toBe(400);
+    expect(stripe.detached).toEqual([]);
+  });
+
+  it('answers 503 without a Stripe key and when Stripe does not answer', async () => {
+    expect((await settle(bare)).statusCode).toBe(503);
+    linkAna();
+    stripe.failing = true;
+    const res = await settle();
+    expect(res.statusCode).toBe(503);
+    expect(res.json().detail).toBe('SERVICE_UNAVAILABLE');
+  });
+
+  it('lets an error that is not Stripe’s through as a failure of the server', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    const original = cards.detachCard;
+    cards.detachCard = async () => {
+      throw new TypeError('bug');
+    };
+    expect((await settle()).statusCode).toBe(500);
+    cards.detachCard = original;
+  });
+
+  it('⊥K: a missing or malformed Idempotency-Key is refused first, and a replayed key answers the same', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    for (const key of ['', 'not valid!']) {
+      expect((await settle(app, { 'idempotency-key': key })).statusCode).toBe(
+        400
+      );
+    }
+    const first = await settle(app, { 'idempotency-key': 'once' });
+    const again = await settle(app, { 'idempotency-key': 'once' });
+    expect(again.json()).toEqual(first.json());
+    expect(stripe.detached).toEqual([VISA.id]);
+  });
+
+  it('writes nothing to the orders (T2.7)', async () => {
+    linkAna();
+    own('cus_ana');
+    own('cus_ana', MASTERCARD);
+    await settle();
+    const writes = model.statements.filter((text) =>
+      /^(INSERT|UPDATE|DELETE)/.test(text)
+    );
+    expect(writes.some((text) => /orders/i.test(text))).toBe(false);
+  });
+});
+
+const SAME_ADDRESS = '203.0.113.9';
+
+describe('the routes of the cards answer 10 requests a minute (FC 057 T2.5)', () => {
+  it('refuses the eleventh read in a minute from one address', async () => {
+    const fresh = await boot(true);
+    try {
+      const codes: number[] = [];
+      for (let i = 0; i < 11; i += 1)
+        codes.push((await read(fresh, ANA_COOKIE, SAME_ADDRESS)).statusCode);
+      expect(codes.slice(0, 10).every((code) => code !== 429)).toBe(true);
+      expect(codes[10]).toBe(429);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  it('counts each route on its own', async () => {
+    const fresh = await boot(true);
+    try {
+      const codes: number[] = [];
+      for (let i = 0; i < 11; i += 1) {
+        codes.push(
+          (
+            await send(
+              fresh,
+              'POST',
+              '/v1/account/payment-methods/setup',
+              {},
+              ANA_COOKIE,
+              SAME_ADDRESS
+            )
+          ).statusCode
+        );
+      }
+      expect(codes[10]).toBe(429);
+      expect(
+        (await settle(fresh, {}, ANA_COOKIE, SAME_ADDRESS)).statusCode
+      ).not.toBe(429);
+    } finally {
+      await fresh.close();
+    }
   });
 });
 

@@ -244,8 +244,10 @@ test('a buyer sees their saved cards, adds one at Stripe’s page and removes on
   ).toContainText('se administran directamente dentro de Mercado Pago');
   // Every control is a 44 × 44 px target and says which card it acts on (T2.6).
   for (const control of [
-    page.getByRole('button', { name: 'Eliminar: Visa terminada en 4242' }),
-    page.getByRole('button', { name: 'Agregar tarjeta' }),
+    page.getByRole('button', {
+      name: 'Eliminar tarjeta: Visa terminada en 4242',
+    }),
+    page.getByRole('button', { name: 'Reemplazar tarjeta' }),
   ]) {
     const box = await control.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(44);
@@ -253,7 +255,7 @@ test('a buyer sees their saved cards, adds one at Stripe’s page and removes on
   }
   // Nothing is removed until the person confirms. Axe sees the page with its dialog open (T2.6).
   await page
-    .getByRole('button', { name: 'Eliminar: Visa terminada en 4242' })
+    .getByRole('button', { name: 'Eliminar tarjeta: Visa terminada en 4242' })
     .click();
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -264,7 +266,7 @@ test('a buyer sees their saved cards, adds one at Stripe’s page and removes on
     page.getByRole('heading', { name: 'Visa terminada en 4242' })
   ).toBeVisible();
   await page
-    .getByRole('button', { name: 'Eliminar: Visa terminada en 4242' })
+    .getByRole('button', { name: 'Eliminar tarjeta: Visa terminada en 4242' })
     .click();
   await page.getByRole('button', { name: 'Sí, eliminar' }).click();
   await expect(
@@ -276,6 +278,51 @@ test('a buyer sees their saved cards, adds one at Stripe’s page and removes on
   // The card is typed on Stripe's own page, never here.
   await page.getByRole('button', { name: 'Agregar tarjeta' }).click();
   await expect(page).toHaveURL(E2E_CARD_SETUP_PAGE);
+});
+
+test('a new card typed at Stripe replaces the one saved: back from Stripe the account keeps only the newest (FC 057 T2.1, T2.9, T2.10)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'buyer', cards: [E2E_VISA] });
+  await page.route('https://checkout.stripe.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<h1>Stripe setup</h1>' })
+  );
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await openAccountMenu(page);
+  await page.getByRole('link', { name: 'Métodos de pago' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Visa terminada en 4242' })
+  ).toBeVisible();
+  // Stripe's own page takes the new card; there is no list and no «default» selector.
+  await page.getByRole('button', { name: 'Reemplazar tarjeta' }).click();
+  await expect(page).toHaveURL(E2E_CARD_SETUP_PAGE);
+
+  // Stripe sends the person back to the page of the cards with the mark of a card just added.
+  await page.goto('/cuenta/');
+  await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
+  await page.evaluate(() => {
+    history.pushState(null, '', '/cuenta/metodos-pago/?setup=done');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(
+    page.getByText('Tu tarjeta nueva reemplazó a la anterior.')
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Mastercard terminada en 5100' })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Visa terminada en 4242' })
+  ).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1);
+  // The mark leaves the address at once, so a reload would not settle twice.
+  await expect(page).toHaveURL(/\/cuenta\/metodos-pago\/$/);
+  // The result is announced through a live region (T2.10).
+  await expect(
+    page
+      .getByText('Tu tarjeta nueva reemplazó a la anterior.')
+      .locator('xpath=ancestor-or-self::output')
+  ).toHaveAttribute('aria-live', 'polite');
 });
 
 test('the saved cards are there in English too, at their own address (FC 054 F1)', async ({
@@ -291,7 +338,13 @@ test('the saved cards are there in English too, at their own address (FC 054 F1)
     page.getByRole('heading', { name: 'Visa ending in 4242' })
   ).toBeVisible();
   await expect(page.getByText('Expires 03/2031')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add a card' })).toBeVisible();
+  // One card per account: with one saved, the button replaces it (FC 057).
+  await expect(
+    page.getByRole('button', { name: 'Replace card' })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Stripe Link and digital wallets' })
+  ).toBeVisible();
   await expect(
     page.getByRole('region', { name: 'Mercado Pago' })
   ).toBeVisible();

@@ -1,7 +1,8 @@
 /**
- * Contract of the saved cards of an account (FC 054 T0.2): what `GET /v1/account/payment-methods`,
- * `POST /v1/account/payment-methods/setup` and `DELETE /v1/account/payment-methods/:id` answer,
- * shared by the API and the browser.
+ * Contract of the saved cards of an account (FC 054 T0.2, FC 057): what `GET /v1/account/payment-methods`,
+ * `POST /v1/account/payment-methods/setup`, `POST /v1/account/payment-methods/settle` and
+ * `DELETE /v1/account/payment-methods/:id` answer, shared by the API and the browser. An account
+ * keeps at most one card (FC 057): a new one replaces the previous one.
  *
  * A saved card lives at Stripe, never here: the API asks Stripe for these four harmless facts each
  * time they are shown and forgets them (PCI DSS SAQ A, FC 054 T2.1). There is no card number, no
@@ -44,6 +45,13 @@ export const paymentMethodListResponseSchema = z.object({
 export const paymentMethodSetupResponseSchema = z.object({
   /** The hosted page of Stripe where the person enters the card. */
   redirectUrl: z.url(),
+});
+
+/** Answer of `POST /v1/account/payment-methods/settle` (200): the one card the account keeps now. */
+export const paymentMethodSettleResponseSchema = z.object({
+  /** `saved` when it is the account's first card, `replaced` when it took the place of another. */
+  status: z.enum(['saved', 'replaced']),
+  paymentMethod: savedCardSchema,
 });
 
 /** Answer of `DELETE /v1/account/payment-methods/:id` (200). */

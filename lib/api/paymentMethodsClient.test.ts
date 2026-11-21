@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   detachPaymentMethod,
   listPaymentMethods,
+  settlePaymentMethods,
   startPaymentMethodSetup,
 } from './paymentMethodsClient';
 
@@ -53,6 +54,34 @@ describe('saved cards client (FC 054 F1)', () => {
     );
     expect(init?.method).toBe('POST');
     expect(headersOf(fetchImpl)['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('settles the account to its newest card under a fresh Idempotency-Key (FC 057)', async () => {
+    const fetchImpl = answering(200, {
+      status: 'replaced',
+      paymentMethod: CARD,
+    });
+    await expect(settlePaymentMethods(fetchImpl)).resolves.toEqual({
+      ok: true,
+      data: { status: 'replaced', paymentMethod: CARD },
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe(
+      'https://apiv1.yekora.mx/v1/account/payment-methods/settle'
+    );
+    expect(init?.method).toBe('POST');
+    expect(headersOf(fetchImpl)['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('names the two refusals of the settle by their machine code', async () => {
+    for (const [status, detail] of [
+      [400, 'CARD_ATTACH_FAILED'],
+      [502, 'GATEWAY_DETACH_FAILED'],
+    ] as const) {
+      await expect(
+        settlePaymentMethods(answering(status, { detail }))
+      ).resolves.toEqual({ ok: false, reason: detail });
+    }
   });
 
   it('detaches one card by its id', async () => {

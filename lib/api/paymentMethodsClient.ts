@@ -15,6 +15,7 @@ import type { z } from 'zod';
 import {
   paymentMethodDetachResponseSchema,
   paymentMethodListResponseSchema,
+  paymentMethodSettleResponseSchema,
   paymentMethodSetupResponseSchema,
 } from '@/lib/account/paymentMethodTypes';
 import { sessionRequest, type TransportFailure } from './http';
@@ -24,6 +25,8 @@ const TIMEOUT_MS = 25_000;
 
 /** Refusals the page explains by name. */
 const CODES = [
+  'CARD_ATTACH_FAILED',
+  'GATEWAY_DETACH_FAILED',
   'PAYMENT_METHOD_NOT_FOUND',
   'SERVICE_UNAVAILABLE',
   'SESSION_INVALID_OR_EXPIRED',
@@ -109,6 +112,23 @@ export function detachPaymentMethod(
     `/v1/account/payment-methods/${id}`,
     paymentMethodDetachResponseSchema,
     'DELETE',
+    fetchImpl
+  );
+}
+
+/**
+ * Leaves the account with one card (FC 057): the newest one at Stripe stays and the older ones are
+ * detached. The page asks it when Stripe sends the person back after adding a card, and when it
+ * finds more than one.
+ *
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The card kept and whether it was `saved` or `replaced` another, or why it was refused.
+ */
+export function settlePaymentMethods(fetchImpl: typeof fetch = fetch) {
+  return request(
+    '/v1/account/payment-methods/settle',
+    paymentMethodSettleResponseSchema,
+    'POST',
     fetchImpl
   );
 }
