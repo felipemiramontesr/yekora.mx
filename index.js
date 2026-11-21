@@ -102683,7 +102683,9 @@ function registerAccountRoutes(app, deps) {
             entityType: "user_stripe_customers",
             entityId: userId,
             before: null,
-            after: null,
+            after: {
+              detached_payment_method_id: fingerprint(params.data.id)
+            },
             ip: request.ip
           });
           return {
@@ -118712,7 +118714,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "21567ee4882a195822fcf35081f417b6d71921a8" : void 0;
+var sha = true ? "6fb56f4b0856752aa0bc6ce305016ba0fdd964a4" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
