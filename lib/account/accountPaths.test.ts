@@ -127,3 +127,18 @@ describe('administrators console path (FC 044 F2)', () => {
     }
   });
 });
+
+describe('shipping console path (FC 061)', () => {
+  it('reads and writes /envios/ the same in both languages, whatever follows it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}envios/`, area)).toEqual({
+        tab: 'shipping',
+        orderNumber: null,
+      });
+      expect(parseAccountPath(`${area}envios/x/`, area).tab).toBe('shipping');
+      expect(accountPath(area, { tab: 'shipping', orderNumber: null })).toBe(
+        `${area}envios/`
+      );
+    }
+  });
+});

@@ -43,6 +43,7 @@ import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
 import type { AdminUsersTexts } from './AdminUsersConsole';
+import type { ShippingAdminTexts } from './ShippingAdminConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
 /**
@@ -70,6 +71,21 @@ const CatalogConsole = dynamic<{
 const AdminUsersConsole = dynamic<{ texts: AdminUsersTexts }>(
   () =>
     import('./AdminUsersConsole').then((module) => module.AdminUsersConsole),
+  { ssr: false }
+);
+
+/**
+ * The shipping console, in its own chunk (FC 061): only an account with `shipping:manage` opens
+ * it, so nobody else downloads it with `/cuenta/`.
+ */
+const ShippingAdminConsole = dynamic<{
+  texts: ShippingAdminTexts;
+  locale: Locale;
+}>(
+  () =>
+    import('./ShippingAdminConsole').then(
+      (module) => module.ShippingAdminConsole
+    ),
   { ssr: false }
 );
 
@@ -344,6 +360,7 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
   const cards = texts.adminHub.cards;
   if (view.tab === 'panel') return cards.orders.name;
   if (view.tab === 'admins') return cards.admins.name;
+  if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
     return (view.section === 'productos' ? cards.products : cards.catalog).name;
   }
@@ -377,7 +394,11 @@ function Dashboard({
   // A tab opens only with its permission or role; the API would refuse it anyway.
   const tab = canOpen(user, view.tab) ? view.tab : 'orders';
   // A console is a step under «Administración» (FC 052): «Mi cuenta › Administración › Catálogo».
-  const underAdmin = tab === 'panel' || tab === 'catalog' || tab === 'admins';
+  const underAdmin =
+    tab === 'panel' ||
+    tab === 'catalog' ||
+    tab === 'admins' ||
+    tab === 'shipping';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
   const open = (orderNumber: string | null) => onNavigate({ tab, orderNumber });
@@ -459,6 +480,9 @@ function Dashboard({
         />
       )}
       {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
+      {tab === 'shipping' && (
+        <ShippingAdminConsole texts={texts.account.shipping} locale={locale} />
+      )}
       {isOrders && view.orderNumber && (
         <OrderDetailView
           scope={scope}

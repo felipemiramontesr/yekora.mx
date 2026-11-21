@@ -1,6 +1,6 @@
 'use client';
 
-import { ClipboardList, Package, ShieldCheck, Tags } from 'lucide-react';
+import { ClipboardList, Package, ShieldCheck, Tags, Truck } from 'lucide-react';
 import type { ComponentType, MouseEvent } from 'react';
 import type { Messages } from '@/app/i18n';
 import { type AccountView, accountPath } from '@/lib/account/accountPaths';
@@ -12,6 +12,7 @@ const ICONS: Record<AdminCard['key'], ComponentType<{ size: number }>> = {
   orders: ClipboardList,
   products: Package,
   catalog: Tags,
+  shipping: Truck,
   admins: ShieldCheck,
 };
 

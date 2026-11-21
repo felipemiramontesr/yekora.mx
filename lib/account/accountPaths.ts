@@ -12,7 +12,9 @@
  *   (FC 052);
  * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`), and one tab of it:
  *   `{area}catalogo/{productos,marcas,propiedades,publicar}/`;
- * - `{area}administradores/` the administrators console (FC 044 F2, the owner only).
+ * - `{area}administradores/` the administrators console (FC 044 F2, the owner only);
+ * - `{area}envios/` the shipping console (FC 061, `shipping:manage`): strategy, free shipping and the
+ *   rate of each state. The sub-path is the same in both languages.
  *
  * @module
  */
@@ -30,7 +32,8 @@ export interface AccountView {
     | 'admin'
     | 'panel'
     | 'catalog'
-    | 'admins';
+    | 'admins'
+    | 'shipping';
   /** The open order, or null for the list. */
   orderNumber: string | null;
   /** The open tab of the catalog console, or none (the first one). */
@@ -71,6 +74,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
     return { tab: 'catalog', orderNumber: null, section };
   }
   if (first === 'administradores') return { tab: 'admins', orderNumber: null };
+  if (first === 'envios') return { tab: 'shipping', orderNumber: null };
   if (first === 'panel') {
     return {
       tab: 'panel',
@@ -99,6 +103,7 @@ export function accountPath(area: string, view: AccountView): string {
     return `${area}catalogo/${section}`;
   }
   if (view.tab === 'admins') return `${area}administradores/`;
+  if (view.tab === 'shipping') return `${area}envios/`;
   const tab = view.tab === 'panel' ? 'panel/' : '';
   const order = view.orderNumber ? `${view.orderNumber}/` : '';
   return `${area}${tab}${order}`;

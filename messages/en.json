@@ -898,6 +898,7 @@
       "deviceForgotten": "Done. Next time you sign in from here we will ask for the code.",
       "catalog": "Catalog",
       "admins": "Administrators",
+      "shipping": "Shipping",
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
       "profile": "My information",
@@ -1490,6 +1491,43 @@
         "unknown": "We could not complete the request. Try again."
       }
     },
+    "shipping": {
+      "loading": "Loading shipping…",
+      "intro": "Here you set what shipping costs to each state of Mexico and from which amount it is free. Changes apply at once in the cart and at checkout.",
+      "strategyTitle": "How shipping is charged",
+      "strategyActive": "Active strategy: {name}.",
+      "strategyNote": "This screen manages the rate by state. The other strategies are not edited here yet.",
+      "freeTitle": "Free shipping",
+      "freeToggle": "Offer free shipping from a purchase amount",
+      "freeThreshold": "Minimum purchase amount (MXN)",
+      "freeDescription": "From this amount, VAT included, shipping is not charged. If you do not want free shipping, leave the box unchecked.",
+      "freeExample": "1500",
+      "saveFree": "Save free shipping",
+      "ratesTitle": "Rate by state",
+      "ratesIntro": "Every amount is in Mexican pesos with VAT included and is charged once per purchase. Enter 0 for a state that always ships free.",
+      "caption": "Shipping rate of each state",
+      "state": "State",
+      "rate": "Rate (MXN)",
+      "rateFor": "Shipping rate to {state}",
+      "saveRates": "Save rates",
+      "saving": "Saving…",
+      "saved": "Changes saved.",
+      "invalidAmount": "Check the amounts: use numbers from 0 to 100,000 with up to two decimals.",
+      "errors": {
+        "SHIPPING_STRATEGY_UNAVAILABLE": "That strategy has no active rates.",
+        "SHIPPING_ZONE_UNKNOWN": "A state no longer exists. Reload the page.",
+        "PERMISSION_DENIED": "Your account cannot manage shipping.",
+        "SECOND_FACTOR_REQUIRED": "Turn on two-step verification to manage shipping.",
+        "INVALID_REQUEST": "Check the amounts.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Try again.",
+        "invalid": "The server answer could not be read. Try again.",
+        "unknown": "Something failed. Try again."
+      },
+      "exampleLabel": "Example"
+    },
     "adminHub": {
       "title": "Administration",
       "intro": "You run the store from here. You only see what your account can open.",
@@ -1506,6 +1544,10 @@
         "catalog": {
           "name": "Catalog",
           "description": "Brands, product properties and publishing the catalog to the store."
+        },
+        "shipping": {
+          "name": "Shipping",
+          "description": "What shipping costs to each state and from which amount it is free."
         },
         "admins": {
           "name": "Administrators",

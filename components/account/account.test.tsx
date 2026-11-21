@@ -33,6 +33,7 @@ import {
   updateAdminUser,
 } from '@/lib/api/adminUsersClient';
 import { listPaymentMethods } from '@/lib/api/paymentMethodsClient';
+import { readShippingAdmin } from '@/lib/api/shippingAdminClient';
 import { AccountView } from '../views/AccountView';
 import { AccountApp } from './AccountApp';
 
@@ -71,6 +72,12 @@ vi.mock('@/lib/api/adminUsersClient', () => ({
   listAdminUsers: vi.fn(),
   inviteAdminUser: vi.fn(),
   updateAdminUser: vi.fn(),
+}));
+
+vi.mock('@/lib/api/shippingAdminClient', () => ({
+  readShippingAdmin: vi.fn(),
+  saveShippingConfig: vi.fn(),
+  saveShippingRules: vi.fn(),
 }));
 
 const data = {
@@ -1523,5 +1530,48 @@ describe('account area · sign-up from the header (FC 047)', () => {
       screen.queryByRole('heading', { name: account.register.title })
     ).toBeNull();
     expect(screen.getByText(/Hola, /)).toBeTruthy();
+  });
+});
+
+describe('shipping console of the area (FC 061 F1, T2.4)', () => {
+  const ADMIN = {
+    ...BUYER,
+    fullName: 'Zoe Admin',
+    roles: ['admin'],
+    permissions: ['account:self', 'shipping:manage'],
+  };
+  const VIEW = {
+    config: {
+      strategyId: 2,
+      isFreeShippingActive: false,
+      freeShippingThresholdMxnCents: null,
+    },
+    strategies: [],
+    classes: [],
+    zones: [],
+    rules: [],
+  };
+
+  it('opens /envios/ under Administración for an account with shipping:manage', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/envios/');
+    api.me.mockResolvedValue(ok(ADMIN));
+    vi.mocked(readShippingAdmin).mockResolvedValue(ok(VIEW));
+    renderApp();
+    await screen.findByText(account.shipping.strategyTitle);
+    expect(
+      screen
+        .getByText(account.adminHub.cards.shipping.name, { selector: 'li' })
+        .getAttribute('aria-current')
+    ).toBe('page');
+    expect(screen.getByText(account.dashboard.admin)).toBeTruthy();
+  });
+
+  it('shows an account without the permission its orders instead', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/envios/');
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    await screen.findByText(/Hola, /);
+    expect(screen.queryByText(account.shipping.strategyTitle)).toBeNull();
+    expect(readShippingAdmin).not.toHaveBeenCalled();
   });
 });

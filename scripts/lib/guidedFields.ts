@@ -23,13 +23,15 @@ export const FIELD_MODULE = 'components/ui/Field.tsx';
 /**
  * The components whose controls are not form fields to fill in, audited by hand: the filter bar of
  * the catalog, the status filter of the orders, the quantity of a cart line and the state picker
- * of the cart summary. They sit beside the thing they change, not in a form.
+ * of the cart summary, and the rate of each state in the shipping console (FC 061): a column of
+ * numbers in a table, each named by its row. They sit beside the thing they change, not in a form.
  */
 export const ALLOWLIST: readonly string[] = [
   'components/catalog/CatalogGrid.tsx',
   'components/account/AccountOrders.tsx',
   'components/cart/CartItemRow.tsx',
   'components/cart/CartSummary.tsx',
+  'components/account/ShippingAdminConsole.tsx',
 ];
 
 /** Input types that are not typed text. */

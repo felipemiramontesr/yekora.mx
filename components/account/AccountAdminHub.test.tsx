@@ -30,7 +30,12 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
   it('shows a card for each console the account may open, with what it is for', () => {
     show({
       roles: ['owner'],
-      permissions: ['account:self', 'orders:read', 'catalog:write'],
+      permissions: [
+        'account:self',
+        'orders:read',
+        'catalog:write',
+        'shipping:manage',
+      ],
     });
     expect(screen.getByRole('heading', { name: texts.title })).toBeTruthy();
     expect(screen.getByText(texts.intro)).toBeTruthy();
@@ -38,7 +43,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       expect(screen.getByText(card.name)).toBeTruthy();
       expect(screen.getByText(card.description)).toBeTruthy();
     }
-    expect(screen.getAllByText(texts.open)).toHaveLength(4);
+    expect(screen.getAllByText(texts.open)).toHaveLength(5);
   });
 
   it.each([
@@ -48,6 +53,11 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       'catalog:write',
       { ...none, permissions: ['catalog:write'] },
       ['Productos', 'Catálogo'],
+    ],
+    [
+      'shipping:manage',
+      { ...none, permissions: ['shipping:manage'] },
+      ['Envíos'],
     ],
     [
       'the owner role',
@@ -65,6 +75,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'Pedidos',
         'Productos',
         'Catálogo',
+        'Envíos',
         'Administradores',
       ]) {
         if (!shown.includes(absent)) {
@@ -76,7 +87,10 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
 
   it('opens a console by its own address in the area, without reloading, and in English too', () => {
     const open = show(
-      { roles: ['owner'], permissions: ['orders:read', 'catalog:write'] },
+      {
+        roles: ['owner'],
+        permissions: ['orders:read', 'catalog:write', 'shipping:manage'],
+      },
       'en'
     );
     const links = screen.getAllByRole('link');
@@ -84,6 +98,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       '/en/account/panel/',
       '/en/account/catalogo/productos/',
       '/en/account/catalogo/marcas/',
+      '/en/account/envios/',
       '/en/account/administradores/',
     ]);
     // Each click is a navigation of the area, never a reload of the page.
@@ -94,6 +109,12 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       section: 'productos',
     });
     fireEvent.click(links[3]);
+    expect(open).toHaveBeenLastCalledWith({
+      tab: 'shipping',
+      orderNumber: null,
+      section: null,
+    });
+    fireEvent.click(links[4]);
     expect(open).toHaveBeenLastCalledWith({
       tab: 'admins',
       orderNumber: null,

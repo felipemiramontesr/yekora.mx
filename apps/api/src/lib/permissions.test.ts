@@ -14,6 +14,7 @@ const migration = (number: string) =>
   );
 const migration004 = migration('004');
 const migration008 = migration('008');
+const migration014 = migration('014');
 
 describe('permission catalog (FC 028)', () => {
   it('names exactly the permissions migration 004 seeds, so code and database never drift', () => {
@@ -24,7 +25,23 @@ describe('permission catalog (FC 028)', () => {
     const seeded = [...block.matchAll(/\('([a-z]+:[a-z_]+)'/g)].map(
       (m) => m[1]
     );
-    expect(seeded.sort()).toEqual([...PERMISSIONS].sort());
+    // FC 061: migration 014 opens `shipping:manage` and grants it to owner and admin by name,
+    // because 004 and 008 ran before it existed.
+    expect(seeded.sort()).toEqual(
+      PERMISSIONS.filter(
+        (permission) => permission !== 'shipping:manage'
+      ).sort()
+    );
+  });
+
+  it('opens shipping:manage in migration 014 and grants it to owner and admin (FC 061 T0.1)', () => {
+    expect(migration014).toMatch(
+      /INSERT IGNORE INTO permissions \(id, module, description\) VALUES\s+\('shipping:manage', 'shipping'/
+    );
+    expect(migration014).toMatch(
+      /SELECT r\.id, 'shipping:manage' FROM roles r WHERE r\.id IN \('owner', 'admin'\)/
+    );
+    expect(PERMISSIONS).toContain('shipping:manage');
   });
 
   it('gives admin the union of every permission by construction, never a hand-kept list (T2.3b)', () => {

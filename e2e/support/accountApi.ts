@@ -133,6 +133,7 @@ const USERS: Record<Persona, object> = {
       'audit:read',
       'catalog:write',
       'orders:read',
+      'shipping:manage',
       'users:manage',
     ],
   },
@@ -215,6 +216,103 @@ function answerAdmins(route: Route, accounts: AdminAccount[]) {
   return json(route, 200, account);
 }
 
+/** One state of the shipping console (FC 061) with its rate in cents. */
+interface ShippingState {
+  id: number;
+  code: string;
+  name: string;
+  nameEn: string;
+  cents: number;
+}
+
+/** Three states are enough to prove the console edits each one on its own. */
+const SHIPPING_STATES: readonly ShippingState[] = [
+  {
+    id: 1,
+    code: 'AGU',
+    name: 'Aguascalientes',
+    nameEn: 'Aguascalientes',
+    cents: 15000,
+  },
+  {
+    id: 7,
+    code: 'CMX',
+    name: 'Ciudad de México',
+    nameEn: 'Mexico City',
+    cents: 15000,
+  },
+  {
+    id: 32,
+    code: 'ZAC',
+    name: 'Zacatecas',
+    nameEn: 'Zacatecas',
+    cents: 15000,
+  },
+];
+
+/** The shipping console view as `GET /v1/admin/shipping` answers it. */
+function shippingView(
+  states: ShippingState[],
+  config: { free: boolean; threshold: number | null }
+) {
+  return {
+    config: {
+      strategyId: 2,
+      isFreeShippingActive: config.free,
+      freeShippingThresholdMxnCents: config.threshold,
+    },
+    strategies: [
+      {
+        id: 2,
+        code: 'ZONE_RATE',
+        nameEs: 'Tarifa por estado',
+        nameEn: 'Rate by state',
+        administrable: true,
+      },
+    ],
+    classes: [],
+    zones: states.map(({ id, code, name, nameEn }) => ({
+      id,
+      code,
+      nameEs: name,
+      nameEn,
+    })),
+    rules: states.map(({ id, cents }) => ({ zoneId: id, rateMxnCents: cents })),
+  };
+}
+
+/**
+ * `/v1/admin/shipping` for the owner (FC 061 T1.1, T1.2): the rates and free shipping live in
+ * memory, writes need an Idempotency-Key, and the answer is the view after the change.
+ */
+function answerShipping(
+  route: Route,
+  states: ShippingState[],
+  config: { free: boolean; threshold: number | null }
+) {
+  const request = route.request();
+  if (request.method() === 'GET') {
+    return json(route, 200, shippingView(states, config));
+  }
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  const body = request.postDataJSON() as Record<string, unknown>;
+  if (new URL(request.url()).pathname.endsWith('/rules')) {
+    for (const rule of body.rules as {
+      zoneId: number;
+      rateMxnCents: number;
+    }[]) {
+      const state = states.find((candidate) => candidate.id === rule.zoneId);
+      if (state) state.cents = rule.rateMxnCents;
+    }
+  } else {
+    config.free = body.isFreeShippingActive === true;
+    config.threshold = (body.freeShippingThresholdMxnCents as number) ?? null;
+  }
+  return json(route, 200, shippingView(states, config));
+}
+
 /** CORS of a credentialed request, as the real API answers the site's origin. */
 const CORS = {
   'access-control-allow-origin': 'http://localhost:3100',
@@ -239,7 +337,7 @@ const withCors = (answer: (route: Route) => Promise<void>) => (route: Route) =>
         status: 204,
         headers: {
           ...CORS,
-          'access-control-allow-methods': 'GET, POST, PATCH',
+          'access-control-allow-methods': 'GET, POST, PUT, PATCH',
           'access-control-allow-headers': 'content-type, idempotency-key',
         },
       })
@@ -506,6 +604,11 @@ export async function mockAccountApi(
   };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   const admins = adminAccounts();
+  const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
+  const shippingConfig: { free: boolean; threshold: number | null } = {
+    free: false,
+    threshold: null,
+  };
   await page.route(
     'https://apiv1.yekora.mx/v1/auth/**',
     withCors(async (route) => {
@@ -566,6 +669,11 @@ export async function mockAccountApi(
         return user === 'owner'
           ? answerAdmins(route, admins)
           : problem(route, 403, 'OWNER_ROLE_REQUIRED');
+      }
+      if (path.startsWith('/v1/admin/shipping')) {
+        return user === 'owner'
+          ? answerShipping(route, shippingStates, shippingConfig)
+          : problem(route, 403, 'PERMISSION_DENIED');
       }
       return user === 'staff' || user === 'owner'
         ? answerOrders(route)

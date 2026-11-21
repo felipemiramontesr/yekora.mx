@@ -95,6 +95,11 @@ import {
   adminUserParams,
   adminUserSchema,
 } from '../../../lib/account/adminUserTypes';
+import {
+  shippingAdminViewSchema,
+  shippingConfigRequestSchema,
+  shippingRulesRequestSchema,
+} from '../../../lib/account/shippingAdminTypes';
 import type { Permission } from './lib/permissions';
 import { problemSchema } from './lib/problem';
 import { cartQuoteRequestSchema } from './routes/cart';
@@ -657,6 +662,42 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       400: problemSchema,
       404: problemSchema,
       409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
+  {
+    method: 'GET',
+    path: '/v1/admin/shipping',
+    summary:
+      'The shipping configuration, its catalogs and the rate of each of the 32 states',
+    permission: 'shipping:manage',
+    request: {},
+    responses: { 200: shippingAdminViewSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'PUT',
+    path: '/v1/admin/shipping/config',
+    summary: 'Sets the active strategy and free shipping (audited)',
+    permission: 'shipping:manage',
+    request: { headers: mutationHeaders, body: shippingConfigRequestSchema },
+    responses: {
+      200: shippingAdminViewSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'PUT',
+    path: '/v1/admin/shipping/rules',
+    summary:
+      'Replaces the ZONE_RATE rate of the 32 states atomically (audited)',
+    permission: 'shipping:manage',
+    request: { headers: mutationHeaders, body: shippingRulesRequestSchema },
+    responses: {
+      200: shippingAdminViewSchema,
+      400: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

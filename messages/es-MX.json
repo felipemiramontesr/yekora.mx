@@ -898,6 +898,7 @@
       "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código.",
       "catalog": "Catálogo",
       "admins": "Administradores",
+      "shipping": "Envíos",
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
       "profile": "Mi información",
@@ -1490,6 +1491,43 @@
         "unknown": "No pudimos completar la solicitud. Intenta de nuevo."
       }
     },
+    "shipping": {
+      "loading": "Cargando los envíos…",
+      "intro": "Aquí defines cuánto cuesta el envío a cada estado de México y desde qué monto es gratis. Los cambios se aplican al instante en el carrito y en el pago.",
+      "strategyTitle": "Cómo se cobra el envío",
+      "strategyActive": "Estrategia activa: {name}.",
+      "strategyNote": "Esta pantalla administra la tarifa por estado. Las otras estrategias todavía no se editan aquí.",
+      "freeTitle": "Envío gratis",
+      "freeToggle": "Ofrecer envío gratis desde un monto de compra",
+      "freeThreshold": "Monto mínimo de compra (MXN)",
+      "freeDescription": "Desde este monto, con IVA incluido, el envío no se cobra. Si no quieres envío gratis, deja la casilla sin marcar.",
+      "freeExample": "1500",
+      "saveFree": "Guardar envío gratis",
+      "ratesTitle": "Tarifa por estado",
+      "ratesIntro": "Cada importe está en pesos mexicanos con IVA incluido y se cobra una vez por compra. Pon 0 para que un estado tenga envío gratis siempre.",
+      "caption": "Tarifa de envío de cada estado",
+      "state": "Estado",
+      "rate": "Tarifa (MXN)",
+      "rateFor": "Tarifa de envío a {state}",
+      "saveRates": "Guardar tarifas",
+      "saving": "Guardando…",
+      "saved": "Cambios guardados.",
+      "invalidAmount": "Revisa los importes: usa números de 0 a 100,000 con hasta dos decimales.",
+      "errors": {
+        "SHIPPING_STRATEGY_UNAVAILABLE": "Esa estrategia no tiene tarifas activas.",
+        "SHIPPING_ZONE_UNKNOWN": "Hay un estado que ya no existe. Recarga la página.",
+        "PERMISSION_DENIED": "Tu cuenta no puede administrar los envíos.",
+        "SECOND_FACTOR_REQUIRED": "Activa la verificación en dos pasos para administrar los envíos.",
+        "INVALID_REQUEST": "Revisa los importes.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
+        "invalid": "La respuesta del servidor no se pudo leer. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
+      },
+      "exampleLabel": "Ejemplo"
+    },
     "adminHub": {
       "title": "Administración",
       "intro": "Desde aquí administras la tienda. Ves solo lo que tu cuenta puede abrir.",
@@ -1506,6 +1544,10 @@
         "catalog": {
           "name": "Catálogo",
           "description": "Marcas, propiedades de producto y publicación del catálogo en la tienda."
+        },
+        "shipping": {
+          "name": "Envíos",
+          "description": "Cuánto cuesta el envío a cada estado y desde qué monto es gratis."
         },
         "admins": {
           "name": "Administradores",

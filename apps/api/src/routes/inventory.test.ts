@@ -56,6 +56,10 @@ const INVENTORY = [
   // FC 044 F1: the owner's console of administrators (users:manage, then the role owner).
   '├── /v1/admin/admins (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
+  // FC 061: the shipping console (shipping:manage).
+  '├── /v1/admin/shipping (GET, HEAD)',
+  '│   ├── /config (PUT)',
+  '│   └── /rules (PUT)',
   // FC 029 F2: the catalog backoffice (catalog:write). Its DELETE /v1/admin/catalog/* refusal
   // is a wildcard this view does not print; routes/catalogAdmin.test.ts proves its 405.
   '├── /v1/admin/catalog/media (POST)',
@@ -241,6 +245,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     expect(panel).toEqual([
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
       '├── /v1/admin/admins (GET, HEAD, POST)',
+      '├── /v1/admin/shipping (GET, HEAD)',
       '├── /v1/admin/catalog/media (POST)',
       '├── /v1/admin/catalog/brands (GET, HEAD, POST)',
       '├── /v1/admin/catalog/facets (GET, HEAD)',

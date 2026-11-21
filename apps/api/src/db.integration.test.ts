@@ -83,6 +83,11 @@ import {
 } from './services/passwordResets';
 import { hashPassword } from './services/passwords';
 import type { PaymentProcessorPort } from './services/paymentPort';
+import {
+  readShippingAdmin,
+  updateShippingConfig,
+  updateShippingRules,
+} from './services/shippingAdmin';
 import { createTableRateProvider } from './services/shippingRates';
 import type { ShippingRateProvider } from './services/shippingPort';
 import { receiveWebhook } from './services/webhooks';
@@ -219,7 +224,8 @@ async function addProduct(sku: string, slug: string, stock: number) {
 
 beforeAll(async () => {
   await db.query(
-    'INSERT INTO shipping_configs (id, active_strategy_id, is_free_shipping_active) VALUES (1, 1, 0)'
+    // Migration 014 seeds the row (ZONE_RATE); this suite prices with the flat national rate below.
+    'INSERT INTO shipping_configs (id, active_strategy_id, is_free_shipping_active) VALUES (1, 1, 0) ON DUPLICATE KEY UPDATE active_strategy_id = 1, is_free_shipping_active = 0'
   );
   await db.query(
     'INSERT INTO shipping_rules (strategy_id, rate_mxn_cents) VALUES (1, 15000)'
@@ -576,6 +582,7 @@ describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
       'audit:read',
       'catalog:write',
       'orders:read',
+      'shipping:manage',
       'users:manage',
     ]);
     await db.query(
@@ -2143,5 +2150,158 @@ describe('the link to the Stripe customer of an account on real SQL (migration 0
       "SELECT COUNT(*) AS n FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'user_stripe_customers'"
     );
     expect(Number(refs.n)).toBe(0);
+  });
+});
+
+describe('the shipping configuration on real SQL (migration 014, shippingAdmin.ts, FC 061 F0 F1)', () => {
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const LINE = {
+    quantity: 1,
+    weightGrams: 1200,
+    lengthMm: 500,
+    widthMm: 300,
+    heightMm: 200,
+    classId: 1,
+  };
+  const quote = (stateCode: string) =>
+    shipping.quote({ stateCode, lines: [LINE], itemsTotalMxnCents: 185_000 });
+  const actor = async () => {
+    await createCustomer(db, {
+      email: 'shipping-admin@example.test',
+      passwordHash: ARGON,
+      fullName: 'Prueba',
+    });
+    const [row] = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?',
+      ['shipping-admin@example.test']
+    );
+    return { userId: row.id, ip: '203.0.113.9' };
+  };
+  /** The suite's own setup: a flat national rate (strategy 1) is the active one. */
+  const restoreSuiteConfig = () =>
+    db.query(
+      'UPDATE shipping_configs SET active_strategy_id = 1, is_free_shipping_active = 0, free_shipping_threshold_mxn_cents = NULL WHERE id = 1'
+    );
+
+  it('seeds a ZONE_RATE rate of 150.00 for each of the 32 states, and the permission for owner and admin (T0.1, T2.1)', async () => {
+    const [zones] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM shipping_zones z JOIN shipping_rules r ON r.strategy_id = 2 AND r.zone_id = z.id AND r.is_active = 1 AND r.rate_mxn_cents = 15000 WHERE z.is_active = 1'
+    );
+    expect(Number(zones.n)).toBe(32);
+    const granted = await db.query<{ role_id: string }>(
+      "SELECT role_id FROM role_permissions WHERE permission_id = 'shipping:manage' ORDER BY role_id"
+    );
+    expect(granted.map((row) => row.role_id)).toEqual(['admin', 'owner']);
+  });
+
+  it('quotes every state on the seeded rates once ZONE_RATE is the active strategy (T2.1, T2.2)', async () => {
+    await db.query(
+      'UPDATE shipping_configs SET active_strategy_id = 2 WHERE id = 1'
+    );
+    for (const stateCode of ['AGU', 'CMX', 'ZAC', 'YUC']) {
+      expect(await quote(stateCode)).toMatchObject({
+        serviceable: true,
+        totalMxnCents: 15000,
+      });
+    }
+    await restoreSuiteConfig();
+  });
+
+  it('reads the view, then saves free shipping and the 32 rates in one transaction each, with audit (T1.1, T1.2, T2.3)', async () => {
+    const who = await actor();
+    const before = await readShippingAdmin(db);
+    expect(before.zones).toHaveLength(32);
+    expect(before.strategies).toHaveLength(5);
+    expect(before.rules).toHaveLength(32);
+
+    const config = await db.transaction((tx) =>
+      updateShippingConfig(
+        tx,
+        {
+          strategyId: 2,
+          isFreeShippingActive: true,
+          freeShippingThresholdMxnCents: 100_000,
+        },
+        who
+      )
+    );
+    expect(config).toMatchObject({
+      config: {
+        strategyId: 2,
+        isFreeShippingActive: true,
+        freeShippingThresholdMxnCents: 100_000,
+      },
+    });
+    expect(await quote('ZAC')).toMatchObject({
+      serviceable: true,
+      totalMxnCents: 0,
+    });
+
+    const rules = await db.transaction((tx) =>
+      updateShippingRules(
+        tx,
+        {
+          rules: before.zones.map((zone) => ({
+            zoneId: zone.id,
+            rateMxnCents: zone.code === 'ZAC' ? 9900 : 20000,
+          })),
+        },
+        who
+      )
+    );
+    expect(rules).toMatchObject({ rules: expect.any(Array) });
+    const [count] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM shipping_rules WHERE strategy_id = 2'
+    );
+    expect(Number(count.n)).toBe(32);
+    await db.query(
+      'UPDATE shipping_configs SET is_free_shipping_active = 0, free_shipping_threshold_mxn_cents = NULL WHERE id = 1'
+    );
+    expect(await quote('ZAC')).toMatchObject({
+      serviceable: true,
+      totalMxnCents: 9900,
+    });
+    expect(await quote('AGU')).toMatchObject({
+      serviceable: true,
+      totalMxnCents: 20000,
+    });
+
+    const audit = await db.query<{
+      action: string;
+      before_state: string;
+      after_state: string;
+    }>(
+      "SELECT action, before_state, after_state FROM audit_log WHERE user_id = ? AND action IN ('SHIPPING_CONFIG_UPDATED', 'SHIPPING_RULES_UPDATED') ORDER BY id",
+      [who.userId]
+    );
+    expect(audit.map((row) => row.action)).toEqual([
+      'SHIPPING_CONFIG_UPDATED',
+      'SHIPPING_RULES_UPDATED',
+    ]);
+    expect(JSON.parse(audit[0].after_state)).toMatchObject({
+      isFreeShippingActive: true,
+    });
+    await restoreSuiteConfig();
+  });
+
+  it('refuses a strategy with no active rates and leaves the configuration as it was (A04)', async () => {
+    const who = await actor();
+    const outcome = await db.transaction((tx) =>
+      updateShippingConfig(
+        tx,
+        {
+          strategyId: 4,
+          isFreeShippingActive: false,
+          freeShippingThresholdMxnCents: null,
+        },
+        who
+      )
+    );
+    expect(outcome).toBe('SHIPPING_STRATEGY_UNAVAILABLE');
+    const [row] = await db.query<{ active_strategy_id: number }>(
+      'SELECT active_strategy_id FROM shipping_configs WHERE id = 1'
+    );
+    expect(Number(row.active_strategy_id)).toBe(1);
   });
 });

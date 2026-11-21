@@ -38,7 +38,13 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
     expect(canOpen(staff, 'admins')).toBe(false);
     expect(canOpen(staff, 'admin')).toBe(true);
     const buyer = { roles: ['customer'], permissions: ['account:self'] };
-    for (const section of ['panel', 'catalog', 'admins', 'admin'] as const) {
+    for (const section of [
+      'panel',
+      'catalog',
+      'shipping',
+      'admins',
+      'admin',
+    ] as const) {
       expect(canOpen(buyer, section)).toBe(false);
     }
     expect(canOpen(buyer, 'orders')).toBe(true);
@@ -57,20 +63,27 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
       'products',
       'catalog',
     ]);
+    expect(keys({ roles: [], permissions: ['shipping:manage'] })).toEqual([
+      'shipping',
+    ]);
     expect(keys({ roles: ['owner'], permissions: [] })).toEqual(['admins']);
     expect(
-      keys({ roles: ['owner'], permissions: ['orders:read', 'catalog:write'] })
-    ).toEqual(['orders', 'products', 'catalog', 'admins']);
+      keys({
+        roles: ['owner'],
+        permissions: ['orders:read', 'catalog:write', 'shipping:manage'],
+      })
+    ).toEqual(['orders', 'products', 'catalog', 'shipping', 'admins']);
     // Each card names the console and the tab it opens.
     expect(
       adminCardsOf({
         roles: ['owner'],
-        permissions: ['orders:read', 'catalog:write'],
+        permissions: ['orders:read', 'catalog:write', 'shipping:manage'],
       })
     ).toEqual([
       { key: 'orders', tab: 'panel', section: null },
       { key: 'products', tab: 'catalog', section: 'productos' },
       { key: 'catalog', tab: 'catalog', section: 'marcas' },
+      { key: 'shipping', tab: 'shipping', section: null },
       { key: 'admins', tab: 'admins', section: null },
     ]);
   });
