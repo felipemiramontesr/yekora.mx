@@ -11,8 +11,12 @@
  */
 import type { TxQuery } from './db';
 
-/** The mail the API sends. */
-export type MailEvent =
+/**
+ * The mail the API sends. Every event may name the language of its message (`locale`, FC 065
+ * T1.1): `en` asks for English; anything else, or nothing, is Mexican Spanish. A message is
+ * never written in both.
+ */
+export type MailEvent = (
   | {
       /** The 6-digit sign-in code of an `EMAIL` challenge. */
       type: 'SIGN_IN_CODE';
@@ -37,7 +41,11 @@ export type MailEvent =
       /** Security alert: the password changed through a reset link (FC 042 T2.3). */
       type: 'PASSWORD_CHANGED';
       userId: string;
-    };
+    }
+) & {
+  /** The language the message asks for, if any. */
+  locale?: string;
+};
 
 declare module 'fastify' {
   interface FastifyRequest {

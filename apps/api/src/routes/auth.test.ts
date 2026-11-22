@@ -516,7 +516,7 @@ function memoryDb() {
 
 let app: FastifyInstance;
 let store: ReturnType<typeof memoryDb>;
-let sent: { to: string; subject: string; text: string }[];
+let sent: { to: string; subject: string; text: string; html?: string }[];
 /** Every pause `forgot-password` asked for (FC 042 T2.1), instead of waiting for real. */
 let waits: number[];
 /**
@@ -1554,8 +1554,10 @@ describe(
       expect(mail?.text).toContain(
         `https://yekora.mx/cuenta/?action=reset-password&token=${token}`
       );
-      expect(mail?.text).toContain(
-        `https://yekora.mx/en/account/?action=reset-password&token=${token}`
+      // FC 065 T2.2: one language per message, so the English link is not in the Spanish mail.
+      expect(mail?.text).not.toContain('/en/account/');
+      expect(mail?.html).toContain(
+        `https://yekora.mx/cuenta/?action=reset-password&amp;token=${token}`
       );
     });
 
@@ -1734,7 +1736,9 @@ describe(
       expect(mail?.text).toContain(
         'Si no fuiste tú, escríbenos de inmediato a contacto@yekora.mx.'
       );
-      expect(mail?.text).toContain('write to contacto@yekora.mx right away');
+      // FC 065 T2.2: Spanish only, never the English twin in the same message.
+      expect(mail?.text).not.toContain('right away');
+      expect(mail?.html).toContain('contacto@yekora.mx');
     });
 
     it('T1.2 · refuses an unknown or expired link, and a weak password without spending the link', async () => {

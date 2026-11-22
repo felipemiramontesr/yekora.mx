@@ -60,7 +60,7 @@ function outboxDb(
 }
 
 /** What the recording sender receives. */
-type Message = { to: string; subject: string; text: string };
+type Message = { to: string; subject: string; text: string; html?: string };
 
 const log = { error: vi.fn() };
 
@@ -321,4 +321,103 @@ describe('SMTP sender (nodemailer)', () => {
       expect.objectContaining({ host: 'smtp.hostinger.com', secure: true })
     );
   }, 30_000);
+});
+
+describe('the branded, single-language mail of the identity events (FC 065 T1.1, T2.2, T2.3, T2.4)', () => {
+  const challengeId = 'c0000000-0000-4000-8000-000000000009';
+  const events = (locale?: string) => [
+    row(1, {
+      event_type: 'SIGN_IN_CODE',
+      payload: JSON.stringify({
+        userId: USER,
+        challengeId,
+        code: encryptTotpSecret(KEY, challengeId, Buffer.from('482913')),
+        locale,
+      }),
+    }),
+    row(2, {
+      event_type: 'PASSWORD_RESET',
+      payload: JSON.stringify({
+        userId: USER,
+        token: encryptTotpSecret(KEY, USER, Buffer.from('a'.repeat(64))),
+        locale,
+      }),
+    }),
+    row(3, {
+      event_type: 'PASSWORD_CHANGED',
+      payload: JSON.stringify({ userId: USER, locale }),
+    }),
+    row(4, {
+      event_type: 'TOTP_ENABLED',
+      payload: JSON.stringify({ userId: USER, locale }),
+    }),
+  ];
+
+  async function sentFor(locale?: string) {
+    const { db } = outboxDb([events(locale)]);
+    const { outbox, send } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    return send.mock.calls.map(([message]) => message);
+  }
+
+  it('hands the transport the text and the HTML of every event, both non-empty, with the same facts (T2.3)', async () => {
+    const [code, reset, changed, totp] = await sentFor();
+    for (const message of [code, reset, changed, totp]) {
+      expect(message.to).toBe('ana@example.test');
+      expect(message.subject.length).toBeGreaterThan(0);
+      expect(message.text.trim().length).toBeGreaterThan(0);
+      expect(message.html?.trim().length).toBeGreaterThan(0);
+      expect(message.html).toContain('https://yekora.mx/brand/email/logo.png');
+      expect(message.html).toContain('https://yekora.mx/privacidad/');
+      expect(message.text).toContain('https://yekora.mx/privacidad/');
+      expect(message.html).not.toContain('<script');
+    }
+    expect(code.text).toContain('482913');
+    expect(code.html).toContain('482913');
+    const link = `https://yekora.mx/cuenta/?action=reset-password&token=${'a'.repeat(64)}`;
+    expect(reset.text).toContain(link);
+    expect(reset.html).toContain(link.replace('&', '&amp;'));
+    expect(changed.text).toContain('contacto@yekora.mx');
+    expect(totp.text).toContain('autenticación');
+  });
+
+  it('writes every event without a language in Mexican Spanish only (T1.1)', async () => {
+    for (const message of await sentFor()) {
+      expect(message.html).toContain('<html lang="es-MX">');
+      expect(message.text).not.toMatch(
+        /\b(your|expires|right away|sign-in)\b/i
+      );
+    }
+    for (const message of await sentFor('fr')) {
+      expect(message.html).toContain('<html lang="es-MX">');
+    }
+  });
+
+  it('writes an event that asks for English in English only, with the English link and privacy page (T1.1, T2.2)', async () => {
+    const [code, reset, changed, totp] = await sentFor('en');
+    for (const message of [code, reset, changed, totp]) {
+      expect(message.html).toContain('<html lang="en">');
+      expect(message.html).toContain('https://yekora.mx/en/privacy/');
+      expect(message.text).not.toMatch(/\b(tu|contraseña|vence|cuenta)\b/i);
+    }
+    expect(code.subject).toBe('Your YĒKORA sign-in code');
+    expect(reset.text).toContain(
+      `https://yekora.mx/en/account/?action=reset-password&token=${'a'.repeat(64)}`
+    );
+    expect(reset.text).not.toContain('/cuenta/');
+    expect(changed.subject).toBe('You changed your YĒKORA password');
+    expect(totp.subject).toBe('You turned on two-step verification on YĒKORA');
+  });
+
+  it('keeps the secrets encrypted in the queue and out of the logs: the payload never holds the code or the token (T2.4)', async () => {
+    const { db, sql } = outboxDb([events()]);
+    const { outbox } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    const everything =
+      JSON.stringify(sql) + JSON.stringify(log.error.mock.calls);
+    expect(everything).not.toContain('482913');
+    expect(everything).not.toContain('a'.repeat(64));
+  });
 });

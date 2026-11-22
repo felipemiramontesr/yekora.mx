@@ -21,6 +21,13 @@ import { retryDelaySeconds } from '../../../../scripts/lib/outboxValidation';
 import type { MailConfig } from '../config';
 import { decryptTotpSecret } from './authCrypto';
 import type { Db } from './db';
+import {
+  assertMultipart,
+  type EmailContent,
+  type MailLocale,
+  renderEmail,
+  resolveMailLocale,
+} from './emailTemplate';
 import { emailOf } from './identity';
 import type { MailEvent } from './outbox';
 
@@ -39,7 +46,10 @@ const SWEEP_MS = 60_000;
 interface MailMessage {
   to: string;
   subject: string;
+  /** Plain-text body, with the same information as the HTML one (FC 065 T2.3). */
   text: string;
+  /** HTML body of the brand template. */
+  html?: string;
 }
 
 /** Sends one message, or throws. */
@@ -85,21 +95,157 @@ export function smtpSender(mail: MailConfig): SendMail {
 }
 
 /**
- * The reset links of a token (FC 042 T1.1), one per language: the account page reads the token
- * from the query and drops it from the address bar at once.
+ * The reset link of a token (FC 042 T1.1): the account page reads the token from the query and
+ * drops it from the address bar at once. One link, in the language of the message (FC 065 T2.2).
  */
-function resetLinks(
-  siteUrl: string,
-  token: string
-): { es: string; en: string } {
-  const query = `?action=reset-password&token=${token}`;
-  return {
-    es: `${siteUrl}/cuenta/${query}`,
-    en: `${siteUrl}/en/account/${query}`,
-  };
+function resetLink(siteUrl: string, token: string, locale: MailLocale): string {
+  const area = locale === 'en' ? '/en/account/' : '/cuenta/';
+  return `${siteUrl}${area}?action=reset-password&token=${token}`;
 }
 
-/** The text of one message, addressed to the account's current e-mail. */
+/** The subject and the content of one identity message, in one language (FC 065 T1.1, T2.2). */
+interface Copy {
+  subject: string;
+  content: Omit<EmailContent, 'locale'>;
+}
+
+/** The words of the four identity messages, in each language. */
+const COPY = {
+  SIGN_IN_CODE: {
+    'es-MX': (code: string): Copy => ({
+      subject: 'Tu código de acceso a YĒKORA',
+      content: {
+        heading: 'Tu código de acceso',
+        paragraphs: [
+          'Escribe este código para entrar a tu cuenta. Vence en 5 minutos.',
+        ],
+        code,
+        notice:
+          'Si no intentaste entrar, cambia tu contraseña: alguien la conoce.',
+      },
+    }),
+    en: (code: string): Copy => ({
+      subject: 'Your YĒKORA sign-in code',
+      content: {
+        heading: 'Your sign-in code',
+        paragraphs: [
+          'Enter this code to sign in to your account. It expires in 5 minutes.',
+        ],
+        code,
+        notice:
+          'If you did not try to sign in, change your password: someone knows it.',
+      },
+    }),
+  },
+  PASSWORD_RESET: {
+    'es-MX': (link: string): Copy => ({
+      subject: 'Restablece tu contraseña de YĒKORA',
+      content: {
+        heading: 'Elige una contraseña nueva',
+        paragraphs: [
+          'Para elegir una contraseña nueva, abre el enlace. Vence en 15 minutos y sirve una sola vez.',
+        ],
+        button: { label: 'Elegir contraseña nueva', url: link },
+        notice:
+          'Si no lo pediste, ignora este correo: tu contraseña no cambia.',
+      },
+    }),
+    en: (link: string): Copy => ({
+      subject: 'Reset your YĒKORA password',
+      content: {
+        heading: 'Choose a new password',
+        paragraphs: [
+          'To choose a new password, open the link. It expires in 15 minutes and works once.',
+        ],
+        button: { label: 'Choose a new password', url: link },
+        notice:
+          'If you did not ask for it, ignore this e-mail: your password does not change.',
+      },
+    }),
+  },
+  PASSWORD_CHANGED: {
+    'es-MX': (): Copy => ({
+      subject: 'Cambiaste tu contraseña de YĒKORA',
+      content: {
+        heading: 'Tu contraseña cambió',
+        paragraphs: [
+          'Tu contraseña cambió y cerramos todas tus sesiones abiertas.',
+        ],
+        notice: `Si no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (): Copy => ({
+      subject: 'You changed your YĒKORA password',
+      content: {
+        heading: 'Your password changed',
+        paragraphs: ['Your password changed and we closed every open session.'],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
+  TOTP_ENABLED: {
+    'es-MX': (): Copy => ({
+      subject: 'Activaste la verificación en dos pasos en YĒKORA',
+      content: {
+        heading: 'Verificación en dos pasos activada',
+        paragraphs: [
+          'Tu cuenta ahora pide el código de tu app de autenticación al entrar.',
+        ],
+        notice: `Si no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (): Copy => ({
+      subject: 'You turned on two-step verification on YĒKORA',
+      content: {
+        heading: 'Two-step verification is on',
+        paragraphs: [
+          'Your account now asks for the code of your authenticator app when you sign in.',
+        ],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
+} as const;
+
+/**
+ * The words of one message in its language. Secrets are decrypted here, in memory, and go only
+ * into the body that is about to be sent (FC 065 T2.4).
+ */
+function copyOf(
+  keys: { totpKey: Buffer; siteUrl: string },
+  event: MailEvent,
+  locale: MailLocale
+): Copy {
+  switch (event.type) {
+    case 'SIGN_IN_CODE': {
+      const code = decryptTotpSecret(
+        keys.totpKey,
+        event.challengeId,
+        event.code
+      ).toString('utf8');
+      return COPY.SIGN_IN_CODE[locale](code);
+    }
+    case 'PASSWORD_RESET': {
+      const token = decryptTotpSecret(
+        keys.totpKey,
+        event.userId,
+        event.token
+      ).toString('utf8');
+      return COPY.PASSWORD_RESET[locale](
+        resetLink(keys.siteUrl, token, locale)
+      );
+    }
+    case 'PASSWORD_CHANGED':
+      return COPY.PASSWORD_CHANGED[locale]();
+    case 'TOTP_ENABLED':
+      return COPY.TOTP_ENABLED[locale]();
+  }
+}
+
+/**
+ * The message of one queued event: both bodies, in one language, addressed to the account's
+ * current e-mail.
+ */
 async function render(
   db: Db,
   keys: { totpKey: Buffer; siteUrl: string },
@@ -110,45 +256,11 @@ async function render(
     ...JSON.parse(row.payload),
   } as MailEvent;
   const to = await emailOf(db, event.userId);
-  switch (event.type) {
-    case 'SIGN_IN_CODE': {
-      const code = decryptTotpSecret(
-        keys.totpKey,
-        event.challengeId,
-        event.code
-      ).toString('utf8');
-      return {
-        to,
-        subject: 'Tu código de acceso a YĒKORA',
-        text: `Tu código de acceso es ${code}. Vence en 5 minutos.\n\nSi no intentaste entrar, cambia tu contraseña: alguien la conoce.\n\nYour YĒKORA sign-in code is ${code}. It expires in 5 minutes.`,
-      };
-    }
-    case 'PASSWORD_RESET': {
-      const token = decryptTotpSecret(
-        keys.totpKey,
-        event.userId,
-        event.token
-      ).toString('utf8');
-      const link = resetLinks(keys.siteUrl, token);
-      return {
-        to,
-        subject: 'Restablece tu contraseña de YĒKORA',
-        text: `Para elegir una contraseña nueva, abre este enlace. Vence en 15 minutos y sirve una sola vez:\n${link.es}\n\nSi no lo pediste, ignora este correo: tu contraseña no cambia.\n\nTo choose a new YĒKORA password, open this link. It expires in 15 minutes and works once:\n${link.en}`,
-      };
-    }
-    case 'PASSWORD_CHANGED':
-      return {
-        to,
-        subject: 'Cambiaste tu contraseña de YĒKORA',
-        text: `Tu contraseña cambió y cerramos todas tus sesiones abiertas.\n\nSi no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.\n\nYour YĒKORA password changed and every open session was closed. If this was not you, write to ${SUPPORT_EMAIL} right away.`,
-      };
-    case 'TOTP_ENABLED':
-      return {
-        to,
-        subject: 'Activaste la verificación en dos pasos en YĒKORA',
-        text: 'Tu cuenta ahora pide el código de tu app de autenticación al entrar.\n\nSi no fuiste tú, escríbenos de inmediato.\n\nTwo-step verification is now on for your YĒKORA account.',
-      };
-  }
+  const locale = resolveMailLocale(event.locale);
+  const { subject, content } = copyOf(keys, event, locale);
+  const { html, text } = renderEmail({ ...content, locale }, keys.siteUrl);
+  assertMultipart(html, text);
+  return { to, subject, text, html };
 }
 
 /**
