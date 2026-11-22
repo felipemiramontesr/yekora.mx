@@ -75527,17 +75527,17 @@ var require_query2 = __commonJS({
           }
           return this.done();
         }
-        let row2;
+        let row3;
         try {
-          row2 = this._rowParser.next(packet, this._currentFields, this.options);
+          row3 = this._rowParser.next(packet, this._currentFields, this.options);
         } catch (err) {
           this._localStreamError = err;
           return this.doneInsert(null);
         }
         if (this.onResult) {
-          this._currentRows.push(row2);
+          this._currentRows.push(row3);
         } else {
-          this.emit("result", row2, this._resultIndex);
+          this.emit("result", row3, this._resultIndex);
         }
         return _Query.prototype.row;
       }
@@ -75561,12 +75561,12 @@ var require_query2 = __commonJS({
             stream.emit("end");
           }
         });
-        const onResult = (row2, index) => {
+        const onResult = (row3, index) => {
           if (stream.destroyed) return;
-          if (!stream.push(row2)) {
+          if (!stream.push(row3)) {
             this._connection && this._connection.pause();
           }
-          stream.emit("result", row2, index);
+          stream.emit("result", row3, index);
         };
         const onFields = (fields2) => {
           if (stream.destroyed) return;
@@ -77942,10 +77942,10 @@ var require_connection = __commonJS({
       }
       writeTextResult(rows, columns, binary = false) {
         this.writeColumns(columns);
-        rows.forEach((row2) => {
+        rows.forEach((row3) => {
           const arrayRow = new Array(columns.length);
           columns.forEach((column) => {
-            arrayRow.push(row2[column.name]);
+            arrayRow.push(row3[column.name]);
           });
           if (binary) {
             this.writeBinaryRow(arrayRow);
@@ -100041,8 +100041,8 @@ function stockStatus(stock) {
   if (stock <= 0) return "out_of_stock";
   return stock < LOW_STOCK ? "low_stock" : "available";
 }
-function quoteLine(line, row2, lang) {
-  if (!row2) {
+function quoteLine(line, row3, lang) {
+  if (!row3) {
     return {
       quoted: {
         sku: line.sku,
@@ -100060,8 +100060,8 @@ function quoteLine(line, row2, lang) {
       warning: "unavailable"
     };
   }
-  const unit = Number(row2.price_mxn_cents);
-  const stock = Number(row2.stock);
+  const unit = Number(row3.price_mxn_cents);
+  const stock = Number(row3.stock);
   const total = unit * line.quantity;
   const { base: base2, tax } = splitVat(total);
   const status = stockStatus(stock);
@@ -100071,9 +100071,9 @@ function quoteLine(line, row2, lang) {
   else if (!purchasable) warning = "insufficient_stock";
   return {
     quoted: {
-      sku: row2.sku,
-      slug: row2.slug,
-      name: lang === "en" ? row2.name_en : row2.name_es,
+      sku: row3.sku,
+      slug: row3.slug,
+      name: lang === "en" ? row3.name_en : row3.name_es,
       quantity: line.quantity,
       unitPriceMxnCents: unit,
       lineTotalMxnCents: total,
@@ -100088,7 +100088,7 @@ function quoteLine(line, row2, lang) {
   };
 }
 function buildQuote(lines, rows, rate, lang, shipping = null) {
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const bySku = new Map(rows.map((row3) => [row3.sku, row3]));
   const items = [];
   const warnings = [];
   const summary2 = {
@@ -100153,19 +100153,19 @@ async function quoteCartToDestination(db, lines, rate, lang, destination, provid
   if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
     return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
   }
-  const bySku = new Map(rows.map((row2) => [row2.sku, row2]));
+  const bySku = new Map(rows.map((row3) => [row3.sku, row3]));
   const shipment = await provider.quote({
     stateCode: destination.stateCode,
     itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
     lines: lines.map((line) => {
-      const row2 = bySku.get(line.sku);
+      const row3 = bySku.get(line.sku);
       return {
         quantity: line.quantity,
-        weightGrams: Number(row2.weight_grams),
-        lengthMm: Number(row2.length_mm),
-        widthMm: Number(row2.width_mm),
-        heightMm: Number(row2.height_mm),
-        classId: Number(row2.shipping_class_id)
+        weightGrams: Number(row3.weight_grams),
+        lengthMm: Number(row3.length_mm),
+        widthMm: Number(row3.width_mm),
+        heightMm: Number(row3.height_mm),
+        classId: Number(row3.shipping_class_id)
       };
     })
   });
@@ -100294,29 +100294,29 @@ var catalogListQuery = external_exports.object({
 var catalogItemParams = external_exports.object({ slug: slug2 });
 function presentProperties(rows, language) {
   const english = language === "en";
-  return rows.map((row2) => ({
-    groupCode: row2.group_code,
-    groupName: english ? row2.group_name_en : row2.group_name_es,
-    valueCode: row2.value_code,
-    valueName: english ? row2.value_en : row2.value_es,
-    isFilterable: Number(row2.is_filterable) === 1
+  return rows.map((row3) => ({
+    groupCode: row3.group_code,
+    groupName: english ? row3.group_name_en : row3.group_name_es,
+    valueCode: row3.value_code,
+    valueName: english ? row3.value_en : row3.value_es,
+    isFilterable: Number(row3.is_filterable) === 1
   }));
 }
-function present(row2, language, fix, properties) {
+function present(row3, language, fix, properties) {
   const english = language === "en";
   return {
-    sku: row2.sku,
-    slug: row2.slug,
-    name: english ? row2.name_en : row2.name_es,
-    description: english ? row2.description_en : row2.description_es,
-    discipline: row2.discipline,
-    disciplineName: english ? row2.discipline_name_en : row2.discipline_name_es,
-    brand: row2.brand,
-    brandName: row2.brand_name,
+    sku: row3.sku,
+    slug: row3.slug,
+    name: english ? row3.name_en : row3.name_es,
+    description: english ? row3.description_en : row3.description_es,
+    discipline: row3.discipline,
+    disciplineName: english ? row3.discipline_name_en : row3.discipline_name_es,
+    brand: row3.brand,
+    brandName: row3.brand_name,
     properties: presentProperties(properties, language),
-    priceMxnCents: Number(row2.price_mxn_cents),
-    priceUsdCents: usdCents(Number(row2.price_mxn_cents), fix),
-    inStock: Number(row2.stock) > 0
+    priceMxnCents: Number(row3.price_mxn_cents),
+    priceUsdCents: usdCents(Number(row3.price_mxn_cents), fix),
+    inStock: Number(row3.stock) > 0
   };
 }
 function registerCatalogRoutes(app, deps) {
@@ -100335,11 +100335,11 @@ function registerCatalogRoutes(app, deps) {
     ]);
     const fix = rate ? Number(rate.rate) : null;
     const properties = await Promise.all(
-      items.map((row2) => findProductProperties(deps.db, row2.slug))
+      items.map((row3) => findProductProperties(deps.db, row3.slug))
     );
     return {
       items: items.map(
-        (row2, index) => present(row2, query.lang, fix, properties[index])
+        (row3, index) => present(row3, query.lang, fix, properties[index])
       ),
       page: query.page,
       pageSize: query.pageSize,
@@ -100464,22 +100464,22 @@ ${key}`).digest("hex");
 function runIdempotent(db, request, work) {
   const hash2 = keyHash(request.userId, request.key);
   return db.transaction(async (tx) => {
-    const [row2] = await tx.query(
+    const [row3] = await tx.query(
       "SELECT route, request_hash, response_status, response_body, expires_at FROM idempotency_keys WHERE key_hash = ? FOR UPDATE",
       [hash2]
     );
-    if (row2 && new Date(row2.expires_at) > request.now) {
-      if (row2.route !== request.route || row2.request_hash !== request.requestHash)
+    if (row3 && new Date(row3.expires_at) > request.now) {
+      if (row3.route !== request.route || row3.request_hash !== request.requestHash)
         return { code: "IDEMP_PAYLOAD_MISMATCH" };
       return {
         code: "IDEMP_REPLAY_SUCCESS",
         answer: {
-          status: Number(row2.response_status),
-          body: JSON.parse(row2.response_body)
+          status: Number(row3.response_status),
+          body: JSON.parse(row3.response_body)
         }
       };
     }
-    if (row2) {
+    if (row3) {
       await tx.query("DELETE FROM idempotency_keys WHERE key_hash = ?", [hash2]);
     }
     const answer = await work(tx);
@@ -100702,11 +100702,11 @@ async function storeMedia(tx, bytes, verdict) {
   return true;
 }
 async function readMedia(db, sha2562) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT mime_type, media_data FROM media_blobs WHERE sha256 = ?",
     [sha2562]
   );
-  return row2 ? { mimeType: row2.mime_type, data: row2.media_data } : null;
+  return row3 ? { mimeType: row3.mime_type, data: row3.media_data } : null;
 }
 function matchesDigest(data, sha2562) {
   return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
@@ -100813,25 +100813,25 @@ function sealed(key, userId, addressId, content) {
     JSON.stringify(content)
   );
 }
-function opened(key, userId, row2) {
+function opened(key, userId, row3) {
   return addressContentSchema.parse(
     JSON.parse(
       decryptPii(
         key,
-        subjectOf(userId, row2.id),
+        subjectOf(userId, row3.id),
         "user_address",
-        row2.address_enc
+        row3.address_enc
       )
     )
   );
 }
-function viewOf(key, userId, row2, defaultId) {
-  const content = opened(key, userId, row2);
+function viewOf(key, userId, row3, defaultId) {
+  const content = opened(key, userId, row3);
   return {
-    id: row2.id,
-    isDefault: row2.id === defaultId,
-    isComplete: Number(row2.is_complete) === 1,
-    stateCode: row2.state_code,
+    id: row3.id,
+    isDefault: row3.id === defaultId,
+    isComplete: Number(row3.is_complete) === 1,
+    stateCode: row3.state_code,
     postalCode: content.postalCode,
     label: content.label ?? null,
     name: content.name ?? null,
@@ -100854,25 +100854,25 @@ async function listAddresses(db, key, userId) {
     [userId]
   );
   return rows.map(
-    (row2) => viewOf(key, userId, row2, owner?.default_address_id ?? null)
+    (row3) => viewOf(key, userId, row3, owner?.default_address_id ?? null)
   );
 }
 async function accountDelivery(db, key, userId) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT u.phone_enc, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?",
     [userId]
   );
   if (key === null) return { phone: null, postalCode: null, stateCode: null };
-  const address = row2.address_enc ? opened(key, userId, {
-    id: row2.address_id,
-    state_code: row2.state_code,
+  const address = row3.address_enc ? opened(key, userId, {
+    id: row3.address_id,
+    state_code: row3.state_code,
     is_complete: 0,
-    address_enc: row2.address_enc
+    address_enc: row3.address_enc
   }) : null;
   return {
-    phone: row2.phone_enc ? decryptPii(key, userId, "user_phone", row2.phone_enc) : null,
+    phone: row3.phone_enc ? decryptPii(key, userId, "user_phone", row3.phone_enc) : null,
     postalCode: address?.postalCode ?? null,
-    stateCode: address ? row2.state_code : null
+    stateCode: address ? row3.state_code : null
   };
 }
 async function updateProfile(tx, key, userId, profile) {
@@ -100931,11 +100931,11 @@ async function updateAddress(tx, key, userId, addressId, change) {
       ]
     );
   } else {
-    const [row2] = await tx.query(
+    const [row3] = await tx.query(
       "SELECT is_complete FROM user_addresses WHERE id = ? AND user_id = ?",
       [addressId, userId]
     );
-    isComplete = Number(row2.is_complete) === 1;
+    isComplete = Number(row3.is_complete) === 1;
   }
   if (isDefault) {
     await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
@@ -100978,13 +100978,22 @@ async function deleteAddress(tx, userId, addressId) {
   return null;
 }
 
+// src/services/outbox.ts
+async function enqueueMail(tx, event) {
+  const { type, ...payload } = event;
+  await tx.query(
+    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
+    [type, JSON.stringify(payload)]
+  );
+}
+
 // src/services/stripeCustomer.ts
 async function linkedCustomer(db, userId) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT stripe_customer_id FROM user_stripe_customers WHERE user_id = ?",
     [userId]
   );
-  return row2?.stripe_customer_id ?? null;
+  return row3?.stripe_customer_id ?? null;
 }
 async function ensureCustomer(db, cards, userId) {
   const existing = await linkedCustomer(db, userId);
@@ -101021,7 +101030,7 @@ async function expireOverdueOrders(db, now) {
       [now]
     );
     if (overdue.length === 0) return 0;
-    const ids = overdue.map((row2) => row2.id);
+    const ids = overdue.map((row3) => row3.id);
     await tx.query(
       "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
       [ids]
@@ -101029,6 +101038,9 @@ async function expireOverdueOrders(db, now) {
     await tx.query(
       "UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1",
       [ids]
+    );
+    await Promise.all(
+      ids.map((orderId) => enqueueMail(tx, { type: "ORDER_EXPIRED", orderId }))
     );
     return ids.length;
   });
@@ -101043,17 +101055,17 @@ async function reserveLines(tx, lines) {
         [line.quantity, line.sku, line.quantity]
       );
       if (affected(result) !== 1) return null;
-      const [row2] = await tx.query(
+      const [row3] = await tx.query(
         "SELECT id FROM products WHERE sku = ?",
         [line.sku]
       );
-      return [line.sku, row2.id];
+      return [line.sku, row3.id];
     })
   );
   if (reserved.includes(null)) throw new InsufficientStock();
   return new Map(reserved);
 }
-async function cancelOrder(db, orderId) {
+async function cancelOrder(db, orderId, locale) {
   await db.transaction(async (tx) => {
     const result = await tx.query(
       "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
@@ -101064,6 +101076,7 @@ async function cancelOrder(db, orderId) {
       "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
       [orderId]
     );
+    await enqueueMail(tx, { type: "ORDER_CANCELLED", orderId, locale });
   });
 }
 function methodOf(body) {
@@ -101259,25 +101272,25 @@ async function createCheckout(deps, body, lang, userId = null) {
       }
     };
   } catch {
-    await cancelOrder(deps.db, orderId);
+    await cancelOrder(deps.db, orderId, lang);
     return refuse2(503, "SERVICE_UNAVAILABLE");
   }
 }
 
 // src/services/orderReads.ts
 var iso = (date5) => new Date(date5).toISOString();
-function summary(row2) {
+function summary(row3) {
   return {
-    orderNumber: row2.order_number,
-    status: row2.status,
-    method: row2.method,
-    itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
-    shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
-    totalMxnCents: Number(row2.total_mxn_cents),
-    createdAt: iso(row2.created_at),
-    expiresAt: iso(row2.expires_at),
-    paidAt: row2.paid_at === null ? null : iso(row2.paid_at),
-    isTest: Number(row2.is_test) === 1
+    orderNumber: row3.order_number,
+    status: row3.status,
+    method: row3.method,
+    itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
+    shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
+    totalMxnCents: Number(row3.total_mxn_cents),
+    createdAt: iso(row3.created_at),
+    expiresAt: iso(row3.expires_at),
+    paidAt: row3.paid_at === null ? null : iso(row3.paid_at),
+    isTest: Number(row3.is_test) === 1
   };
 }
 async function listOrders(db, scope, paging2) {
@@ -101305,25 +101318,25 @@ async function listOrders(db, scope, paging2) {
   return { items: rows.map(summary), total: Number(count.n) };
 }
 async function findOrder(db, orderNumber) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
     [orderNumber]
   );
-  if (row2 === void 0) return null;
+  if (row3 === void 0) return null;
   const [lines, events] = await Promise.all([
     db.query(
       "SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id",
-      [row2.id]
+      [row3.id]
     ),
     db.query(
       "SELECT p.code AS processor, e.event_type, e.processor_status, e.amount_mxn_cents, r.code AS resulting_status, e.is_alert, e.received_at FROM payment_events e JOIN payment_processors p ON p.id = e.processor_id LEFT JOIN order_statuses r ON r.id = e.resulting_status_id WHERE e.order_id = ? ORDER BY e.received_at, e.id",
-      [row2.id]
+      [row3.id]
     )
   ]);
   return {
-    ownerId: row2.user_id,
+    ownerId: row3.user_id,
     order: {
-      ...summary(row2),
+      ...summary(row3),
       lines: lines.map((line) => ({
         sku: line.sku,
         quantity: Number(line.quantity),
@@ -101383,25 +101396,25 @@ function registerOrderRoutes(app, deps) {
       if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
         return notFound();
       await expireOverdueOrders(deps.db, deps.now());
-      const [row2] = await deps.db.query(
+      const [row3] = await deps.db.query(
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row2 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
-        Buffer.from(row2.access_token_hash),
+      if (row3 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
+        Buffer.from(row3.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
         return notFound();
       }
       return orderViewSchema.parse({
-        orderNumber: row2.order_number,
-        status: row2.status,
-        method: row2.method,
-        itemsTotalMxnCents: Number(row2.items_total_mxn_cents),
-        shippingTotalMxnCents: Number(row2.shipping_total_mxn_cents),
-        totalMxnCents: Number(row2.total_mxn_cents),
-        expiresAt: new Date(row2.expires_at).toISOString(),
-        paidAt: row2.paid_at === null ? null : new Date(row2.paid_at).toISOString()
+        orderNumber: row3.order_number,
+        status: row3.status,
+        method: row3.method,
+        itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
+        shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
+        totalMxnCents: Number(row3.total_mxn_cents),
+        expiresAt: new Date(row3.expires_at).toISOString(),
+        paidAt: row3.paid_at === null ? null : new Date(row3.paid_at).toISOString()
       });
     }
   );
@@ -102163,18 +102176,18 @@ function clientFacts(ip, userAgent) {
   return { ip: ip || null, userAgent: userAgent?.slice(0, 500) ?? null };
 }
 async function findUserByEmail(db, email3) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT id, email, password_hash, full_name, is_active FROM users WHERE email = ? AND is_active = 1",
     [email3]
   );
-  return row2 ?? null;
+  return row3 ?? null;
 }
 async function emailOf(db, userId) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT email FROM users WHERE id = ?",
     [userId]
   );
-  return row2.email;
+  return row3.email;
 }
 function createCustomer(db, user) {
   return db.transaction(async (tx) => {
@@ -102211,10 +102224,10 @@ async function capabilitiesOf(db, userId) {
     [userId]
   );
   return {
-    roles: [...new Set(rows.map((row2) => row2.role_id))].sort(byName),
+    roles: [...new Set(rows.map((row3) => row3.role_id))].sort(byName),
     permissions: [
       ...new Set(
-        rows.flatMap((row2) => row2.permission_id ? [row2.permission_id] : [])
+        rows.flatMap((row3) => row3.permission_id ? [row3.permission_id] : [])
       )
     ].sort(byName),
     totpEnabled: Number(totp?.is_totp_enabled ?? 0) === 1
@@ -102247,16 +102260,16 @@ async function markEmailVerified(db, userId, now) {
   );
 }
 async function liveChallenge(db, id, now) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT id, user_id, challenge_type, code_hash, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?",
     [id, now, MAX_ATTEMPTS]
   );
-  return row2 ? {
-    id: row2.id,
-    userId: row2.user_id,
-    type: row2.challenge_type,
-    codeHash: row2.code_hash,
-    attempts: Number(row2.attempts)
+  return row3 ? {
+    id: row3.id,
+    userId: row3.user_id,
+    type: row3.challenge_type,
+    codeHash: row3.code_hash,
+    attempts: Number(row3.attempts)
   } : null;
 }
 async function failChallenge(db, id) {
@@ -102266,14 +102279,14 @@ async function failChallenge(db, id) {
   );
 }
 async function totpOf(db, userId) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT totp_secret_encrypted, is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
     [userId]
   );
-  if (!row2?.totp_secret_encrypted) return null;
+  if (!row3?.totp_secret_encrypted) return null;
   return {
-    encrypted: row2.totp_secret_encrypted,
-    enabled: Number(row2.is_totp_enabled) === 1
+    encrypted: row3.totp_secret_encrypted,
+    enabled: Number(row3.is_totp_enabled) === 1
   };
 }
 async function savePendingTotp(db, userId, encrypted) {
@@ -102329,17 +102342,17 @@ async function openSession(tx, input2) {
   return { token, maxAgeSeconds: lifetime / 1e3 };
 }
 async function sessionUser(db, token, now) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT s.id, s.user_id, u.email, u.full_name FROM user_sessions s JOIN users u ON u.id = s.user_id AND u.is_active = 1 WHERE s.id = ? AND s.expires_at > ?",
     [tokenHash2(token), now]
   );
-  if (!row2) return null;
-  const capabilities = await capabilitiesOf(db, row2.user_id);
+  if (!row3) return null;
+  const capabilities = await capabilitiesOf(db, row3.user_id);
   return {
-    sessionId: row2.id,
-    userId: row2.user_id,
-    email: row2.email,
-    fullName: row2.full_name,
+    sessionId: row3.id,
+    userId: row3.user_id,
+    email: row3.email,
+    fullName: row3.full_name,
     ...capabilities
   };
 }
@@ -102367,11 +102380,11 @@ async function rememberDevice(db, device) {
   return token;
 }
 async function isTrustedDevice(db, token, userId, now) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT id FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ? AND expires_at > ?",
     [tokenHash2(token), userId, now]
   );
-  return row2 !== void 0;
+  return row3 !== void 0;
 }
 async function forgetDevice(db, token, userId) {
   await db.query(
@@ -102916,13 +102929,13 @@ function registerAdminRoutes(app, deps) {
 
 // src/services/shippingAdmin.ts
 async function readConfig(db) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT active_strategy_id, is_free_shipping_active, free_shipping_threshold_mxn_cents FROM shipping_configs WHERE id = 1"
   );
   return {
-    strategyId: row2?.active_strategy_id ?? ZONE_RATE_STRATEGY_ID,
-    isFreeShippingActive: Number(row2?.is_free_shipping_active ?? 0) === 1,
-    freeShippingThresholdMxnCents: row2?.free_shipping_threshold_mxn_cents ?? null
+    strategyId: row3?.active_strategy_id ?? ZONE_RATE_STRATEGY_ID,
+    isFreeShippingActive: Number(row3?.is_free_shipping_active ?? 0) === 1,
+    freeShippingThresholdMxnCents: row3?.free_shipping_threshold_mxn_cents ?? null
   };
 }
 async function readRules(db) {
@@ -102932,9 +102945,9 @@ async function readRules(db) {
      GROUP BY zone_id ORDER BY zone_id`,
     [ZONE_RATE_STRATEGY_ID]
   );
-  return rows.map((row2) => ({
-    zoneId: row2.zone_id,
-    rateMxnCents: Number(row2.rate_mxn_cents)
+  return rows.map((row3) => ({
+    zoneId: row3.zone_id,
+    rateMxnCents: Number(row3.rate_mxn_cents)
   }));
 }
 async function readShippingAdmin(db) {
@@ -102953,24 +102966,24 @@ async function readShippingAdmin(db) {
   ]);
   return {
     config: config2,
-    strategies: strategies.map((row2) => ({
-      id: row2.id,
-      code: row2.code,
-      nameEs: row2.name_es,
-      nameEn: row2.name_en,
-      administrable: row2.id === ZONE_RATE_STRATEGY_ID
+    strategies: strategies.map((row3) => ({
+      id: row3.id,
+      code: row3.code,
+      nameEs: row3.name_es,
+      nameEn: row3.name_en,
+      administrable: row3.id === ZONE_RATE_STRATEGY_ID
     })),
-    classes: classes.map((row2) => ({
-      id: row2.id,
-      slug: row2.slug,
-      nameEs: row2.name_es,
-      nameEn: row2.name_en
+    classes: classes.map((row3) => ({
+      id: row3.id,
+      slug: row3.slug,
+      nameEs: row3.name_es,
+      nameEn: row3.name_en
     })),
-    zones: zones.map((row2) => ({
-      id: row2.id,
-      code: row2.code,
-      nameEs: row2.name_es,
-      nameEn: row2.name_en
+    zones: zones.map((row3) => ({
+      id: row3.id,
+      code: row3.code,
+      nameEs: row3.name_es,
+      nameEn: row3.name_en
     })),
     rules
   };
@@ -103101,17 +103114,6 @@ var import_node_crypto11 = require("node:crypto");
 
 // src/services/passwordResets.ts
 var import_node_crypto9 = require("node:crypto");
-
-// src/services/outbox.ts
-async function enqueueMail(tx, event) {
-  const { type, ...payload } = event;
-  await tx.query(
-    "INSERT INTO outbox_events (event_type, payload) VALUES (?, ?)",
-    [type, JSON.stringify(payload)]
-  );
-}
-
-// src/services/passwordResets.ts
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
   const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
@@ -103138,15 +103140,15 @@ function decoyReset(totpKey) {
   );
 }
 async function liveReset(db, token, now) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
     [tokenHash2(token), now]
   );
-  return row2 ? {
-    id: Number(row2.id),
-    userId: row2.user_id,
-    email: row2.email,
-    fullName: row2.full_name
+  return row3 ? {
+    id: Number(row3.id),
+    userId: row3.user_id,
+    email: row3.email,
+    fullName: row3.full_name
   } : null;
 }
 function completeReset(db, reset, passwordHash, now, ip) {
@@ -103218,14 +103220,14 @@ function decoyHash() {
 }
 
 // src/services/adminUsers.ts
-var toAdminUser = (row2) => ({
-  id: row2.id,
-  email: row2.email,
-  fullName: row2.full_name,
-  roles: row2.roles.split(","),
-  isActive: Number(row2.is_active) === 1,
-  totpEnabled: Number(row2.totp_enabled) === 1,
-  createdAt: row2.created_at.toISOString()
+var toAdminUser = (row3) => ({
+  id: row3.id,
+  email: row3.email,
+  fullName: row3.full_name,
+  roles: row3.roles.split(","),
+  isActive: Number(row3.is_active) === 1,
+  totpEnabled: Number(row3.totp_enabled) === 1,
+  createdAt: row3.created_at.toISOString()
 });
 async function listAdmins(db) {
   const rows = await db.query(
@@ -103234,18 +103236,18 @@ async function listAdmins(db) {
   return rows.map(toAdminUser);
 }
 async function accountOf(tx, id) {
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id WHERE u.id = ? GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at",
     [id]
   );
-  return toAdminUser(row2);
+  return toAdminUser(row3);
 }
 async function lockedRoles(tx, userId) {
   const rows = await tx.query(
     "SELECT role_id FROM user_roles WHERE user_id = ? FOR UPDATE",
     [userId]
   );
-  return rows.map((row2) => row2.role_id);
+  return rows.map((row3) => row3.role_id);
 }
 async function createAdmin(tx, input2, actor) {
   const [existing] = await tx.query(
@@ -103941,12 +103943,12 @@ function registerAuthRoutes(app, deps) {
 }
 
 // src/services/catalogAdmin.ts
-var brandOf = (row2) => ({
-  id: Number(row2.id),
-  slug: row2.slug,
-  name: row2.name,
-  website: row2.website,
-  isActive: Number(row2.is_active) === 1
+var brandOf = (row3) => ({
+  id: Number(row3.id),
+  slug: row3.slug,
+  name: row3.name,
+  website: row3.website,
+  isActive: Number(row3.is_active) === 1
 });
 async function listBrands(db) {
   const rows = await db.query(
@@ -103955,11 +103957,11 @@ async function listBrands(db) {
   return rows.map(brandOf);
 }
 async function lockBrand(tx, id) {
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, slug, name, website, is_active FROM brands WHERE id = ? FOR UPDATE",
     [id]
   );
-  return row2 ? brandOf(row2) : null;
+  return row3 ? brandOf(row3) : null;
 }
 async function createBrand(tx, input2) {
   await tx.query("INSERT INTO brands (slug, name, website) VALUES (?, ?, ?)", [
@@ -103967,11 +103969,11 @@ async function createBrand(tx, input2) {
     input2.name,
     input2.website
   ]);
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, slug, name, website, is_active FROM brands WHERE slug = ?",
     [input2.slug]
   );
-  return { before: null, after: brandOf(row2) };
+  return { before: null, after: brandOf(row3) };
 }
 async function updateBrand(tx, id, patch) {
   const before = await lockBrand(tx, id);
@@ -103984,25 +103986,25 @@ async function updateBrand(tx, id, patch) {
   return { before, after };
 }
 var flag = (value) => Number(value) === 1;
-var groupOf = (row2, values = []) => ({
-  id: Number(row2.id),
-  code: row2.code,
-  nameEs: row2.name_es,
-  nameEn: row2.name_en,
-  isRequired: flag(row2.is_required),
-  isOrdered: flag(row2.is_ordered),
-  isFilterable: flag(row2.is_filterable),
-  showOnLanding: flag(row2.show_on_landing),
-  isActive: flag(row2.is_active),
-  sortOrder: Number(row2.sort_order),
+var groupOf = (row3, values = []) => ({
+  id: Number(row3.id),
+  code: row3.code,
+  nameEs: row3.name_es,
+  nameEn: row3.name_en,
+  isRequired: flag(row3.is_required),
+  isOrdered: flag(row3.is_ordered),
+  isFilterable: flag(row3.is_filterable),
+  showOnLanding: flag(row3.show_on_landing),
+  isActive: flag(row3.is_active),
+  sortOrder: Number(row3.sort_order),
   values
 });
-var valueOf = (row2) => ({
-  id: Number(row2.id),
-  code: row2.code,
-  valueEs: row2.value_es,
-  valueEn: row2.value_en,
-  sortOrder: Number(row2.sort_order)
+var valueOf = (row3) => ({
+  id: Number(row3.id),
+  code: row3.code,
+  valueEs: row3.value_es,
+  valueEn: row3.value_en,
+  sortOrder: Number(row3.sort_order)
 });
 async function listFacets(db) {
   const groups = await db.query(
@@ -104019,11 +104021,11 @@ async function listFacets(db) {
   );
 }
 async function lockGroup(tx, id) {
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
     [id]
   );
-  return row2 ? groupOf(row2) : null;
+  return row3 ? groupOf(row3) : null;
 }
 async function createFacetGroup(tx, input2) {
   await tx.query(
@@ -104039,11 +104041,11 @@ async function createFacetGroup(tx, input2) {
       input2.sortOrder
     ]
   );
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE code = ?",
     [input2.code]
   );
-  return { before: null, after: groupOf(row2) };
+  return { before: null, after: groupOf(row3) };
 }
 async function updateFacetGroup(tx, id, patch) {
   const before = await lockGroup(tx, id);
@@ -104072,19 +104074,19 @@ async function createFacetValue(tx, groupId, input2) {
     "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
     [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
   );
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id = ? AND code = ?",
     [groupId, input2.code]
   );
-  return { before: null, after: valueOf(row2) };
+  return { before: null, after: valueOf(row3) };
 }
 async function updateFacetValue(tx, id, patch) {
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE id = ? FOR UPDATE",
     [id]
   );
-  if (!row2) return "CAT_NOT_FOUND";
-  const before = valueOf(row2);
+  if (!row3) return "CAT_NOT_FOUND";
+  const before = valueOf(row3);
   const after = { ...before, ...patch };
   await tx.query(
     "UPDATE product_facet_values SET value_es = ?, value_en = ?, sort_order = ? WHERE id = ?",
@@ -104146,26 +104148,26 @@ function registerCatalogEntityRoutes(app, deps) {
 }
 
 // src/services/catalogProducts.ts
-var productOf = (row2, facetValueIds = [], gallery = []) => ({
-  id: Number(row2.id),
-  sku: row2.sku,
-  slug: row2.slug,
-  nameEs: row2.name_es,
-  nameEn: row2.name_en,
-  descriptionEs: row2.description_es,
-  descriptionEn: row2.description_en,
-  priceMxnCents: Number(row2.price_mxn_cents),
-  stock: Number(row2.stock),
-  reservedStock: Number(row2.reserved_stock),
-  discipline: row2.discipline,
-  brandId: row2.brand_id === null ? null : Number(row2.brand_id),
-  shippingClass: row2.shipping_class,
-  weightGrams: Number(row2.weight_grams),
-  lengthMm: Number(row2.length_mm),
-  widthMm: Number(row2.width_mm),
-  heightMm: Number(row2.height_mm),
-  isActive: Number(row2.is_active) === 1,
-  isTest: Number(row2.is_test) === 1,
+var productOf = (row3, facetValueIds = [], gallery = []) => ({
+  id: Number(row3.id),
+  sku: row3.sku,
+  slug: row3.slug,
+  nameEs: row3.name_es,
+  nameEn: row3.name_en,
+  descriptionEs: row3.description_es,
+  descriptionEn: row3.description_en,
+  priceMxnCents: Number(row3.price_mxn_cents),
+  stock: Number(row3.stock),
+  reservedStock: Number(row3.reserved_stock),
+  discipline: row3.discipline,
+  brandId: row3.brand_id === null ? null : Number(row3.brand_id),
+  shippingClass: row3.shipping_class,
+  weightGrams: Number(row3.weight_grams),
+  lengthMm: Number(row3.length_mm),
+  widthMm: Number(row3.width_mm),
+  heightMm: Number(row3.height_mm),
+  isActive: Number(row3.is_active) === 1,
+  isTest: Number(row3.is_test) === 1,
   facetValueIds,
   gallery
 });
@@ -104177,15 +104179,15 @@ async function listAdminProducts(db, paging2) {
     "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
     [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
   );
-  const items = await Promise.all(rows.map((row2) => fullProduct(db, row2)));
+  const items = await Promise.all(rows.map((row3) => fullProduct(db, row3)));
   return { items, total: Number(total) };
 }
 async function productRow(tx, id) {
-  const [row2] = await tx.query(
+  const [row3] = await tx.query(
     "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
     [id]
   );
-  return row2;
+  return row3;
 }
 async function lockedProduct(tx, id) {
   const [found] = await tx.query(
@@ -104194,17 +104196,17 @@ async function lockedProduct(tx, id) {
   );
   return found ? productRow(tx, id) : void 0;
 }
-async function fullProduct(tx, row2) {
+async function fullProduct(tx, row3) {
   const values = await tx.query(
     "SELECT value_id FROM product_facet_links WHERE product_id = ? ORDER BY value_id ASC",
-    [row2.id]
+    [row3.id]
   );
   const images = await tx.query(
     "SELECT media_sha256, alt_text_es, alt_text_en, sort_order, is_primary FROM product_media WHERE product_id = ? AND is_active = 1 ORDER BY is_primary DESC, sort_order ASC, id ASC",
-    [row2.id]
+    [row3.id]
   );
   return productOf(
-    row2,
+    row3,
     values.map((value) => Number(value.value_id)),
     images.map((image) => ({
       sha256: image.media_sha256,
@@ -104216,8 +104218,8 @@ async function fullProduct(tx, row2) {
   );
 }
 async function readAdminProduct(db, id) {
-  const row2 = await productRow(db, id);
-  return row2 ? fullProduct(db, row2) : null;
+  const row3 = await productRow(db, id);
+  return row3 ? fullProduct(db, row3) : null;
 }
 async function references(tx, fields2) {
   const [category] = await tx.query(
@@ -104297,13 +104299,13 @@ async function createProduct(tx, input2) {
   await Promise.all(
     input2.images.map((image, index) => placeImage(tx, id, image, index))
   );
-  const row2 = await productRow(tx, id);
-  return { before: null, after: await fullProduct(tx, row2) };
+  const row3 = await productRow(tx, id);
+  return { before: null, after: await fullProduct(tx, row3) };
 }
 async function updateProduct(tx, id, patch) {
-  const row2 = await lockedProduct(tx, id);
-  if (!row2) return "CAT_NOT_FOUND";
-  const before = await fullProduct(tx, row2);
+  const row3 = await lockedProduct(tx, id);
+  if (!row3) return "CAT_NOT_FOUND";
+  const before = await fullProduct(tx, row3);
   const facets = await checkedFacets(tx, patch.facetValueIds ?? []);
   if (facets === "CAT_REFERENCE_INVALID") return facets;
   const { facetValueIds, isActive, ...fields2 } = patch;
@@ -104369,10 +104371,10 @@ async function placeImage(tx, productId, image, index) {
   }
 }
 async function replaceGallery(tx, id, images) {
-  const row2 = await lockedProduct(tx, id);
-  if (!row2) return "CAT_NOT_FOUND";
+  const row3 = await lockedProduct(tx, id);
+  if (!row3) return "CAT_NOT_FOUND";
   if (!await checkedBlobs(tx, images)) return "CAT_REFERENCE_INVALID";
-  const before = await fullProduct(tx, row2);
+  const before = await fullProduct(tx, row3);
   await tx.query(
     "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
     [id]
@@ -104380,7 +104382,7 @@ async function replaceGallery(tx, id, images) {
   await Promise.all(
     images.map((image, index) => placeImage(tx, id, image, index))
   );
-  return { before, after: await fullProduct(tx, row2) };
+  return { before, after: await fullProduct(tx, row3) };
 }
 
 // src/routes/catalogProducts.ts
@@ -104701,30 +104703,33 @@ function settleOrder(deps, base2, order2) {
       [order2.id]
     );
     const status = Number(current.status_id);
-    const row2 = settle2(
+    const row3 = settle2(
       status === STATUS.PENDING,
       status === STATUS.PAID && current.payment_resource_id === resourceId,
       status === STATUS.EXPIRED || status === STATUS.CANCELLED
     );
     const recorded = await recordEvent(tx, {
       ...base2,
-      resultingStatusId: row2.nextStatusId ?? status,
-      alert: row2.alert
+      resultingStatusId: row3.nextStatusId ?? status,
+      alert: row3.alert
     });
     if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
-    if (row2.nextStatusId !== null) {
+    if (row3.nextStatusId !== null) {
       await tx.query(
         "UPDATE orders SET status_id = ?, paid_at = ?, payment_resource_id = ? WHERE id = ?",
-        [row2.nextStatusId, deps.now(), resourceId, order2.id]
+        [row3.nextStatusId, deps.now(), resourceId, order2.id]
       );
     }
-    if (row2.sellsStock) {
+    if (row3.sellsStock) {
       await tx.query(
         "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity, p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
         [order2.id]
       );
     }
-    return { status: row2.httpStatus, code: row2.code };
+    if (status === STATUS.PENDING && row3.nextStatusId === STATUS.PAID) {
+      await enqueueMail(tx, { type: "ORDER_CONFIRMED", orderId: order2.id });
+    }
+    return { status: row3.httpStatus, code: row3.code };
   });
 }
 async function receiveWebhook(deps, code2, input2) {
@@ -104791,7 +104796,10 @@ async function registerWebhookRoutes(app, deps) {
           headers: request.headers,
           query: request.query
         });
-        if (outcome.status === 200) return { code: outcome.code };
+        if (outcome.status === 200) {
+          request.outboxQueued = true;
+          return { code: outcome.code };
+        }
         return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
       });
     }
@@ -117957,14 +117965,42 @@ var FRAME = {
     contact: "Escr\xEDbenos a",
     privacy: "Aviso de privacidad",
     privacyPath: "/privacidad/",
-    unattended: "Este mensaje se gener\xF3 de forma autom\xE1tica; no respondas a este correo."
+    unattended: "Este mensaje se gener\xF3 de forma autom\xE1tica; no respondas a este correo.",
+    order: {
+      number: "Pedido",
+      date: "Fecha",
+      method: "M\xE9todo de pago",
+      product: "Producto",
+      quantity: "Cant.",
+      unit: "Precio",
+      amount: "Importe",
+      items: "Productos (IVA incluido)",
+      shipping: "Env\xEDo (IVA incluido)",
+      tax: "IVA incluido en el total",
+      total: "Total pagado",
+      address: "Direcci\xF3n de entrega"
+    }
   },
   en: {
     fallbackLink: "If the button does not work, copy this link into your browser:",
     contact: "Write to us at",
     privacy: "Privacy notice",
     privacyPath: "/en/privacy/",
-    unattended: "This message was generated automatically; do not reply to it."
+    unattended: "This message was generated automatically; do not reply to it.",
+    order: {
+      number: "Order",
+      date: "Date",
+      method: "Payment method",
+      product: "Product",
+      quantity: "Qty",
+      unit: "Price",
+      amount: "Amount",
+      items: "Products (VAT included)",
+      shipping: "Shipping (VAT included)",
+      tax: "VAT included in the total",
+      total: "Total paid",
+      address: "Delivery address"
+    }
   }
 };
 function resolveMailLocale(requested) {
@@ -117990,6 +118026,54 @@ function button(label2, url2) {
 function fallbackLink(intro, url2) {
   return `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(intro)}<br><a href="${escapeHtml(url2)}" style="color:${PETROLEO};word-break:break-all;">${escapeHtml(url2)}</a></p>`;
 }
+function row2(cells, opts = {}) {
+  const weight = opts.head || opts.strong ? "bold" : "normal";
+  const tag = opts.head ? "th" : "td";
+  return `<tr>${cells.map(
+    (cell, index) => `<${tag} align="${index === 0 ? "left" : "right"}" style="padding:8px 4px;border-bottom:1px solid ${MARFIL};font-family:${SANS};font-size:14px;line-height:20px;font-weight:${weight};color:${PETROLEO};">${escapeHtml(cell)}</${tag}>`
+  ).join("")}</tr>`;
+}
+function orderHtml(order2, words) {
+  const summary2 = [
+    [words.number, order2.number],
+    [words.date, order2.date],
+    [words.method, order2.method]
+  ];
+  const lines = order2.lines.map(
+    (line) => row2([
+      `${line.name} (${line.sku})`,
+      String(line.quantity),
+      line.unitPrice,
+      line.lineTotal
+    ])
+  );
+  const totals = [
+    [words.items, order2.itemsTotal],
+    [words.shipping, order2.shipping],
+    [words.tax, order2.tax]
+  ].map(([label2, value]) => row2([label2, "", "", value]));
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${summary2.map(([label2, value]) => row2([label2, value])).join("")}</table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${row2([words.product, words.quantity, words.unit, words.amount], { head: true })}${lines.join("")}${totals.join("")}${row2([words.total, "", "", order2.total], { strong: true })}</table><p style="margin:0 0 4px 0;font-family:${SANS};font-size:14px;line-height:20px;font-weight:bold;color:${PETROLEO};">${escapeHtml(words.address)}</p><p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${order2.address.map(escapeHtml).join("<br>")}</p>`;
+}
+function orderText(order2, words) {
+  return [
+    [
+      `${words.number}: ${order2.number}`,
+      `${words.date}: ${order2.date}`,
+      `${words.method}: ${order2.method}`
+    ].join("\n"),
+    [
+      ...order2.lines.map(
+        (line) => `- ${line.name} (${line.sku}) x ${line.quantity} \xB7 ${words.unit} ${line.unitPrice} \xB7 ${words.amount} ${line.lineTotal}`
+      ),
+      `${words.items}: ${order2.itemsTotal}`,
+      `${words.shipping}: ${order2.shipping}`,
+      `${words.tax}: ${order2.tax}`,
+      `${words.total}: ${order2.total}`
+    ].join("\n"),
+    `${words.address}:
+${order2.address.join("\n")}`
+  ];
+}
 function notice(text3) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;"><tr><td style="padding:12px 16px;border-left:4px solid ${OCRE};background-color:${MARFIL};font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(text3)}</td></tr></table>`;
 }
@@ -117998,6 +118082,7 @@ function renderEmail(content, siteUrl) {
   const privacyUrl = `${siteUrl}${frame.privacyPath}`;
   const body = [
     ...content.paragraphs.map(paragraph),
+    content.order === void 0 ? "" : orderHtml(content.order, frame.order),
     content.code === void 0 ? "" : codeBlock(content.code),
     content.button === void 0 ? "" : button(content.button.label, content.button.url) + fallbackLink(frame.fallbackLink, content.button.url),
     content.notice === void 0 ? "" : notice(content.notice)
@@ -118006,6 +118091,7 @@ function renderEmail(content, siteUrl) {
   const text3 = [
     content.heading,
     ...content.paragraphs,
+    ...content.order === void 0 ? [] : orderText(content.order, frame.order),
     ...content.code === void 0 ? [] : [content.code],
     ...content.button === void 0 ? [] : [`${content.button.label}: ${content.button.url}`],
     ...content.notice === void 0 ? [] : [content.notice],
@@ -118155,13 +118241,183 @@ function copyOf(keys, event, locale) {
       return COPY.TOTP_ENABLED[locale]();
   }
 }
-async function render(db, keys, row2) {
-  const event = {
-    type: row2.event_type,
-    ...JSON.parse(row2.payload)
+var ORDER_COPY = {
+  ORDER_CONFIRMED: {
+    "es-MX": (name2, number4, site) => ({
+      subject: `Confirmamos tu pedido ${number4} en Y\u0112KORA`,
+      content: {
+        heading: "Gracias por tu compra",
+        paragraphs: [
+          `Hola ${name2}: recibimos tu pago y tu pedido ${number4} est\xE1 confirmado. Este es el resumen.`
+        ],
+        button: {
+          label: "Ver mi pedido",
+          url: `${site}/cuenta/${number4}/`
+        },
+        notice: `Si no reconoces esta compra, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: (name2, number4, site) => ({
+      subject: `We confirmed your order ${number4} at Y\u0112KORA`,
+      content: {
+        heading: "Thank you for your purchase",
+        paragraphs: [
+          `Hello ${name2}: we received your payment and your order ${number4} is confirmed. Here is the summary.`
+        ],
+        button: {
+          label: "View my order",
+          url: `${site}/en/account/${number4}/`
+        },
+        notice: `If you do not recognize this purchase, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  },
+  ORDER_EXPIRED: {
+    "es-MX": (name2, number4, site) => ({
+      subject: `Tu pedido ${number4} venci\xF3 sin pago`,
+      content: {
+        heading: "Tu pedido venci\xF3",
+        paragraphs: [
+          `Hola ${name2}: no recibimos el pago de tu pedido ${number4} a tiempo, as\xED que liberamos los productos que reservamos. No se hizo ning\xFAn cargo.`
+        ],
+        button: { label: "Volver a la tienda", url: `${site}/catalogo/` }
+      }
+    }),
+    en: (name2, number4, site) => ({
+      subject: `Your order ${number4} expired unpaid`,
+      content: {
+        heading: "Your order expired",
+        paragraphs: [
+          `Hello ${name2}: we did not receive the payment for your order ${number4} in time, so we released the products we held. You were not charged.`
+        ],
+        button: { label: "Back to the store", url: `${site}/en/catalog/` }
+      }
+    })
+  },
+  ORDER_CANCELLED: {
+    "es-MX": (name2, number4, site) => ({
+      subject: `Cancelamos tu pedido ${number4}`,
+      content: {
+        heading: "Cancelamos tu pedido",
+        paragraphs: [
+          `Hola ${name2}: no pudimos abrir la p\xE1gina de pago de tu pedido ${number4}, as\xED que lo cancelamos y liberamos los productos. No se hizo ning\xFAn cargo. Puedes intentar tu compra de nuevo.`
+        ],
+        button: { label: "Volver a la tienda", url: `${site}/catalogo/` }
+      }
+    }),
+    en: (name2, number4, site) => ({
+      subject: `We cancelled your order ${number4}`,
+      content: {
+        heading: "We cancelled your order",
+        paragraphs: [
+          `Hello ${name2}: we could not open the payment page of your order ${number4}, so we cancelled it and released the products. You were not charged. You can try your purchase again.`
+        ],
+        button: { label: "Back to the store", url: `${site}/en/catalog/` }
+      }
+    })
+  }
+};
+function money(cents3, locale) {
+  const amount = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "MXN",
+    currencyDisplay: "narrowSymbol"
+  }).format(cents3 / 100);
+  return `${amount} MXN`;
+}
+function addressLines(address, state) {
+  const number4 = [address.exteriorNumber, address.interiorNumber].filter((part) => part !== void 0 && part !== "").join(" int. ");
+  return [
+    `${address.street} ${number4}`,
+    address.neighborhood,
+    `${address.municipality}, ${state} ${address.postalCode}`,
+    ...address.references ? [address.references] : []
+  ];
+}
+async function renderOrder(db, keys, event, locale) {
+  if (keys.piiKey === null) throw new Error("CHECKOUT_PII_KEY is not set");
+  const [order2] = await db.query(
+    "SELECT o.order_number, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ?",
+    [event.orderId]
+  );
+  if (order2 === void 0) throw new Error("Order not found");
+  const [items, [zone]] = await Promise.all([
+    db.query(
+      "SELECT i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, p.name_es, p.name_en FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = ? ORDER BY i.id",
+      [event.orderId]
+    ),
+    db.query(
+      "SELECT z.name_es, z.name_en FROM orders o JOIN shipping_zones z ON z.id = o.shipping_zone_id WHERE o.id = ?",
+      [event.orderId]
+    )
+  ]);
+  const number4 = order2.order_number;
+  const name2 = decryptPii(
+    keys.piiKey,
+    number4,
+    "customer_name",
+    order2.customer_name_enc
+  );
+  const to = decryptPii(
+    keys.piiKey,
+    number4,
+    "customer_email",
+    order2.customer_email_enc
+  );
+  const address = JSON.parse(
+    decryptPii(
+      keys.piiKey,
+      number4,
+      "shipping_address",
+      order2.shipping_address_enc
+    )
+  );
+  const english = locale === "en";
+  const date5 = new Intl.DateTimeFormat(locale, {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "America/Mexico_City"
+  }).format(order2.created_at);
+  const { subject, content } = ORDER_COPY[event.type][locale](
+    name2,
+    number4,
+    keys.siteUrl
+  );
+  const block = {
+    number: number4,
+    date: date5,
+    method: english ? order2.method_en : order2.method_es,
+    lines: items.map((item) => ({
+      name: english ? item.name_en : item.name_es,
+      sku: item.sku,
+      quantity: item.quantity,
+      unitPrice: money(item.unit_price_mxn_cents, locale),
+      lineTotal: money(item.line_total_mxn_cents, locale)
+    })),
+    itemsTotal: money(order2.items_total_mxn_cents, locale),
+    shipping: money(order2.shipping_total_mxn_cents, locale),
+    tax: money(
+      Number(order2.items_tax_mxn_cents) + Number(order2.shipping_tax_mxn_cents),
+      locale
+    ),
+    total: money(order2.total_mxn_cents, locale),
+    address: addressLines(address, english ? zone.name_en : zone.name_es)
   };
-  const to = await emailOf(db, event.userId);
+  const { html, text: text3 } = renderEmail(
+    { ...content, locale, order: block },
+    keys.siteUrl
+  );
+  assertMultipart(html, text3);
+  return { to, subject, text: text3, html };
+}
+async function render(db, keys, row3) {
+  const event = {
+    type: row3.event_type,
+    ...JSON.parse(row3.payload)
+  };
   const locale = resolveMailLocale(event.locale);
+  if ("orderId" in event) return renderOrder(db, keys, event, locale);
+  const to = await emailOf(db, event.userId);
   const { subject, content } = copyOf(keys, event, locale);
   const { html, text: text3 } = renderEmail({ ...content, locale }, keys.siteUrl);
   assertMultipart(html, text3);
@@ -118173,33 +118429,33 @@ function createOutboxDispatcher(deps) {
   let running = null;
   let again = false;
   let timer;
-  async function deliver(row2) {
+  async function deliver(row3) {
     const now = deps.now();
     const claim2 = await db.query(
       "UPDATE outbox_events SET status = 'PROCESSING', next_retry_at = ? WHERE id = ? AND status = 'PENDING'",
-      [new Date(now.getTime() + LEASE_MS), row2.id]
+      [new Date(now.getTime() + LEASE_MS), row3.id]
     );
     if (claim2.affectedRows !== 1) return;
     try {
-      await deps.send(await render(db, deps, row2));
+      await deps.send(await render(db, deps, row3));
       await db.query(
         "UPDATE outbox_events SET status = 'SENT', sent_at = ?, error_message = NULL WHERE id = ?",
-        [now, row2.id]
+        [now, row3.id]
       );
     } catch (error63) {
-      const attempts = Number(row2.retry_count) + 1;
+      const attempts = Number(row3.retry_count) + 1;
       const reason = error63 instanceof Error ? error63.message : String(error63);
       await db.query(
         "UPDATE outbox_events SET status = ?, retry_count = ?, next_retry_at = ?, error_message = ? WHERE id = ?",
         [
-          attempts >= Number(row2.max_retries) ? "FAILED" : "PENDING",
+          attempts >= Number(row3.max_retries) ? "FAILED" : "PENDING",
           attempts,
           new Date(now.getTime() + retryDelaySeconds(attempts) * 1e3),
           reason.slice(0, 500),
-          row2.id
+          row3.id
         ]
       );
-      deps.log.error({ outboxId: row2.id, attempts }, "outbox send failed");
+      deps.log.error({ outboxId: row3.id, attempts }, "outbox send failed");
     }
   }
   async function runOnce2() {
@@ -118216,7 +118472,7 @@ function createOutboxDispatcher(deps) {
       [now, BATCH]
     );
     await due.reduce(
-      (previous, row2, index) => previous.then(() => index === 0 ? void 0 : wait(GAP_MS)).then(() => deliver(row2)),
+      (previous, row3, index) => previous.then(() => index === 0 ? void 0 : wait(GAP_MS)).then(() => deliver(row3)),
       Promise.resolve()
     );
     return due.length;
@@ -118369,16 +118625,16 @@ function evaluateShipping(config2, rules, facts) {
 }
 
 // src/services/shippingRates.ts
-function toRule(row2) {
+function toRule(row3) {
   return {
-    id: row2.id,
-    zoneId: row2.zone_id,
-    classId: row2.shipping_class_id,
-    minWeightGrams: row2.min_weight_grams,
-    maxWeightGrams: row2.max_weight_grams,
-    minItemsTotalMxnCents: row2.min_items_total_mxn_cents,
-    maxItemsTotalMxnCents: row2.max_items_total_mxn_cents,
-    rateMxnCents: row2.rate_mxn_cents
+    id: row3.id,
+    zoneId: row3.zone_id,
+    classId: row3.shipping_class_id,
+    minWeightGrams: row3.min_weight_grams,
+    maxWeightGrams: row3.max_weight_grams,
+    minItemsTotalMxnCents: row3.min_items_total_mxn_cents,
+    maxItemsTotalMxnCents: row3.max_items_total_mxn_cents,
+    rateMxnCents: row3.rate_mxn_cents
   };
 }
 function createTableRateProvider(db) {
@@ -118390,20 +118646,20 @@ function createTableRateProvider(db) {
       );
       if (zone === void 0)
         return { serviceable: false, code: "INVALID_DESTINATION" };
-      const [row2] = await db.query(
+      const [row3] = await db.query(
         `SELECT s.id AS strategy_id, s.code AS strategy, c.is_free_shipping_active,
            c.free_shipping_threshold_mxn_cents
          FROM shipping_configs c
          JOIN shipping_strategies s ON s.id = c.active_strategy_id
          WHERE c.id = 1 AND s.is_active = 1`
       );
-      if (row2 === void 0) {
+      if (row3 === void 0) {
         return { serviceable: false, code: "UNSERVICEABLE_DESTINATION" };
       }
       const config2 = {
-        strategy: row2.strategy,
-        freeShippingActive: row2.is_free_shipping_active === 1,
-        freeShippingThresholdMxnCents: row2.free_shipping_threshold_mxn_cents
+        strategy: row3.strategy,
+        freeShippingActive: row3.is_free_shipping_active === 1,
+        freeShippingThresholdMxnCents: row3.free_shipping_threshold_mxn_cents
       };
       const [classes, rules] = await Promise.all([
         db.query(
@@ -118413,7 +118669,7 @@ function createTableRateProvider(db) {
           `SELECT id, zone_id, shipping_class_id, min_weight_grams, max_weight_grams,
              min_items_total_mxn_cents, max_items_total_mxn_cents, rate_mxn_cents
            FROM shipping_rules WHERE strategy_id = ? AND is_active = 1`,
-          [row2.strategy_id]
+          [row3.strategy_id]
         )
       ]);
       return evaluateShipping(config2, rules.map(toRule), {
@@ -118617,8 +118873,8 @@ function createStripeCards(secrets, fetchImpl = fetch) {
         { method: "GET" }
       );
       const rows = Array.isArray(body.data) ? body.data : [];
-      return rows.flatMap((row2) => {
-        const method = row2;
+      return rows.flatMap((row3) => {
+        const method = row3;
         const id = textOrNull(method.id);
         const brand = textOrNull(method.card?.brand);
         const last4 = textOrNull(method.card?.last4);
@@ -118772,6 +119028,7 @@ async function buildApp(deps) {
   const dispatcher = auth2 && mail ? createOutboxDispatcher({
     db: deps.db,
     totpKey: auth2.totpKey,
+    piiKey: deps.config.payments.checkout?.piiKey ?? null,
     siteUrl: deps.config.payments.siteUrl,
     send: deps.sendMail ?? smtpSender(mail),
     now,
@@ -119070,15 +119327,15 @@ async function fetchLatestFix(token, fetchImpl = fetch, timeoutMs = 3e3) {
 // src/services/exchangeRate.ts
 var REFRESH_MS = 60 * 60 * 1e3;
 async function latestStored(db) {
-  const [row2] = await db.query(
+  const [row3] = await db.query(
     "SELECT DATE_FORMAT(determination_date, '%Y-%m-%d') AS determination_date, rate_decimal, fetched_at FROM exchange_rates WHERE series_id = ? ORDER BY determination_date DESC LIMIT 1",
     [FIX_SERIES]
   );
-  return row2;
+  return row3;
 }
 async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix = fetchLatestFix) {
-  let row2 = await latestStored(db);
-  const stale = !row2 || now.getTime() - new Date(row2.fetched_at).getTime() > REFRESH_MS;
+  let row3 = await latestStored(db);
+  const stale = !row3 || now.getTime() - new Date(row3.fetched_at).getTime() > REFRESH_MS;
   if (token && stale) {
     try {
       const fix = await fetchFix(token);
@@ -119086,14 +119343,14 @@ async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix
         "INSERT INTO exchange_rates (series_id, determination_date, rate_decimal, fetched_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE rate_decimal = VALUES(rate_decimal), fetched_at = VALUES(fetched_at)",
         [FIX_SERIES, fix.date, fix.rate, now]
       );
-      row2 = await latestStored(db);
+      row3 = await latestStored(db);
     } catch {
     }
   }
-  return row2 ? {
+  return row3 ? {
     series: FIX_SERIES,
-    date: row2.determination_date,
-    rate: String(row2.rate_decimal)
+    date: row3.determination_date,
+    rate: String(row3.rate_decimal)
   } : null;
 }
 
@@ -119128,7 +119385,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "bd2c19d296c8ddce3915251e4501731e84cc1cf7" : void 0;
+var sha = true ? "9dcec67dc0619f4e39816001f92fbdf8c98ba23f" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
