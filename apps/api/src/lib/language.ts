@@ -10,7 +10,7 @@ import { z } from 'zod';
 export const languageSchema = z.enum(['es-MX', 'en']).default('es-MX');
 
 /** The two official languages (FC 067 T1.2). */
-const SUPPORTED: readonly unknown[] = ['es-MX', 'en'];
+const SUPPORTED = new Set<unknown>(['es-MX', 'en']);
 
 /**
  * Whether a request body names a language outside the catalog under `key` (FC 067 T1.2: the
@@ -24,7 +24,7 @@ const SUPPORTED: readonly unknown[] = ['es-MX', 'en'];
 export function unsupportedLocale(body: unknown, key: string): boolean {
   if (typeof body !== 'object' || body === null) return false;
   const value = (body as Record<string, unknown>)[key];
-  return value !== undefined && !SUPPORTED.includes(value);
+  return value !== undefined && !SUPPORTED.has(value);
 }
 
 /** Query of a route whose only parameter is the language. */

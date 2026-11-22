@@ -1955,11 +1955,14 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
       phone: null,
       postalCode: '98612',
       stateCode: 'ZAC',
+      // FC 067: the language of the account's mail comes with it, Spanish by default.
+      preferredLocale: 'es-MX',
     });
     expect(await accountDelivery(db, null, id)).toEqual({
       phone: null,
       postalCode: null,
       stateCode: null,
+      preferredLocale: 'es-MX',
     });
     // The same bytes do not open for another account.
     const other = await signUp('otro-cp@example.test');
@@ -1982,6 +1985,7 @@ describe('the phone and the book of addresses of an account on real SQL (migrati
       phone: null,
       postalCode: null,
       stateCode: null,
+      preferredLocale: 'es-MX',
     });
   });
 
