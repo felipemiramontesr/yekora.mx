@@ -2658,23 +2658,23 @@ var require_helpers = __commonJS({
   "../../node_modules/ip-address/dist/v6/helpers.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.escapeHtml = escapeHtml;
+    exports2.escapeHtml = escapeHtml2;
     exports2.spanAllZeroes = spanAllZeroes;
     exports2.spanAll = spanAll;
     exports2.spanLeadingZeroes = spanLeadingZeroes;
     exports2.simpleGroup = simpleGroup;
-    function escapeHtml(s) {
+    function escapeHtml2(s) {
       return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
     function spanAllZeroes(s) {
-      return escapeHtml(s).replace(/(0+)/g, '<span class="zero">$1</span>');
+      return escapeHtml2(s).replace(/(0+)/g, '<span class="zero">$1</span>');
     }
     function spanAll(s, offset = 0) {
       const letters = s.split("");
-      return letters.map((n, i) => `<span class="digit value-${escapeHtml(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
+      return letters.map((n, i) => `<span class="digit value-${escapeHtml2(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
     }
     function spanLeadingZeroesSimple(group) {
-      return escapeHtml(group).replace(/^(0+)/, '<span class="zero">$1</span>');
+      return escapeHtml2(group).replace(/^(0+)/, '<span class="zero">$1</span>');
     }
     function spanLeadingZeroes(address) {
       const groups = address.split(":");
@@ -20872,10 +20872,10 @@ var require_validate = __commonJS({
         else
           this.params = obj;
       }
-      block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
+      block$data(valid, codeBlock2, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
           this.check$data(valid, $dataValid);
-          codeBlock();
+          codeBlock2();
         });
       }
       check$data(valid = codegen_1.nil, $dataValid = codegen_1.nil) {
@@ -31167,10 +31167,10 @@ var require_validate2 = __commonJS({
         else
           this.params = obj;
       }
-      block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
+      block$data(valid, codeBlock2, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
           this.check$data(valid, $dataValid);
-          codeBlock();
+          codeBlock2();
         });
       }
       check$data(valid = codegen_1.nil, $dataValid = codegen_1.nil) {
@@ -38719,10 +38719,10 @@ var require_validate3 = __commonJS({
         else
           this.params = obj;
       }
-      block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
+      block$data(valid, codeBlock2, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
           this.check$data(valid, $dataValid);
-          codeBlock();
+          codeBlock2();
         });
       }
       check$data(valid = codegen_1.nil, $dataValid = codegen_1.nil) {
@@ -117944,8 +117944,80 @@ function retryDelaySeconds(attempt, baseSeconds = 30, capSeconds = 3600) {
   return Math.min(capSeconds, baseSeconds * 2 ** Math.max(0, attempt - 1));
 }
 
-// src/services/outboxDispatcher.ts
+// src/services/emailTemplate.ts
+var PETROLEO = "#213C41";
+var MARFIL = "#F8F5EE";
+var OCRE = "#AD843E";
 var SUPPORT_EMAIL = "contacto@yekora.mx";
+var SANS = "-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+var MONO = "'SFMono-Regular',Consolas,'Courier New',monospace";
+var FRAME = {
+  "es-MX": {
+    fallbackLink: "Si el bot\xF3n no funciona, copia este enlace en tu navegador:",
+    contact: "Escr\xEDbenos a",
+    privacy: "Aviso de privacidad",
+    privacyPath: "/privacidad/",
+    unattended: "Este mensaje se gener\xF3 de forma autom\xE1tica; no respondas a este correo."
+  },
+  en: {
+    fallbackLink: "If the button does not work, copy this link into your browser:",
+    contact: "Write to us at",
+    privacy: "Privacy notice",
+    privacyPath: "/en/privacy/",
+    unattended: "This message was generated automatically; do not reply to it."
+  }
+};
+function resolveMailLocale(requested) {
+  return requested === "en" ? "en" : "es-MX";
+}
+function assertMultipart(html, text3) {
+  if (html.trim() === "" || text3.trim() === "") {
+    throw new Error("MULTIPART_PAYLOAD_REJECTED");
+  }
+}
+function escapeHtml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function paragraph(text3) {
+  return `<p style="margin:0 0 16px 0;font-family:${SANS};font-size:16px;line-height:24px;color:${PETROLEO};">${escapeHtml(text3)}</p>`;
+}
+function codeBlock(code2) {
+  return `<p style="margin:8px 0 24px 0;padding:16px;border:1px solid ${OCRE};border-radius:6px;background-color:${MARFIL};text-align:center;font-family:${MONO};font-size:32px;line-height:40px;letter-spacing:8px;font-weight:bold;color:${PETROLEO};">${escapeHtml(code2)}</p>`;
+}
+function button(label2, url2) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px 0;"><tr><td align="center" bgcolor="${PETROLEO}" style="border-radius:6px;background-color:${PETROLEO};"><a href="${escapeHtml(url2)}" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:16px;line-height:20px;font-weight:bold;color:${MARFIL};text-decoration:none;border-radius:6px;">${escapeHtml(label2)}</a></td></tr></table>`;
+}
+function fallbackLink(intro, url2) {
+  return `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(intro)}<br><a href="${escapeHtml(url2)}" style="color:${PETROLEO};word-break:break-all;">${escapeHtml(url2)}</a></p>`;
+}
+function notice(text3) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;"><tr><td style="padding:12px 16px;border-left:4px solid ${OCRE};background-color:${MARFIL};font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(text3)}</td></tr></table>`;
+}
+function renderEmail(content, siteUrl) {
+  const frame = FRAME[content.locale];
+  const privacyUrl = `${siteUrl}${frame.privacyPath}`;
+  const body = [
+    ...content.paragraphs.map(paragraph),
+    content.code === void 0 ? "" : codeBlock(content.code),
+    content.button === void 0 ? "" : button(content.button.label, content.button.url) + fallbackLink(frame.fallbackLink, content.button.url),
+    content.notice === void 0 ? "" : notice(content.notice)
+  ].join("");
+  const html = `<!DOCTYPE html><html lang="${content.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(content.heading)}</title></head><body style="margin:0;padding:0;background-color:${MARFIL};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${MARFIL};"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#FFFFFF;border-radius:8px;"><tr><td align="center" bgcolor="${PETROLEO}" style="padding:20px 24px;background-color:${PETROLEO};border-radius:8px 8px 0 0;"><img src="${escapeHtml(siteUrl)}/brand/email/logo.png" width="160" height="40" alt="Y\u0112KORA" style="display:block;border:0;outline:none;text-decoration:none;"></td></tr><tr><td style="padding:32px 28px 16px 28px;"><h1 style="margin:0 0 20px 0;font-family:${SANS};font-size:24px;line-height:32px;font-weight:bold;color:${PETROLEO};">${escapeHtml(content.heading)}</h1>${body}</td></tr><tr><td style="padding:16px 28px 28px 28px;border-top:1px solid ${MARFIL};font-family:${SANS};font-size:13px;line-height:20px;color:${PETROLEO};">${escapeHtml(frame.contact)} <a href="mailto:${SUPPORT_EMAIL}" style="color:${PETROLEO};">${SUPPORT_EMAIL}</a><br><a href="${escapeHtml(privacyUrl)}" style="color:${PETROLEO};">${escapeHtml(frame.privacy)}</a><br>${escapeHtml(frame.unattended)}</td></tr></table></td></tr></table></body></html>`;
+  const text3 = [
+    content.heading,
+    ...content.paragraphs,
+    ...content.code === void 0 ? [] : [content.code],
+    ...content.button === void 0 ? [] : [`${content.button.label}: ${content.button.url}`],
+    ...content.notice === void 0 ? [] : [content.notice],
+    `${frame.contact} ${SUPPORT_EMAIL}`,
+    `${frame.privacy}: ${privacyUrl}`,
+    frame.unattended
+  ].join("\n\n");
+  return { html, text: text3 };
+}
+
+// src/services/outboxDispatcher.ts
+var SUPPORT_EMAIL2 = "contacto@yekora.mx";
 var BATCH = 10;
 var GAP_MS = 1e3;
 var LEASE_MS = 5 * 6e4;
@@ -117961,19 +118033,103 @@ function smtpSender(mail) {
     await transport.sendMail({ from: mail.from, ...message });
   };
 }
-function resetLinks(siteUrl, token) {
-  const query = `?action=reset-password&token=${token}`;
-  return {
-    es: `${siteUrl}/cuenta/${query}`,
-    en: `${siteUrl}/en/account/${query}`
-  };
+function resetLink(siteUrl, token, locale) {
+  const area = locale === "en" ? "/en/account/" : "/cuenta/";
+  return `${siteUrl}${area}?action=reset-password&token=${token}`;
 }
-async function render(db, keys, row2) {
-  const event = {
-    type: row2.event_type,
-    ...JSON.parse(row2.payload)
-  };
-  const to = await emailOf(db, event.userId);
+var COPY = {
+  SIGN_IN_CODE: {
+    "es-MX": (code2) => ({
+      subject: "Tu c\xF3digo de acceso a Y\u0112KORA",
+      content: {
+        heading: "Tu c\xF3digo de acceso",
+        paragraphs: [
+          "Escribe este c\xF3digo para entrar a tu cuenta. Vence en 5 minutos."
+        ],
+        code: code2,
+        notice: "Si no intentaste entrar, cambia tu contrase\xF1a: alguien la conoce."
+      }
+    }),
+    en: (code2) => ({
+      subject: "Your Y\u0112KORA sign-in code",
+      content: {
+        heading: "Your sign-in code",
+        paragraphs: [
+          "Enter this code to sign in to your account. It expires in 5 minutes."
+        ],
+        code: code2,
+        notice: "If you did not try to sign in, change your password: someone knows it."
+      }
+    })
+  },
+  PASSWORD_RESET: {
+    "es-MX": (link) => ({
+      subject: "Restablece tu contrase\xF1a de Y\u0112KORA",
+      content: {
+        heading: "Elige una contrase\xF1a nueva",
+        paragraphs: [
+          "Para elegir una contrase\xF1a nueva, abre el enlace. Vence en 15 minutos y sirve una sola vez."
+        ],
+        button: { label: "Elegir contrase\xF1a nueva", url: link },
+        notice: "Si no lo pediste, ignora este correo: tu contrase\xF1a no cambia."
+      }
+    }),
+    en: (link) => ({
+      subject: "Reset your Y\u0112KORA password",
+      content: {
+        heading: "Choose a new password",
+        paragraphs: [
+          "To choose a new password, open the link. It expires in 15 minutes and works once."
+        ],
+        button: { label: "Choose a new password", url: link },
+        notice: "If you did not ask for it, ignore this e-mail: your password does not change."
+      }
+    })
+  },
+  PASSWORD_CHANGED: {
+    "es-MX": () => ({
+      subject: "Cambiaste tu contrase\xF1a de Y\u0112KORA",
+      content: {
+        heading: "Tu contrase\xF1a cambi\xF3",
+        paragraphs: [
+          "Tu contrase\xF1a cambi\xF3 y cerramos todas tus sesiones abiertas."
+        ],
+        notice: `Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: () => ({
+      subject: "You changed your Y\u0112KORA password",
+      content: {
+        heading: "Your password changed",
+        paragraphs: ["Your password changed and we closed every open session."],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  },
+  TOTP_ENABLED: {
+    "es-MX": () => ({
+      subject: "Activaste la verificaci\xF3n en dos pasos en Y\u0112KORA",
+      content: {
+        heading: "Verificaci\xF3n en dos pasos activada",
+        paragraphs: [
+          "Tu cuenta ahora pide el c\xF3digo de tu app de autenticaci\xF3n al entrar."
+        ],
+        notice: `Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: () => ({
+      subject: "You turned on two-step verification on Y\u0112KORA",
+      content: {
+        heading: "Two-step verification is on",
+        paragraphs: [
+          "Your account now asks for the code of your authenticator app when you sign in."
+        ],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  }
+};
+function copyOf(keys, event, locale) {
   switch (event.type) {
     case "SIGN_IN_CODE": {
       const code2 = decryptTotpSecret(
@@ -117981,15 +118137,7 @@ async function render(db, keys, row2) {
         event.challengeId,
         event.code
       ).toString("utf8");
-      return {
-        to,
-        subject: "Tu c\xF3digo de acceso a Y\u0112KORA",
-        text: `Tu c\xF3digo de acceso es ${code2}. Vence en 5 minutos.
-
-Si no intentaste entrar, cambia tu contrase\xF1a: alguien la conoce.
-
-Your Y\u0112KORA sign-in code is ${code2}. It expires in 5 minutes.`
-      };
+      return COPY.SIGN_IN_CODE[locale](code2);
     }
     case "PASSWORD_RESET": {
       const token = decryptTotpSecret(
@@ -117997,36 +118145,27 @@ Your Y\u0112KORA sign-in code is ${code2}. It expires in 5 minutes.`
         event.userId,
         event.token
       ).toString("utf8");
-      const link = resetLinks(keys.siteUrl, token);
-      return {
-        to,
-        subject: "Restablece tu contrase\xF1a de Y\u0112KORA",
-        text: `Para elegir una contrase\xF1a nueva, abre este enlace. Vence en 15 minutos y sirve una sola vez:
-${link.es}
-
-Si no lo pediste, ignora este correo: tu contrase\xF1a no cambia.
-
-To choose a new Y\u0112KORA password, open this link. It expires in 15 minutes and works once:
-${link.en}`
-      };
+      return COPY.PASSWORD_RESET[locale](
+        resetLink(keys.siteUrl, token, locale)
+      );
     }
     case "PASSWORD_CHANGED":
-      return {
-        to,
-        subject: "Cambiaste tu contrase\xF1a de Y\u0112KORA",
-        text: `Tu contrase\xF1a cambi\xF3 y cerramos todas tus sesiones abiertas.
-
-Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL}.
-
-Your Y\u0112KORA password changed and every open session was closed. If this was not you, write to ${SUPPORT_EMAIL} right away.`
-      };
+      return COPY.PASSWORD_CHANGED[locale]();
     case "TOTP_ENABLED":
-      return {
-        to,
-        subject: "Activaste la verificaci\xF3n en dos pasos en Y\u0112KORA",
-        text: "Tu cuenta ahora pide el c\xF3digo de tu app de autenticaci\xF3n al entrar.\n\nSi no fuiste t\xFA, escr\xEDbenos de inmediato.\n\nTwo-step verification is now on for your Y\u0112KORA account."
-      };
+      return COPY.TOTP_ENABLED[locale]();
   }
+}
+async function render(db, keys, row2) {
+  const event = {
+    type: row2.event_type,
+    ...JSON.parse(row2.payload)
+  };
+  const to = await emailOf(db, event.userId);
+  const locale = resolveMailLocale(event.locale);
+  const { subject, content } = copyOf(keys, event, locale);
+  const { html, text: text3 } = renderEmail({ ...content, locale }, keys.siteUrl);
+  assertMultipart(html, text3);
+  return { to, subject, text: text3, html };
 }
 function createOutboxDispatcher(deps) {
   const { db } = deps;
@@ -118989,7 +119128,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "3602dbbab55e644686a00d978dc883a59ff3f4c8" : void 0;
+var sha = true ? "bd2c19d296c8ddce3915251e4501731e84cc1cf7" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
