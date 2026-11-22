@@ -66,6 +66,8 @@ interface State {
   addresses: { params: unknown[] }[];
   /** user_stripe_customers: account id → Stripe customer id (FC 054). */
   links: Record<string, string>;
+  /** The rows of `outbox_events` the checkout queued (FC 066): event type and payload. */
+  outbox: { type: string; payload: Record<string, unknown> }[];
 }
 
 /**
@@ -105,6 +107,7 @@ function memoryDb(
     ],
     addresses: [],
     links: {},
+    outbox: [],
     ...seed,
   };
   let snapshot: State | null = null;
@@ -261,6 +264,16 @@ function memoryDb(
       },
     ],
     ['UPDATE orders SET status_id = 4', cancel],
+    [
+      'INSERT INTO outbox_events',
+      ([type, payload]) => {
+        state.outbox.push({
+          type: type as string,
+          payload: JSON.parse(payload as string),
+        });
+        return { affectedRows: 1 };
+      },
+    ],
     [
       'UPDATE products p JOIN order_items i',
       ([id]) => {
@@ -684,6 +697,13 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     expect(outcome).toEqual(refused(503, 'SERVICE_UNAVAILABLE'));
     expect(state().orders[0].status).toBe(4);
     expect(state().products[0].reserved).toBe(0);
+    // FC 066 T2.4: the cancellation notice is queued with the change, in the checkout's language.
+    expect(state().outbox).toEqual([
+      {
+        type: 'ORDER_CANCELLED',
+        payload: { orderId: state().orders[0].id, locale: 'es-MX' },
+      },
+    ]);
   });
 
   it('does not touch an order that left PENDING while the processor was failing', async () => {
@@ -702,6 +722,8 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     );
     expect(state().orders[0].status).toBe(3);
     expect(state().products[0].reserved).toBe(1); // released by the expiry, not twice
+    // The order was no longer pending: nothing was cancelled, so no notice is queued.
+    expect(state().outbox).toEqual([]);
   });
 
   it('lets a database failure surface instead of answering a code', async () => {
@@ -754,6 +776,26 @@ describe('lazy expiry (no cron, no public endpoint)', () => {
     );
     await expect(expireOverdueOrders(db, NOW)).resolves.toBe(0);
     expect(state().orders.map((o) => o.status)).toEqual([1, 2]);
+    expect(state().outbox).toEqual([]);
+  });
+
+  it('queues one ORDER_EXPIRED for each order it expires, in the same transaction (FC 066 T2.4)', async () => {
+    const { db, state } = memoryDb();
+    for (const id of [1, 2]) {
+      state().orders.push({
+        id,
+        params: [],
+        status: 1,
+        expiresAt: new Date(NOW.getTime() - 1),
+        reference: null,
+      });
+    }
+    await expect(expireOverdueOrders(db, NOW)).resolves.toBe(2);
+    expect(state().orders.map((o) => o.status)).toEqual([3, 3]);
+    expect(state().outbox).toEqual([
+      { type: 'ORDER_EXPIRED', payload: { orderId: 1 } },
+      { type: 'ORDER_EXPIRED', payload: { orderId: 2 } },
+    ]);
   });
 });
 

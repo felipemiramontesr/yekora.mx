@@ -5,7 +5,8 @@
  * services/outboxDispatcher.ts does (scripts/checkPlatformGuards.ts).
  *
  * A payload carries ids and ciphertext only: the recipient's address is looked up when the
- * message is sent, and a sign-in code waits encrypted under TOTP_ENCRYPTION_KEY.
+ * message is sent, a sign-in code waits encrypted under TOTP_ENCRYPTION_KEY, and an order mail
+ * carries just the order id (FC 066 T2.2).
  *
  * @module
  */
@@ -41,6 +42,22 @@ export type MailEvent = (
       /** Security alert: the password changed through a reset link (FC 042 T2.3). */
       type: 'PASSWORD_CHANGED';
       userId: string;
+    }
+  | {
+      /** The payment of an order was confirmed (FC 066, K-88). */
+      type: 'ORDER_CONFIRMED';
+      /** `orders.id`: the buyer's data is read and decrypted only when the mail is sent. */
+      orderId: number;
+    }
+  | {
+      /** The reservation of an order lapsed unpaid (FC 066). */
+      type: 'ORDER_EXPIRED';
+      orderId: number;
+    }
+  | {
+      /** An order was cancelled because its payment page could not be opened (FC 066). */
+      type: 'ORDER_CANCELLED';
+      orderId: number;
     }
 ) & {
   /** The language the message asks for, if any. */

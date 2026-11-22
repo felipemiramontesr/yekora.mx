@@ -180,3 +180,105 @@ describe('MailMultipartRenderingGate (FC 065 T1.2)', () => {
     }
   });
 });
+
+describe('the order block (FC 066 T2.3)', () => {
+  const ORDER = {
+    number: 'YEK-2026-AB12CD34',
+    date: '21 de noviembre de 2026, 14:00',
+    method: 'Tarjeta',
+    lines: [
+      {
+        name: 'Tienda <2P>',
+        sku: 'TENT',
+        quantity: 2,
+        unitPrice: '$925.00 MXN',
+        lineTotal: '$1,850.00 MXN',
+      },
+      {
+        name: 'Lámpara',
+        sku: 'LAMP',
+        quantity: 1,
+        unitPrice: '$350.00 MXN',
+        lineTotal: '$350.00 MXN',
+      },
+    ],
+    itemsTotal: '$2,200.00 MXN',
+    shipping: '$150.00 MXN',
+    tax: '$324.14 MXN',
+    total: '$2,350.00 MXN',
+    address: ['Av. Barones 209', 'Guadalupe, Zacatecas 98612'],
+  };
+  const { html, text } = renderEmail(
+    {
+      ...CONTENT,
+      code: undefined,
+      button: undefined,
+      notice: undefined,
+      order: ORDER,
+    },
+    SITE
+  );
+
+  it('shows the number, the lines with their amounts, the shipping, the VAT and the total in the HTML', () => {
+    for (const fact of [
+      ORDER.number,
+      ORDER.date,
+      ORDER.method,
+      'TENT',
+      'LAMP',
+      '$925.00 MXN',
+      '$1,850.00 MXN',
+      ORDER.itemsTotal,
+      ORDER.shipping,
+      ORDER.tax,
+      ORDER.total,
+      'Av. Barones 209',
+      'Guadalupe, Zacatecas 98612',
+    ]) {
+      expect(html).toContain(fact);
+    }
+    expect(html).toContain('<th align="left"');
+    expect(html).toContain('Total pagado');
+    expect(html).toContain('Dirección de entrega');
+  });
+
+  it('escapes the names of the products', () => {
+    expect(html).toContain('Tienda &lt;2P&gt; (TENT)');
+    expect(html).not.toContain('<2P>');
+  });
+
+  it('carries the same facts in the plain text, without markup', () => {
+    for (const fact of [
+      ORDER.number,
+      ORDER.date,
+      ORDER.method,
+      'TENT',
+      'LAMP',
+      '$925.00 MXN',
+      '$1,850.00 MXN',
+      ORDER.itemsTotal,
+      ORDER.shipping,
+      ORDER.tax,
+      ORDER.total,
+      'Av. Barones 209',
+      'Guadalupe, Zacatecas 98612',
+    ]) {
+      expect(text).toContain(fact);
+    }
+    expect(text).toContain('- Tienda <2P> (TENT) x 2');
+    expect(text).toContain('Total pagado: $2,350.00 MXN');
+    expect(text).not.toContain('&lt;');
+  });
+
+  it('uses the English words for an English message', () => {
+    const english = renderEmail(
+      { ...CONTENT, locale: 'en', order: ORDER },
+      SITE
+    );
+    expect(english.html).toContain('Total paid');
+    expect(english.html).toContain('Delivery address');
+    expect(english.text).toContain('Payment method: Tarjeta');
+    expect(english.text).toContain('Total paid: $2,350.00 MXN');
+    expect(english.text).not.toContain('Total pagado');
+  });
+});

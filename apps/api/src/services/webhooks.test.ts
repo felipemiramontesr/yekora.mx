@@ -46,6 +46,8 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
     } as OrderState,
     events: [] as EventRow[],
     sold: [] as unknown[],
+    /** The rows of `outbox_events` the receiver queued (FC 066): event type and payload. */
+    outbox: [] as { type: string; payload: Record<string, unknown> }[],
   };
   const sql: string[] = [];
   const handlers: [string, (p: unknown[]) => unknown][] = [
@@ -91,6 +93,16 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
       'UPDATE products p JOIN order_items i',
       ([orderId]) => {
         state.sold.push(orderId);
+        return { affectedRows: 1 };
+      },
+    ],
+    [
+      'INSERT INTO outbox_events',
+      ([type, payload]) => {
+        state.outbox.push({
+          type: type as string,
+          payload: JSON.parse(payload as string),
+        });
         return { affectedRows: 1 };
       },
     ],
@@ -314,6 +326,10 @@ describe('T1.4 applied to the order (V ∧ N ∧ R)', () => {
       paidAt: NOW,
     });
     expect(state.sold).toEqual([7]);
+    // FC 066 T1.2, T2.4: the confirmation is queued in the same transaction, with only the id.
+    expect(state.outbox).toEqual([
+      { type: 'ORDER_CONFIRMED', payload: { orderId: 7 } },
+    ]);
     expect(state.events[0].params.slice(3)).toEqual([
       7,
       'paid',
@@ -336,6 +352,8 @@ describe('T1.4 applied to the order (V ∧ N ∧ R)', () => {
       receiveWebhook(deps(db, port), 'STRIPE', INPUT)
     ).resolves.toEqual({ status: 200, code: 'ALREADY_PAID' });
     expect(state.sold).toEqual([]);
+    // FC 066 T2.1: a payment already settled queues no second confirmation.
+    expect(state.outbox).toEqual([]);
     expect(state.events[0].params.slice(7)).toEqual([2, 0, 1]);
   });
 
@@ -352,6 +370,8 @@ describe('T1.4 applied to the order (V ∧ N ∧ R)', () => {
       ).resolves.toEqual({ status: 200, code: 'LATE_PAYMENT_NEEDS_REVIEW' });
       expect(state.order).toMatchObject({ status: 6, resource: 'cs_test_1' });
       expect(state.sold).toEqual([]);
+      // FC 066 T1.2: a late payment is for a person to review, not a confirmation.
+      expect(state.outbox).toEqual([]);
       expect(state.events[0].params.slice(7)).toEqual([6, 1, 1]);
     }
   );

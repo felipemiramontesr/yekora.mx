@@ -50,7 +50,11 @@ export async function registerWebhookRoutes(
           headers: request.headers,
           query: request.query as Record<string, string | undefined>,
         });
-        if (outcome.status === 200) return { code: outcome.code };
+        if (outcome.status === 200) {
+          // FC 066: a settled payment queued its confirmation; wake the dispatcher after the answer.
+          request.outboxQueued = true;
+          return { code: outcome.code };
+        }
         return reply
           .code(outcome.status)
           .type(PROBLEM_TYPE)

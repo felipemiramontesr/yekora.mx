@@ -22,6 +22,7 @@ import type {
   VerifiedEvent,
   WebhookInput,
 } from './paymentPort';
+import { enqueueMail } from './outbox';
 import { settle } from './settlement';
 
 /** Dependencies of the webhook receiver. */
@@ -173,6 +174,11 @@ function settleOrder(
         'UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity, p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?',
         [order.id]
       );
+    }
+    // FC 066 T1.2: a recorded event that moves a pending order to PAID queues its confirmation, in
+    // this same transaction (T2.4). A repeated delivery returned above, so it queues nothing (T2.1).
+    if (status === STATUS.PENDING && row.nextStatusId === STATUS.PAID) {
+      await enqueueMail(tx, { type: 'ORDER_CONFIRMED', orderId: order.id });
     }
     return { status: row.httpStatus, code: row.code };
   });

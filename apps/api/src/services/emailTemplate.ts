@@ -18,6 +18,45 @@
 /** The languages of the store's mail. */
 export type MailLocale = 'es-MX' | 'en';
 
+/** One line of an order, with its amounts already formatted for the reader. */
+interface OrderLine {
+  /** Product name, in the language of the message. */
+  name: string;
+  /** Stock-keeping unit. */
+  sku: string;
+  /** Units bought. */
+  quantity: number;
+  /** Price of one unit, VAT included. */
+  unitPrice: string;
+  /** Amount of the line, VAT included. */
+  lineTotal: string;
+}
+
+/**
+ * An order as the message shows it (FC 066 T2.3): who it is, what was bought, what it cost and
+ * where it goes. Every amount and the date arrive formatted, so the template stays pure.
+ */
+export interface OrderBlock {
+  /** Public order number. */
+  number: string;
+  /** When the order was placed. */
+  date: string;
+  /** How the buyer chose to pay. */
+  method: string;
+  /** The lines of the order. */
+  lines: readonly OrderLine[];
+  /** Products, VAT included. */
+  itemsTotal: string;
+  /** Shipping, VAT included. */
+  shipping: string;
+  /** VAT contained in the total. */
+  tax: string;
+  /** Everything the buyer pays. */
+  total: string;
+  /** The delivery address, one line each. */
+  address: readonly string[];
+}
+
 /** What one message says, before it is laid out. */
 export interface EmailContent {
   /** Language of the whole message. */
@@ -26,6 +65,8 @@ export interface EmailContent {
   heading: string;
   /** Paragraphs, in order, shown before the code and the button. */
   paragraphs: readonly string[];
+  /** The order the message is about, shown as a summary, a table of lines and the totals. */
+  order?: OrderBlock;
   /** A short code shown highlighted and monospaced (a sign-in code). */
   code?: string;
   /** The main action: a labelled link, shown as a button and repeated as plain text. */
@@ -63,6 +104,20 @@ const FRAME = {
     privacyPath: '/privacidad/',
     unattended:
       'Este mensaje se generó de forma automática; no respondas a este correo.',
+    order: {
+      number: 'Pedido',
+      date: 'Fecha',
+      method: 'Método de pago',
+      product: 'Producto',
+      quantity: 'Cant.',
+      unit: 'Precio',
+      amount: 'Importe',
+      items: 'Productos (IVA incluido)',
+      shipping: 'Envío (IVA incluido)',
+      tax: 'IVA incluido en el total',
+      total: 'Total pagado',
+      address: 'Dirección de entrega',
+    },
   },
   en: {
     fallbackLink:
@@ -71,6 +126,20 @@ const FRAME = {
     privacy: 'Privacy notice',
     privacyPath: '/en/privacy/',
     unattended: 'This message was generated automatically; do not reply to it.',
+    order: {
+      number: 'Order',
+      date: 'Date',
+      method: 'Payment method',
+      product: 'Product',
+      quantity: 'Qty',
+      unit: 'Price',
+      amount: 'Amount',
+      items: 'Products (VAT included)',
+      shipping: 'Shipping (VAT included)',
+      tax: 'VAT included in the total',
+      total: 'Total paid',
+      address: 'Delivery address',
+    },
   },
 } as const;
 
@@ -129,6 +198,77 @@ function fallbackLink(intro: string, url: string): string {
   return `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(intro)}<br><a href="${escapeHtml(url)}" style="color:${PETROLEO};word-break:break-all;">${escapeHtml(url)}</a></p>`;
 }
 
+/** One row of the order's tables. */
+function row(
+  cells: readonly string[],
+  opts: { head?: boolean; strong?: boolean } = {}
+): string {
+  const weight = opts.head || opts.strong ? 'bold' : 'normal';
+  const tag = opts.head ? 'th' : 'td';
+  return `<tr>${cells
+    .map(
+      (cell, index) =>
+        `<${tag} align="${index === 0 ? 'left' : 'right'}" style="padding:8px 4px;border-bottom:1px solid ${MARFIL};font-family:${SANS};font-size:14px;line-height:20px;font-weight:${weight};color:${PETROLEO};">${escapeHtml(cell)}</${tag}>`
+    )
+    .join('')}</tr>`;
+}
+
+/** The order: summary, lines, totals and delivery address. */
+function orderHtml(
+  order: OrderBlock,
+  words: (typeof FRAME)['es-MX']['order'] | (typeof FRAME)['en']['order']
+): string {
+  const summary = [
+    [words.number, order.number],
+    [words.date, order.date],
+    [words.method, order.method],
+  ];
+  const lines = order.lines.map((line) =>
+    row([
+      `${line.name} (${line.sku})`,
+      String(line.quantity),
+      line.unitPrice,
+      line.lineTotal,
+    ])
+  );
+  const totals = [
+    [words.items, order.itemsTotal],
+    [words.shipping, order.shipping],
+    [words.tax, order.tax],
+  ].map(([label, value]) => row([label, '', '', value]));
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${summary.map(([label, value]) => row([label, value])).join('')}</table>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${row([words.product, words.quantity, words.unit, words.amount], { head: true })}${lines.join('')}${totals.join('')}${row([words.total, '', '', order.total], { strong: true })}</table>` +
+    `<p style="margin:0 0 4px 0;font-family:${SANS};font-size:14px;line-height:20px;font-weight:bold;color:${PETROLEO};">${escapeHtml(words.address)}</p>` +
+    `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${order.address.map(escapeHtml).join('<br>')}</p>`
+  );
+}
+
+/** The same order as plain text. */
+function orderText(
+  order: OrderBlock,
+  words: (typeof FRAME)['es-MX']['order'] | (typeof FRAME)['en']['order']
+): string[] {
+  return [
+    [
+      `${words.number}: ${order.number}`,
+      `${words.date}: ${order.date}`,
+      `${words.method}: ${order.method}`,
+    ].join('\n'),
+    [
+      ...order.lines.map(
+        (line) =>
+          `- ${line.name} (${line.sku}) x ${line.quantity} · ${words.unit} ${line.unitPrice} · ${words.amount} ${line.lineTotal}`
+      ),
+      `${words.items}: ${order.itemsTotal}`,
+      `${words.shipping}: ${order.shipping}`,
+      `${words.tax}: ${order.tax}`,
+      `${words.total}: ${order.total}`,
+    ].join('\n'),
+    `${words.address}:\n${order.address.join('\n')}`,
+  ];
+}
+
 /** A security notice, apart from the rest. */
 function notice(text: string): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;"><tr><td style="padding:12px 16px;border-left:4px solid ${OCRE};background-color:${MARFIL};font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(text)}</td></tr></table>`;
@@ -150,6 +290,7 @@ export function renderEmail(
   const privacyUrl = `${siteUrl}${frame.privacyPath}`;
   const body = [
     ...content.paragraphs.map(paragraph),
+    content.order === undefined ? '' : orderHtml(content.order, frame.order),
     content.code === undefined ? '' : codeBlock(content.code),
     content.button === undefined
       ? ''
@@ -161,6 +302,9 @@ export function renderEmail(
   const text = [
     content.heading,
     ...content.paragraphs,
+    ...(content.order === undefined
+      ? []
+      : orderText(content.order, frame.order)),
     ...(content.code === undefined ? [] : [content.code]),
     ...(content.button === undefined
       ? []

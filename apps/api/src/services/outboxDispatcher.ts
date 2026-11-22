@@ -20,11 +20,13 @@ import nodemailer from 'nodemailer';
 import { retryDelaySeconds } from '../../../../scripts/lib/outboxValidation';
 import type { MailConfig } from '../config';
 import { decryptTotpSecret } from './authCrypto';
+import { decryptPii } from './checkoutCrypto';
 import type { Db } from './db';
 import {
   assertMultipart,
   type EmailContent,
   type MailLocale,
+  type OrderBlock,
   renderEmail,
   resolveMailLocale,
 } from './emailTemplate';
@@ -213,7 +215,7 @@ const COPY = {
  */
 function copyOf(
   keys: { totpKey: Buffer; siteUrl: string },
-  event: MailEvent,
+  event: Exclude<MailEvent, OrderEvent>,
   locale: MailLocale
 ): Copy {
   switch (event.type) {
@@ -242,21 +244,251 @@ function copyOf(
   }
 }
 
+/** The three order events, which carry an order id instead of an account. */
+type OrderEvent = Extract<MailEvent, { orderId: number }>;
+
+/** The columns of an order a message needs, as MariaDB returns them. */
+interface OrderData {
+  order_number: string;
+  created_at: Date;
+  method_es: string;
+  method_en: string;
+  items_total_mxn_cents: number;
+  shipping_total_mxn_cents: number;
+  items_tax_mxn_cents: number;
+  shipping_tax_mxn_cents: number;
+  total_mxn_cents: number;
+  customer_name_enc: Buffer;
+  customer_email_enc: Buffer;
+  shipping_address_enc: Buffer;
+}
+
+/** A line of an order as MariaDB returns it. */
+interface OrderItemData {
+  sku: string;
+  quantity: number;
+  unit_price_mxn_cents: number;
+  line_total_mxn_cents: number;
+  name_es: string;
+  name_en: string;
+}
+
+/** The delivery address as the checkout sealed it. */
+interface SealedAddress {
+  street: string;
+  exteriorNumber: string;
+  interiorNumber?: string;
+  neighborhood: string;
+  municipality: string;
+  stateCode: string;
+  postalCode: string;
+  references?: string;
+}
+
+/** The words of the three order messages, in each language. */
+const ORDER_COPY = {
+  ORDER_CONFIRMED: {
+    'es-MX': (name: string, number: string, site: string): Copy => ({
+      subject: `Confirmamos tu pedido ${number} en YĒKORA`,
+      content: {
+        heading: 'Gracias por tu compra',
+        paragraphs: [
+          `Hola ${name}: recibimos tu pago y tu pedido ${number} está confirmado. Este es el resumen.`,
+        ],
+        button: {
+          label: 'Ver mi pedido',
+          url: `${site}/cuenta/${number}/`,
+        },
+        notice: `Si no reconoces esta compra, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (name: string, number: string, site: string): Copy => ({
+      subject: `We confirmed your order ${number} at YĒKORA`,
+      content: {
+        heading: 'Thank you for your purchase',
+        paragraphs: [
+          `Hello ${name}: we received your payment and your order ${number} is confirmed. Here is the summary.`,
+        ],
+        button: {
+          label: 'View my order',
+          url: `${site}/en/account/${number}/`,
+        },
+        notice: `If you do not recognize this purchase, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
+  ORDER_EXPIRED: {
+    'es-MX': (name: string, number: string, site: string): Copy => ({
+      subject: `Tu pedido ${number} venció sin pago`,
+      content: {
+        heading: 'Tu pedido venció',
+        paragraphs: [
+          `Hola ${name}: no recibimos el pago de tu pedido ${number} a tiempo, así que liberamos los productos que reservamos. No se hizo ningún cargo.`,
+        ],
+        button: { label: 'Volver a la tienda', url: `${site}/catalogo/` },
+      },
+    }),
+    en: (name: string, number: string, site: string): Copy => ({
+      subject: `Your order ${number} expired unpaid`,
+      content: {
+        heading: 'Your order expired',
+        paragraphs: [
+          `Hello ${name}: we did not receive the payment for your order ${number} in time, so we released the products we held. You were not charged.`,
+        ],
+        button: { label: 'Back to the store', url: `${site}/en/catalog/` },
+      },
+    }),
+  },
+  ORDER_CANCELLED: {
+    'es-MX': (name: string, number: string, site: string): Copy => ({
+      subject: `Cancelamos tu pedido ${number}`,
+      content: {
+        heading: 'Cancelamos tu pedido',
+        paragraphs: [
+          `Hola ${name}: no pudimos abrir la página de pago de tu pedido ${number}, así que lo cancelamos y liberamos los productos. No se hizo ningún cargo. Puedes intentar tu compra de nuevo.`,
+        ],
+        button: { label: 'Volver a la tienda', url: `${site}/catalogo/` },
+      },
+    }),
+    en: (name: string, number: string, site: string): Copy => ({
+      subject: `We cancelled your order ${number}`,
+      content: {
+        heading: 'We cancelled your order',
+        paragraphs: [
+          `Hello ${name}: we could not open the payment page of your order ${number}, so we cancelled it and released the products. You were not charged. You can try your purchase again.`,
+        ],
+        button: { label: 'Back to the store', url: `${site}/en/catalog/` },
+      },
+    }),
+  },
+} as const;
+
+/** An amount in MXN with its currency code, like the site shows it. */
+function money(cents: number, locale: MailLocale): string {
+  const amount = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'MXN',
+    currencyDisplay: 'narrowSymbol',
+  }).format(cents / 100);
+  return `${amount} MXN`;
+}
+
+/** The delivery address as the lines a person reads. */
+function addressLines(address: SealedAddress, state: string): string[] {
+  const number = [address.exteriorNumber, address.interiorNumber]
+    .filter((part) => part !== undefined && part !== '')
+    .join(' int. ');
+  return [
+    `${address.street} ${number}`,
+    address.neighborhood,
+    `${address.municipality}, ${state} ${address.postalCode}`,
+    ...(address.references ? [address.references] : []),
+  ];
+}
+
+/**
+ * The message of one order event (FC 066): the order is read when the mail is sent, and the
+ * buyer's name, e-mail and address are decrypted here, in memory, and only into the message
+ * (T2.2). Nothing personal is written back, logged or queued.
+ */
+async function renderOrder(
+  db: Db,
+  keys: { piiKey: Buffer | null; siteUrl: string },
+  event: OrderEvent,
+  locale: MailLocale
+): Promise<MailMessage> {
+  if (keys.piiKey === null) throw new Error('CHECKOUT_PII_KEY is not set');
+  const [order] = await db.query<OrderData>(
+    'SELECT o.order_number, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ?',
+    [event.orderId]
+  );
+  if (order === undefined) throw new Error('Order not found');
+  const [items, [zone]] = await Promise.all([
+    db.query<OrderItemData>(
+      'SELECT i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, p.name_es, p.name_en FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = ? ORDER BY i.id',
+      [event.orderId]
+    ),
+    db.query<{ name_es: string; name_en: string }>(
+      'SELECT z.name_es, z.name_en FROM orders o JOIN shipping_zones z ON z.id = o.shipping_zone_id WHERE o.id = ?',
+      [event.orderId]
+    ),
+  ]);
+  const number = order.order_number;
+  const name = decryptPii(
+    keys.piiKey,
+    number,
+    'customer_name',
+    order.customer_name_enc
+  );
+  const to = decryptPii(
+    keys.piiKey,
+    number,
+    'customer_email',
+    order.customer_email_enc
+  );
+  const address = JSON.parse(
+    decryptPii(
+      keys.piiKey,
+      number,
+      'shipping_address',
+      order.shipping_address_enc
+    )
+  ) as SealedAddress;
+  const english = locale === 'en';
+  const date = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: 'America/Mexico_City',
+  }).format(order.created_at);
+  const { subject, content } = ORDER_COPY[event.type][locale](
+    name,
+    number,
+    keys.siteUrl
+  );
+  const block: OrderBlock = {
+    number,
+    date,
+    method: english ? order.method_en : order.method_es,
+    lines: items.map((item) => ({
+      name: english ? item.name_en : item.name_es,
+      sku: item.sku,
+      quantity: item.quantity,
+      unitPrice: money(item.unit_price_mxn_cents, locale),
+      lineTotal: money(item.line_total_mxn_cents, locale),
+    })),
+    itemsTotal: money(order.items_total_mxn_cents, locale),
+    shipping: money(order.shipping_total_mxn_cents, locale),
+    tax: money(
+      Number(order.items_tax_mxn_cents) + Number(order.shipping_tax_mxn_cents),
+      locale
+    ),
+    total: money(order.total_mxn_cents, locale),
+    address: addressLines(address, english ? zone.name_en : zone.name_es),
+  };
+  const { html, text } = renderEmail(
+    { ...content, locale, order: block },
+    keys.siteUrl
+  );
+  assertMultipart(html, text);
+  return { to, subject, text, html };
+}
+
 /**
  * The message of one queued event: both bodies, in one language, addressed to the account's
  * current e-mail.
  */
 async function render(
   db: Db,
-  keys: { totpKey: Buffer; siteUrl: string },
+  keys: { totpKey: Buffer; piiKey: Buffer | null; siteUrl: string },
   row: OutboxRow
 ): Promise<MailMessage> {
   const event = {
     type: row.event_type,
     ...JSON.parse(row.payload),
   } as MailEvent;
-  const to = await emailOf(db, event.userId);
   const locale = resolveMailLocale(event.locale);
+  if ('orderId' in event) return renderOrder(db, keys, event, locale);
+  const to = await emailOf(db, event.userId);
   const { subject, content } = copyOf(keys, event, locale);
   const { html, text } = renderEmail({ ...content, locale }, keys.siteUrl);
   assertMultipart(html, text);
@@ -266,13 +498,16 @@ async function render(
 /**
  * Builds the dispatcher of one application.
  *
- * @param deps - Database, the key of queued codes and links, the site's address (for reset links),
+ * @param deps - Database, the key of queued codes and links, the key of the buyer's sealed data,
+ *   the site's address (for links),
  *   the sender, clock, logger and, for tests, the pause.
  * @returns The dispatcher; nothing runs until {@link OutboxDispatcher.start} or a kick.
  */
 export function createOutboxDispatcher(deps: {
   db: Db;
   totpKey: Buffer;
+  /** Key of the buyer's sealed data; null while checkout is not configured (FC 066 T2.2). */
+  piiKey: Buffer | null;
   siteUrl: string;
   send: SendMail;
   now: () => Date;

@@ -201,6 +201,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       ? createOutboxDispatcher({
           db: deps.db,
           totpKey: auth.totpKey,
+          piiKey: deps.config.payments.checkout?.piiKey ?? null,
           siteUrl: deps.config.payments.siteUrl,
           send: deps.sendMail ?? smtpSender(mail),
           now,

@@ -832,6 +832,7 @@ describe('mailed code and outbox on real SQL (identity.ts, outbox.ts, outboxDisp
     const outbox = createOutboxDispatcher({
       db,
       totpKey: KEY,
+      piiKey: null,
       siteUrl: 'https://yekora.mx',
       send: async (message) => {
         if (fail) throw new Error('smtp down');
@@ -873,6 +874,47 @@ describe('mailed code and outbox on real SQL (identity.ts, outbox.ts, outboxDisp
       retry_count: 1,
       error_message: 'smtp down',
     });
+  });
+
+  it('sends the order mails queued by the checkout, the webhook and the expiry from real SQL, opening the buyer’s data only to send (FC 066 T2.2, T2.4)', async () => {
+    // An order the suite already made, plus the confirmations queued by its own settlements.
+    const [order] = await db.query<{ id: number }>(
+      'SELECT id FROM orders ORDER BY id LIMIT 1'
+    );
+    await db.transaction((tx) =>
+      enqueueMail(tx, { type: 'ORDER_CONFIRMED', orderId: order.id })
+    );
+    const sent: { to: string; subject: string; text: string; html?: string }[] =
+      [];
+    const outbox = createOutboxDispatcher({
+      db,
+      totpKey: KEY,
+      piiKey: Buffer.alloc(32, 9),
+      siteUrl: 'https://yekora.mx',
+      send: async (message) => {
+        sent.push(message);
+      },
+      // An hour ahead, so the retries the previous test left are due too.
+      now: () => new Date(Date.now() + 3_600_000),
+      log: { error: () => undefined },
+      wait: async () => undefined,
+    });
+    outbox.kick();
+    await outbox.drain();
+    const orderMails = sent.filter((message) =>
+      /pedido/i.test(message.subject)
+    );
+    expect(orderMails.length).toBeGreaterThan(0);
+    for (const message of orderMails) {
+      expect(message.to).toBe('ana@example.com');
+      expect(message.text).toContain('YEK-');
+      expect(message.text).toContain('MXN');
+      expect(message.html).toContain('https://yekora.mx/brand/email/logo.png');
+    }
+    const [left] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type LIKE 'ORDER\\_%' AND status <> 'SENT'"
+    );
+    expect(Number(left.n)).toBe(0);
   });
 });
 

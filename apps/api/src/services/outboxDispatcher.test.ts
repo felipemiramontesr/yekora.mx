@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { encryptTotpSecret } from './authCrypto';
+import { encryptPii } from './checkoutCrypto';
 import type { Db, Transactional } from './db';
 import { createOutboxDispatcher, smtpSender } from './outboxDispatcher';
 
@@ -22,6 +23,7 @@ vi.mock('nodemailer', () => ({ default: { createTransport } }));
 
 const NOW = new Date('2026-11-03T18:00:00Z');
 const KEY = Buffer.alloc(32, 4);
+const PII_KEY = Buffer.alloc(32, 9);
 const USER = 'u0000000-0000-4000-8000-000000000001';
 
 /** A queued row as the dispatcher selects it. */
@@ -72,6 +74,7 @@ function dispatcher(
   const outbox = createOutboxDispatcher({
     db,
     totpKey: KEY,
+    piiKey: PII_KEY,
     siteUrl: 'https://yekora.mx',
     send,
     now: () => NOW,
@@ -242,6 +245,7 @@ describe('outbox dispatcher (FC 028 T1.3 S)', () => {
     const outbox = createOutboxDispatcher({
       db,
       totpKey: KEY,
+      piiKey: null,
       siteUrl: 'https://yekora.mx',
       send,
       now: () => NOW,
@@ -419,5 +423,240 @@ describe('the branded, single-language mail of the identity events (FC 065 T1.1,
       JSON.stringify(sql) + JSON.stringify(log.error.mock.calls);
     expect(everything).not.toContain('482913');
     expect(everything).not.toContain('a'.repeat(64));
+  });
+});
+
+describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => {
+  const ORDER_NUMBER = 'YEK-2026-AB12CD34';
+  const seal = (field: Parameters<typeof encryptPii>[2], value: string) =>
+    encryptPii(PII_KEY, ORDER_NUMBER, field, value);
+  const ADDRESS = {
+    street: 'Av. Barones',
+    exteriorNumber: '209',
+    interiorNumber: '4B',
+    neighborhood: 'Las Américas',
+    municipality: 'Guadalupe',
+    stateCode: 'ZAC',
+    postalCode: '98612',
+    references: 'Portón negro',
+  };
+  const orderRow = (over: Record<string, unknown> = {}) => ({
+    order_number: ORDER_NUMBER,
+    created_at: new Date('2026-11-21T20:00:00Z'),
+    method_es: 'Tarjeta',
+    method_en: 'Card',
+    items_total_mxn_cents: 185000,
+    shipping_total_mxn_cents: 15000,
+    items_tax_mxn_cents: 25517,
+    shipping_tax_mxn_cents: 2069,
+    total_mxn_cents: 200000,
+    customer_name_enc: seal('customer_name', 'Ana Flores'),
+    customer_email_enc: seal('customer_email', 'ana@example.test'),
+    shipping_address_enc: seal('shipping_address', JSON.stringify(ADDRESS)),
+    ...over,
+  });
+
+  /** A database with one order, its lines and its zone; records every statement. */
+  function orderDb(
+    due: ReturnType<typeof row>[],
+    order: ReturnType<typeof orderRow> | null = orderRow(),
+    addressOver: Partial<typeof ADDRESS> = {}
+  ) {
+    const sql: { text: string; params: readonly unknown[] }[] = [];
+    const sealed =
+      Object.keys(addressOver).length === 0
+        ? order
+        : order && {
+            ...order,
+            shipping_address_enc: seal(
+              'shipping_address',
+              JSON.stringify({ ...ADDRESS, ...addressOver })
+            ),
+          };
+    const runs = [due];
+    const db = {
+      async query(text: string, params: readonly unknown[] = []) {
+        sql.push({ text, params });
+        if (text.startsWith('SELECT id, event_type')) return runs.shift() ?? [];
+        if (text.startsWith("UPDATE outbox_events SET status = 'PROCESSING'"))
+          return { affectedRows: 1 };
+        if (text.startsWith('SELECT o.order_number'))
+          return sealed ? [sealed] : [];
+        if (text.startsWith('SELECT i.sku'))
+          return [
+            {
+              sku: 'TENT',
+              quantity: 2,
+              unit_price_mxn_cents: 92500,
+              line_total_mxn_cents: 185000,
+              name_es: 'Tienda 2P',
+              name_en: '2P tent',
+            },
+          ];
+        if (text.startsWith('SELECT z.name_es'))
+          return [{ name_es: 'Zacatecas', name_en: 'Zacatecas' }];
+        return [];
+      },
+    } as unknown as Db;
+    return { db, sql };
+  }
+
+  const event = (type: string, locale?: string) =>
+    row(1, {
+      event_type: type,
+      payload: JSON.stringify({ orderId: 7, locale }),
+    });
+
+  async function sentFor(due: ReturnType<typeof row>[], made = orderDb(due)) {
+    const { outbox, send } = dispatcher(made.db);
+    outbox.kick();
+    await outbox.drain();
+    return { send, ...made };
+  }
+
+  it('sends the confirmation to the buyer’s own address, decrypted in memory, with the whole order in both bodies (T2.2, T2.3)', async () => {
+    const { send } = await sentFor([event('ORDER_CONFIRMED')]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.to).toBe('ana@example.test');
+    expect(message.subject).toBe(
+      `Confirmamos tu pedido ${ORDER_NUMBER} en YĒKORA`
+    );
+    for (const body of [message.text, message.html ?? '']) {
+      expect(body).toContain('Hola Ana Flores');
+      expect(body).toContain(ORDER_NUMBER);
+      expect(body).toContain('Tienda 2P');
+      expect(body).toContain('TENT');
+      expect(body).toContain('$1,850.00 MXN');
+      expect(body).toContain('$150.00 MXN');
+      expect(body).toContain('$2,000.00 MXN');
+      expect(body).toContain('$275.86 MXN');
+      expect(body).toContain('Tarjeta');
+      expect(body).toContain('Av. Barones 209 int. 4B');
+      expect(body).toContain('Guadalupe, Zacatecas 98612');
+      expect(body).toContain('Portón negro');
+    }
+    expect(message.html).toContain(`https://yekora.mx/cuenta/${ORDER_NUMBER}/`);
+    expect(message.text).toContain(`https://yekora.mx/cuenta/${ORDER_NUMBER}/`);
+  });
+
+  it('writes the English confirmation in English only, with the English link (T1.1)', async () => {
+    const { send } = await sentFor([event('ORDER_CONFIRMED', 'en')]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(
+      `We confirmed your order ${ORDER_NUMBER} at YĒKORA`
+    );
+    expect(message.html).toContain('<html lang="en">');
+    expect(message.text).toContain('2P tent');
+    expect(message.text).toContain('Payment method: Card');
+    expect(message.text).not.toMatch(/\b(Pedido|Tarjeta|Gracias)\b/);
+    expect(message.text).toContain(
+      `https://yekora.mx/en/account/${ORDER_NUMBER}/`
+    );
+  });
+
+  it.each([
+    [
+      'ORDER_EXPIRED',
+      undefined,
+      `Tu pedido ${ORDER_NUMBER} venció sin pago`,
+      'No se hizo ningún cargo',
+      'https://yekora.mx/catalogo/',
+    ],
+    [
+      'ORDER_EXPIRED',
+      'en',
+      `Your order ${ORDER_NUMBER} expired unpaid`,
+      'You were not charged',
+      'https://yekora.mx/en/catalog/',
+    ],
+    [
+      'ORDER_CANCELLED',
+      undefined,
+      `Cancelamos tu pedido ${ORDER_NUMBER}`,
+      'No se hizo ningún cargo',
+      'https://yekora.mx/catalogo/',
+    ],
+    [
+      'ORDER_CANCELLED',
+      'en',
+      `We cancelled your order ${ORDER_NUMBER}`,
+      'You were not charged',
+      'https://yekora.mx/en/catalog/',
+    ],
+  ])(
+    'sends the %s notice (%s) with the order and a way back to the store',
+    async (type, locale, subject, saying, link) => {
+      const { send } = await sentFor([event(type, locale)]);
+      const [message] = send.mock.calls.map(([sent]) => sent);
+      expect(message.subject).toBe(subject);
+      expect(message.text).toContain(saying);
+      expect(message.html).toContain(saying);
+      expect(message.text).toContain(link);
+      expect(message.text).toContain('TENT');
+      expect(message.to).toBe('ana@example.test');
+    }
+  );
+
+  it('leaves out the optional parts of an address (no interior number, no references) and a message holds nothing it was not given', async () => {
+    const made = orderDb([event('ORDER_CONFIRMED')], orderRow(), {
+      interiorNumber: undefined,
+      references: undefined,
+    });
+    const { send } = await sentFor([], made);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.text).toContain('Av. Barones 209\n');
+    expect(message.text).not.toContain('int.');
+    expect(message.text).not.toContain('Portón negro');
+  });
+
+  it('keeps the buyer’s data out of the queue, the statements and the logs: only the order id travels (T2.2)', async () => {
+    const { sql } = await sentFor([event('ORDER_CONFIRMED')]);
+    const everything =
+      JSON.stringify(sql) + JSON.stringify(log.error.mock.calls);
+    for (const secret of ['Ana Flores', 'ana@example.test', 'Av. Barones']) {
+      expect(everything).not.toContain(secret);
+    }
+    expect(
+      sql.find(({ text }) => text.startsWith('SELECT o.order_number'))?.params
+    ).toEqual([7]);
+  });
+
+  it('retries a message whose order cannot be read or opened, keeping its state (test plan 4)', async () => {
+    const missing = await sentFor(
+      [event('ORDER_CONFIRMED')],
+      orderDb([event('ORDER_CONFIRMED')], null)
+    );
+    expect(missing.send).not.toHaveBeenCalled();
+    expect(log.error).toHaveBeenCalledWith(
+      { outboxId: 1, attempts: 1 },
+      'outbox send failed'
+    );
+    const failed = missing.sql.find(({ text }) =>
+      text.startsWith('UPDATE outbox_events SET status = ?')
+    );
+    expect(failed?.params[0]).toBe('PENDING');
+    expect(failed?.params[3]).toBe('Order not found');
+  });
+
+  it('retries, and never sends, while the key of the buyer’s data is not configured', async () => {
+    const { db, sql } = orderDb([event('ORDER_CONFIRMED')]);
+    const send = vi.fn(async () => undefined);
+    const outbox = createOutboxDispatcher({
+      db,
+      totpKey: KEY,
+      piiKey: null,
+      siteUrl: 'https://yekora.mx',
+      send,
+      now: () => NOW,
+      log,
+    });
+    outbox.kick();
+    await outbox.drain();
+    expect(send).not.toHaveBeenCalled();
+    expect(
+      sql.find(({ text }) =>
+        text.startsWith('UPDATE outbox_events SET status = ?')
+      )?.params[3]
+    ).toBe('CHECKOUT_PII_KEY is not set');
   });
 });

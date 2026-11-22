@@ -42,6 +42,7 @@ import {
 } from './checkoutCrypto';
 import type { Db, Transactional, TxQuery } from './db';
 import type { CurrentRate } from './exchangeRate';
+import { enqueueMail } from './outbox';
 import type { PaymentMethodCode, PaymentProcessorPort } from './paymentPort';
 import type { StripeCardsPort } from './stripeAdapter';
 import { ensureCustomer } from './stripeCustomer';
@@ -138,6 +139,10 @@ export async function expireOverdueOrders(
       'UPDATE orders SET status_id = 3 WHERE id IN (?) AND status_id = 1',
       [ids]
     );
+    // FC 066 T2.4: each expired order queues its notice in the same transaction as its change.
+    await Promise.all(
+      ids.map((orderId) => enqueueMail(tx, { type: 'ORDER_EXPIRED', orderId }))
+    );
     return ids.length;
   });
 }
@@ -169,8 +174,15 @@ async function reserveLines(
   return new Map(reserved as (readonly [string, number])[]);
 }
 
-/** Cancels an order whose payment session could not be created, returning its stock. */
-async function cancelOrder(db: Transactional, orderId: number): Promise<void> {
+/**
+ * Cancels an order whose payment session could not be created, returning its stock and queueing
+ * its notice in the same transaction (FC 066 T2.4), in the language of the checkout.
+ */
+async function cancelOrder(
+  db: Transactional,
+  orderId: number,
+  locale: string
+): Promise<void> {
   await db.transaction(async (tx) => {
     const result = await tx.query(
       'UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1',
@@ -181,6 +193,7 @@ async function cancelOrder(db: Transactional, orderId: number): Promise<void> {
       'UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?',
       [orderId]
     );
+    await enqueueMail(tx, { type: 'ORDER_CANCELLED', orderId, locale });
   });
 }
 
@@ -468,7 +481,7 @@ export async function createCheckout(
     };
   } catch {
     // The processor (or recording its reference) failed: give the stock back at once.
-    await cancelOrder(deps.db, orderId);
+    await cancelOrder(deps.db, orderId, lang);
     return refuse(503, 'SERVICE_UNAVAILABLE');
   }
 }
