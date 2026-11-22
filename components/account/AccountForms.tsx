@@ -303,15 +303,18 @@ export function RegisterForm({
  *
  * @param messages - `account` texts.
  * @param initialEmail - The e-mail already typed in the sign-in form.
+ * @param notice - Why the form opened by itself (a reset link with no usable token, FC 062), if so.
  * @param onSignIn - Back to the sign-in form.
  */
 export function ForgotForm({
   messages,
   initialEmail,
+  notice,
   onSignIn,
 }: Readonly<{
   messages: AccountMessages;
   initialEmail: string;
+  notice?: string;
   onSignIn: () => void;
 }>) {
   const base = useId();
@@ -341,6 +344,7 @@ export function ForgotForm({
       className="flex max-w-md flex-col gap-4"
     >
       <h2 className="text-2xl font-semibold">{messages.forgot.title}</h2>
+      {notice && <output className="block">{notice}</output>}
       <p className="text-petroleo/80">{messages.forgot.intro}</p>
       <FormAlert text={error} />
       {sent && <output className="block">{messages.forgot.sent}</output>}

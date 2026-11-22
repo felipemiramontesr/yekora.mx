@@ -667,6 +667,12 @@
     },
     "pay": "Ir a pagar {total}",
     "submitting": "Preparando tu pago seguro…",
+    "unavailable": {
+      "title": "Tus productos ya no están disponibles",
+      "text": "Ninguno de los productos de tu mochila tiene existencias en este momento, así que no hay nada que pagar. Revisa tu mochila o sigue viendo el catálogo.",
+      "cart": "Ver mi mochila",
+      "catalog": "Ver catálogo"
+    },
     "notReady": {
       "quote": "Calculando el total de tu mochila…",
       "shipping": "Elige un estado al que enviemos para calcular el total.",
@@ -856,7 +862,8 @@
       "done": "Listo: tu contraseña cambió y cerramos tus sesiones abiertas. Entra con la nueva.",
       "again": "Pedir otro enlace",
       "checking": "Revisando tu enlace…",
-      "account": "Cambiando la contraseña de {email}"
+      "account": "Cambiando la contraseña de {email}",
+      "missingLink": "Ese enlace para cambiar tu contraseña está incompleto o ya no sirve. Escribe tu correo y te enviamos uno nuevo."
     },
     "code": {
       "titleEmail": "Revisa tu correo",

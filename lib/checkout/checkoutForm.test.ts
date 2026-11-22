@@ -4,6 +4,7 @@ import type { CartQuote } from '@/lib/cart/cartTypes';
 import {
   type CheckoutValues,
   EMPTY_VALUES,
+  nothingToBuy,
   readiness,
   validateCheckout,
 } from './checkoutForm';
@@ -173,5 +174,43 @@ describe('readiness (may the buyer pay now?)', () => {
     ],
   ] as const)('%s → %s', (_case, quoteState, stateCode, expected) => {
     expect(readiness(quoteState, stateCode)).toBe(expected);
+  });
+});
+
+describe('nothingToBuy (FC 062 T1.1: is there anything to pay?)', () => {
+  const lines = (...purchasable: boolean[]) =>
+    ({
+      ...quote(),
+      items: purchasable.map((flag, index) => ({
+        sku: `SKU-${index}`,
+        purchasable: flag,
+      })),
+    }) as unknown as CartQuote;
+
+  it.each([
+    [
+      'the server says the cart is unavailable',
+      state({ shippingIssue: 'cart_unavailable' }),
+      true,
+    ],
+    [
+      'every quoted line is not purchasable',
+      state({ quote: lines(false, false) }),
+      true,
+    ],
+    [
+      'one quoted line can be bought',
+      state({ quote: lines(false, true) }),
+      false,
+    ],
+    ['no line was quoted at all', state({ quote: lines() }), false],
+    [
+      'the quote is not confirmed yet',
+      state({ status: 'loading', quote: lines(false) }),
+      false,
+    ],
+    ['there is no quote', state({ status: 'loading', quote: null }), false],
+  ] as const)('%s → %s', (_case, quoteState, expected) => {
+    expect(nothingToBuy(quoteState)).toBe(expected);
   });
 });

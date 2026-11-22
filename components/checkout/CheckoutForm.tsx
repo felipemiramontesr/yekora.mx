@@ -20,6 +20,7 @@ import {
   FIELD_ORDER,
   type FieldErrors,
   type FieldName,
+  nothingToBuy,
   type PaymentMethodCode,
   readiness,
   validateCheckout,
@@ -211,6 +212,32 @@ export function CheckoutForm({
         >
           {messages.empty.cta}
         </Link>
+      </div>
+    );
+  }
+
+  if (nothingToBuy(quote)) {
+    return (
+      <div
+        data-checkout-unavailable
+        className="flex flex-col items-start gap-4"
+      >
+        <p className="text-xl font-semibold">{messages.unavailable.title}</p>
+        <p className="text-petroleo/80">{messages.unavailable.text}</p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href={routeFor('cart', locale)}
+            className="inline-flex min-h-11 items-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
+          >
+            {messages.unavailable.cart}
+          </Link>
+          <Link
+            href={routeFor('catalog', locale)}
+            className="inline-flex min-h-11 items-center rounded-md border border-petroleo px-6 font-semibold"
+          >
+            {messages.unavailable.catalog}
+          </Link>
+        </div>
       </div>
     );
   }

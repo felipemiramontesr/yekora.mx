@@ -16,6 +16,8 @@ interface CartContentsProps {
   messages: Messages['cart'];
   /** `catalog.price` texts. */
   priceMessages: Messages['catalog']['price'];
+  /** Called when the buyer follows «Continuar al pago», so a panel around the cart closes. */
+  onNavigate?: () => void;
 }
 
 /**
@@ -27,6 +29,7 @@ export function CartContents({
   locale,
   messages,
   priceMessages,
+  onNavigate,
 }: Readonly<CartContentsProps>) {
   const lines = useCartLines();
   const [stateCode, setStateCode] = useDeliveryState();
@@ -71,6 +74,8 @@ export function CartContents({
       {/* FC 012: the checkout re-checks stock and shipping itself; it is always reachable. */}
       <Link
         href={routeFor('checkout', locale)}
+        // FC 062 T2.2 (K-86): client navigation keeps the panel's dialog mounted; close it.
+        onClick={onNavigate}
         className="inline-flex min-h-12 items-center justify-center rounded-md bg-petroleo px-6 font-semibold text-marfil"
       >
         {messages.toCheckout}

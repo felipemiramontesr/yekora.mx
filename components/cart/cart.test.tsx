@@ -206,6 +206,19 @@ describe('cart button and panel', () => {
     expect(within(cartLink()).getByRole('status').textContent).toBe('3');
   });
 
+  it('closes the panel when «Continuar al pago» is followed, so it never covers the checkout (FC 062 T2.2)', async () => {
+    getCartStore().addItem('TENT');
+    showButton();
+    fireEvent.click(cartLink());
+    const toCheckout = await within(panel()).findByRole('link', {
+      name: 'Continuar al pago',
+    });
+    expect(panel().hasAttribute('open')).toBe(true);
+    // The click is a client navigation: nothing reloads, so the dialog must close by itself.
+    fireEvent.click(toCheckout);
+    expect(panel().hasAttribute('open')).toBe(false);
+  });
+
   it('closes with its button, with Esc and with a click on the backdrop', () => {
     showButton();
     fireEvent.click(cartLink());
@@ -424,6 +437,34 @@ describe('CartSummary states', () => {
     show(state as QuoteState);
     expect(screen.getByRole('status').textContent).toBe(text);
     expect(screen.getByText('1 pieza')).toBeTruthy();
+  });
+
+  it('reserves the height of the totals with a neutral skeleton while the first quote runs, and not once it has amounts (FC 062 T2.3)', () => {
+    const { container } = show({
+      status: 'loading',
+      quote: null,
+      error: null,
+      shippingIssue: null,
+    });
+    expect(container.querySelector('[data-summary-skeleton]')).not.toBeNull();
+    cleanup();
+    const loaded = show({
+      status: 'loading',
+      quote,
+      error: null,
+      shippingIssue: null,
+    });
+    expect(
+      loaded.container.querySelector('[data-summary-skeleton]')
+    ).toBeNull();
+    cleanup();
+    const idle = show({
+      status: 'idle',
+      quote: null,
+      error: null,
+      shippingIssue: null,
+    });
+    expect(idle.container.querySelector('[data-summary-skeleton]')).toBeNull();
   });
 
   it('shows no totals before the first quote, and no USD without a reference', () => {

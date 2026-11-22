@@ -136,6 +136,34 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+describe('CheckoutForm with nothing to buy (FC 062 T1.1, T2.1)', () => {
+  it('shows the useful state with its two links, never the form with $0.00', () => {
+    liveQuote.mockReturnValue({
+      status: 'ready',
+      quote: {
+        ...QUOTE,
+        items: [{ sku: 'TENT', purchasable: false }],
+      } as unknown as CartQuote,
+      error: null,
+      shippingIssue: null,
+    });
+    const { container } = renderForm();
+    const { unavailable } = getMessages('es-MX').checkout;
+    expect(screen.getByText(unavailable.title)).toBeTruthy();
+    expect(screen.getByText(unavailable.text)).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: unavailable.cart }).getAttribute('href')
+    ).toBe('/carrito/');
+    expect(
+      screen
+        .getByRole('link', { name: unavailable.catalog })
+        .getAttribute('href')
+    ).toBe('/catalogo/');
+    expect(container.querySelector('form')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ir a pagar/ })).toBeNull();
+  });
+});
+
 describe('CheckoutForm', () => {
   it('pays: validates, opens the session, keeps the access in this tab and goes to the processor', async () => {
     submit.mockResolvedValue({ ok: true, session: SESSION });

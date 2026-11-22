@@ -103,7 +103,7 @@ interface AccountAppProps {
 type Stage =
   | { kind: 'signIn'; email: string; notice: string | null }
   | { kind: 'register' }
-  | { kind: 'forgot'; email: string }
+  | { kind: 'forgot'; email: string; notice?: string }
   | { kind: 'reset'; token: string }
   | { kind: 'code'; challengeId: string; channel: Channel; email: string }
   | { kind: 'enroll'; challengeId: string }
@@ -139,6 +139,11 @@ function stageAsked(current: Stage, asked: 'register' | 'signIn'): Stage {
 
 /** The token of a mailed reset link (FC 042): `?action=reset-password&token=<64 hex>`. */
 const RESET_TOKEN = /^[0-9a-f]{64}$/;
+
+/** Whether the address is a reset link (`?action=reset-password`), with or without a usable token. */
+function resetRequested(search: string): boolean {
+  return new URLSearchParams(search).get('action') === 'reset-password';
+}
 
 /**
  * The reset token the address carries, if any.
@@ -227,7 +232,16 @@ export function AccountApp({
     // FC 042: a mailed reset link opens the new-password form. Its token leaves the address bar
     // at once, so it stays out of the history, of a shared screen and of any Referer.
     const token = resetTokenOf(globalThis.location.search);
-    if (token === null) {
+    if (token === null && resetRequested(globalThis.location.search)) {
+      // FC 062 T2.1: a reset link with no usable token cannot reset anything; open the form that
+      // asks for a new one, with the reason, instead of an unexplained sign-in form.
+      globalThis.history.replaceState(null, '', area);
+      setStage({
+        kind: 'forgot',
+        email: '',
+        notice: messages.reset.missingLink,
+      });
+    } else if (token === null) {
       setCached(readSessionFirstName() === null ? null : readSessionCache());
       void loadSession(true);
     } else {
@@ -288,6 +302,7 @@ export function AccountApp({
         <ForgotForm
           messages={messages}
           initialEmail={stage.email}
+          notice={stage.notice}
           onSignIn={() => setStage(signedOut())}
         />
       )}

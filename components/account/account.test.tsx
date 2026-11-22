@@ -867,6 +867,15 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     await screen.findByText(account.orders.empty);
   });
 
+  it('shows a neutral not-found for an order that does not exist or is not theirs, with no hint of which (FC 062 T2.1)', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/YEK-2026-AB12CD99/');
+    api.me.mockResolvedValue(ok(BUYER));
+    api.readOrder.mockResolvedValue(no('not_found'));
+    renderApp();
+    await screen.findByText(account.errors.not_found);
+    expect(screen.queryByText(account.orders.paidAt)).toBeNull();
+  });
+
   it('keeps a buyer out of the panel even when the path names it', async () => {
     globalThis.history.replaceState(null, '', '/cuenta/panel/');
     api.me.mockResolvedValue(ok(BUYER));
@@ -888,7 +897,8 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     api.readOrder.mockResolvedValueOnce(no('DATA_DOMAIN_FORBIDDEN'));
     renderApp();
     expect(
-      await screen.findByText(account.errors.DATA_DOMAIN_FORBIDDEN)
+      // FC 062 T2.1: someone else's order reads like a missing one.
+      await screen.findByText(account.errors.not_found)
     ).toBeTruthy();
   });
 
@@ -1272,16 +1282,20 @@ describe('account area · passwords (FC 042 F2)', () => {
     expect(api.checkReset).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores a malformed reset link and shows the sign-in form', async () => {
-    globalThis.history.replaceState(
-      null,
-      '',
-      '/cuenta/?action=reset-password&token=not-a-token'
-    );
-    renderApp();
-    await screen.findByRole('heading', { name: account.signIn.title });
-    await waitFor(() => expect(api.me).toHaveBeenCalled());
-  });
+  it.each([
+    ['a malformed token', '/cuenta/?action=reset-password&token=not-a-token'],
+    ['no token at all', '/cuenta/?action=reset-password'],
+  ])(
+    'opens the form that asks for a new link, with why, when the reset link has %s (FC 062 T2.1)',
+    async (_case, address) => {
+      globalThis.history.replaceState(null, '', address);
+      renderApp();
+      await screen.findByRole('heading', { name: account.forgot.title });
+      expect(screen.getByText(account.reset.missingLink)).toBeTruthy();
+      expect(globalThis.location.search).toBe('');
+      expect(api.me).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', () => {

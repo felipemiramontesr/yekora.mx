@@ -78,6 +78,7 @@ export function CartDrawer({
             locale={locale}
             messages={messages}
             priceMessages={priceMessages}
+            onNavigate={onClose}
           />
           <Link
             href={routeFor('cart', locale)}

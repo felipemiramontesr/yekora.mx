@@ -402,7 +402,13 @@ export function OrderDetailView({
         <output className="block">{account.orders.loading}</output>
       )}
       {load.kind === 'failed' && (
-        <FormAlert text={failureText(account, load.reason)} />
+        // FC 062 T2.1: an order that is not the buyer's reads exactly like one that does not exist.
+        <FormAlert
+          text={failureText(
+            account,
+            load.reason === 'DATA_DOMAIN_FORBIDDEN' ? 'not_found' : load.reason
+          )}
+        />
       )}
       {load.kind === 'ready' && (
         <OrderFacts order={load.data} locale={locale} texts={texts} />

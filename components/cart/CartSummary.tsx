@@ -156,6 +156,15 @@ export function CartSummary({
           />
         </div>
       )}
+      {!totals && state.status === 'loading' && (
+        // FC 062 T2.3 (K-87): keep the height of the totals while the first quote runs, so the
+        // summary does not jump when they arrive.
+        <div
+          data-summary-skeleton
+          aria-hidden="true"
+          className="mt-4 h-56 animate-pulse rounded-md bg-petroleo/10"
+        />
+      )}
       {totals && (
         <>
           <p className="mt-3 text-sm text-petroleo/80">

@@ -667,6 +667,12 @@
     },
     "pay": "Pay {total}",
     "submitting": "Preparing your secure payment…",
+    "unavailable": {
+      "title": "Your products are no longer available",
+      "text": "None of the products in your bag is in stock right now, so there is nothing to pay. Check your bag or keep browsing the catalog.",
+      "cart": "View my bag",
+      "catalog": "View catalog"
+    },
     "notReady": {
       "quote": "Calculating the total of your pack…",
       "shipping": "Choose a state we ship to so we can calculate the total.",
@@ -856,7 +862,8 @@
       "done": "Done: your password changed and every open session was closed. Sign in with the new one.",
       "again": "Ask for another link",
       "checking": "Checking your link…",
-      "account": "Changing the password of {email}"
+      "account": "Changing the password of {email}",
+      "missingLink": "That link to change your password is incomplete or no longer works. Enter your e-mail and we will send you a new one."
     },
     "code": {
       "titleEmail": "Check your e-mail",

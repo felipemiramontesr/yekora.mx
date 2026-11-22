@@ -145,6 +145,24 @@ export function validateCheckout(
 type Readiness = 'ready' | 'quote' | 'shipping' | 'stock' | 'failed';
 
 /**
+ * Whether no line of the cart can be bought (FC 062 T1.1): the server answered that the cart is
+ * unavailable, or quoted it with lines and not one is purchasable. The checkout then shows a useful
+ * state instead of a form with a total of $0.00.
+ *
+ * @param state - Live quote of the cart.
+ * @returns True when there is nothing to pay.
+ */
+export function nothingToBuy(state: QuoteState): boolean {
+  if (state.shippingIssue === 'cart_unavailable') return true;
+  return (
+    state.status === 'ready' &&
+    state.quote !== null &&
+    state.quote.items.length > 0 &&
+    state.quote.items.every((item) => !item.purchasable)
+  );
+}
+
+/**
  * Whether the cart's live quote allows paying: a state chosen and served, every line in stock
  * and a confirmed total. The server checks all of this again (T1.2); this only avoids sending a
  * request that is bound to be refused.
