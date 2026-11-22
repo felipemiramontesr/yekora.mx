@@ -144,14 +144,20 @@ const FRAME = {
 } as const;
 
 /**
- * The language a message is written in (T1.1): English only when the event asked for it
- * explicitly, Mexican Spanish in every other case, so a message never mixes the two.
+ * The language a message is written in (FC 067 T1.1): the first of the candidates, in order, that
+ * is one of the two official languages; Mexican Spanish when none is. The dispatcher lists them
+ * from the strongest to the weakest: what the event itself asked for, the account's preference,
+ * the language of a guest's order. A language outside the catalog is skipped, never used, so a
+ * message is written in one language only.
  *
- * @param requested - The language the event named, if any.
+ * @param candidates - Languages in order of precedence; absent or unsupported ones are skipped.
  * @returns `en` or `es-MX`.
  */
-export function resolveMailLocale(requested: string | undefined): MailLocale {
-  return requested === 'en' ? 'en' : 'es-MX';
+export function pickMailLocale(
+  ...candidates: readonly (string | null | undefined)[]
+): MailLocale {
+  const found = candidates.find((value) => value === 'es-MX' || value === 'en');
+  return found === 'en' ? 'en' : 'es-MX';
 }
 
 /**

@@ -7,6 +7,12 @@
  */
 import { z } from 'zod';
 
+/**
+ * The language an account reads the store's mail in (FC 067 T1.2): one of the two official
+ * languages. The same catalog as the site's pages and the `locale` of an order.
+ */
+export const preferredLocaleSchema = z.enum(['es-MX', 'en']);
+
 /** An e-mail as typed: surrounding spaces are dropped before it is validated. */
 const emailField = z.string().trim().pipe(z.email().max(255));
 
@@ -28,6 +34,11 @@ export const registerRequestSchema = z.strictObject({
   email: emailField,
   password: newPasswordField,
   fullName: z.string().trim().min(2).max(150),
+  /**
+   * The language the new account reads its mail in (FC 067 T1.2). Optional: without it the account
+   * starts in Mexican Spanish. The sign-up form sends the language of its own page.
+   */
+  preferredLocale: preferredLocaleSchema.optional(),
   /**
    * Obsolete (FC 055 T0.2, T2.3): sign-up no longer takes a postal code, which lives only in the
    * book of addresses. A web bundle cached before that still sends it, so it is accepted, whatever
@@ -170,6 +181,8 @@ export const meResponseSchema = z.object({
     .string()
     .regex(/^\d{10}$/)
     .nullish(),
+  /** The language the account reads the store's mail in (FC 067). Absent from an older API. */
+  preferredLocale: preferredLocaleSchema.optional(),
 });
 
 /** Who is signed in, as `GET /v1/account/me` answers. */

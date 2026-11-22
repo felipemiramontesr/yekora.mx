@@ -85,12 +85,17 @@ test('sign-up turns its button on only when every rule is met and both match; th
   await expect(submit).toBeEnabled();
   // FC 055 T2.2: sign-up asks for identity only; the postal code lives in the book of addresses.
   await expect(page.getByLabel(/código postal/i)).toHaveCount(0);
+  // FC 067: the language of the mail starts as the page's, and the person can pick the other.
+  const language = page.getByLabel('Idioma de tus correos');
+  await expect(language).toHaveValue('es-MX');
+  await language.selectOption('en');
   const sent = page.waitForRequest('**/v1/auth/register');
   await submit.click();
   expect((await sent).postDataJSON()).toEqual({
     email: 'ana@example.test',
     password: STRONG,
     fullName: 'Ana Prueba',
+    preferredLocale: 'en',
     altcha: expect.any(String),
   });
   await expect(

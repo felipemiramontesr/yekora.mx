@@ -176,13 +176,10 @@ async function reserveLines(
 
 /**
  * Cancels an order whose payment session could not be created, returning its stock and queueing
- * its notice in the same transaction (FC 066 T2.4), in the language of the checkout.
+ * its notice in the same transaction (FC 066 T2.4). The notice names no language: the dispatcher
+ * reads the account's preference or the order's own (FC 067 T1.1).
  */
-async function cancelOrder(
-  db: Transactional,
-  orderId: number,
-  locale: string
-): Promise<void> {
+async function cancelOrder(db: Transactional, orderId: number): Promise<void> {
   await db.transaction(async (tx) => {
     const result = await tx.query(
       'UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1',
@@ -193,7 +190,7 @@ async function cancelOrder(
       'UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?',
       [orderId]
     );
-    await enqueueMail(tx, { type: 'ORDER_CANCELLED', orderId, locale });
+    await enqueueMail(tx, { type: 'ORDER_CANCELLED', orderId });
   });
 }
 
@@ -289,6 +286,8 @@ interface NewOrder {
   expiresAt: Date;
   /** The signed-in buyer's account (FC 028 decision 1a), or null for a guest. */
   userId: string | null;
+  /** The language of the page the buyer bought from, kept with the order (FC 067 T2.4). */
+  locale: 'es-MX' | 'en';
 }
 
 /** T1.2 I and the order itself, in one transaction: every line reserved, or nothing kept. */
@@ -307,7 +306,7 @@ async function persist(
     return await deps.db.transaction(async (tx) => {
       const productIds = await reserveLines(tx, request.items);
       const inserted = await tx.query(
-        'INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?',
+        'INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test, locale) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?',
         [
           order.orderNumber,
           order.userId,
@@ -328,6 +327,7 @@ async function persist(
           order.now,
           order.expiresAt,
           deps.payments.mode === 'sandbox' ? 1 : 0,
+          order.locale,
           address.stateCode,
         ]
       );
@@ -439,6 +439,7 @@ export async function createCheckout(
       now.getTime() + Number(methodRow.hold_minutes) * 60_000
     ),
     userId,
+    locale: lang,
   };
   const orderId = await persist(deps, admitted, quote, order);
   if (typeof orderId !== 'number') return orderId;
@@ -481,7 +482,7 @@ export async function createCheckout(
     };
   } catch {
     // The processor (or recording its reference) failed: give the stock back at once.
-    await cancelOrder(deps.db, orderId, lang);
+    await cancelOrder(deps.db, orderId);
     return refuse(503, 'SERVICE_UNAVAILABLE');
   }
 }

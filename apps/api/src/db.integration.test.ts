@@ -2347,3 +2347,79 @@ describe('the shipping configuration on real SQL (migration 014, shippingAdmin.t
     expect(Number(row.active_strategy_id)).toBe(1);
   });
 });
+
+describe('the language of the mail on real SQL (migration 015, identity.ts, accountAddresses.ts, FC 067 F0 F1)', () => {
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const KEY_PII = Buffer.alloc(32, 9);
+  const signUp = async (email: string, preferredLocale?: 'es-MX' | 'en') => {
+    await createCustomer(db, {
+      email,
+      passwordHash: ARGON,
+      fullName: 'Prueba',
+      preferredLocale,
+    });
+    return (
+      await db.query<{ id: string; preferred_locale: string }>(
+        'SELECT id, preferred_locale FROM users WHERE email = ?',
+        [email]
+      )
+    )[0];
+  };
+
+  it('keeps the language an account chose at sign-up, and Mexican Spanish when it chose none (T0.1, T2.2)', async () => {
+    expect((await signUp('lang-en@example.test', 'en')).preferred_locale).toBe(
+      'en'
+    );
+    expect((await signUp('lang-es@example.test')).preferred_locale).toBe(
+      'es-MX'
+    );
+  });
+
+  it('refuses a language outside the catalog in the account and in the order (T1.2)', async () => {
+    const { id } = await signUp('lang-check@example.test');
+    await expect(
+      db.query('UPDATE users SET preferred_locale = ? WHERE id = ?', ['fr', id])
+    ).rejects.toThrow('ck_users_preferred_locale');
+    await expect(
+      db.query("UPDATE orders SET locale = 'fr' ORDER BY id LIMIT 1")
+    ).rejects.toThrow('ck_orders_locale');
+  });
+
+  it('changes the language with the profile, and leaves it alone when the profile names none', async () => {
+    const { id } = await signUp('lang-profile@example.test', 'en');
+    await db.transaction((tx) =>
+      updateProfile(tx, KEY_PII, id, {
+        fullName: 'Prueba Dos',
+        phone: '4929421780',
+      })
+    );
+    const read = async () =>
+      (
+        await db.query<{ preferred_locale: string }>(
+          'SELECT preferred_locale FROM users WHERE id = ?',
+          [id]
+        )
+      )[0].preferred_locale;
+    expect(await read()).toBe('en');
+    await db.transaction((tx) =>
+      updateProfile(tx, KEY_PII, id, {
+        fullName: 'Prueba Dos',
+        phone: '4929421780',
+        preferredLocale: 'es-MX',
+      })
+    );
+    expect(await read()).toBe('es-MX');
+  });
+
+  it('stores the language of every order the suite made, never outside the catalog (T2.4)', async () => {
+    const [outside] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM orders WHERE locale NOT IN ('es-MX', 'en')"
+    );
+    expect(Number(outside.n)).toBe(0);
+    const [made] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM orders'
+    );
+    expect(Number(made.n)).toBeGreaterThan(0);
+  });
+});

@@ -621,10 +621,12 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     expect((p[15] as Buffer).equals(tokenHash(TOKEN_PEPPER, accessToken))).toBe(
       true
     );
-    expect(p.slice(16, 20)).toEqual([
+    expect(p.slice(16, 21)).toEqual([
       NOW,
       new Date(NOW.getTime() + 60 * MIN),
       1,
+      // FC 067 T2.4: the language of the page the buyer bought from goes with the order.
+      'es-MX',
       'ZAC',
     ]);
     // No plain personal data anywhere in the row.
@@ -697,13 +699,23 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     expect(outcome).toEqual(refused(503, 'SERVICE_UNAVAILABLE'));
     expect(state().orders[0].status).toBe(4);
     expect(state().products[0].reserved).toBe(0);
-    // FC 066 T2.4: the cancellation notice is queued with the change, in the checkout's language.
+    // FC 066 T2.4: the cancellation notice is queued with the change; it names no language, so
+    // the dispatcher reads the account's or the order's own (FC 067 T1.1).
     expect(state().outbox).toEqual([
       {
         type: 'ORDER_CANCELLED',
-        payload: { orderId: state().orders[0].id, locale: 'es-MX' },
+        payload: { orderId: state().orders[0].id },
       },
     ]);
+  });
+
+  it('keeps the language of the page the buyer bought from with the order (FC 067 T2.4)', async () => {
+    const { db, state } = memoryDb();
+    const outcome = await createCheckout(deps(db), body(), 'en');
+    expect(outcome.ok).toBe(true);
+    const params = state().orders[0].params as unknown[];
+    // is_test (sandbox), then the locale, then the state code of the zone lookup.
+    expect(params.slice(18, 21)).toEqual([1, 'en', 'ZAC']);
   });
 
   it('does not touch an order that left PENDING while the processor was failing', async () => {

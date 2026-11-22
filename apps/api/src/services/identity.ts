@@ -133,6 +133,8 @@ export function createCustomer(
     email: string;
     passwordHash: string;
     fullName: string;
+    /** The language of the account's mail (FC 067); Mexican Spanish when absent. */
+    preferredLocale?: 'es-MX' | 'en';
   }
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
@@ -143,8 +145,14 @@ export function createCustomer(
     if (taken) return false;
     const id = randomUUID();
     await tx.query(
-      'INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
-      [id, user.email, user.passwordHash, user.fullName]
+      'INSERT INTO users (id, email, password_hash, full_name, preferred_locale) VALUES (?, ?, ?, ?, ?)',
+      [
+        id,
+        user.email,
+        user.passwordHash,
+        user.fullName,
+        user.preferredLocale ?? 'es-MX',
+      ]
     );
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",

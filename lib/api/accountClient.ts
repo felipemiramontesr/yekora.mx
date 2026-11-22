@@ -164,6 +164,8 @@ export function register(
     password: string;
     fullName: string;
     postalCode?: string;
+    /** The language the account reads the store's mail in (FC 067). */
+    preferredLocale?: 'es-MX' | 'en';
   },
   options: ClientOptions = {}
 ) {

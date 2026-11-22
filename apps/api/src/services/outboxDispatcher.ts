@@ -28,7 +28,7 @@ import {
   type MailLocale,
   type OrderBlock,
   renderEmail,
-  resolveMailLocale,
+  pickMailLocale,
 } from './emailTemplate';
 import { emailOf } from './identity';
 import type { MailEvent } from './outbox';
@@ -250,6 +250,10 @@ type OrderEvent = Extract<MailEvent, { orderId: number }>;
 /** The columns of an order a message needs, as MariaDB returns them. */
 interface OrderData {
   order_number: string;
+  /** The language of the order, where the buyer bought (FC 067). */
+  order_locale: string;
+  /** The language its account chose, or null for a guest (FC 067). */
+  account_locale: string | null;
   created_at: Date;
   method_es: string;
   method_en: string;
@@ -394,12 +398,11 @@ function addressLines(address: SealedAddress, state: string): string[] {
 async function renderOrder(
   db: Db,
   keys: { piiKey: Buffer | null; siteUrl: string },
-  event: OrderEvent,
-  locale: MailLocale
+  event: OrderEvent
 ): Promise<MailMessage> {
   if (keys.piiKey === null) throw new Error('CHECKOUT_PII_KEY is not set');
   const [order] = await db.query<OrderData>(
-    'SELECT o.order_number, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ?',
+    'SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?',
     [event.orderId]
   );
   if (order === undefined) throw new Error('Order not found');
@@ -413,6 +416,12 @@ async function renderOrder(
       [event.orderId]
     ),
   ]);
+  // FC 067 T1.1: what the event asked for, then the account's preference, then the guest's order.
+  const locale = pickMailLocale(
+    event.locale,
+    order.account_locale,
+    order.order_locale
+  );
   const number = order.order_number;
   const name = decryptPii(
     keys.piiKey,
@@ -486,9 +495,14 @@ async function render(
     type: row.event_type,
     ...JSON.parse(row.payload),
   } as MailEvent;
-  const locale = resolveMailLocale(event.locale);
-  if ('orderId' in event) return renderOrder(db, keys, event, locale);
+  if ('orderId' in event) return renderOrder(db, keys, event);
   const to = await emailOf(db, event.userId);
+  // FC 067 T1.1: what the event asked for, then the account's preference.
+  const [account] = await db.query<{ preferred_locale: string }>(
+    'SELECT preferred_locale FROM users WHERE id = ?',
+    [event.userId]
+  );
+  const locale = pickMailLocale(event.locale, account?.preferred_locale);
   const { subject, content } = copyOf(keys, event, locale);
   const { html, text } = renderEmail({ ...content, locale }, keys.siteUrl);
   assertMultipart(html, text);

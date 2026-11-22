@@ -171,11 +171,52 @@ describe('profile of the account (FC 051 T1.1, T2.3)', () => {
     expect(api.profile).toHaveBeenCalledWith({
       fullName: 'Ana P. López',
       phone: '4929421781',
+      // FC 067: the account's language travels with the profile, unchanged here.
+      preferredLocale: 'es-MX',
     });
     await waitFor(() => expect(chosen).toHaveBeenCalled());
     api.profile.mockResolvedValue(no('SERVICE_UNAVAILABLE'));
     fireEvent.submit(form);
     expect(await screen.findByText(t.errors.SERVICE_UNAVAILABLE)).toBeTruthy();
+  });
+});
+
+describe('language of the mail in «Mi información» (FC 067 T2.3)', () => {
+  const language = getMessages('es-MX').account.language;
+
+  it('starts with the language the account chose, and saves the one picked with the profile', async () => {
+    api.profile.mockResolvedValue(
+      ok({ fullName: 'Ana Pérez', preferredLocale: 'es-MX' })
+    );
+    show([], { user: { ...ANA, preferredLocale: 'en' } });
+    const form = await screen.findByRole('form', { name: t.profile.title });
+    const select = within(form).getByLabelText(
+      language.label
+    ) as HTMLSelectElement;
+    expect(select.value).toBe('en');
+    fireEvent.change(select, { target: { value: 'es-MX' } });
+    fireEvent.submit(form);
+    await screen.findByText(t.profile.saved);
+    expect(api.profile).toHaveBeenCalledWith(
+      expect.objectContaining({ preferredLocale: 'es-MX' })
+    );
+  });
+
+  it('starts in Mexican Spanish for an account the API does not say a language for', async () => {
+    show([]);
+    const form = await screen.findByRole('form', { name: t.profile.title });
+    expect(
+      (within(form).getByLabelText(language.label) as HTMLSelectElement).value
+    ).toBe('es-MX');
+  });
+
+  it('is reachable in English too, with the English words', async () => {
+    show([], { user: { ...ANA, preferredLocale: 'en' }, locale: 'en' });
+    const english = getMessages('en').account;
+    const form = await screen.findByRole('form', {
+      name: english.data.profile.title,
+    });
+    expect(within(form).getByLabelText(english.language.label)).toBeTruthy();
   });
 });
 

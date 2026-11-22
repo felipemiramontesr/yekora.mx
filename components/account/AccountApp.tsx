@@ -317,6 +317,7 @@ export function AccountApp({
       {stage.kind === 'register' && (
         <RegisterForm
           messages={messages}
+          locale={locale}
           onRegistered={(email) =>
             setStage({
               kind: 'signIn',

@@ -12,7 +12,7 @@ import {
   assertMultipart,
   type EmailContent,
   renderEmail,
-  resolveMailLocale,
+  pickMailLocale,
 } from './emailTemplate';
 
 const SITE = 'https://yekora.mx';
@@ -152,15 +152,27 @@ describe('the plain-text twin (FC 065 T2.3)', () => {
   });
 });
 
-describe('MailLocaleResolutionGate (FC 065 T1.1)', () => {
+describe('MailLocalePrecedenceGate (FC 067 T1.1)', () => {
+  // X: the event asked for a language; E: it asked for English; C: the context (account or guest
+  // order) is in English. English ⟺ (X ∧ E) ∨ (¬X ∧ C), in the eight rows of the table.
   it.each([
-    ['en', 'en'],
-    ['es-MX', 'es-MX'],
-    [undefined, 'es-MX'],
-    ['fr', 'es-MX'],
-    ['EN', 'es-MX'],
-  ] as const)('resolves %j to %s', (requested, expected) => {
-    expect(resolveMailLocale(requested)).toBe(expected);
+    ['X ⊤ E ⊤ C ⊤', 'en', 'en', 'en'],
+    ['X ⊤ E ⊤ C ⊥', 'en', 'es-MX', 'en'],
+    ['X ⊤ E ⊥ C ⊤', 'es-MX', 'en', 'es-MX'],
+    ['X ⊤ E ⊥ C ⊥', 'es-MX', 'es-MX', 'es-MX'],
+    ['X ⊥ E ⊤ C ⊤', undefined, 'en', 'en'],
+    ['X ⊥ E ⊤ C ⊥', undefined, 'es-MX', 'es-MX'],
+    ['X ⊥ E ⊥ C ⊤', 'fr', 'en', 'en'],
+    ['X ⊥ E ⊥ C ⊥', 'fr', 'es-MX', 'es-MX'],
+  ] as const)('%s', (_row, explicit, context, expected) => {
+    expect(pickMailLocale(explicit, context)).toBe(expected);
+  });
+
+  it('takes the strongest candidate that is official, skipping the absent and the unsupported', () => {
+    expect(pickMailLocale()).toBe('es-MX');
+    expect(pickMailLocale(undefined, null, 'en')).toBe('en');
+    expect(pickMailLocale(null, 'EN', 'fr', 'en', 'es-MX')).toBe('en');
+    expect(pickMailLocale('es-MX', 'en')).toBe('es-MX');
   });
 });
 

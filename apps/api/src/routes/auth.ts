@@ -65,6 +65,7 @@ import {
   passwordViolation,
 } from '../../../../lib/account/passwordPolicy';
 import type { AuthSecrets } from '../config';
+import { unsupportedLocale } from '../lib/language';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { isPrivileged } from '../lib/permissions';
 import {
@@ -151,6 +152,7 @@ const TITLES: Record<string, string> = {
   AUTH_UNAVAILABLE: 'Sign-in unavailable',
   MAIL_UNAVAILABLE: 'Sign-in by e-mail unavailable',
   INVALID_REQUEST: 'Invalid request',
+  LOCALE_INPUT_UNSUPPORTED: 'Unsupported language',
   INVALID_CREDENTIALS: 'Invalid e-mail or password',
   INVALID_CHALLENGE: 'Sign-in expired, start again',
   INVALID_CODE: 'Invalid code',
@@ -349,6 +351,10 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
   );
 
   app.post('/v1/auth/register', LIMITED, async (request, reply) => {
+    // FC 067 T1.2: a language outside the catalog is refused by name, before the rest of the body.
+    if (unsupportedLocale(request.body, 'preferredLocale')) {
+      return refuse(reply, 400, 'LOCALE_INPUT_UNSUPPORTED');
+    }
     const parsed = parse(registerRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth, body } = parsed;
@@ -362,6 +368,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
       fullName: body.fullName,
+      preferredLocale: body.preferredLocale,
     });
     return reply.code(202).send(registeredSchema.parse({ status: 'accepted' }));
   });

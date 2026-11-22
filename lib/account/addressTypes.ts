@@ -16,6 +16,7 @@ import {
   customerSchema,
   shippingAddressSchema,
 } from '../checkout/checkoutTypes';
+import { preferredLocaleSchema } from './authTypes';
 
 /** The most addresses an account keeps (Ω, 2026-11-15). */
 export const MAX_USER_ADDRESSES = 5;
@@ -24,10 +25,18 @@ export const MAX_USER_ADDRESSES = 5;
 export const profileUpdateRequestSchema = z.strictObject({
   fullName: z.string().trim().min(2).max(150),
   phone: customerSchema.shape.phone,
+  /** The language of the account's mail (FC 067 T1.2); left as it is when absent. */
+  preferredLocale: preferredLocaleSchema.optional(),
 });
 
-/** Answer of `PATCH /v1/account/profile`: the name only, never the phone (T1.1). */
-export const profileUpdatedSchema = z.object({ fullName: z.string() });
+/**
+ * Answer of `PATCH /v1/account/profile`: the name and the language, never the phone (T1.1). The
+ * language is not personal data beyond the account's own choice.
+ */
+export const profileUpdatedSchema = z.object({
+  fullName: z.string(),
+  preferredLocale: preferredLocaleSchema.optional(),
+});
 
 /** The fields of an address that can ship an order: who receives it, where, and what to call it. */
 const addressFields = shippingAddressSchema.extend({

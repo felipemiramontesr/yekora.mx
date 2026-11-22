@@ -8,7 +8,7 @@ import {
   useId,
   useState,
 } from 'react';
-import type { Messages } from '@/app/i18n';
+import type { Locale, Messages } from '@/app/i18n';
 import {
   PASSWORD_RULES,
   type PasswordContext,
@@ -27,6 +27,7 @@ import {
 } from '@/lib/api/accountClient';
 import { fill } from '@/lib/catalog/format';
 import { TextField } from '../ui/TextField';
+import { LanguageField, type PreferredLocale } from './LanguageField';
 import {
   NewPasswordFields,
   newPasswordReady,
@@ -198,15 +199,19 @@ const ALL_RULES: readonly PasswordRule[] = PASSWORD_RULES;
  * goes back to sign-in with the e-mail filled in.
  *
  * @param messages - `account` texts.
+ * @param locale - Language of the page; the language of the new account's mail starts as this one.
  * @param onRegistered - Called with the e-mail after the API accepted.
  * @param onSignIn - Switches back to the sign-in form.
  */
 export function RegisterForm({
   messages,
+  locale,
   onRegistered,
   onSignIn,
 }: Readonly<{
   messages: AccountMessages;
+  /** The language of the page: the one the language selector starts with (FC 067 T2.3). */
+  locale: Locale;
   onRegistered: (email: string) => void;
   onSignIn: () => void;
 }>) {
@@ -215,6 +220,8 @@ export function RegisterForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [repeated, setRepeated] = useState('');
+  const [preferredLocale, setPreferredLocale] =
+    useState<PreferredLocale>(locale);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const context = { email, fullName };
@@ -228,7 +235,12 @@ export function RegisterForm({
     }
     // FC 055 T2.2: only identity is asked; the postal code is given with an address of the account.
     setBusy(true);
-    const result = await register({ email, password, fullName });
+    const result = await register({
+      email,
+      password,
+      fullName,
+      preferredLocale,
+    });
     setBusy(false);
     if (result.ok) {
       onRegistered(email.trim());
@@ -271,6 +283,13 @@ export function RegisterForm({
           value: email,
           onChange: (event) => setEmail(event.target.value),
         }}
+      />
+      <LanguageField
+        id={`${base}-language`}
+        texts={messages.language}
+        exampleLabel={messages.exampleLabel}
+        value={preferredLocale}
+        onChange={setPreferredLocale}
       />
       <NewPasswordFields
         id={base}

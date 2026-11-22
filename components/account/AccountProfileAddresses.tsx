@@ -28,6 +28,7 @@ import { MEXICAN_STATES } from '@/lib/cart/mxStates';
 import { stateOfPostalCode } from '@/lib/cart/postalRanges';
 import { fill } from '@/lib/catalog/format';
 import { TextField } from '../ui/TextField';
+import { LanguageField, type PreferredLocale } from './LanguageField';
 
 /** `account.data` texts. */
 type DataTexts = Messages['account']['data'];
@@ -166,6 +167,9 @@ function ProfileForm({
   const base = useId();
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone ?? '');
+  const [preferredLocale, setPreferredLocale] = useState<PreferredLocale>(
+    user.preferredLocale ?? 'es-MX'
+  );
   const [errors, setErrors] = useState<{ fullName?: string; phone?: string }>(
     {}
   );
@@ -173,7 +177,11 @@ function ProfileForm({
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const parsed = profileUpdateRequestSchema.safeParse({ fullName, phone });
+    const parsed = profileUpdateRequestSchema.safeParse({
+      fullName,
+      phone,
+      preferredLocale,
+    });
     if (!parsed.success) {
       const next: { fullName?: string; phone?: string } = {};
       for (const issue of parsed.error.issues) {
@@ -238,6 +246,13 @@ function ProfileForm({
           value: phone,
           onChange: (event) => setPhone(event.target.value),
         }}
+      />
+      <LanguageField
+        id={`${base}-language`}
+        texts={messages.language}
+        exampleLabel={messages.exampleLabel}
+        value={preferredLocale}
+        onChange={setPreferredLocale}
       />
       <button
         type="submit"
@@ -585,7 +600,7 @@ export function AccountProfileAddresses({
         </output>
       )}
       <ProfileForm
-        key={`${user.fullName}|${user.phone ?? ''}`}
+        key={`${user.fullName}|${user.phone ?? ''}|${user.preferredLocale ?? ''}`}
         user={user}
         messages={messages}
         onSaved={(next) => void settle(next, false)}

@@ -48,6 +48,7 @@ const model = {
       full_name: string;
       phone_enc: Buffer | null;
       default_address_id: string | null;
+      preferred_locale?: string;
     }
   >(),
   addresses: [] as Address[],
@@ -111,9 +112,12 @@ const HANDLERS: [string, Handler][] = [
     },
   ],
   [
-    'UPDATE users SET full_name = ?, phone_enc = ?',
+    'UPDATE users SET full_name = ?, phone_enc = ?, preferred_locale = COALESCE(?, preferred_locale)',
     (p) => {
-      Object.assign(forUser(p[2]) ?? {}, { full_name: p[0], phone_enc: p[1] });
+      const user = forUser(p[3]);
+      if (user === undefined) return [];
+      Object.assign(user, { full_name: p[0], phone_enc: p[1] });
+      if (p[2] !== null) user.preferred_locale = p[2] as string;
       return [];
     },
   ],
@@ -209,7 +213,7 @@ const HANDLERS: [string, Handler][] = [
         .sort((a, b) => a.created_at - b.created_at),
   ],
   [
-    'SELECT u.phone_enc, a.id AS address_id',
+    'SELECT u.phone_enc, u.preferred_locale, a.id AS address_id',
     (p) => {
       const user = forUser(p[0]);
       const address = model.addresses.find(
@@ -218,6 +222,7 @@ const HANDLERS: [string, Handler][] = [
       return [
         {
           phone_enc: user?.phone_enc ?? null,
+          preferred_locale: user?.preferred_locale ?? 'es-MX',
           address_id: address?.id ?? null,
           state_code: address?.state_code ?? null,
           address_enc: address?.address_enc ?? null,
@@ -340,6 +345,51 @@ describe('profile (FC 051 T1.1)', () => {
       '4929421780'
     );
   });
+
+  it('FC 067 T1.2 · saves the language the account chose, answers it, and gives it back in /me', async () => {
+    const res = await send('PATCH', '/v1/account/profile', {
+      fullName: 'Ana Pérez',
+      phone: '4929421780',
+      preferredLocale: 'en',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      fullName: 'Ana Pérez',
+      preferredLocale: 'en',
+    });
+    expect(model.users.get(ANA)?.preferred_locale).toBe('en');
+    expect(JSON.stringify(model.audit)).toContain('preferredLocale');
+    expect((await read('/v1/account/me')).json()).toMatchObject({
+      preferredLocale: 'en',
+    });
+  });
+
+  it('FC 067 T1.2 · leaves the language as it was when the profile does not name one', async () => {
+    await send('PATCH', '/v1/account/profile', {
+      fullName: 'Ana Pérez',
+      phone: '4929421780',
+      preferredLocale: 'en',
+    });
+    await send('PATCH', '/v1/account/profile', {
+      fullName: 'Ana Pérez López',
+      phone: '4929421780',
+    });
+    expect(model.users.get(ANA)?.preferred_locale).toBe('en');
+  });
+
+  it.each(['fr', 'EN', 7, null])(
+    'FC 067 T1.2 · refuses the language %j with LOCALE_INPUT_UNSUPPORTED and changes nothing',
+    async (language) => {
+      const res = await send('PATCH', '/v1/account/profile', {
+        fullName: 'Otro Nombre',
+        phone: '4929421780',
+        preferredLocale: language,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ detail: 'LOCALE_INPUT_UNSUPPORTED' });
+      expect(model.users.get(ANA)?.full_name).not.toBe('Otro Nombre');
+    }
+  );
 
   it('gives the phone back to its holder in /me, and no one else', async () => {
     await send('PATCH', '/v1/account/profile', {

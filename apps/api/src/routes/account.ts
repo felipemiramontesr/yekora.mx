@@ -48,6 +48,7 @@ import {
   orderDetailSchema,
   orderPageSchema,
 } from '../../../../lib/account/orderTypes';
+import { unsupportedLocale } from '../lib/language';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import {
   clearedDeviceCookie,
@@ -224,7 +225,12 @@ export function registerAccountRoutes(
       user.userId
     ).catch((error: unknown) => {
       request.log.error({ err: error }, 'account data unreadable');
-      return { phone: null, postalCode: null, stateCode: null };
+      return {
+        phone: null,
+        postalCode: null,
+        stateCode: null,
+        preferredLocale: undefined,
+      };
     });
     return reply.send(
       meResponseSchema.parse({
@@ -241,6 +247,15 @@ export function registerAccountRoutes(
   app.patch('/v1/account/profile', async (request, reply) => {
     const gate = writeGate(deps, request, reply);
     if (gate === null) return reply;
+    // FC 067 T1.2: a language outside the catalog is refused by name.
+    if (unsupportedLocale(request.body, 'preferredLocale')) {
+      return refuse(
+        reply,
+        400,
+        'Unsupported language',
+        'LOCALE_INPUT_UNSUPPORTED'
+      );
+    }
     const body = profileUpdateRequestSchema.safeParse(request.body);
     if (!body.success) {
       return refuse(reply, 400, 'Invalid request', 'INVALID_REQUEST');
@@ -253,12 +268,20 @@ export function registerAccountRoutes(
         entityType: 'users',
         entityId: userId,
         before: null,
-        after: { changed: ['fullName', 'phone'] },
+        after: {
+          changed:
+            body.data.preferredLocale === undefined
+              ? ['fullName', 'phone']
+              : ['fullName', 'phone', 'preferredLocale'],
+        },
         ip: request.ip,
       });
       return {
         status: 200,
-        body: profileUpdatedSchema.parse({ fullName: body.data.fullName }),
+        body: profileUpdatedSchema.parse({
+          fullName: body.data.fullName,
+          preferredLocale: body.data.preferredLocale,
+        }),
       };
     });
   });

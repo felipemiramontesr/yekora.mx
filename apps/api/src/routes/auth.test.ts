@@ -239,6 +239,7 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
           email: p[1],
           password_hash: p[2],
           full_name: p[3],
+          preferred_locale: p[4],
           phone_enc: null,
           default_address_id: null,
           is_active: 1,
@@ -268,13 +269,14 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
       }),
   ],
   [
-    'SELECT u.phone_enc, a.id AS address_id',
+    'SELECT u.phone_enc, u.preferred_locale, a.id AS address_id',
     (s, p) => {
       const user = s.users.get(p[0] as string);
       const address = s.addresses.get(String(user?.default_address_id));
       return [
         {
           phone_enc: user?.phone_enc ?? null,
+          preferred_locale: user?.preferred_locale ?? 'es-MX',
           address_id: address?.id ?? null,
           state_code: address?.state_code ?? null,
           address_enc: address?.address_enc ?? null,
@@ -297,6 +299,12 @@ const HANDLERS: [string, (s: State, p: Params) => unknown][] = [
   [
     'SELECT email FROM users',
     (s, p) => [{ email: s.users.get(p[0] as string)?.email }],
+  ],
+  [
+    'SELECT preferred_locale FROM users',
+    (s, p) => [
+      { preferred_locale: s.users.get(p[0] as string)?.preferred_locale },
+    ],
   ],
   ['SELECT ur.role_id', capabilityRows],
   [
@@ -766,6 +774,46 @@ describe('A07 identification and authentication', { timeout: 20_000 }, () => {
     expect(store.users.size).toBe(1);
     expect(store.addresses.size).toBe(0);
   });
+
+  it.each([
+    ['English', 'en', 'en'],
+    ['Mexican Spanish', 'es-MX', 'es-MX'],
+    ['nothing: the default', undefined, 'es-MX'],
+  ])(
+    'FC 067 T1.2 · keeps the language the new account chose (%s) as its preference',
+    async (_case, chosen, kept) => {
+      await start();
+      const response = await post('/v1/auth/register', {
+        email: 'lang@example.test',
+        password: PASSWORD,
+        fullName: 'Ana Prueba',
+        ...(chosen === undefined ? {} : { preferredLocale: chosen }),
+        altcha: await solved(),
+      });
+      expect(response.statusCode).toBe(202);
+      const [user] = [...store.users.values()];
+      expect(user.preferred_locale).toBe(kept);
+    }
+  );
+
+  it.each(['fr', 'EN', 1, null])(
+    'FC 067 T1.2 · refuses the language %j with LOCALE_INPUT_UNSUPPORTED and creates nothing',
+    async (language) => {
+      await start();
+      const response = await post('/v1/auth/register', {
+        email: 'lang@example.test',
+        password: PASSWORD,
+        fullName: 'Ana Prueba',
+        preferredLocale: language,
+        altcha: await solved(),
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        detail: 'LOCALE_INPUT_UNSUPPORTED',
+      });
+      expect(store.users.size).toBe(0);
+    }
+  );
 
   it('OWASP-A07 · refuses unknown fields (400), before any work', async () => {
     await start();

@@ -138,6 +138,8 @@ interface AccountDelivery {
   phone: string | null;
   postalCode: string | null;
   stateCode: string | null;
+  /** The language of the account's mail (FC 067); not personal data, so given back even without the key. */
+  preferredLocale: 'es-MX' | 'en';
 }
 
 /**
@@ -160,11 +162,15 @@ export async function accountDelivery(
     address_id: string | null;
     state_code: string | null;
     address_enc: Buffer | null;
+    preferred_locale: 'es-MX' | 'en';
   }>(
-    'SELECT u.phone_enc, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?',
+    'SELECT u.phone_enc, u.preferred_locale, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?',
     [userId]
   );
-  if (key === null) return { phone: null, postalCode: null, stateCode: null };
+  const preferredLocale = row.preferred_locale;
+  if (key === null) {
+    return { phone: null, postalCode: null, stateCode: null, preferredLocale };
+  }
   // The address columns come from one LEFT JOIN row: all three are there, or none is.
   const address = row.address_enc
     ? opened(key, userId, {
@@ -180,6 +186,7 @@ export async function accountDelivery(
       : null,
     postalCode: address?.postalCode ?? null,
     stateCode: address ? row.state_code : null,
+    preferredLocale,
   };
 }
 
@@ -195,13 +202,22 @@ export async function updateProfile(
   tx: TxQuery,
   key: Buffer,
   userId: string,
-  profile: { fullName: string; phone: string }
+  profile: {
+    fullName: string;
+    phone: string;
+    preferredLocale?: 'es-MX' | 'en';
+  }
 ): Promise<void> {
-  await tx.query('UPDATE users SET full_name = ?, phone_enc = ? WHERE id = ?', [
-    profile.fullName,
-    encryptPii(key, userId, 'user_phone', profile.phone),
-    userId,
-  ]);
+  // FC 067 T1.2: a profile without a language leaves the account's language as it was.
+  await tx.query(
+    'UPDATE users SET full_name = ?, phone_enc = ?, preferred_locale = COALESCE(?, preferred_locale) WHERE id = ?',
+    [
+      profile.fullName,
+      encryptPii(key, userId, 'user_phone', profile.phone),
+      profile.preferredLocale ?? null,
+      userId,
+    ]
+  );
 }
 
 /** Inserts one sealed address and, when it is the account's first or asked for, makes it the default. */

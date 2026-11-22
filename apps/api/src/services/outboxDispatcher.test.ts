@@ -39,7 +39,7 @@ const row = (id: number, over: Record<string, unknown> = {}) => ({
 /** A database that serves `due` once per run and records every statement. */
 function outboxDb(
   runs: ReturnType<typeof row>[][],
-  { claim = 1, users = true } = {}
+  { claim = 1, users = true, locale = 'es-MX' as string | null } = {}
 ) {
   const sql: { text: string; params: readonly unknown[] }[] = [];
   const queue = [...runs];
@@ -49,6 +49,8 @@ function outboxDb(
       if (text.startsWith('SELECT id, event_type')) return queue.shift() ?? [];
       if (text.startsWith('SELECT email FROM users'))
         return users ? [{ email: 'ana@example.test' }] : [];
+      if (text.startsWith('SELECT preferred_locale FROM users'))
+        return users && locale !== null ? [{ preferred_locale: locale }] : [];
       if (text.startsWith("UPDATE outbox_events SET status = 'PROCESSING'"))
         return { affectedRows: claim };
       return [];
@@ -450,6 +452,8 @@ describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => 
     items_tax_mxn_cents: 25517,
     shipping_tax_mxn_cents: 2069,
     total_mxn_cents: 200000,
+    order_locale: 'es-MX',
+    account_locale: null,
     customer_name_enc: seal('customer_name', 'Ana Flores'),
     customer_email_enc: seal('customer_email', 'ana@example.test'),
     shipping_address_enc: seal('shipping_address', JSON.stringify(ADDRESS)),
@@ -658,5 +662,219 @@ describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => 
         text.startsWith('UPDATE outbox_events SET status = ?')
       )?.params[3]
     ).toBe('CHECKOUT_PII_KEY is not set');
+  });
+});
+
+describe('the language of every mail: event, account, guest order, es-MX (FC 067 T1.1, T2.1)', () => {
+  const challengeId = 'c0000000-0000-4000-8000-000000000009';
+  const identity = (type: string, locale?: string) =>
+    row(1, {
+      event_type: type,
+      payload: JSON.stringify({
+        userId: USER,
+        challengeId,
+        code: encryptTotpSecret(KEY, challengeId, Buffer.from('482913')),
+        token: encryptTotpSecret(KEY, USER, Buffer.from('a'.repeat(64))),
+        locale,
+      }),
+    });
+
+  async function identityMail(
+    type: string,
+    account: string,
+    explicit?: string
+  ) {
+    const { db, sql } = outboxDb([[identity(type, explicit)]], {
+      locale: account,
+    });
+    const { outbox, send } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    return {
+      message: send.mock.calls[0][0],
+      asked: sql.filter(({ text }) =>
+        text.startsWith('SELECT preferred_locale FROM users')
+      ),
+    };
+  }
+
+  it.each([
+    [
+      'SIGN_IN_CODE',
+      'Your YĒKORA sign-in code',
+      'Tu código de acceso a YĒKORA',
+    ],
+    [
+      'PASSWORD_RESET',
+      'Reset your YĒKORA password',
+      'Restablece tu contraseña de YĒKORA',
+    ],
+    [
+      'PASSWORD_CHANGED',
+      'You changed your YĒKORA password',
+      'Cambiaste tu contraseña de YĒKORA',
+    ],
+    [
+      'TOTP_ENABLED',
+      'You turned on two-step verification on YĒKORA',
+      'Activaste la verificación en dos pasos en YĒKORA',
+    ],
+  ])(
+    '%s: the preference of the account decides when the event names no language',
+    async (type, english, spanish) => {
+      const en = await identityMail(type, 'en');
+      expect(en.message.subject).toBe(english);
+      expect(en.message.html).toContain('<html lang="en">');
+      expect(en.asked[0].params).toEqual([USER]);
+      const es = await identityMail(type, 'es-MX');
+      expect(es.message.subject).toBe(spanish);
+    }
+  );
+
+  it('an explicit language of the event beats the account, in either direction (X ∧ E, X ∧ ¬E)', async () => {
+    expect(
+      (await identityMail('TOTP_ENABLED', 'es-MX', 'en')).message.html
+    ).toContain('<html lang="en">');
+    expect(
+      (await identityMail('TOTP_ENABLED', 'en', 'es-MX')).message.html
+    ).toContain('<html lang="es-MX">');
+  });
+
+  it('a language outside the catalog in the event is skipped, and the account decides', async () => {
+    expect(
+      (await identityMail('TOTP_ENABLED', 'en', 'fr')).message.html
+    ).toContain('<html lang="en">');
+  });
+
+  it('writes Mexican Spanish when the account holds no preference at all (T1.1 last row)', async () => {
+    const { db } = outboxDb([[identity('TOTP_ENABLED')]], { locale: null });
+    const { outbox, send } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    expect(send.mock.calls[0][0].html).toContain('<html lang="es-MX">');
+  });
+
+  it('does not guess a language for an account that is gone: no address, so it is retried', async () => {
+    const { db } = outboxDb([[identity('TOTP_ENABLED')]], { users: false });
+    const { outbox, send } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('the language of an order mail (FC 067 T1.1, T2.1)', () => {
+  const ORDER_NUMBER = 'YEK-2026-AB12CD34';
+  const seal = (field: Parameters<typeof encryptPii>[2], value: string) =>
+    encryptPii(PII_KEY, ORDER_NUMBER, field, value);
+  const base = {
+    order_number: ORDER_NUMBER,
+    created_at: new Date('2026-11-21T20:00:00Z'),
+    method_es: 'Tarjeta',
+    method_en: 'Card',
+    items_total_mxn_cents: 185000,
+    shipping_total_mxn_cents: 15000,
+    items_tax_mxn_cents: 25517,
+    shipping_tax_mxn_cents: 2069,
+    total_mxn_cents: 200000,
+    customer_name_enc: seal('customer_name', 'Ana Flores'),
+    customer_email_enc: seal('customer_email', 'ana@example.test'),
+    shipping_address_enc: seal(
+      'shipping_address',
+      JSON.stringify({
+        street: 'Av. Barones',
+        exteriorNumber: '209',
+        neighborhood: 'Las Américas',
+        municipality: 'Guadalupe',
+        stateCode: 'ZAC',
+        postalCode: '98612',
+      })
+    ),
+  };
+
+  async function orderMail(
+    order: { order_locale: string; account_locale: string | null },
+    explicit?: string
+  ) {
+    const queued = row(1, {
+      event_type: 'ORDER_CONFIRMED',
+      payload: JSON.stringify({ orderId: 7, locale: explicit }),
+    });
+    const db = {
+      async query(text: string) {
+        if (text.startsWith('SELECT id, event_type')) return [queued];
+        if (text.startsWith("UPDATE outbox_events SET status = 'PROCESSING'"))
+          return { affectedRows: 1 };
+        if (text.startsWith('SELECT o.order_number'))
+          return [{ ...base, ...order }];
+        if (text.startsWith('SELECT i.sku'))
+          return [
+            {
+              sku: 'TENT',
+              quantity: 1,
+              unit_price_mxn_cents: 185000,
+              line_total_mxn_cents: 185000,
+              name_es: 'Tienda',
+              name_en: 'Tent',
+            },
+          ];
+        if (text.startsWith('SELECT z.name_es'))
+          return [{ name_es: 'Zacatecas', name_en: 'Zacatecas' }];
+        return [];
+      },
+    } as unknown as Db;
+    const { outbox, send } = dispatcher(db);
+    outbox.kick();
+    await outbox.drain();
+    return send.mock.calls[0][0];
+  }
+
+  it('the account of the buyer decides over the language of the order (account before order)', async () => {
+    const english = await orderMail({
+      order_locale: 'es-MX',
+      account_locale: 'en',
+    });
+    expect(english.html).toContain('<html lang="en">');
+    expect(english.subject).toContain('We confirmed your order');
+    const spanish = await orderMail({
+      order_locale: 'en',
+      account_locale: 'es-MX',
+    });
+    expect(spanish.html).toContain('<html lang="es-MX">');
+  });
+
+  it('a guest has no account: the language of the order decides', async () => {
+    const english = await orderMail({
+      order_locale: 'en',
+      account_locale: null,
+    });
+    expect(english.html).toContain('<html lang="en">');
+    expect(english.text).toContain('Payment method: Card');
+    const spanish = await orderMail({
+      order_locale: 'es-MX',
+      account_locale: null,
+    });
+    expect(spanish.html).toContain('<html lang="es-MX">');
+  });
+
+  it('an explicit language of the event beats both (es-MX stays Spanish for an English account)', async () => {
+    const spanish = await orderMail(
+      { order_locale: 'en', account_locale: 'en' },
+      'es-MX'
+    );
+    expect(spanish.html).toContain('<html lang="es-MX">');
+    const english = await orderMail(
+      { order_locale: 'es-MX', account_locale: 'es-MX' },
+      'en'
+    );
+    expect(english.html).toContain('<html lang="en">');
+  });
+
+  it('a value in the order outside the catalog never reaches the message: Mexican Spanish', async () => {
+    const message = await orderMail({
+      order_locale: 'xx',
+      account_locale: null,
+    });
+    expect(message.html).toContain('<html lang="es-MX">');
   });
 });

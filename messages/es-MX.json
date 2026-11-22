@@ -1535,6 +1535,15 @@
       },
       "exampleLabel": "Ejemplo"
     },
+    "language": {
+      "label": "Idioma de tus correos",
+      "description": "El idioma en que te escribimos: códigos de acceso, avisos y las confirmaciones de tus pedidos. Lo puedes cambiar después en «Mi información».",
+      "example": "Español",
+      "options": {
+        "es-MX": "Español",
+        "en": "English"
+      }
+    },
     "adminHub": {
       "title": "Administración",
       "intro": "Desde aquí administras la tienda. Ves solo lo que tu cuenta puede abrir.",

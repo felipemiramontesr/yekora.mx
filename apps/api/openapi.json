@@ -2004,6 +2004,10 @@
                     "minLength": 2,
                     "maxLength": 150
                   },
+                  "preferredLocale": {
+                    "type": "string",
+                    "enum": ["es-MX", "en"]
+                  },
                   "postalCode": {
                     "type": "string"
                   },
@@ -3243,6 +3247,10 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "preferredLocale": {
+                      "type": "string",
+                      "enum": ["es-MX", "en"]
                     }
                   },
                   "required": [
@@ -3374,6 +3382,10 @@
                   "phone": {
                     "type": "string",
                     "pattern": "^\\d{10}$"
+                  },
+                  "preferredLocale": {
+                    "type": "string",
+                    "enum": ["es-MX", "en"]
                   }
                 },
                 "required": ["fullName", "phone"],
@@ -3392,6 +3404,10 @@
                   "properties": {
                     "fullName": {
                       "type": "string"
+                    },
+                    "preferredLocale": {
+                      "type": "string",
+                      "enum": ["es-MX", "en"]
                     }
                   },
                   "required": ["fullName"],

@@ -406,6 +406,8 @@ describe('account area · signing in (FC 028 F2)', () => {
       email: 'ana@example.test',
       password: STRONG,
       fullName: 'Ana Flores',
+      // FC 067: the language of the page the person registered from.
+      preferredLocale: 'es-MX',
     });
     expect(
       (screen.getByLabelText(account.signIn.email) as HTMLInputElement).value
@@ -413,6 +415,38 @@ describe('account area · signing in (FC 028 F2)', () => {
     press(account.signIn.toRegister);
     press(account.register.toSignIn);
     await screen.findByRole('heading', { name: account.signIn.title });
+  });
+
+  it('FC 067 T2.3 · offers the language of the mail with the page language chosen, and sends the one picked', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: account.signIn.title });
+    press(account.signIn.toRegister);
+    const select = (await screen.findByLabelText(
+      account.language.label
+    )) as HTMLSelectElement;
+    expect(select.value).toBe('es-MX');
+    expect(
+      [...select.options].map((option) => [option.value, option.textContent])
+    ).toEqual([
+      ['es-MX', account.language.options['es-MX']],
+      ['en', account.language.options.en],
+    ]);
+    // A guided field: its hint and its example are tied to the control.
+    expect(select.getAttribute('aria-describedby')).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'en' } });
+    type(account.register.fullName, 'Ana Flores');
+    type(account.register.email, 'ana@example.test');
+    type(account.register.password, STRONG);
+    type(account.register.confirm, STRONG);
+    api.register.mockResolvedValueOnce(ok({ status: 'accepted' }));
+    press(account.register.submit);
+    await screen.findByText(account.register.accepted);
+    expect(api.register).toHaveBeenLastCalledWith({
+      email: 'ana@example.test',
+      password: STRONG,
+      fullName: 'Ana Flores',
+      preferredLocale: 'en',
+    });
   });
 
   it('makes staff turn the authenticator on, shows the backup codes once and signs in', async () => {

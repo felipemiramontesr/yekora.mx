@@ -1535,6 +1535,15 @@
       },
       "exampleLabel": "Example"
     },
+    "language": {
+      "label": "Language of your e-mails",
+      "description": "The language we write to you in: sign-in codes, notices and the confirmations of your orders. You can change it later in «My information».",
+      "example": "English",
+      "options": {
+        "es-MX": "Español",
+        "en": "English"
+      }
+    },
     "adminHub": {
       "title": "Administration",
       "intro": "You run the store from here. You only see what your account can open.",
