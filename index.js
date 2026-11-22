@@ -71662,7 +71662,7 @@ var require_typed_parameter = __commonJS({
       BINARY: "STRING",
       TEXT: "BLOB"
     };
-    var SUPPORTED = [
+    var SUPPORTED2 = [
       ...Object.keys(INTEGER_BYTES),
       Types.FLOAT,
       Types.DOUBLE,
@@ -71671,7 +71671,7 @@ var require_typed_parameter = __commonJS({
       ...LENGTH_CODED
     ].map(Number);
     var types = /* @__PURE__ */ Object.create(null);
-    for (const type of SUPPORTED) {
+    for (const type of SUPPORTED2) {
       const name2 = Types[type];
       const bytes = INTEGER_BYTES[type];
       const build = bytes ? (value, unsigned) => new TypedParameter(
@@ -99697,58 +99697,8 @@ function stateOfPostalCode(postalCode) {
   return hit ? hit[2] : null;
 }
 
-// ../../lib/account/addressTypes.ts
-var MAX_USER_ADDRESSES = 5;
-var profileUpdateRequestSchema = external_exports.strictObject({
-  fullName: external_exports.string().trim().min(2).max(150),
-  phone: customerSchema.shape.phone
-});
-var profileUpdatedSchema = external_exports.object({ fullName: external_exports.string() });
-var addressFields = shippingAddressSchema.extend({
-  name: customerSchema.shape.name,
-  phone: customerSchema.shape.phone,
-  /** What the person calls it («Casa», «Oficina»). */
-  label: external_exports.string().trim().min(1).max(40).optional()
-});
-var addressContentSchema = external_exports.union([
-  addressFields,
-  external_exports.strictObject({ postalCode: addressFields.shape.postalCode })
-]);
-var stateMatches = (address) => stateOfPostalCode(address.postalCode) === address.stateCode;
-var addressUpsertRequestSchema = addressFields.extend({ isDefault: external_exports.boolean().optional() }).refine(stateMatches, "The state does not match the postal code");
-var addressPatchRequestSchema = external_exports.union([
-  addressUpsertRequestSchema,
-  external_exports.strictObject({ isDefault: external_exports.literal(true) })
-]);
-var addressParams = external_exports.object({ id: external_exports.uuid() });
-var addressViewSchema = external_exports.object({
-  id: external_exports.uuid(),
-  isDefault: external_exports.boolean(),
-  /** Whether it can ship an order; the one given at sign-up cannot until it is completed. */
-  isComplete: external_exports.boolean(),
-  stateCode: external_exports.string(),
-  postalCode: external_exports.string().regex(/^\d{5}$/),
-  label: external_exports.string().nullable(),
-  name: external_exports.string().nullable(),
-  phone: external_exports.string().nullable(),
-  street: external_exports.string().nullable(),
-  exteriorNumber: external_exports.string().nullable(),
-  interiorNumber: external_exports.string().nullable(),
-  neighborhood: external_exports.string().nullable(),
-  municipality: external_exports.string().nullable(),
-  references: external_exports.string().nullable()
-});
-var addressListSchema = external_exports.object({
-  items: external_exports.array(addressViewSchema),
-  max: external_exports.number().int().positive()
-});
-var addressSavedSchema = external_exports.object({
-  id: external_exports.uuid(),
-  isDefault: external_exports.boolean(),
-  isComplete: external_exports.boolean()
-});
-
 // ../../lib/account/authTypes.ts
+var preferredLocaleSchema = external_exports.enum(["es-MX", "en"]);
 var emailField = external_exports.string().trim().pipe(external_exports.email().max(255));
 var altchaField = external_exports.string().min(1).max(2e3).optional();
 var newPasswordField = external_exports.string().min(1).max(1024);
@@ -99756,6 +99706,11 @@ var registerRequestSchema = external_exports.strictObject({
   email: emailField,
   password: newPasswordField,
   fullName: external_exports.string().trim().min(2).max(150),
+  /**
+   * The language the new account reads its mail in (FC 067 T1.2). Optional: without it the account
+   * starts in Mexican Spanish. The sign-up form sends the language of its own page.
+   */
+  preferredLocale: preferredLocaleSchema.optional(),
   /**
    * Obsolete (FC 055 T0.2, T2.3): sign-up no longer takes a postal code, which lives only in the
    * book of addresses. A web bundle cached before that still sends it, so it is accepted, whatever
@@ -99837,7 +99792,65 @@ var meResponseSchema = external_exports.object({
   /** The state of that default address (a code of the 32 shipping zones), or none (FC 051). */
   stateCode: external_exports.string().nullish(),
   /** The phone of the account, 10 digits, only ever given back to its holder (FC 051 T1.1). */
-  phone: external_exports.string().regex(/^\d{10}$/).nullish()
+  phone: external_exports.string().regex(/^\d{10}$/).nullish(),
+  /** The language the account reads the store's mail in (FC 067). Absent from an older API. */
+  preferredLocale: preferredLocaleSchema.optional()
+});
+
+// ../../lib/account/addressTypes.ts
+var MAX_USER_ADDRESSES = 5;
+var profileUpdateRequestSchema = external_exports.strictObject({
+  fullName: external_exports.string().trim().min(2).max(150),
+  phone: customerSchema.shape.phone,
+  /** The language of the account's mail (FC 067 T1.2); left as it is when absent. */
+  preferredLocale: preferredLocaleSchema.optional()
+});
+var profileUpdatedSchema = external_exports.object({
+  fullName: external_exports.string(),
+  preferredLocale: preferredLocaleSchema.optional()
+});
+var addressFields = shippingAddressSchema.extend({
+  name: customerSchema.shape.name,
+  phone: customerSchema.shape.phone,
+  /** What the person calls it («Casa», «Oficina»). */
+  label: external_exports.string().trim().min(1).max(40).optional()
+});
+var addressContentSchema = external_exports.union([
+  addressFields,
+  external_exports.strictObject({ postalCode: addressFields.shape.postalCode })
+]);
+var stateMatches = (address) => stateOfPostalCode(address.postalCode) === address.stateCode;
+var addressUpsertRequestSchema = addressFields.extend({ isDefault: external_exports.boolean().optional() }).refine(stateMatches, "The state does not match the postal code");
+var addressPatchRequestSchema = external_exports.union([
+  addressUpsertRequestSchema,
+  external_exports.strictObject({ isDefault: external_exports.literal(true) })
+]);
+var addressParams = external_exports.object({ id: external_exports.uuid() });
+var addressViewSchema = external_exports.object({
+  id: external_exports.uuid(),
+  isDefault: external_exports.boolean(),
+  /** Whether it can ship an order; the one given at sign-up cannot until it is completed. */
+  isComplete: external_exports.boolean(),
+  stateCode: external_exports.string(),
+  postalCode: external_exports.string().regex(/^\d{5}$/),
+  label: external_exports.string().nullable(),
+  name: external_exports.string().nullable(),
+  phone: external_exports.string().nullable(),
+  street: external_exports.string().nullable(),
+  exteriorNumber: external_exports.string().nullable(),
+  interiorNumber: external_exports.string().nullable(),
+  neighborhood: external_exports.string().nullable(),
+  municipality: external_exports.string().nullable(),
+  references: external_exports.string().nullable()
+});
+var addressListSchema = external_exports.object({
+  items: external_exports.array(addressViewSchema),
+  max: external_exports.number().int().positive()
+});
+var addressSavedSchema = external_exports.object({
+  id: external_exports.uuid(),
+  isDefault: external_exports.boolean(),
+  isComplete: external_exports.boolean()
 });
 
 // ../../lib/account/orderTypes.ts
@@ -99921,6 +99934,12 @@ var paymentMethodDetachResponseSchema = external_exports.object({
 
 // src/lib/language.ts
 var languageSchema = external_exports.enum(["es-MX", "en"]).default("es-MX");
+var SUPPORTED = /* @__PURE__ */ new Set(["es-MX", "en"]);
+function unsupportedLocale(body, key) {
+  if (typeof body !== "object" || body === null) return false;
+  const value = body[key];
+  return value !== void 0 && !SUPPORTED.has(value);
+}
 var languageQuery = external_exports.object({ lang: languageSchema });
 
 // ../../lib/account/adminUserTypes.ts
@@ -100859,10 +100878,13 @@ async function listAddresses(db, key, userId) {
 }
 async function accountDelivery(db, key, userId) {
   const [row3] = await db.query(
-    "SELECT u.phone_enc, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?",
+    "SELECT u.phone_enc, u.preferred_locale, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?",
     [userId]
   );
-  if (key === null) return { phone: null, postalCode: null, stateCode: null };
+  const preferredLocale = row3.preferred_locale;
+  if (key === null) {
+    return { phone: null, postalCode: null, stateCode: null, preferredLocale };
+  }
   const address = row3.address_enc ? opened(key, userId, {
     id: row3.address_id,
     state_code: row3.state_code,
@@ -100872,15 +100894,20 @@ async function accountDelivery(db, key, userId) {
   return {
     phone: row3.phone_enc ? decryptPii(key, userId, "user_phone", row3.phone_enc) : null,
     postalCode: address?.postalCode ?? null,
-    stateCode: address ? row3.state_code : null
+    stateCode: address ? row3.state_code : null,
+    preferredLocale
   };
 }
 async function updateProfile(tx, key, userId, profile) {
-  await tx.query("UPDATE users SET full_name = ?, phone_enc = ? WHERE id = ?", [
-    profile.fullName,
-    encryptPii(key, userId, "user_phone", profile.phone),
-    userId
-  ]);
+  await tx.query(
+    "UPDATE users SET full_name = ?, phone_enc = ?, preferred_locale = COALESCE(?, preferred_locale) WHERE id = ?",
+    [
+      profile.fullName,
+      encryptPii(key, userId, "user_phone", profile.phone),
+      profile.preferredLocale ?? null,
+      userId
+    ]
+  );
 }
 async function insertAddress(tx, key, userId, address) {
   const id = (0, import_node_crypto4.randomUUID)();
@@ -101065,7 +101092,7 @@ async function reserveLines(tx, lines) {
   if (reserved.includes(null)) throw new InsufficientStock();
   return new Map(reserved);
 }
-async function cancelOrder(db, orderId, locale) {
+async function cancelOrder(db, orderId) {
   await db.transaction(async (tx) => {
     const result = await tx.query(
       "UPDATE orders SET status_id = 4 WHERE id = ? AND status_id = 1",
@@ -101076,7 +101103,7 @@ async function cancelOrder(db, orderId, locale) {
       "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
       [orderId]
     );
-    await enqueueMail(tx, { type: "ORDER_CANCELLED", orderId, locale });
+    await enqueueMail(tx, { type: "ORDER_CANCELLED", orderId });
   });
 }
 function methodOf(body) {
@@ -101143,7 +101170,7 @@ async function persist(deps, admitted, quote, order2) {
     return await deps.db.transaction(async (tx) => {
       const productIds = await reserveLines(tx, request.items);
       const inserted = await tx.query(
-        "INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
+        "INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test, locale) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
         [
           order2.orderNumber,
           order2.userId,
@@ -101164,6 +101191,7 @@ async function persist(deps, admitted, quote, order2) {
           order2.now,
           order2.expiresAt,
           deps.payments.mode === "sandbox" ? 1 : 0,
+          order2.locale,
           address.stateCode
         ]
       );
@@ -101232,7 +101260,8 @@ async function createCheckout(deps, body, lang, userId = null) {
     expiresAt: new Date(
       now.getTime() + Number(methodRow.hold_minutes) * 6e4
     ),
-    userId
+    userId,
+    locale: lang
   };
   const orderId = await persist(deps, admitted, quote, order2);
   if (typeof orderId !== "number") return orderId;
@@ -101272,7 +101301,7 @@ async function createCheckout(deps, body, lang, userId = null) {
       }
     };
   } catch {
-    await cancelOrder(deps.db, orderId, lang);
+    await cancelOrder(deps.db, orderId);
     return refuse2(503, "SERVICE_UNAVAILABLE");
   }
 }
@@ -102198,8 +102227,14 @@ function createCustomer(db, user) {
     if (taken) return false;
     const id = (0, import_node_crypto7.randomUUID)();
     await tx.query(
-      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
-      [id, user.email, user.passwordHash, user.fullName]
+      "INSERT INTO users (id, email, password_hash, full_name, preferred_locale) VALUES (?, ?, ?, ?, ?)",
+      [
+        id,
+        user.email,
+        user.passwordHash,
+        user.fullName,
+        user.preferredLocale ?? "es-MX"
+      ]
     );
     await tx.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES (?, 'customer')",
@@ -102587,7 +102622,12 @@ function registerAccountRoutes(app, deps) {
       user.userId
     ).catch((error63) => {
       request.log.error({ err: error63 }, "account data unreadable");
-      return { phone: null, postalCode: null, stateCode: null };
+      return {
+        phone: null,
+        postalCode: null,
+        stateCode: null,
+        preferredLocale: void 0
+      };
     });
     return reply.send(
       meResponseSchema.parse({
@@ -102603,6 +102643,14 @@ function registerAccountRoutes(app, deps) {
   app.patch("/v1/account/profile", async (request, reply) => {
     const gate = writeGate(deps, request, reply);
     if (gate === null) return reply;
+    if (unsupportedLocale(request.body, "preferredLocale")) {
+      return refuse(
+        reply,
+        400,
+        "Unsupported language",
+        "LOCALE_INPUT_UNSUPPORTED"
+      );
+    }
     const body = profileUpdateRequestSchema.safeParse(request.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
@@ -102615,12 +102663,17 @@ function registerAccountRoutes(app, deps) {
         entityType: "users",
         entityId: userId,
         before: null,
-        after: { changed: ["fullName", "phone"] },
+        after: {
+          changed: body.data.preferredLocale === void 0 ? ["fullName", "phone"] : ["fullName", "phone", "preferredLocale"]
+        },
         ip: request.ip
       });
       return {
         status: 200,
-        body: profileUpdatedSchema.parse({ fullName: body.data.fullName })
+        body: profileUpdatedSchema.parse({
+          fullName: body.data.fullName,
+          preferredLocale: body.data.preferredLocale
+        })
       };
     });
   });
@@ -103588,6 +103641,7 @@ var TITLES2 = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
   MAIL_UNAVAILABLE: "Sign-in by e-mail unavailable",
   INVALID_REQUEST: "Invalid request",
+  LOCALE_INPUT_UNSUPPORTED: "Unsupported language",
   INVALID_CREDENTIALS: "Invalid e-mail or password",
   INVALID_CHALLENGE: "Sign-in expired, start again",
   INVALID_CODE: "Invalid code",
@@ -103715,6 +103769,9 @@ function registerAuthRoutes(app, deps) {
     }
   );
   app.post("/v1/auth/register", LIMITED, async (request, reply) => {
+    if (unsupportedLocale(request.body, "preferredLocale")) {
+      return refuse3(reply, 400, "LOCALE_INPUT_UNSUPPORTED");
+    }
     const parsed = parse4(registerRequestSchema, request, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
@@ -103725,7 +103782,8 @@ function registerAuthRoutes(app, deps) {
     await createCustomer(deps.db, {
       email: canonicalEmail(body.email),
       passwordHash: await hashPassword(body.password),
-      fullName: body.fullName
+      fullName: body.fullName,
+      preferredLocale: body.preferredLocale
     });
     return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
   });
@@ -118003,8 +118061,9 @@ var FRAME = {
     }
   }
 };
-function resolveMailLocale(requested) {
-  return requested === "en" ? "en" : "es-MX";
+function pickMailLocale(...candidates) {
+  const found = candidates.find((value) => value === "es-MX" || value === "en");
+  return found === "en" ? "en" : "es-MX";
 }
 function assertMultipart(html, text3) {
   if (html.trim() === "" || text3.trim() === "") {
@@ -118334,10 +118393,10 @@ function addressLines(address, state) {
     ...address.references ? [address.references] : []
   ];
 }
-async function renderOrder(db, keys, event, locale) {
+async function renderOrder(db, keys, event) {
   if (keys.piiKey === null) throw new Error("CHECKOUT_PII_KEY is not set");
   const [order2] = await db.query(
-    "SELECT o.order_number, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ?",
+    "SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?",
     [event.orderId]
   );
   if (order2 === void 0) throw new Error("Order not found");
@@ -118351,6 +118410,11 @@ async function renderOrder(db, keys, event, locale) {
       [event.orderId]
     )
   ]);
+  const locale = pickMailLocale(
+    event.locale,
+    order2.account_locale,
+    order2.order_locale
+  );
   const number4 = order2.order_number;
   const name2 = decryptPii(
     keys.piiKey,
@@ -118415,9 +118479,13 @@ async function render(db, keys, row3) {
     type: row3.event_type,
     ...JSON.parse(row3.payload)
   };
-  const locale = resolveMailLocale(event.locale);
-  if ("orderId" in event) return renderOrder(db, keys, event, locale);
+  if ("orderId" in event) return renderOrder(db, keys, event);
   const to = await emailOf(db, event.userId);
+  const [account] = await db.query(
+    "SELECT preferred_locale FROM users WHERE id = ?",
+    [event.userId]
+  );
+  const locale = pickMailLocale(event.locale, account?.preferred_locale);
   const { subject, content } = copyOf(keys, event, locale);
   const { html, text: text3 } = renderEmail({ ...content, locale }, keys.siteUrl);
   assertMultipart(html, text3);
@@ -119385,7 +119453,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "fe84fb971351aeb153428c732fde23fc2ed5bc29" : void 0;
+var sha = true ? "5f8c321ade8594501da1da2b0b642ac25708806e" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
