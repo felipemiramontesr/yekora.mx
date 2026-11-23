@@ -29,8 +29,8 @@ type RefundOutcome =
 
 /** The statuses of `order_statuses` a refund distinguishes. */
 const REFUNDED = 5;
-const IN_WAREHOUSE: readonly number[] = [2, 7];
-const LEFT_WAREHOUSE: readonly number[] = [8, 9];
+const IN_WAREHOUSE: ReadonlySet<number> = new Set([2, 7]);
+const LEFT_WAREHOUSE: ReadonlySet<number> = new Set([8, 9]);
 
 /**
  * Decides what a full refund does to an order, from its status alone (T1.2 and T1.3).
@@ -40,8 +40,8 @@ const LEFT_WAREHOUSE: readonly number[] = [8, 9];
  */
 export function decideRefund(statusId: number): RefundOutcome {
   if (statusId === REFUNDED) return 'IDEMPOTENT_IGNORED';
-  if (IN_WAREHOUSE.includes(statusId)) return 'ORDER_REFUNDED_RESTOCK';
-  if (LEFT_WAREHOUSE.includes(statusId)) return 'ORDER_REFUNDED_NO_RESTOCK';
+  if (IN_WAREHOUSE.has(statusId)) return 'ORDER_REFUNDED_RESTOCK';
+  if (LEFT_WAREHOUSE.has(statusId)) return 'ORDER_REFUNDED_NO_RESTOCK';
   return 'REFUND_STATUS_CONFLICT_ANOMALY';
 }
 
