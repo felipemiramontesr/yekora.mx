@@ -37,8 +37,8 @@ export async function readPaymentsHealth(
     probe(processors.STRIPE),
     probe(processors.MERCADO_PAGO),
   ]);
-  const states = [stripe, mercadoPago];
-  const healthy = states.includes('ok') && !states.includes('unreachable');
+  const states = new Set([stripe, mercadoPago]);
+  const healthy = states.has('ok') && !states.has('unreachable');
   return {
     status: healthy ? 'ok' : 'degraded',
     mode,
