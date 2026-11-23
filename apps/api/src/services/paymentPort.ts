@@ -136,6 +136,13 @@ export interface PaymentProcessorPort {
    *   payment intent or no session of ours.
    */
   fetchRefund?(chargeId: string): Promise<RefundStatus | null>;
+  /**
+   * Asks the processor, with a read-only call, whether it can be reached and still accepts the
+   * credentials (FC 070 T2.2). It charges nothing, writes nothing and reveals no secret.
+   *
+   * @returns True only when the processor answered successfully; false for any failure.
+   */
+  ping(): Promise<boolean>;
 }
 
 /** A processor call that failed; the message never carries secrets or payer data. */

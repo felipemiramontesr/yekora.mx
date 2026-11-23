@@ -39,6 +39,7 @@ import {
   exchangeRateSchema,
   productSchema,
 } from '../../../lib/api/catalogClient';
+import { paymentsHealthSchema } from '../../../lib/account/paymentsHealthTypes';
 import { cartQuoteSchema } from '../../../lib/cart/cartTypes';
 import {
   checkoutRequestSchema,
@@ -610,6 +611,18 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     responses: {
       200: orderPageSchema,
       400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/payments/health',
+    summary:
+      'The payments mode and whether each processor answers (no secret, audited)',
+    permission: 'orders:read',
+    request: {},
+    responses: {
+      200: paymentsHealthSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

@@ -242,7 +242,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     cards,
     siteUrl: deps.config.payments.siteUrl,
   });
-  registerAdminRoutes(app, { db: deps.db, now });
+  registerAdminRoutes(app, {
+    db: deps.db,
+    now,
+    processors,
+    mode: deps.config.payments.mode,
+  });
   // FC 044 F1: the owner's console of administrators.
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   // FC 068 F1: prepare, ship and deliver a paid order (orders:manage).

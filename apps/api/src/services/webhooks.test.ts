@@ -196,6 +196,7 @@ function processor(
     createSession: vi.fn(),
     verifyWebhook: vi.fn(() => event),
     fetchPayment,
+    ping: async () => true,
   };
   return { port, fetchPayment };
 }
@@ -511,6 +512,7 @@ describe('FC 069 · a refunded charge (T1.1, T1.2, T1.3)', () => {
       verifyWebhook: vi.fn(() => event),
       fetchPayment: vi.fn(),
       fetchRefund,
+      ping: async () => true,
     };
     return { port, fetchRefund };
   }

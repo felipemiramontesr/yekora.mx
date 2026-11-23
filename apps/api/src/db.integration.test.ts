@@ -141,6 +141,7 @@ function processor(
     fetchPayment: async () => {
       throw new Error('no payment');
     },
+    ping: async () => true,
     ...over,
   };
 }

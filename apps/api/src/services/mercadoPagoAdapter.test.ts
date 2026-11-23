@@ -376,3 +376,28 @@ describe('account check at startup (FC 019, GET /users/me)', () => {
     }
   );
 });
+
+describe('ping (FC 070 T2.2)', () => {
+  it('reads the account of the token and reports true', async () => {
+    const fetchMock = answering({ id: 1 });
+    await expect(
+      createMercadoPagoAdapter(SECRETS, fetchMock).ping()
+    ).resolves.toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.mercadopago.com/users/me'
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('is false on an HTTP error or when it cannot be reached, and never throws', async () => {
+    await expect(
+      createMercadoPagoAdapter(SECRETS, answering({}, 401)).ping()
+    ).resolves.toBe(false);
+    const down = vi.fn<typeof fetch>(async () => {
+      throw new TypeError('fetch failed');
+    });
+    await expect(createMercadoPagoAdapter(SECRETS, down).ping()).resolves.toBe(
+      false
+    );
+  });
+});

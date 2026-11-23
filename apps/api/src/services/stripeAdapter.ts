@@ -298,6 +298,16 @@ export function createStripeAdapter(
       };
     },
 
+    async ping(): Promise<boolean> {
+      // The lightest read the restricted key of the checkout is allowed (Checkout Sessions).
+      try {
+        await call('/checkout/sessions?limit=1', { method: 'GET' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
     async fetchRefund(chargeId): Promise<RefundStatus | null> {
       // The event carries a charge (`ch_…`); only its payment intent (`pi_…`) finds the session.
       const charge = (await call(`/charges/${encodeURIComponent(chargeId)}`, {

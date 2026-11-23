@@ -255,6 +255,15 @@ export function createMercadoPagoAdapter(
       return { eventId, type, resourceId: dataId };
     },
 
+    async ping(): Promise<boolean> {
+      try {
+        await call('/users/me', { method: 'GET' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
     async fetchPayment(paymentId): Promise<PaymentStatus> {
       const payment = (await call(
         `/v1/payments/${encodeURIComponent(paymentId)}`,

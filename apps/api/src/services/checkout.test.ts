@@ -348,6 +348,7 @@ function processor(fail = false) {
     },
     verifyWebhook: () => null,
     fetchPayment: vi.fn(),
+    ping: async () => true,
   };
   return { port, requests };
 }

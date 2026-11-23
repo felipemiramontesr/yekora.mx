@@ -43,6 +43,8 @@ export default defineConfig({
         'scripts/lib/e2eStackSeed.ts',
         // FC 027: the sandbox purge deletes production rows; same bar.
         'scripts/lib/sandboxPurge.ts',
+        // FC 070: the go-live checks decide whether payments may be switched on; same bar.
+        'scripts/lib/paymentsBunker.ts',
       ],
       exclude: [
         'app/**/*.{test,spec}.{ts,tsx}',
@@ -52,8 +54,8 @@ export default defineConfig({
         // Process wiring only (node dist/index.js on Hostinger); its logic is start() in index.ts.
         'apps/api/src/server.ts',
         // Vitest 4 matches these globs anywhere in the path, so `lib/**` above also catches
-        // scripts/lib: keep the gate rules out, except the five held to product coverage.
-        'scripts/lib/!(backupCrypto|certification|dbParity|e2eStackSeed|sandboxPurge).ts',
+        // scripts/lib: keep the gate rules out, except the six held to product coverage.
+        'scripts/lib/!(backupCrypto|certification|dbParity|e2eStackSeed|sandboxPurge|paymentsBunker).ts',
       ],
       thresholds: {
         lines: 100,

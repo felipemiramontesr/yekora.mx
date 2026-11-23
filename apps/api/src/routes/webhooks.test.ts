@@ -38,6 +38,7 @@ function processor(signed: string | null) {
         : null;
     },
     fetchPayment: vi.fn(),
+    ping: async () => true,
   };
   return { port, received };
 }

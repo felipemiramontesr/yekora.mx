@@ -616,3 +616,34 @@ describe('fetchRefund (FC 069)', () => {
     }
   );
 });
+
+describe('ping (FC 070 T2.2)', () => {
+  it('reads one Checkout Session with the key and reports true', async () => {
+    const fetchMock = answering({ data: [] });
+    await expect(createStripeAdapter(SECRETS, fetchMock).ping()).resolves.toBe(
+      true
+    );
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.stripe.com/v1/checkout/sessions?limit=1'
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it.each([[401], [500]])(
+    'is false on HTTP %i, and never throws',
+    async (status) => {
+      await expect(
+        createStripeAdapter(SECRETS, answering({}, status)).ping()
+      ).resolves.toBe(false);
+    }
+  );
+
+  it('is false when Stripe cannot be reached', async () => {
+    const down = vi.fn<typeof fetch>(async () => {
+      throw new TypeError('fetch failed');
+    });
+    await expect(createStripeAdapter(SECRETS, down).ping()).resolves.toBe(
+      false
+    );
+  });
+});

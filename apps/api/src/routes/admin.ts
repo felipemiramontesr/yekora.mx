@@ -16,10 +16,13 @@ import {
   orderDetailSchema,
   orderPageSchema,
 } from '../../../../lib/account/orderTypes';
+import { paymentsHealthSchema } from '../../../../lib/account/paymentsHealthTypes';
+import type { PaymentsConfig } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
-import { expireOverdueOrders } from '../services/checkout';
+import { type CheckoutDeps, expireOverdueOrders } from '../services/checkout';
 import type { Db, Transactional } from '../services/db';
 import { listOrders } from '../services/orderReads';
+import { readPaymentsHealth } from '../services/paymentsHealth';
 import { lookUpOrder } from './orders';
 
 /** Dependencies of the panel routes. */
@@ -28,6 +31,10 @@ interface AdminDeps {
   db: Db & Transactional;
   /** Clock. */
   now: () => Date;
+  /** The processors whose secrets are configured, for the payments probe (FC 070). */
+  processors: CheckoutDeps['processors'];
+  /** `PAYMENTS_MODE` of this environment. */
+  mode: PaymentsConfig['mode'];
 }
 
 /**
@@ -57,6 +64,14 @@ export function registerAdminRoutes(
     );
     return orderPageSchema.parse({ items, total, ...paging });
   });
+
+  // FC 070 T2.2: reachability of the processors, behind the session, the authenticator and
+  // orders:read of the guard. The public GET /health is another route and stays as it is.
+  app.get('/v1/admin/payments/health', async () =>
+    paymentsHealthSchema.parse(
+      await readPaymentsHealth(deps.mode, deps.processors)
+    )
+  );
 
   app.get('/v1/admin/orders/:order_number', async (request, reply) => {
     const { order_number: orderNumber } = request.params as {

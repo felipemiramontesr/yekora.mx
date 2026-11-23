@@ -318,3 +318,62 @@ describe('loadConfig · mail (FC 028 F1, ADR 0013)', () => {
     ).toThrow('Mail needs all of its settings or none');
   });
 });
+
+describe('FC 070 T1.1 · PaymentGatewayConfigurationGate(K, P, M) at start-up', () => {
+  const STRIPE = { STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'w' };
+  const MERCADO_PAGO = { MP_ACCESS_TOKEN: 'TEST-1', MP_WEBHOOK_SECRET: 'm' };
+
+  it('K ⊤ P ⊤ M ⊤: GATEWAY_CONFIGURED_200, with a secret or a restricted test key in sandbox', () => {
+    for (const key of ['sk_test_1', 'rk_test_1']) {
+      const { payments } = loadConfig({
+        ...base,
+        STRIPE_SECRET_KEY: key,
+        STRIPE_WEBHOOK_SECRET: 'w',
+      });
+      expect(payments.stripe?.apiKey).toBe(key);
+    }
+  });
+
+  it.each([
+    ['sk_live_1', 'sandbox'],
+    ['rk_live_1', 'sandbox'],
+    ['sk_test_1', 'live'],
+    ['rk_test_1', 'live'],
+  ])('K ⊤ P ⊤ M ⊥: %s in %s is GATEWAY_MODE_MISMATCH_ABORT', (key, mode) => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        PAYMENTS_MODE: mode,
+        STRIPE_SECRET_KEY: key,
+        STRIPE_WEBHOOK_SECRET: 'w',
+      })
+    ).toThrow('STRIPE_SECRET_KEY does not match PAYMENTS_MODE');
+  });
+
+  it.each([
+    ['a key without its webhook secret', { STRIPE_SECRET_KEY: 'sk_test_1' }],
+    ['a webhook secret without its key', { STRIPE_WEBHOOK_SECRET: 'w' }],
+    ['a token without its webhook secret', { MP_ACCESS_TOKEN: 'TEST-1' }],
+    ['a webhook secret without its token', { MP_WEBHOOK_SECRET: 'm' }],
+  ])('K ⊤ P ⊥: %s is GATEWAY_INCOMPLETE_ABORT', (_name, env) => {
+    expect(() => loadConfig({ ...base, ...env })).toThrow(
+      'needs both of its secrets or none'
+    );
+  });
+
+  it('K ⊥: a processor with neither secret is PROCESSOR_ABSENT_OMITTED and the other keeps working', () => {
+    const onlyStripe = loadConfig({ ...base, ...STRIPE }).payments;
+    expect(onlyStripe.mercadoPago).toBeNull();
+    expect(onlyStripe.stripe?.apiKey).toBe('sk_test_1');
+    const onlyMercadoPago = loadConfig({ ...base, ...MERCADO_PAGO }).payments;
+    expect(onlyMercadoPago.stripe).toBeNull();
+    expect(onlyMercadoPago.mercadoPago?.accessToken).toBe('TEST-1');
+  });
+
+  it('K ⊥ for both: no processor is configured and the app still starts, with the checkout closed', () => {
+    const { payments } = loadConfig(base);
+    expect(payments.stripe).toBeNull();
+    expect(payments.mercadoPago).toBeNull();
+    expect(payments.checkout).toBeNull();
+  });
+});
