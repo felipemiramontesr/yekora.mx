@@ -104877,6 +104877,40 @@ function registerExchangeRateRoute(app, rate) {
   });
 }
 
+// src/services/refundFsm.ts
+var REFUNDED = 5;
+var IN_WAREHOUSE = /* @__PURE__ */ new Set([2, 7]);
+var LEFT_WAREHOUSE = /* @__PURE__ */ new Set([8, 9]);
+function decideRefund(statusId) {
+  if (statusId === REFUNDED) return "IDEMPOTENT_IGNORED";
+  if (IN_WAREHOUSE.has(statusId)) return "ORDER_REFUNDED_RESTOCK";
+  if (LEFT_WAREHOUSE.has(statusId)) return "ORDER_REFUNDED_NO_RESTOCK";
+  return "REFUND_STATUS_CONFLICT_ANOMALY";
+}
+async function applyRefund(tx, orderId, orderNumber, outcome) {
+  const restock = outcome === "ORDER_REFUNDED_RESTOCK";
+  await tx.query("UPDATE orders SET status_id = ? WHERE id = ?", [
+    REFUNDED,
+    orderId
+  ]);
+  if (restock) {
+    await tx.query(
+      "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock + i.quantity WHERE i.order_id = ?",
+      [orderId]
+    );
+  }
+  await enqueueMail(tx, { type: "ORDER_REFUNDED", orderId });
+  await recordAudit(tx, {
+    userId: null,
+    action: "ORDER_REFUNDED",
+    entityType: "orders",
+    entityId: orderNumber,
+    before: null,
+    after: { status: "REFUNDED", restocked: restock },
+    ip: null
+  });
+}
+
 // src/services/settlement.ts
 var row = (code2, nextStatusId, alert, sellsStock = false) => ({
   code: code2,
@@ -104911,6 +104945,10 @@ var SETTLING_TYPES = {
     "checkout.session.async_payment_succeeded"
   ],
   MERCADO_PAGO: ["payment"]
+};
+var REFUND_TYPES = {
+  STRIPE: ["charge.refunded"],
+  MERCADO_PAGO: []
 };
 var STATUS = { PENDING: 1, PAID: 2, EXPIRED: 3, CANCELLED: 4 };
 async function recordEvent(tx, record2) {
@@ -104948,6 +104986,83 @@ async function reconcile(deps, code2, processor, event) {
   );
   const confirmed = payment.paid && order2 !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order2.total_mxn_cents);
   return { payment, order: order2 ?? null, confirmed };
+}
+function recordRefundAlert(deps, base2, code2) {
+  return deps.db.transaction(async (tx) => {
+    const recorded = await recordEvent(tx, {
+      ...base2,
+      resultingStatusId: null,
+      alert: true
+    });
+    return { status: 200, code: recorded ? code2 : "IDEMPOTENT_IGNORED" };
+  });
+}
+function refundOrder(deps, base2, order2) {
+  return deps.db.transaction(async (tx) => {
+    const [current] = await tx.query(
+      "SELECT status_id FROM orders WHERE id = ? FOR UPDATE",
+      [order2.id]
+    );
+    const status = Number(current.status_id);
+    const outcome = decideRefund(status);
+    const conflict = outcome === "REFUND_STATUS_CONFLICT_ANOMALY";
+    const recorded = await recordEvent(tx, {
+      ...base2,
+      resultingStatusId: conflict ? status : 5,
+      alert: conflict
+    });
+    if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
+    if (conflict) return { status: 500, code: outcome };
+    if (outcome === "IDEMPOTENT_IGNORED") {
+      return { status: 200, code: outcome };
+    }
+    await applyRefund(tx, order2.id, order2.order_number, outcome);
+    return { status: 200, code: "REFUND_PROCESSED" };
+  });
+}
+async function receiveRefund(deps, code2, processor, event, isTest) {
+  const processorId = PROCESSOR_ID[code2];
+  const nothing = {
+    payment: null,
+    order: null,
+    confirmed: false
+  };
+  const unreconciled = (reconciliation = nothing) => recordRefundAlert(
+    deps,
+    { processorId, event, reconciliation, isTest },
+    "REFUND_UNRECONCILED_ALERT"
+  );
+  if (event.resourceId === null || processor.fetchRefund === void 0) {
+    return unreconciled();
+  }
+  let refund;
+  try {
+    refund = await processor.fetchRefund(event.resourceId);
+  } catch {
+    return { status: 503, code: "SERVICE_UNAVAILABLE" };
+  }
+  if (refund === null) return unreconciled();
+  const [order2] = await deps.db.query(
+    "SELECT o.id, o.order_number, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ? AND o.payment_resource_id = ?",
+    [refund.orderNumber, processorId, refund.sessionId]
+  );
+  const payment = {
+    paid: false,
+    amountMxnCents: refund.refundedMxnCents,
+    currency: refund.currency,
+    orderNumber: refund.orderNumber,
+    processorStatus: "refunded"
+  };
+  if (order2 === void 0 || refund.currency !== "MXN" || refund.amountMxnCents !== Number(order2.total_mxn_cents)) {
+    return unreconciled({ payment, order: null, confirmed: false });
+  }
+  const base2 = {
+    processorId,
+    event,
+    reconciliation: { payment, order: order2, confirmed: true },
+    isTest
+  };
+  return refund.refundedMxnCents >= refund.amountMxnCents ? refundOrder(deps, base2, order2) : recordRefundAlert(deps, base2, "PARTIAL_REFUND_ALERT");
 }
 function settleOrder(deps, base2, order2) {
   const resourceId = base2.event.resourceId;
@@ -104999,6 +105114,10 @@ async function receiveWebhook(deps, code2, input2) {
     [processorId, event.eventId]
   );
   if (seen !== void 0) return { status: 200, code: "IDEMPOTENT_IGNORED" };
+  const isTest = deps.payments.mode === "sandbox";
+  if (REFUND_TYPES[code2].includes(event.type)) {
+    return receiveRefund(deps, code2, processor, event, isTest);
+  }
   let reconciliation;
   try {
     reconciliation = await reconcile(deps, code2, processor, event);
@@ -105009,7 +105128,7 @@ async function receiveWebhook(deps, code2, input2) {
     processorId,
     event,
     reconciliation,
-    isTest: deps.payments.mode === "sandbox"
+    isTest
   };
   if (!reconciliation.confirmed) {
     const recorded = await deps.db.transaction(
@@ -105033,7 +105152,8 @@ var ROUTES = [
 var TITLES4 = {
   INVALID_SIGNATURE: "Invalid signature",
   SERVICE_UNAVAILABLE: "Payments unavailable",
-  STATE_CONFLICT_ANOMALY: "Order state conflict"
+  STATE_CONFLICT_ANOMALY: "Order state conflict",
+  REFUND_STATUS_CONFLICT_ANOMALY: "Refund state conflict"
 };
 async function registerWebhookRoutes(app, deps) {
   await app.register((scope, _options, done) => {
@@ -118583,6 +118703,34 @@ var ORDER_COPY = {
       }
     })
   },
+  ORDER_REFUNDED: {
+    "es-MX": ({ name: name2, number: number4, site }) => ({
+      subject: `Reembolsamos tu pedido ${number4}`,
+      content: {
+        heading: "Reembolsamos tu pedido",
+        paragraphs: [
+          `Hola ${name2}: reembolsamos el pago completo de tu pedido ${number4}. El dinero regresa a tu m\xE9todo de pago; seg\xFAn tu banco puede tardar unos d\xEDas en verse reflejado.`
+        ],
+        button: {
+          label: "Ver mi pedido",
+          url: `${site}/cuenta/${number4}/`
+        }
+      }
+    }),
+    en: ({ name: name2, number: number4, site }) => ({
+      subject: `We refunded your order ${number4}`,
+      content: {
+        heading: "We refunded your order",
+        paragraphs: [
+          `Hello ${name2}: we refunded the full payment of your order ${number4}. The money goes back to your payment method; depending on your bank it may take a few days to show.`
+        ],
+        button: {
+          label: "View my order",
+          url: `${site}/en/account/${number4}/`
+        }
+      }
+    })
+  },
   ORDER_PREPARED: {
     "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Estamos preparando tu pedido ${number4}`,
@@ -119203,6 +119351,27 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
         processorStatus: status
       };
+    },
+    async fetchRefund(chargeId) {
+      const charge = await call(`/charges/${encodeURIComponent(chargeId)}`, {
+        method: "GET"
+      });
+      if (typeof charge.payment_intent !== "string" || !Number.isInteger(charge.amount) || !Number.isInteger(charge.amount_refunded)) {
+        return null;
+      }
+      const found = await call(
+        `/checkout/sessions?payment_intent=${encodeURIComponent(charge.payment_intent)}&limit=1`,
+        { method: "GET" }
+      );
+      const session = found.data?.[0];
+      if (typeof session?.id !== "string") return null;
+      return {
+        sessionId: session.id,
+        orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
+        amountMxnCents: charge.amount,
+        refundedMxnCents: charge.amount_refunded,
+        currency: typeof charge.currency === "string" ? charge.currency.toUpperCase() : null
+      };
     }
   };
 }
@@ -119742,7 +119911,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "0b7eb294a7e43aaffd8aa2ece97e202ce78ced25" : void 0;
+var sha = true ? "88b1cf196fda47e36ca78f42a504761594fea03b" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
