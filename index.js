@@ -99474,6 +99474,17 @@ var pageSchema = external_exports.object({
   exchangeRate: exchangeRateSchema.nullable()
 });
 
+// ../../lib/account/paymentsHealthTypes.ts
+var processorHealthSchema = external_exports.enum(["ok", "unreachable", "unconfigured"]);
+var paymentsHealthSchema = external_exports.strictObject({
+  status: external_exports.enum(["ok", "degraded"]),
+  mode: external_exports.enum(["sandbox", "live"]),
+  processors: external_exports.strictObject({
+    stripe: processorHealthSchema,
+    mercadoPago: processorHealthSchema
+  })
+});
+
 // ../../lib/cart/cartTypes.ts
 var MAX_LINES = 50;
 var MAX_QUANTITY = 99;
@@ -100722,18 +100733,18 @@ var MAX_MEDIA_BYTES = 2097152;
 var CANONICAL_WIDTHS = /* @__PURE__ */ new Set([1200, 600, 300]);
 var MAX_HEIGHT = 1200;
 function inspectMedia(bytes, declaredType) {
-  const probe = probeImage(bytes);
-  if (probe?.type !== declaredType) return { code: "MEDIA_UNSAFE_TYPE" };
+  const probe2 = probeImage(bytes);
+  if (probe2?.type !== declaredType) return { code: "MEDIA_UNSAFE_TYPE" };
   if (bytes.length > MAX_MEDIA_BYTES) return { code: "MEDIA_SIZE_EXCEEDED" };
-  if (!CANONICAL_WIDTHS.has(probe.width) || probe.height < 1 || probe.height > MAX_HEIGHT) {
+  if (!CANONICAL_WIDTHS.has(probe2.width) || probe2.height < 1 || probe2.height > MAX_HEIGHT) {
     return { code: "MEDIA_DIMENSIONS_INVALID" };
   }
   return {
     code: "MEDIA_ACCEPTED",
     sha256: (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex"),
-    mimeType: probe.type,
-    width: probe.width,
-    height: probe.height,
+    mimeType: probe2.type,
+    width: probe2.width,
+    height: probe2.height,
     sizeBytes: bytes.length
   };
 }
@@ -101898,6 +101909,17 @@ var ROUTE_CONTRACTS = [
   },
   {
     method: "GET",
+    path: "/v1/admin/payments/health",
+    summary: "The payments mode and whether each processor answers (no secret, audited)",
+    permission: "orders:read",
+    request: {},
+    responses: {
+      200: paymentsHealthSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
     path: "/v1/admin/orders/:order_number",
     summary: "One order, with its lines and payment events",
     permission: "orders:read",
@@ -103021,6 +103043,26 @@ function registerAccountRoutes(app, deps) {
   });
 }
 
+// src/services/paymentsHealth.ts
+async function probe(port) {
+  if (port === void 0) return "unconfigured";
+  const answered = await port.ping().catch(() => false);
+  return answered ? "ok" : "unreachable";
+}
+async function readPaymentsHealth(mode, processors) {
+  const [stripe, mercadoPago] = await Promise.all([
+    probe(processors.STRIPE),
+    probe(processors.MERCADO_PAGO)
+  ]);
+  const states = /* @__PURE__ */ new Set([stripe, mercadoPago]);
+  const healthy = states.has("ok") && !states.has("unreachable");
+  return {
+    status: healthy ? "ok" : "degraded",
+    mode,
+    processors: { stripe, mercadoPago }
+  };
+}
+
 // src/routes/admin.ts
 function registerAdminRoutes(app, deps) {
   app.get("/v1/admin/orders", async (request, reply) => {
@@ -103037,6 +103079,12 @@ function registerAdminRoutes(app, deps) {
     );
     return orderPageSchema.parse({ items, total, ...paging2 });
   });
+  app.get(
+    "/v1/admin/payments/health",
+    async () => paymentsHealthSchema.parse(
+      await readPaymentsHealth(deps.mode, deps.processors)
+    )
+  );
   app.get("/v1/admin/orders/:order_number", async (request, reply) => {
     const { order_number: orderNumber } = request.params;
     const found = await lookUpOrder(deps, orderNumber);
@@ -105326,6 +105374,14 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       else if (typeof event.action === "string") type = event.action;
       const eventId = typeof event.id === "string" || typeof event.id === "number" ? String(event.id) : `${type}:${dataId}`;
       return { eventId, type, resourceId: dataId };
+    },
+    async ping() {
+      try {
+        await call("/users/me", { method: "GET" });
+        return true;
+      } catch {
+        return false;
+      }
     },
     async fetchPayment(paymentId) {
       const payment = await call(
@@ -119352,6 +119408,14 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         processorStatus: status
       };
     },
+    async ping() {
+      try {
+        await call("/checkout/sessions?limit=1", { method: "GET" });
+        return true;
+      } catch {
+        return false;
+      }
+    },
     async fetchRefund(chargeId) {
       const charge = await call(`/charges/${encodeURIComponent(chargeId)}`, {
         method: "GET"
@@ -119589,7 +119653,12 @@ async function buildApp(deps) {
     cards,
     siteUrl: deps.config.payments.siteUrl
   });
-  registerAdminRoutes(app, { db: deps.db, now });
+  registerAdminRoutes(app, {
+    db: deps.db,
+    now,
+    processors,
+    mode: deps.config.payments.mode
+  });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerAdminOrderRoutes(app, { db: deps.db, now });
   registerAdminShippingRoutes(app, { db: deps.db, now });
@@ -119911,7 +119980,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "88b1cf196fda47e36ca78f42a504761594fea03b" : void 0;
+var sha = true ? "0a46e701cb49ccf24892704fc353f166810a95aa" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
