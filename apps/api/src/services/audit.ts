@@ -62,8 +62,8 @@ function redactPii(value: unknown, rule: RegExp): unknown {
 
 /** One audit entry, before redaction. */
 interface AuditEntry {
-  /** The staff or admin user who acted. */
-  userId: string;
+  /** The staff or admin user who acted, or null when the system did (a processor's webhook). */
+  userId: string | null;
   /** What was done, e.g. `GET /v1/admin/orders/:order_number`. */
   action: string;
   /** The kind of entity, e.g. `orders`. */

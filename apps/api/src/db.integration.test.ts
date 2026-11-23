@@ -438,6 +438,72 @@ describe('webhook settlement (webhooks.ts)', () => {
     expect(Number(events.n)).toBe(1);
     expect((await stockOf('ITEST-PACK')).stock).toBe(before.stock - 1);
   });
+
+  it('refunds a paid order in full: REFUNDED, the unit back on the shelf, one notice, paid_at kept, and the replay changes nothing (FC 069)', async () => {
+    const orderNumber = await checkout('ITEST-PACK');
+    const before = await stockOf('ITEST-PACK');
+    let event = {
+      eventId: 'evt_itest_pay_69',
+      type: 'checkout.session.completed',
+      resourceId: 'cs_itest_69',
+    };
+    const stripe = processor({
+      verifyWebhook: () => event,
+      fetchPayment: async () => ({
+        paid: true,
+        amountMxnCents: TOTAL_ONE,
+        currency: 'MXN',
+        orderNumber,
+        processorStatus: 'paid',
+      }),
+      fetchRefund: async () => ({
+        sessionId: 'cs_itest_69',
+        orderNumber,
+        amountMxnCents: TOTAL_ONE,
+        refundedMxnCents: TOTAL_ONE,
+        currency: 'MXN',
+      }),
+    });
+    const webhookDeps = {
+      db,
+      processors: { STRIPE: stripe },
+      payments,
+      now: () => NOW,
+    };
+    const input = { rawBody: Buffer.from('{}'), headers: {}, query: {} };
+    await receiveWebhook(webhookDeps, 'STRIPE', input);
+    const paid = await orderOf(orderNumber);
+    expect(paid.status).toBe(2);
+
+    event = {
+      eventId: 'evt_itest_refund_69',
+      type: 'charge.refunded',
+      resourceId: 'ch_itest_69',
+    };
+    expect(await receiveWebhook(webhookDeps, 'STRIPE', input)).toEqual({
+      status: 200,
+      code: 'REFUND_PROCESSED',
+    });
+    const refunded = await orderOf(orderNumber);
+    expect(refunded.status).toBe(5);
+    expect(refunded.paidAt).toEqual(paid.paidAt);
+    expect(await stockOf('ITEST-PACK')).toEqual({
+      stock: before.stock,
+      reserved: before.reserved - 1,
+    });
+    const [notices] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type = 'ORDER_REFUNDED'"
+    );
+    expect(Number(notices.n)).toBe(1);
+
+    // The same refund again, as another event: the order is already REFUNDED.
+    event = { ...event, eventId: 'evt_itest_refund_69_again' };
+    expect(await receiveWebhook(webhookDeps, 'STRIPE', input)).toEqual({
+      status: 200,
+      code: 'IDEMPOTENT_IGNORED',
+    });
+    expect((await stockOf('ITEST-PACK')).stock).toBe(before.stock);
+  });
 });
 
 describe('constraints MariaDB enforces (CHECK and FOREIGN KEY)', () => {

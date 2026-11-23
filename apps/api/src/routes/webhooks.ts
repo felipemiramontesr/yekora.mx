@@ -6,7 +6,8 @@
  *
  * Answers: 200 with the T1.3/T1.4 code (the processor stops retrying), 401 INVALID_SIGNATURE,
  * 503 SERVICE_UNAVAILABLE (not configured, or the processor could not be asked: it retries),
- * 500 STATE_CONFLICT_ANOMALY.
+ * 500 STATE_CONFLICT_ANOMALY, or REFUND_STATUS_CONFLICT_ANOMALY for a refund of an order that
+ * was never paid (FC 069).
  *
  * @module
  */
@@ -23,6 +24,7 @@ const TITLES: Record<string, string> = {
   INVALID_SIGNATURE: 'Invalid signature',
   SERVICE_UNAVAILABLE: 'Payments unavailable',
   STATE_CONFLICT_ANOMALY: 'Order state conflict',
+  REFUND_STATUS_CONFLICT_ANOMALY: 'Refund state conflict',
 };
 
 /**

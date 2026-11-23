@@ -384,6 +384,34 @@ const ORDER_COPY = {
       },
     }),
   },
+  ORDER_REFUNDED: {
+    'es-MX': ({ name, number, site }: OrderContext): Copy => ({
+      subject: `Reembolsamos tu pedido ${number}`,
+      content: {
+        heading: 'Reembolsamos tu pedido',
+        paragraphs: [
+          `Hola ${name}: reembolsamos el pago completo de tu pedido ${number}. El dinero regresa a tu método de pago; según tu banco puede tardar unos días en verse reflejado.`,
+        ],
+        button: {
+          label: 'Ver mi pedido',
+          url: `${site}/cuenta/${number}/`,
+        },
+      },
+    }),
+    en: ({ name, number, site }: OrderContext): Copy => ({
+      subject: `We refunded your order ${number}`,
+      content: {
+        heading: 'We refunded your order',
+        paragraphs: [
+          `Hello ${name}: we refunded the full payment of your order ${number}. The money goes back to your payment method; depending on your bank it may take a few days to show.`,
+        ],
+        button: {
+          label: 'View my order',
+          url: `${site}/en/account/${number}/`,
+        },
+      },
+    }),
+  },
   ORDER_PREPARED: {
     'es-MX': ({ name, number, site }: OrderContext): Copy => ({
       subject: `Estamos preparando tu pedido ${number}`,

@@ -65,6 +65,11 @@ export type MailEvent = (
       orderId: number;
     }
   | {
+      /** The whole payment of an order was refunded at the processor (FC 069, K-76). */
+      type: 'ORDER_REFUNDED';
+      orderId: number;
+    }
+  | {
       /** An operator shipped a paid order and registered its parcel (FC 068, K-48). */
       type: 'ORDER_SHIPPED';
       orderId: number;

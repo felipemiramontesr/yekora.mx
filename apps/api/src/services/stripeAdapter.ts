@@ -22,6 +22,7 @@ import {
   type CreatedSession,
   type PaymentProcessorPort,
   type PaymentStatus,
+  type RefundStatus,
   PaymentProcessorError,
   remoteDeadline,
   type SessionRequest,
@@ -294,6 +295,44 @@ export function createStripeAdapter(
             ? session.client_reference_id
             : null,
         processorStatus: status,
+      };
+    },
+
+    async fetchRefund(chargeId): Promise<RefundStatus | null> {
+      // The event carries a charge (`ch_…`); only its payment intent (`pi_…`) finds the session.
+      const charge = (await call(`/charges/${encodeURIComponent(chargeId)}`, {
+        method: 'GET',
+      })) as {
+        payment_intent?: unknown;
+        amount?: unknown;
+        amount_refunded?: unknown;
+        currency?: unknown;
+      };
+      if (
+        typeof charge.payment_intent !== 'string' ||
+        !Number.isInteger(charge.amount) ||
+        !Number.isInteger(charge.amount_refunded)
+      ) {
+        return null;
+      }
+      const found = (await call(
+        `/checkout/sessions?payment_intent=${encodeURIComponent(charge.payment_intent)}&limit=1`,
+        { method: 'GET' }
+      )) as { data?: { id?: unknown; client_reference_id?: unknown }[] };
+      const session = found.data?.[0];
+      if (typeof session?.id !== 'string') return null;
+      return {
+        sessionId: session.id,
+        orderNumber:
+          typeof session.client_reference_id === 'string'
+            ? session.client_reference_id
+            : null,
+        amountMxnCents: charge.amount as number,
+        refundedMxnCents: charge.amount_refunded as number,
+        currency:
+          typeof charge.currency === 'string'
+            ? charge.currency.toUpperCase()
+            : null,
       };
     },
   };

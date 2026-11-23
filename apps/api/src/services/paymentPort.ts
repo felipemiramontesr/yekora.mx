@@ -79,6 +79,20 @@ export interface PaymentStatus {
   processorStatus: string;
 }
 
+/** What the processor says about a refunded charge, read back from its API (FC 069). */
+export interface RefundStatus {
+  /** The hosted session that took the payment: `orders.payment_resource_id`. */
+  sessionId: string;
+  /** Its external reference: must equal the order number. */
+  orderNumber: string | null;
+  /** What was charged, MXN cents. */
+  amountMxnCents: number;
+  /** What has been refunded so far, MXN cents: all of it only for a full refund. */
+  refundedMxnCents: number;
+  /** Currency as the processor reports it, upper case. */
+  currency: string | null;
+}
+
 /** Headers and query of an incoming webhook, as the route received them. */
 export interface WebhookInput {
   /** Exact request body bytes; signatures are computed over these. */
@@ -113,6 +127,15 @@ export interface PaymentProcessorPort {
    * @param resourceId - Session or payment id from the verified event.
    */
   fetchPayment(resourceId: string): Promise<PaymentStatus>;
+  /**
+   * Reads a refunded charge back from the processor and finds the session that took the payment
+   * (FC 069). Only a processor whose refunds reach the webhook implements it.
+   *
+   * @param chargeId - Charge id from the verified event.
+   * @returns What was charged and refunded and the session, or null when the charge has no
+   *   payment intent or no session of ours.
+   */
+  fetchRefund?(chargeId: string): Promise<RefundStatus | null>;
 }
 
 /** A processor call that failed; the message never carries secrets or payer data. */

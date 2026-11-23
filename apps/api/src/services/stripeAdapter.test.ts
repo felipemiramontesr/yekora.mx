@@ -542,3 +542,77 @@ describe('createStripeCards (FC 054: the cards live at Stripe)', () => {
     expect(source).not.toMatch(/number|cvc|cvv|pan/i);
   });
 });
+
+describe('fetchRefund (FC 069)', () => {
+  /** A fetch that answers the charge first and then the sessions list. */
+  const twoCalls = (charge: unknown, sessions: unknown) =>
+    vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(charge)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(sessions)));
+
+  const CHARGE = {
+    payment_intent: 'pi_1',
+    amount: 200000,
+    amount_refunded: 200000,
+    currency: 'mxn',
+  };
+
+  it('reads the charge, then finds the session of its payment intent', async () => {
+    const fetchMock = twoCalls(CHARGE, {
+      data: [{ id: 'cs_test_1', client_reference_id: 'YEK-2026-ABCD1234' }],
+    });
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).fetchRefund?.('ch/1')
+    ).resolves.toEqual({
+      sessionId: 'cs_test_1',
+      orderNumber: 'YEK-2026-ABCD1234',
+      amountMxnCents: 200000,
+      refundedMxnCents: 200000,
+      currency: 'MXN',
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.stripe.com/v1/charges/ch%2F1'
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      'https://api.stripe.com/v1/checkout/sessions?payment_intent=pi_1&limit=1'
+    );
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('GET');
+  });
+
+  it('reports a missing reference and currency as null', async () => {
+    const fetchMock = twoCalls(
+      { ...CHARGE, currency: undefined },
+      { data: [{ id: 'cs_test_1' }] }
+    );
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).fetchRefund?.('ch_1')
+    ).resolves.toMatchObject({ orderNumber: null, currency: null });
+  });
+
+  it.each([
+    ['a charge without a payment intent', { ...CHARGE, payment_intent: null }],
+    ['a charge without an amount', { ...CHARGE, amount: 'x' }],
+    ['a charge without a refunded amount', { ...CHARGE, amount_refunded: 1.5 }],
+  ])(
+    '%s has no session to find: null and one call only',
+    async (_n, charge) => {
+      const fetchMock = twoCalls(charge, { data: [] });
+      await expect(
+        createStripeAdapter(SECRETS, fetchMock).fetchRefund?.('ch_1')
+      ).resolves.toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([[{ data: [] }], [{}], [{ data: [{}] }]])(
+    'a payment intent with no session of ours (%j) is null',
+    async (sessions) => {
+      await expect(
+        createStripeAdapter(SECRETS, twoCalls(CHARGE, sessions)).fetchRefund?.(
+          'ch_1'
+        )
+      ).resolves.toBeNull();
+    }
+  );
+});

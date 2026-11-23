@@ -23,6 +23,7 @@ import type {
   WebhookInput,
 } from './paymentPort';
 import { enqueueMail } from './outbox';
+import { applyRefund, decideRefund } from './refundFsm';
 import { settle } from './settlement';
 
 /** Dependencies of the webhook receiver. */
@@ -57,6 +58,12 @@ const SETTLING_TYPES: Record<ProcessorCode, readonly string[]> = {
     'checkout.session.async_payment_succeeded',
   ],
   MERCADO_PAGO: ['payment'],
+};
+
+/** Event types that announce a refunded charge (FC 069). Mercado Pago's refunds are not heard. */
+const REFUND_TYPES: Record<ProcessorCode, readonly string[]> = {
+  STRIPE: ['charge.refunded'],
+  MERCADO_PAGO: [],
 };
 
 const STATUS = { PENDING: 1, PAID: 2, EXPIRED: 3, CANCELLED: 4 } as const;
@@ -136,6 +143,118 @@ async function reconcile(
   return { payment, order: order ?? null, confirmed };
 }
 
+/** Order of a refunded session, looked up by the session the payment was taken in. */
+interface RefundOrderRow extends OrderRow {
+  order_number: string;
+}
+
+/** The unreconciled and partial refunds are recorded as alerts: nothing changes but someone looks. */
+function recordRefundAlert(
+  deps: WebhookDeps,
+  base: Omit<EventRecord, 'resultingStatusId' | 'alert'>,
+  code: string
+): Promise<WebhookOutcome> {
+  return deps.db.transaction(async (tx) => {
+    const recorded = await recordEvent(tx, {
+      ...base,
+      resultingStatusId: null,
+      alert: true,
+    });
+    return { status: 200, code: recorded ? code : 'IDEMPOTENT_IGNORED' };
+  });
+}
+
+/** T1.2 and T1.3 of FC 069 on the locked order, with the event recorded in the same transaction. */
+function refundOrder(
+  deps: WebhookDeps,
+  base: Omit<EventRecord, 'resultingStatusId' | 'alert'>,
+  order: RefundOrderRow
+): Promise<WebhookOutcome> {
+  return deps.db.transaction(async (tx) => {
+    const [current] = await tx.query<{ status_id: number }>(
+      'SELECT status_id FROM orders WHERE id = ? FOR UPDATE',
+      [order.id]
+    );
+    const status = Number(current.status_id);
+    const outcome = decideRefund(status);
+    const conflict = outcome === 'REFUND_STATUS_CONFLICT_ANOMALY';
+    const recorded = await recordEvent(tx, {
+      ...base,
+      resultingStatusId: conflict ? status : 5,
+      alert: conflict,
+    });
+    if (!recorded) return { status: 200, code: 'IDEMPOTENT_IGNORED' };
+    if (conflict) return { status: 500, code: outcome };
+    if (outcome === 'IDEMPOTENT_IGNORED') {
+      return { status: 200, code: outcome };
+    }
+    await applyRefund(tx, order.id, order.order_number, outcome);
+    return { status: 200, code: 'REFUND_PROCESSED' };
+  });
+}
+
+/**
+ * FC 069: a refunded charge. It is read back from the processor, matched to the order whose
+ * session took the payment, and only a refund of the whole charge moves the order.
+ */
+async function receiveRefund(
+  deps: WebhookDeps,
+  code: ProcessorCode,
+  processor: PaymentProcessorPort,
+  event: VerifiedEvent,
+  isTest: boolean
+): Promise<WebhookOutcome> {
+  const processorId = PROCESSOR_ID[code];
+  const nothing: Reconciliation = {
+    payment: null,
+    order: null,
+    confirmed: false,
+  };
+  const unreconciled = (reconciliation: Reconciliation = nothing) =>
+    recordRefundAlert(
+      deps,
+      { processorId, event, reconciliation, isTest },
+      'REFUND_UNRECONCILED_ALERT'
+    );
+  if (event.resourceId === null || processor.fetchRefund === undefined) {
+    return unreconciled();
+  }
+  let refund;
+  try {
+    refund = await processor.fetchRefund(event.resourceId);
+  } catch {
+    return { status: 503, code: 'SERVICE_UNAVAILABLE' };
+  }
+  if (refund === null) return unreconciled();
+  const [order] = await deps.db.query<RefundOrderRow>(
+    'SELECT o.id, o.order_number, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ? AND o.payment_resource_id = ?',
+    [refund.orderNumber, processorId, refund.sessionId]
+  );
+  const payment: PaymentStatus = {
+    paid: false,
+    amountMxnCents: refund.refundedMxnCents,
+    currency: refund.currency,
+    orderNumber: refund.orderNumber,
+    processorStatus: 'refunded',
+  };
+  if (
+    order === undefined ||
+    refund.currency !== 'MXN' ||
+    refund.amountMxnCents !== Number(order.total_mxn_cents)
+  ) {
+    return unreconciled({ payment, order: null, confirmed: false });
+  }
+  const base = {
+    processorId,
+    event,
+    reconciliation: { payment, order, confirmed: true },
+    isTest,
+  };
+  return refund.refundedMxnCents >= refund.amountMxnCents
+    ? refundOrder(deps, base, order)
+    : recordRefundAlert(deps, base, 'PARTIAL_REFUND_ALERT');
+}
+
 /** T1.4 on the locked order, with the event recorded in the same transaction. */
 function settleOrder(
   deps: WebhookDeps,
@@ -211,6 +330,11 @@ export async function receiveWebhook(
     [processorId, event.eventId]
   );
   if (seen !== undefined) return { status: 200, code: 'IDEMPOTENT_IGNORED' };
+  const isTest = deps.payments.mode === 'sandbox';
+  // FC 069: a refund is reconciled by its own path.
+  if (REFUND_TYPES[code].includes(event.type)) {
+    return receiveRefund(deps, code, processor, event, isTest);
+  }
   // R
   let reconciliation: Reconciliation;
   try {
@@ -222,7 +346,7 @@ export async function receiveWebhook(
     processorId,
     event,
     reconciliation,
-    isTest: deps.payments.mode === 'sandbox',
+    isTest,
   };
   if (!reconciliation.confirmed) {
     const recorded = await deps.db.transaction((tx) =>
