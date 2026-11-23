@@ -581,6 +581,7 @@ describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
       'account:self',
       'audit:read',
       'catalog:write',
+      'orders:manage',
       'orders:read',
       'shipping:manage',
       'users:manage',
