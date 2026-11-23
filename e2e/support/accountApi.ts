@@ -82,6 +82,13 @@ const SUMMARY = {
 
 const DETAIL = {
   ...SUMMARY,
+  // FC 068: an order that has not shipped has no parcel.
+  fulfillment: null,
+  carrier: null,
+  trackingNumber: null,
+  trackingUrl: null,
+  shippedAt: null,
+  deliveredAt: null,
   lines: [
     {
       sku: 'E2E-0001',
@@ -133,6 +140,7 @@ const USERS: Record<Persona, object> = {
       'audit:read',
       'catalog:write',
       'orders:read',
+      'orders:manage',
       'shipping:manage',
       'users:manage',
     ],
@@ -604,6 +612,7 @@ export async function mockAccountApi(
   };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   const admins = adminAccounts();
+  const fulfillment = newFulfillment();
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
     free: false,
@@ -675,8 +684,12 @@ export async function mockAccountApi(
           ? answerShipping(route, shippingStates, shippingConfig)
           : problem(route, 403, 'PERMISSION_DENIED');
       }
+      // FC 068: staff who only read orders may not operate them.
+      if (/\/(prepare|ship|deliver)$/.test(path) && user !== 'owner') {
+        return problem(route, 403, 'PERMISSION_DENIED');
+      }
       return user === 'staff' || user === 'owner'
-        ? answerOrders(route)
+        ? answerOrders(route, fulfillment)
         : problem(route, 403, 'PERMISSION_DENIED');
     })
   );
@@ -759,11 +772,83 @@ function answerCards(route: Route, data: AccountData) {
 }
 
 /** A list of one order, or that order. */
-function answerOrders(route: Route) {
-  const path = new URL(route.request().url()).pathname;
-  return path.endsWith('/orders')
-    ? json(route, 200, { items: [SUMMARY], page: 1, pageSize: 20, total: 1 })
-    : json(route, 200, DETAIL);
+function answerOrders(route: Route, parcel: Fulfillment = newFulfillment()) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  if (path.endsWith('/orders')) {
+    return json(route, 200, {
+      items: [{ ...SUMMARY, fulfillment: parcel.step }],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    });
+  }
+  const step = /\/(prepare|ship|deliver)$/.exec(path)?.[1];
+  if (step === undefined) {
+    return json(route, 200, { ...DETAIL, ...parcel.view() });
+  }
+  // FC 068: the three steps, in the order the API admits them.
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  const admitted: Record<string, (string | null)[]> = {
+    prepare: [null],
+    ship: [null, 'PREPARING'],
+    deliver: ['SHIPPED'],
+  };
+  if (!admitted[step].includes(parcel.step)) {
+    return problem(route, 409, 'ORDER_STATUS_CONFLICT');
+  }
+  if (step === 'ship') {
+    const body = request.postDataJSON() as Record<string, string | undefined>;
+    parcel.carrier = body.carrier ?? null;
+    parcel.trackingNumber = body.trackingNumber ?? null;
+    parcel.trackingUrl = body.trackingUrl ?? null;
+    parcel.step = 'SHIPPED';
+  } else {
+    parcel.step = step === 'prepare' ? 'PREPARING' : 'DELIVERED';
+  }
+  return json(route, 200, { orderNumber: E2E_ORDER, ...parcel.view() });
+}
+
+/** The fulfillment of the one order of the interceptor, kept while a test runs (FC 068). */
+interface Fulfillment {
+  step: 'PREPARING' | 'SHIPPED' | 'DELIVERED' | null;
+  carrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  /** The fields an order answer carries for the current step. */
+  view: () => {
+    fulfillment: Fulfillment['step'];
+    carrier: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+    shippedAt: string | null;
+    deliveredAt: string | null;
+  };
+}
+
+/** A fresh fulfillment: nothing has happened to the order. */
+function newFulfillment(): Fulfillment {
+  const parcel: Fulfillment = {
+    step: null,
+    carrier: null,
+    trackingNumber: null,
+    trackingUrl: null,
+    view: () => ({
+      fulfillment: parcel.step,
+      carrier: parcel.carrier,
+      trackingNumber: parcel.trackingNumber,
+      trackingUrl: parcel.trackingUrl,
+      shippedAt:
+        parcel.step === 'SHIPPED' || parcel.step === 'DELIVERED'
+          ? '2026-11-02T09:00:00.000Z'
+          : null,
+      deliveredAt:
+        parcel.step === 'DELIVERED' ? '2026-11-04T16:00:00.000Z' : null,
+    }),
+  };
+  return parcel;
 }
 
 /** An upload the page sent to the catalog backoffice, as the browser decoded it. */

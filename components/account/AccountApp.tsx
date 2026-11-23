@@ -507,6 +507,9 @@ function Dashboard({
           texts={texts}
           backHref={accountPath(area, { tab, orderNumber: null })}
           onBack={() => open(null)}
+          canManage={
+            scope === 'admin' && user.permissions.includes('orders:manage')
+          }
         />
       )}
       {isOrders && !view.orderNumber && (

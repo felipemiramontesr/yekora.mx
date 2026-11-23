@@ -59,6 +59,16 @@ export type MailEvent = (
       type: 'ORDER_CANCELLED';
       orderId: number;
     }
+  | {
+      /** An operator started preparing a paid order (FC 068, K-48). */
+      type: 'ORDER_PREPARED';
+      orderId: number;
+    }
+  | {
+      /** An operator shipped a paid order and registered its parcel (FC 068, K-48). */
+      type: 'ORDER_SHIPPED';
+      orderId: number;
+    }
 ) & {
   /** The language the message asks for, if any. */
   locale?: string;

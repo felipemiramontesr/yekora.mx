@@ -247,6 +247,22 @@ function copyOf(
 /** The three order events, which carry an order id instead of an account. */
 type OrderEvent = Extract<MailEvent, { orderId: number }>;
 
+/** What the words of an order message are made of. */
+interface OrderContext {
+  /** The buyer's name. */
+  name: string;
+  /** Public order number. */
+  number: string;
+  /** The site's address, for links. */
+  site: string;
+  /** The carrier, once the order shipped. */
+  carrier: string | null;
+  /** The tracking number, once the order shipped. */
+  trackingNumber: string | null;
+  /** The link to follow the parcel, when the carrier gave one and it is http or https. */
+  trackingUrl: string | null;
+}
+
 /** The columns of an order a message needs, as MariaDB returns them. */
 interface OrderData {
   order_number: string;
@@ -262,6 +278,9 @@ interface OrderData {
   items_tax_mxn_cents: number;
   shipping_tax_mxn_cents: number;
   total_mxn_cents: number;
+  carrier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
   customer_name_enc: Buffer;
   customer_email_enc: Buffer;
   shipping_address_enc: Buffer;
@@ -292,7 +311,7 @@ interface SealedAddress {
 /** The words of the three order messages, in each language. */
 const ORDER_COPY = {
   ORDER_CONFIRMED: {
-    'es-MX': (name: string, number: string, site: string): Copy => ({
+    'es-MX': ({ name, number, site }: OrderContext): Copy => ({
       subject: `Confirmamos tu pedido ${number} en YĒKORA`,
       content: {
         heading: 'Gracias por tu compra',
@@ -306,7 +325,7 @@ const ORDER_COPY = {
         notice: `Si no reconoces esta compra, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
       },
     }),
-    en: (name: string, number: string, site: string): Copy => ({
+    en: ({ name, number, site }: OrderContext): Copy => ({
       subject: `We confirmed your order ${number} at YĒKORA`,
       content: {
         heading: 'Thank you for your purchase',
@@ -322,7 +341,7 @@ const ORDER_COPY = {
     }),
   },
   ORDER_EXPIRED: {
-    'es-MX': (name: string, number: string, site: string): Copy => ({
+    'es-MX': ({ name, number, site }: OrderContext): Copy => ({
       subject: `Tu pedido ${number} venció sin pago`,
       content: {
         heading: 'Tu pedido venció',
@@ -332,7 +351,7 @@ const ORDER_COPY = {
         button: { label: 'Volver a la tienda', url: `${site}/catalogo/` },
       },
     }),
-    en: (name: string, number: string, site: string): Copy => ({
+    en: ({ name, number, site }: OrderContext): Copy => ({
       subject: `Your order ${number} expired unpaid`,
       content: {
         heading: 'Your order expired',
@@ -344,7 +363,7 @@ const ORDER_COPY = {
     }),
   },
   ORDER_CANCELLED: {
-    'es-MX': (name: string, number: string, site: string): Copy => ({
+    'es-MX': ({ name, number, site }: OrderContext): Copy => ({
       subject: `Cancelamos tu pedido ${number}`,
       content: {
         heading: 'Cancelamos tu pedido',
@@ -354,7 +373,7 @@ const ORDER_COPY = {
         button: { label: 'Volver a la tienda', url: `${site}/catalogo/` },
       },
     }),
-    en: (name: string, number: string, site: string): Copy => ({
+    en: ({ name, number, site }: OrderContext): Copy => ({
       subject: `We cancelled your order ${number}`,
       content: {
         heading: 'We cancelled your order',
@@ -362,6 +381,76 @@ const ORDER_COPY = {
           `Hello ${name}: we could not open the payment page of your order ${number}, so we cancelled it and released the products. You were not charged. You can try your purchase again.`,
         ],
         button: { label: 'Back to the store', url: `${site}/en/catalog/` },
+      },
+    }),
+  },
+  ORDER_PREPARED: {
+    'es-MX': ({ name, number, site }: OrderContext): Copy => ({
+      subject: `Estamos preparando tu pedido ${number}`,
+      content: {
+        heading: 'Estamos preparando tu pedido',
+        paragraphs: [
+          `Hola ${name}: tu pedido ${number} ya está en preparación. Te avisaremos en cuanto salga.`,
+        ],
+        button: {
+          label: 'Ver mi pedido',
+          url: `${site}/cuenta/${number}/`,
+        },
+      },
+    }),
+    en: ({ name, number, site }: OrderContext): Copy => ({
+      subject: `We are preparing your order ${number}`,
+      content: {
+        heading: 'We are preparing your order',
+        paragraphs: [
+          `Hello ${name}: your order ${number} is being prepared. We will let you know as soon as it ships.`,
+        ],
+        button: {
+          label: 'View my order',
+          url: `${site}/en/account/${number}/`,
+        },
+      },
+    }),
+  },
+  ORDER_SHIPPED: {
+    'es-MX': ({
+      name,
+      number,
+      site,
+      carrier,
+      trackingNumber,
+      trackingUrl,
+    }: OrderContext): Copy => ({
+      subject: `Tu pedido ${number} va en camino`,
+      content: {
+        heading: 'Tu pedido va en camino',
+        paragraphs: [
+          `Hola ${name}: tu pedido ${number} salió con ${carrier}. Tu guía de rastreo es ${trackingNumber}.`,
+        ],
+        button: {
+          label: 'Rastrear mi envío',
+          url: trackingUrl ?? `${site}/cuenta/${number}/`,
+        },
+      },
+    }),
+    en: ({
+      name,
+      number,
+      site,
+      carrier,
+      trackingNumber,
+      trackingUrl,
+    }: OrderContext): Copy => ({
+      subject: `Your order ${number} is on its way`,
+      content: {
+        heading: 'Your order is on its way',
+        paragraphs: [
+          `Hello ${name}: your order ${number} shipped with ${carrier}. Your tracking number is ${trackingNumber}.`,
+        ],
+        button: {
+          label: 'Track my shipment',
+          url: trackingUrl ?? `${site}/en/account/${number}/`,
+        },
       },
     }),
   },
@@ -402,7 +491,7 @@ async function renderOrder(
 ): Promise<MailMessage> {
   if (keys.piiKey === null) throw new Error('CHECKOUT_PII_KEY is not set');
   const [order] = await db.query<OrderData>(
-    'SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?',
+    'SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.carrier, o.tracking_number, o.tracking_url, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?',
     [event.orderId]
   );
   if (order === undefined) throw new Error('Order not found');
@@ -449,11 +538,19 @@ async function renderOrder(
     timeStyle: 'short',
     timeZone: 'America/Mexico_City',
   }).format(order.created_at);
-  const { subject, content } = ORDER_COPY[event.type][locale](
+  // The link of a carrier goes into a button only if it is http or https (FC 068 T2.3).
+  const trackingUrl =
+    order.tracking_url && /^https?:\/\//i.test(order.tracking_url)
+      ? order.tracking_url
+      : null;
+  const { subject, content } = ORDER_COPY[event.type][locale]({
     name,
     number,
-    keys.siteUrl
-  );
+    site: keys.siteUrl,
+    carrier: order.carrier,
+    trackingNumber: order.tracking_number,
+    trackingUrl,
+  });
   const block: OrderBlock = {
     number,
     date,
@@ -473,6 +570,14 @@ async function renderOrder(
     ),
     total: money(order.total_mxn_cents, locale),
     address: addressLines(address, english ? zone.name_en : zone.name_es),
+    ...(order.carrier && order.tracking_number
+      ? {
+          parcel: {
+            carrier: order.carrier,
+            trackingNumber: order.tracking_number,
+          },
+        }
+      : {}),
   };
   const { html, text } = renderEmail(
     { ...content, locale, order: block },

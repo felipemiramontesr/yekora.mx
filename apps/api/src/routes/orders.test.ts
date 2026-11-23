@@ -100,6 +100,7 @@ describe('GET /v1/orders/:order_number', () => {
       totalMxnCents: 200000,
       expiresAt: '2026-10-24T19:00:00.000Z',
       paidAt: null,
+      fulfillment: null,
     });
     // Lapsed reservations are released before reading, at the injected clock.
     expect(sql[0]).toEqual({

@@ -84,7 +84,7 @@ export const checkoutSessionSchema = z.object({
   totalMxnCents: z.number().int().positive(),
 });
 
-/** The six order statuses (FSM of FC 012, `order_statuses`). */
+/** The six order statuses a client already knows (FSM of FC 012, `order_statuses`). */
 export const ORDER_STATUS_CODES = [
   'PENDING_PAYMENT',
   'PAID',
@@ -93,6 +93,34 @@ export const ORDER_STATUS_CODES = [
   'REFUNDED',
   'NEEDS_REVIEW',
 ] as const;
+
+/** The three steps of the fulfillment of a paid order (FC 068, `order_statuses` 7, 8 and 9). */
+export const FULFILLMENT_CODES = ['PREPARING', 'SHIPPED', 'DELIVERED'] as const;
+
+/** One of the six statuses a client knows. */
+type OrderStatusCode = (typeof ORDER_STATUS_CODES)[number];
+
+/** One step of the fulfillment. */
+type FulfillmentCode = (typeof FULFILLMENT_CODES)[number];
+
+/**
+ * Splits the status of the database into what the API has always answered and what FC 068 adds.
+ * An order being prepared, shipped or delivered has been paid, so its `status` stays `PAID` and
+ * its step travels apart as `fulfillment`: a new answer property, which ADR 0014 allows, instead
+ * of three new values of a closed enum, which would break a web bundle cached before the change.
+ *
+ * @param code - `order_statuses.code`, any of the nine.
+ * @returns The status a client knows and the fulfillment step, or null before the order has one.
+ */
+export function splitStatus(code: string): {
+  status: OrderStatusCode;
+  fulfillment: FulfillmentCode | null;
+} {
+  const step = FULFILLMENT_CODES.find((candidate) => candidate === code);
+  return step === undefined
+    ? { status: code as OrderStatusCode, fulfillment: null }
+    : { status: 'PAID', fulfillment: step };
+}
 
 /** Answer of `GET /v1/orders/:order_number`: status, method, amounts and times, no personal data. */
 export const orderViewSchema = z.object({
@@ -106,6 +134,11 @@ export const orderViewSchema = z.object({
   expiresAt: z.string(),
   /** When the payment was settled, ISO 8601, or null. */
   paidAt: z.string().nullable(),
+  /**
+   * Where a paid order is in its fulfillment (FC 068): being prepared, shipped or delivered, or
+   * null before that. Its `status` stays `PAID` meanwhile.
+   */
+  fulfillment: z.enum(FULFILLMENT_CODES).nullable().optional(),
 });
 
 /** The buyer's view of one order. */

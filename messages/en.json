@@ -715,7 +715,10 @@
         "EXPIRED": "The time to pay for this order ran out and the items were released. Nothing was charged.",
         "CANCELLED": "This order was cancelled. Nothing was charged.",
         "REFUNDED": "This order was refunded.",
-        "NEEDS_REVIEW": "We received a payment we are reviewing. We will get in touch with you."
+        "NEEDS_REVIEW": "We received a payment we are reviewing. We will get in touch with you.",
+        "PREPARING": "We are preparing your order. We will let you know as soon as it ships.",
+        "SHIPPED": "Your order is on its way. Use the tracking number to follow it.",
+        "DELIVERED": "Your order was delivered. Thank you for your purchase!"
       },
       "confirming": "This page updates itself as soon as the processor confirms the payment.",
       "payBefore": "Complete your payment before {date}. Your items stay on hold until then.",
@@ -933,6 +936,11 @@
       "method": "Payment method",
       "placed": "Order date",
       "paidAt": "Paid on",
+      "carrier": "Carrier",
+      "tracking": "Tracking number",
+      "trackLink": "Track the shipment",
+      "shippedAt": "Shipped on",
+      "deliveredAt": "Delivered on",
       "expiresAt": "Pay by",
       "itemsTotal": "Products (VAT included)",
       "shipping": "Shipping",
@@ -957,7 +965,10 @@
       "EXPIRED": "Expired",
       "CANCELLED": "Cancelled",
       "REFUNDED": "Refunded",
-      "NEEDS_REVIEW": "Under review"
+      "NEEDS_REVIEW": "Under review",
+      "PREPARING": "Preparing",
+      "SHIPPED": "Shipped",
+      "DELIVERED": "Delivered"
     },
     "errors": {
       "AUTH_UNAVAILABLE": "Accounts are not available right now. Try again later.",
@@ -1542,6 +1553,48 @@
       "options": {
         "es-MX": "Español",
         "en": "English"
+      }
+    },
+    "fulfillment": {
+      "title": "Order fulfillment",
+      "intro": "Record how the order is going. When you start preparing it or ship it, the buyer gets an e-mail.",
+      "prepare": "Start preparing",
+      "ship": "Record the shipment",
+      "deliver": "Mark as delivered",
+      "working": "Saving…",
+      "done": "Done. The order is now «{status}».",
+      "noActions": "This order allows no more actions.",
+      "shipTitle": "Shipment details",
+      "carrier": "Carrier",
+      "trackingNumber": "Tracking number",
+      "trackingUrl": "Tracking link (optional)",
+      "exampleLabel": "Example",
+      "fields": {
+        "carrier": {
+          "description": "The carrier that takes the order.",
+          "example": "DHL"
+        },
+        "trackingNumber": {
+          "description": "The tracking number the carrier gave you, as it appears on the label.",
+          "example": "1234567890"
+        },
+        "trackingUrl": {
+          "description": "The address where the carrier lets you follow the shipment. It must start with https://. Leave it empty if you do not have it.",
+          "example": "https://www.dhl.com/mx-en/home/tracking.html"
+        }
+      },
+      "errors": {
+        "ORDER_STATUS_CONFLICT": "The order is no longer in a status that allows that action. Reload the page.",
+        "ORDER_NOT_FOUND": "We could not find that order.",
+        "ORDER_PAYLOAD_INVALID": "Check the carrier, the tracking number and the link: the carrier and the tracking number are required and the link must start with https://.",
+        "PERMISSION_DENIED": "Your account cannot manage orders.",
+        "SECOND_FACTOR_REQUIRED": "Turn on two-step verification to manage orders.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Try again.",
+        "invalid": "The server answer could not be read. Try again.",
+        "unknown": "Something failed. Try again."
       }
     },
     "adminHub": {

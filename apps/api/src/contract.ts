@@ -96,6 +96,10 @@ import {
   adminUserSchema,
 } from '../../../lib/account/adminUserTypes';
 import {
+  fulfillmentResultSchema,
+  shipRequestSchema,
+} from '../../../lib/account/fulfillmentTypes';
+import {
   shippingAdminViewSchema,
   shippingConfigRequestSchema,
   shippingRulesRequestSchema,
@@ -665,6 +669,29 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       ...SIGNED_IN_REFUSALS,
     },
   },
+  // FC 068 F1: the fulfillment of a paid order. Every step needs orders:manage and an Idempotency-Key.
+  ...(['prepare', 'ship', 'deliver'] as const).map((step): RouteContract => ({
+    method: 'POST',
+    path: `/v1/admin/orders/:order_number/${step}`,
+    summary: {
+      prepare: 'Moves a paid order to PREPARING and tells the buyer (audited)',
+      ship: 'Registers the carrier and the tracking number, moves the order to SHIPPED and tells the buyer (audited)',
+      deliver: 'Moves a shipped order to DELIVERED (audited)',
+    }[step],
+    permission: 'orders:manage',
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      ...(step === 'ship' && { body: shipRequestSchema }),
+    },
+    responses: {
+      200: fulfillmentResultSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  })),
   // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
   {
     method: 'GET',

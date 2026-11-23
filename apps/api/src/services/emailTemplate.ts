@@ -55,6 +55,8 @@ export interface OrderBlock {
   total: string;
   /** The delivery address, one line each. */
   address: readonly string[];
+  /** Who carries the parcel and under which tracking number, once it ships (FC 068). */
+  parcel?: { carrier: string; trackingNumber: string };
 }
 
 /** What one message says, before it is laid out. */
@@ -108,6 +110,8 @@ const FRAME = {
       number: 'Pedido',
       date: 'Fecha',
       method: 'Método de pago',
+      carrier: 'Transportista',
+      tracking: 'Guía de rastreo',
       product: 'Producto',
       quantity: 'Cant.',
       unit: 'Precio',
@@ -130,6 +134,8 @@ const FRAME = {
       number: 'Order',
       date: 'Date',
       method: 'Payment method',
+      carrier: 'Carrier',
+      tracking: 'Tracking number',
       product: 'Product',
       quantity: 'Qty',
       unit: 'Price',
@@ -228,6 +234,12 @@ function orderHtml(
     [words.number, order.number],
     [words.date, order.date],
     [words.method, order.method],
+    ...(order.parcel === undefined
+      ? []
+      : [
+          [words.carrier, order.parcel.carrier],
+          [words.tracking, order.parcel.trackingNumber],
+        ]),
   ];
   const lines = order.lines.map((line) =>
     row([
@@ -260,6 +272,12 @@ function orderText(
       `${words.number}: ${order.number}`,
       `${words.date}: ${order.date}`,
       `${words.method}: ${order.method}`,
+      ...(order.parcel === undefined
+        ? []
+        : [
+            `${words.carrier}: ${order.parcel.carrier}`,
+            `${words.tracking}: ${order.parcel.trackingNumber}`,
+          ]),
     ].join('\n'),
     [
       ...order.lines.map(

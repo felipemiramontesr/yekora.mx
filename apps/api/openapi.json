@@ -1527,6 +1527,17 @@
                     },
                     "paidAt": {
                       "type": ["string", "null"]
+                    },
+                    "fulfillment": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -5513,6 +5524,17 @@
                           "paidAt": {
                             "type": ["string", "null"]
                           },
+                          "fulfillment": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -5874,6 +5896,17 @@
                     "paidAt": {
                       "type": ["string", "null"]
                     },
+                    "fulfillment": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5976,6 +6009,21 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "carrier": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "shippedAt": {
+                      "type": ["string", "null"]
+                    },
+                    "deliveredAt": {
+                      "type": ["string", "null"]
                     }
                   },
                   "required": [
@@ -5990,7 +6038,12 @@
                     "createdAt",
                     "isTest",
                     "lines",
-                    "paymentEvents"
+                    "paymentEvents",
+                    "carrier",
+                    "trackingNumber",
+                    "trackingUrl",
+                    "shippedAt",
+                    "deliveredAt"
                   ],
                   "additionalProperties": false
                 }
@@ -6353,6 +6406,17 @@
                           "paidAt": {
                             "type": ["string", "null"]
                           },
+                          "fulfillment": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -6714,6 +6778,17 @@
                     "paidAt": {
                       "type": ["string", "null"]
                     },
+                    "fulfillment": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -6816,6 +6891,21 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "carrier": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "shippedAt": {
+                      "type": ["string", "null"]
+                    },
+                    "deliveredAt": {
+                      "type": ["string", "null"]
                     }
                   },
                   "required": [
@@ -6830,7 +6920,12 @@
                     "createdAt",
                     "isTest",
                     "lines",
-                    "paymentEvents"
+                    "paymentEvents",
+                    "carrier",
+                    "trackingNumber",
+                    "trackingUrl",
+                    "shippedAt",
+                    "deliveredAt"
                   ],
                   "additionalProperties": false
                 }
@@ -7569,6 +7664,754 @@
                     "isActive",
                     "totpEnabled",
                     "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/orders/{order_number}/prepare": {
+      "post": {
+        "summary": "Moves a paid order to PREPARING and tells the buyer (audited)",
+        "x-permission": "orders:manage",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^YEK-\\d{4}-[0-9A-Z]{8}$"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderNumber": {
+                      "type": "string"
+                    },
+                    "fulfillment": {
+                      "type": "string",
+                      "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                    },
+                    "carrier": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "shippedAt": {
+                      "type": ["string", "null"]
+                    },
+                    "deliveredAt": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": [
+                    "orderNumber",
+                    "fulfillment",
+                    "carrier",
+                    "trackingNumber",
+                    "trackingUrl",
+                    "shippedAt",
+                    "deliveredAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/orders/{order_number}/ship": {
+      "post": {
+        "summary": "Registers the carrier and the tracking number, moves the order to SHIPPED and tells the buyer (audited)",
+        "x-permission": "orders:manage",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^YEK-\\d{4}-[0-9A-Z]{8}$"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "carrier": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "trackingNumber": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "trackingUrl": {
+                    "type": "string",
+                    "maxLength": 512
+                  }
+                },
+                "required": ["carrier", "trackingNumber"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderNumber": {
+                      "type": "string"
+                    },
+                    "fulfillment": {
+                      "type": "string",
+                      "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                    },
+                    "carrier": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "shippedAt": {
+                      "type": ["string", "null"]
+                    },
+                    "deliveredAt": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": [
+                    "orderNumber",
+                    "fulfillment",
+                    "carrier",
+                    "trackingNumber",
+                    "trackingUrl",
+                    "shippedAt",
+                    "deliveredAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/orders/{order_number}/deliver": {
+      "post": {
+        "summary": "Moves a shipped order to DELIVERED (audited)",
+        "x-permission": "orders:manage",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^YEK-\\d{4}-[0-9A-Z]{8}$"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderNumber": {
+                      "type": "string"
+                    },
+                    "fulfillment": {
+                      "type": "string",
+                      "enum": ["PREPARING", "SHIPPED", "DELIVERED"]
+                    },
+                    "carrier": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "trackingUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "shippedAt": {
+                      "type": ["string", "null"]
+                    },
+                    "deliveredAt": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": [
+                    "orderNumber",
+                    "fulfillment",
+                    "carrier",
+                    "trackingNumber",
+                    "trackingUrl",
+                    "shippedAt",
+                    "deliveredAt"
                   ],
                   "additionalProperties": false
                 }

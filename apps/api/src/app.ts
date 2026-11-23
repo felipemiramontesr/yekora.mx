@@ -22,6 +22,7 @@ import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAdminRoutes } from './routes/admin';
+import { registerAdminOrderRoutes } from './routes/adminOrders';
 import { registerAdminShippingRoutes } from './routes/adminShipping';
 import { registerAdminUserRoutes } from './routes/adminUsers';
 import { registerAuthRoutes } from './routes/auth';
@@ -244,6 +245,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAdminRoutes(app, { db: deps.db, now });
   // FC 044 F1: the owner's console of administrators.
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  // FC 068 F1: prepare, ship and deliver a paid order (orders:manage).
+  registerAdminOrderRoutes(app, { db: deps.db, now });
   // FC 061 F1: the shipping console (strategy, free shipping and the rate of each state).
   registerAdminShippingRoutes(app, { db: deps.db, now });
   // FC 029 F2: the catalog backoffice, idempotent and audited, with DELETE refused.

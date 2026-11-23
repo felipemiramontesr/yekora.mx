@@ -480,6 +480,28 @@ describe('OrderStatus (return pages)', () => {
     ).toBe('/catalogo/');
   });
 
+  it.each([
+    [
+      'PREPARING',
+      'Estamos preparando tu pedido. Te avisaremos en cuanto salga.',
+    ],
+    [
+      'SHIPPED',
+      'Tu pedido va en camino. Usa la guía de rastreo para seguirlo.',
+    ],
+    ['DELIVERED', 'Tu pedido fue entregado. ¡Gracias por tu compra!'],
+  ] as const)(
+    'shows the fulfillment step %s of a paid order in place of «Pago confirmado» (FC 068)',
+    async (step, text) => {
+      readOrder.mockResolvedValue({
+        ok: true,
+        order: { ...ORDER, status: 'PAID', fulfillment: step },
+      });
+      renderStatus('success');
+      await screen.findByText(text);
+    }
+  );
+
   it('shows a paid order with its amounts, and empties the cart', async () => {
     readOrder.mockResolvedValue({
       ok: true,

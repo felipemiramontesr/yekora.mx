@@ -9,6 +9,7 @@
  *
  * @module
  */
+import { splitStatus } from '../../../../lib/checkout/checkoutTypes';
 import type {
   OrderDetail,
   OrderSummary,
@@ -43,7 +44,7 @@ const iso = (date: Date) => new Date(date).toISOString();
 function summary(row: OrderRow): OrderSummary {
   return {
     orderNumber: row.order_number,
-    status: row.status as OrderSummary['status'],
+    ...splitStatus(row.status),
     method: row.method as OrderSummary['method'],
     itemsTotalMxnCents: Number(row.items_total_mxn_cents),
     shippingTotalMxnCents: Number(row.shipping_total_mxn_cents),
@@ -107,9 +108,17 @@ export async function findOrder(
   orderNumber: string
 ): Promise<{ ownerId: string | null; order: OrderDetail } | null> {
   const [row] = await db.query<
-    OrderRow & { id: number; user_id: string | null }
+    OrderRow & {
+      id: number;
+      user_id: string | null;
+      carrier: string | null;
+      tracking_number: string | null;
+      tracking_url: string | null;
+      shipped_at: Date | null;
+      delivered_at: Date | null;
+    }
   >(
-    'SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?',
+    'SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test, o.carrier, o.tracking_number, o.tracking_url, o.shipped_at, o.delivered_at FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?',
     [orderNumber]
   );
   if (row === undefined) return null;
@@ -141,6 +150,11 @@ export async function findOrder(
     ownerId: row.user_id,
     order: {
       ...summary(row),
+      carrier: row.carrier,
+      trackingNumber: row.tracking_number,
+      trackingUrl: row.tracking_url,
+      shippedAt: row.shipped_at === null ? null : iso(row.shipped_at),
+      deliveredAt: row.delivered_at === null ? null : iso(row.delivered_at),
       lines: lines.map((line) => ({
         sku: line.sku,
         quantity: Number(line.quantity),

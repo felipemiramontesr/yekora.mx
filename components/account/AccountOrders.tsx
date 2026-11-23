@@ -12,6 +12,7 @@ import {
 import { fill, formatMoney } from '@/lib/catalog/format';
 import { ORDER_STATUS_CODES } from '@/lib/checkout/checkoutTypes';
 import { FormAlert, failureText } from './AccountForms';
+import { OrderFulfillment } from './OrderFulfillment';
 
 /** The texts the order views read. */
 interface OrderTexts {
@@ -195,7 +196,7 @@ export function OrderList({
                       {when(order.createdAt, locale)}
                     </td>
                     <td className="py-2 pr-4">
-                      {account.statuses[order.status]}
+                      {account.statuses[order.fulfillment ?? order.status]}
                     </td>
                     <td className="py-2 text-right">
                       {formatMoney(order.totalMxnCents, 'MXN', locale)}
@@ -256,7 +257,10 @@ function OrderFacts({
   return (
     <>
       <dl className="max-w-lg">
-        <Fact term={orders.status} value={statuses[order.status]} />
+        <Fact
+          term={orders.status}
+          value={statuses[order.fulfillment ?? order.status]}
+        />
         <Fact term={orders.method} value={texts.methods[order.method].label} />
         <Fact term={orders.placed} value={when(order.createdAt, locale)} />
         {order.paidAt === null ? (
@@ -273,7 +277,34 @@ function OrderFacts({
           value={money(order.shippingTotalMxnCents)}
         />
         <Fact term={orders.total} value={money(order.totalMxnCents)} />
+        {order.carrier !== null && (
+          <Fact term={orders.carrier} value={order.carrier} />
+        )}
+        {order.trackingNumber !== null && (
+          <Fact term={orders.tracking} value={order.trackingNumber} />
+        )}
+        {order.shippedAt !== null && (
+          <Fact term={orders.shippedAt} value={when(order.shippedAt, locale)} />
+        )}
+        {order.deliveredAt !== null && (
+          <Fact
+            term={orders.deliveredAt}
+            value={when(order.deliveredAt, locale)}
+          />
+        )}
       </dl>
+      {order.trackingUrl !== null && (
+        // FC 068 T2.3: only the carrier's own link leaves the site, opened apart and without
+        // sending where it came from; nothing of the buyer goes with it.
+        <a
+          href={order.trackingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="tap-target mt-2 inline-flex items-center self-start underline underline-offset-4"
+        >
+          {orders.trackLink}
+        </a>
+      )}
       <h3 className="mt-4 text-lg font-semibold">{orders.lines}</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[30rem] text-left text-sm">
@@ -359,6 +390,7 @@ export function OrderDetailView({
   texts,
   backHref,
   onBack,
+  canManage = false,
 }: Readonly<{
   scope: OrderScope;
   orderNumber: string;
@@ -366,13 +398,18 @@ export function OrderDetailView({
   texts: OrderTexts;
   backHref: string;
   onBack: () => void;
+  /** Whether the account holds `orders:manage`: the panel then shows the fulfillment (FC 068). */
+  canManage?: boolean;
 }>) {
   const { account } = texts;
   const [load, setLoad] = useState<Load<OrderDetail>>({ kind: 'loading' });
+  // A step that applied asks for the order again, so its status and its parcel are the new ones.
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let live = true;
-    setLoad({ kind: 'loading' });
+    // A re-read after a step keeps the order on screen (and the panel's confirmation with it).
+    if (reload === 0) setLoad({ kind: 'loading' });
     void readOrder(scope, orderNumber).then((result) => {
       if (!live) return;
       setLoad(
@@ -384,7 +421,7 @@ export function OrderDetailView({
     return () => {
       live = false;
     };
-  }, [scope, orderNumber]);
+  }, [scope, orderNumber, reload]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -412,6 +449,15 @@ export function OrderDetailView({
       )}
       {load.kind === 'ready' && (
         <OrderFacts order={load.data} locale={locale} texts={texts} />
+      )}
+      {load.kind === 'ready' && canManage && (
+        <OrderFulfillment
+          order={load.data}
+          texts={account.fulfillment}
+          statuses={account.statuses}
+          exampleLabel={account.exampleLabel}
+          onDone={() => setReload((count) => count + 1)}
+        />
       )}
     </section>
   );

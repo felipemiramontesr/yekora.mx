@@ -163,7 +163,9 @@ function OrderDetails({
   const resumable = pending && isGatewayUrl(access.redirectUrl);
   // Back from the cancel page, a pending order is not "waiting for confirmation": it is unpaid.
   const lead =
-    variant === 'cancel' && pending ? null : texts.status[order.status];
+    variant === 'cancel' && pending
+      ? null
+      : texts.status[order.fulfillment ?? order.status];
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm font-medium text-petroleo/80">

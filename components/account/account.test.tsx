@@ -32,6 +32,11 @@ import {
   listAdminUsers,
   updateAdminUser,
 } from '@/lib/api/adminUsersClient';
+import {
+  deliverOrder,
+  prepareOrder,
+  shipOrder,
+} from '@/lib/api/fulfillmentClient';
 import { listPaymentMethods } from '@/lib/api/paymentMethodsClient';
 import { readShippingAdmin } from '@/lib/api/shippingAdminClient';
 import { AccountView } from '../views/AccountView';
@@ -72,6 +77,12 @@ vi.mock('@/lib/api/adminUsersClient', () => ({
   listAdminUsers: vi.fn(),
   inviteAdminUser: vi.fn(),
   updateAdminUser: vi.fn(),
+}));
+
+vi.mock('@/lib/api/fulfillmentClient', () => ({
+  prepareOrder: vi.fn(),
+  shipOrder: vi.fn(),
+  deliverOrder: vi.fn(),
 }));
 
 vi.mock('@/lib/api/shippingAdminClient', () => ({
@@ -141,6 +152,11 @@ const DETAIL: OrderDetail = {
   ...SUMMARY,
   status: 'PENDING_PAYMENT',
   paidAt: null,
+  carrier: null,
+  trackingNumber: null,
+  trackingUrl: null,
+  shippedAt: null,
+  deliveredAt: null,
   lines: [
     {
       sku: 'PACK',
@@ -836,6 +852,122 @@ describe('account area · saved cards (FC 054 F1, T2.4, T2.6)', () => {
       within(breadcrumb).getByText(account.dashboard['payment-methods'])
     ).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Mercado Pago' })).toBeTruthy();
+  });
+});
+
+describe('account area · tracking and fulfillment of an order (FC 068 F1, T2.3)', () => {
+  const SHIPPED_DETAIL = {
+    ...DETAIL,
+    status: 'PAID',
+    fulfillment: 'SHIPPED',
+    paidAt: SUMMARY.paidAt,
+    paymentEvents: [],
+    carrier: 'DHL',
+    trackingNumber: '1234567890',
+    trackingUrl: 'https://www.dhl.com/track?id=1234567890',
+    shippedAt: '2026-11-02T09:00:00.000Z',
+    deliveredAt: null,
+  } as OrderDetail;
+  const MANAGER = {
+    ...STAFF,
+    fullName: 'Luis Operador',
+    permissions: ['account:self', 'orders:read', 'orders:manage'],
+  };
+
+  it('shows the buyer the step, the carrier, the tracking number and a link that leaves the site safely', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/${ORDER}/`);
+    api.me.mockResolvedValue(ok(BUYER));
+    api.readOrder.mockResolvedValue(ok(SHIPPED_DETAIL));
+    renderApp();
+    await screen.findByText(account.orders.carrier);
+    expect(screen.getByText(account.statuses.SHIPPED)).toBeTruthy();
+    expect(screen.getByText('DHL')).toBeTruthy();
+    expect(screen.getByText('1234567890')).toBeTruthy();
+    expect(screen.getByText(account.orders.shippedAt)).toBeTruthy();
+    const link = screen.getByRole('link', { name: account.orders.trackLink });
+    expect(link.getAttribute('href')).toBe(
+      'https://www.dhl.com/track?id=1234567890'
+    );
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    // The buyer gets no controls: only the panel operates the order.
+    expect(
+      screen.queryByRole('region', { name: account.fulfillment.title })
+    ).toBeNull();
+  });
+
+  it('shows a delivered order its delivery time, and no parcel rows before it ships', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/${ORDER}/`);
+    api.me.mockResolvedValue(ok(BUYER));
+    api.readOrder.mockResolvedValue(
+      ok({
+        ...SHIPPED_DETAIL,
+        fulfillment: 'DELIVERED',
+        trackingUrl: null,
+        deliveredAt: '2026-11-04T16:00:00.000Z',
+      })
+    );
+    renderApp();
+    await screen.findByText(account.orders.deliveredAt);
+    expect(
+      screen.queryByRole('link', { name: account.orders.trackLink })
+    ).toBeNull();
+    cleanup();
+    api.readOrder.mockResolvedValue(ok(DETAIL));
+    renderApp();
+    await screen.findByText(account.orders.status);
+    expect(screen.queryByText(account.orders.carrier)).toBeNull();
+    expect(screen.queryByText(account.orders.tracking)).toBeNull();
+  });
+
+  it('gives the panel of an account with orders:manage the fulfillment, and re-reads the order after a step', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/panel/${ORDER}/`);
+    api.me.mockResolvedValue(ok(MANAGER));
+    api.readOrder
+      .mockResolvedValueOnce(
+        ok({
+          ...SHIPPED_DETAIL,
+          fulfillment: null,
+          carrier: null,
+          trackingNumber: null,
+          trackingUrl: null,
+          shippedAt: null,
+        })
+      )
+      .mockResolvedValue(ok({ ...SHIPPED_DETAIL, fulfillment: 'PREPARING' }));
+    vi.mocked(prepareOrder).mockResolvedValue({
+      ok: true,
+      data: {
+        orderNumber: ORDER,
+        fulfillment: 'PREPARING',
+        carrier: null,
+        trackingNumber: null,
+        trackingUrl: null,
+        shippedAt: null,
+        deliveredAt: null,
+      },
+    });
+    renderApp();
+    const prepare = await screen.findByRole('button', {
+      name: account.fulfillment.prepare,
+    });
+    fireEvent.click(prepare);
+    await waitFor(() => expect(api.readOrder).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(prepareOrder)).toHaveBeenCalledWith(ORDER);
+    expect(shipOrder).not.toHaveBeenCalled();
+    expect(deliverOrder).not.toHaveBeenCalled();
+    await screen.findByText(account.statuses.PREPARING, { selector: 'dd' });
+  });
+
+  it('keeps the fulfillment out of the panel of staff who only read orders', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/panel/${ORDER}/`);
+    api.me.mockResolvedValue(ok(STAFF));
+    api.readOrder.mockResolvedValue(ok(SHIPPED_DETAIL));
+    renderApp();
+    await screen.findByText(account.orders.carrier);
+    expect(
+      screen.queryByRole('region', { name: account.fulfillment.title })
+    ).toBeNull();
   });
 });
 

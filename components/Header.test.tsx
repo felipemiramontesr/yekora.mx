@@ -133,8 +133,9 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
       'the link of the saved addresses to «Datos y domicilios» of the account area: its own path (Apache fallback, no export)',
   },
   'components/account/AccountOrders.tsx': {
-    count: 1,
-    reason: 'order links inside the account area, same in-area router',
+    count: 2,
+    reason:
+      'order links inside the account area, same in-area router, and the carrier’s own tracking link, which leaves the site (FC 068)',
   },
   'components/account/AccountForms.tsx': {
     count: 1,

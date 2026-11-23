@@ -84,6 +84,13 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (route.path.startsWith('/v1/admin/admins')) return 'users:manage';
   // FC 061: the shipping console.
   if (route.path.startsWith('/v1/admin/shipping')) return 'shipping:manage';
+  // FC 068: the three steps of the fulfillment of an order.
+  if (
+    /^\/v1\/admin\/orders\/:order_number\/(prepare|ship|deliver)$/.test(
+      route.path
+    )
+  )
+    return 'orders:manage';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';
   return 'public';
 }

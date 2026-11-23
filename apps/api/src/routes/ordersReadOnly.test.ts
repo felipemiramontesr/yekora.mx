@@ -72,6 +72,12 @@ const order = (
   expires_at: new Date('2026-11-01T11:00:00Z'),
   paid_at: paidAt,
   is_test: id === 1 ? 1 : 0,
+  // FC 068: the parcel of an order that has not shipped.
+  carrier: null,
+  tracking_number: null,
+  tracking_url: null,
+  shipped_at: null,
+  delivered_at: null,
 });
 
 const ORDERS = [
@@ -289,6 +295,7 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
           expiresAt: '2026-11-01T11:00:00.000Z',
           paidAt: '2026-11-01T10:20:00.000Z',
           isTest: true,
+          fulfillment: null,
         },
       ],
       page: 1,
@@ -444,6 +451,51 @@ describe('T1.2 the panel needs orders:read, and staff their authenticator (T2.1a
           processorStatus: null,
         },
       ],
+    });
+  });
+
+  it('FC 068 · shows the parcel of a shipped order, and a delivered one, with its step apart from a status that stays PAID', async () => {
+    const shipped = ORDERS[0];
+    Object.assign(shipped, {
+      status: 'SHIPPED',
+      carrier: 'DHL',
+      tracking_number: '1234567890',
+      tracking_url: 'https://www.dhl.com/track?id=1234567890',
+      shipped_at: new Date('2026-11-02T09:00:00Z'),
+    });
+    const first = await app.inject({
+      url: `/v1/admin/orders/${OWN}`,
+      headers: cookie('s'),
+    });
+    expect(first.json()).toMatchObject({
+      status: 'PAID',
+      fulfillment: 'SHIPPED',
+      carrier: 'DHL',
+      trackingNumber: '1234567890',
+      trackingUrl: 'https://www.dhl.com/track?id=1234567890',
+      shippedAt: '2026-11-02T09:00:00.000Z',
+      deliveredAt: null,
+    });
+    Object.assign(shipped, {
+      status: 'DELIVERED',
+      delivered_at: new Date('2026-11-04T16:00:00Z'),
+    });
+    const delivered = await app.inject({
+      url: `/v1/admin/orders/${OWN}`,
+      headers: cookie('s'),
+    });
+    expect(delivered.json()).toMatchObject({
+      status: 'PAID',
+      fulfillment: 'DELIVERED',
+      deliveredAt: '2026-11-04T16:00:00.000Z',
+    });
+    Object.assign(shipped, {
+      status: 'PAID',
+      carrier: null,
+      tracking_number: null,
+      tracking_url: null,
+      shipped_at: null,
+      delivered_at: null,
     });
   });
 

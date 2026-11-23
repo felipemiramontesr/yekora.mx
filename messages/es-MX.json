@@ -715,7 +715,10 @@
         "EXPIRED": "El plazo para pagar este pedido terminó y liberamos los productos. No se hizo ningún cargo.",
         "CANCELLED": "Este pedido se canceló. No se hizo ningún cargo.",
         "REFUNDED": "Este pedido fue reembolsado.",
-        "NEEDS_REVIEW": "Recibimos un pago que estamos revisando. Nos pondremos en contacto contigo."
+        "NEEDS_REVIEW": "Recibimos un pago que estamos revisando. Nos pondremos en contacto contigo.",
+        "PREPARING": "Estamos preparando tu pedido. Te avisaremos en cuanto salga.",
+        "SHIPPED": "Tu pedido va en camino. Usa la guía de rastreo para seguirlo.",
+        "DELIVERED": "Tu pedido fue entregado. ¡Gracias por tu compra!"
       },
       "confirming": "Esta página se actualiza sola en cuanto el procesador confirme el pago.",
       "payBefore": "Completa tu pago antes del {date}. Mientras tanto, tus productos siguen apartados.",
@@ -933,6 +936,11 @@
       "method": "Método de pago",
       "placed": "Fecha del pedido",
       "paidAt": "Pagado el",
+      "carrier": "Transportista",
+      "tracking": "Guía de rastreo",
+      "trackLink": "Rastrear el envío",
+      "shippedAt": "Enviado el",
+      "deliveredAt": "Entregado el",
       "expiresAt": "Fecha límite de pago",
       "itemsTotal": "Productos (IVA incluido)",
       "shipping": "Envío",
@@ -957,7 +965,10 @@
       "EXPIRED": "Vencido",
       "CANCELLED": "Cancelado",
       "REFUNDED": "Reembolsado",
-      "NEEDS_REVIEW": "En revisión"
+      "NEEDS_REVIEW": "En revisión",
+      "PREPARING": "En preparación",
+      "SHIPPED": "Enviado",
+      "DELIVERED": "Entregado"
     },
     "errors": {
       "AUTH_UNAVAILABLE": "Las cuentas no están disponibles en este momento. Intenta más tarde.",
@@ -1542,6 +1553,48 @@
       "options": {
         "es-MX": "Español",
         "en": "English"
+      }
+    },
+    "fulfillment": {
+      "title": "Cumplimiento del pedido",
+      "intro": "Registra cómo va el pedido. Al empezar a prepararlo o al enviarlo, la persona que compró recibe un correo.",
+      "prepare": "Empezar a preparar",
+      "ship": "Registrar el envío",
+      "deliver": "Marcar como entregado",
+      "working": "Guardando…",
+      "done": "Listo. El pedido quedó «{status}».",
+      "noActions": "Este pedido no admite más acciones.",
+      "shipTitle": "Datos del envío",
+      "carrier": "Transportista",
+      "trackingNumber": "Guía de rastreo",
+      "trackingUrl": "Enlace de rastreo (opcional)",
+      "exampleLabel": "Ejemplo",
+      "fields": {
+        "carrier": {
+          "description": "La paquetería que lleva el pedido.",
+          "example": "DHL"
+        },
+        "trackingNumber": {
+          "description": "El número de guía que te dio la paquetería, tal como aparece en la etiqueta.",
+          "example": "1234567890"
+        },
+        "trackingUrl": {
+          "description": "La dirección donde la paquetería deja seguir el envío. Debe empezar con https://. Si no la tienes, déjala vacía.",
+          "example": "https://www.dhl.com/mx-es/home/rastreo.html"
+        }
+      },
+      "errors": {
+        "ORDER_STATUS_CONFLICT": "El pedido ya no está en un estado que permita esa acción. Recarga la página.",
+        "ORDER_NOT_FOUND": "No encontramos ese pedido.",
+        "ORDER_PAYLOAD_INVALID": "Revisa el transportista, la guía y el enlace: el transportista y la guía son obligatorios y el enlace debe empezar con https://.",
+        "PERMISSION_DENIED": "Tu cuenta no puede operar pedidos.",
+        "SECOND_FACTOR_REQUIRED": "Activa la verificación en dos pasos para operar pedidos.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
+        "invalid": "La respuesta del servidor no se pudo leer. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
       }
     },
     "adminHub": {

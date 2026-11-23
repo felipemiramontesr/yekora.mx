@@ -53,6 +53,11 @@ const INVENTORY = [
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  // FC 068: the three steps of the fulfillment (orders:manage); PUT, PATCH and DELETE on the
+  // order itself keep answering 405 ORDERS_READ_ONLY.
+  '│       ├── /prepare (POST)',
+  '│       ├── /ship (POST)',
+  '│       └── /deliver (POST)',
   // FC 044 F1: the owner's console of administrators (users:manage, then the role owner).
   '├── /v1/admin/admins (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',

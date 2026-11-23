@@ -90,6 +90,7 @@ import {
 } from './services/shippingAdmin';
 import { createTableRateProvider } from './services/shippingRates';
 import type { ShippingRateProvider } from './services/shippingPort';
+import { transitionOrder } from './services/ordersFsm';
 import { receiveWebhook } from './services/webhooks';
 
 // Refuse any other database: this suite writes products, orders and payments.
@@ -2426,5 +2427,150 @@ describe('the language of the mail on real SQL (migration 015, identity.ts, acco
       'SELECT COUNT(*) AS n FROM orders'
     );
     expect(Number(made.n)).toBeGreaterThan(0);
+  });
+});
+
+describe('the fulfillment of an order on real SQL (migration 016, ordersFsm.ts, FC 068 F0 F1)', () => {
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+  const SHIPMENT = {
+    carrier: 'DHL',
+    trackingNumber: '1234567890',
+    trackingUrl: 'https://www.dhl.com/track?id=1234567890',
+  };
+
+  /** A paid order the suite already made, and an operator to act. */
+  async function paidOrder() {
+    const [order] = await db.query<{ order_number: string }>(
+      'SELECT order_number FROM orders WHERE status_id = 2 ORDER BY id LIMIT 1'
+    );
+    await createCustomer(db, {
+      email: 'operator@example.test',
+      passwordHash: ARGON,
+      fullName: 'Operador',
+    });
+    const [user] = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?',
+      ['operator@example.test']
+    );
+    return { number: order.order_number, actor: { userId: user.id, ip: null } };
+  }
+  const statusOf = async (number: string) =>
+    (
+      await db.query<{ status_id: number }>(
+        'SELECT status_id FROM orders WHERE order_number = ?',
+        [number]
+      )
+    )[0].status_id;
+  const reset = (number: string) =>
+    db.query(
+      'UPDATE orders SET status_id = 2, carrier = NULL, tracking_number = NULL, tracking_url = NULL, shipped_at = NULL, delivered_at = NULL WHERE order_number = ?',
+      [number]
+    );
+
+  it('seeds the three states, the permission for owner, admin and staff_orders, and starts with nothing in fulfillment (T0.1)', async () => {
+    const states = await db.query<{ code: string }>(
+      'SELECT code FROM order_statuses WHERE id IN (7, 8, 9) ORDER BY id'
+    );
+    expect(states.map((row) => row.code)).toEqual([
+      'PREPARING',
+      'SHIPPED',
+      'DELIVERED',
+    ]);
+    const roles = await db.query<{ role_id: string }>(
+      "SELECT role_id FROM role_permissions WHERE permission_id = 'orders:manage' ORDER BY role_id"
+    );
+    expect(roles.map((row) => row.role_id)).toEqual([
+      'admin',
+      'owner',
+      'staff_orders',
+    ]);
+  });
+
+  it('walks a paid order through the three steps on the database, with the parcel and the times, and queues the two notices (T1.1, T2.1, T2.2)', async () => {
+    const { number, actor } = await paidOrder();
+    const run = (step: 'prepare' | 'ship' | 'deliver') =>
+      db.transaction((tx) =>
+        transitionOrder(
+          tx,
+          step,
+          number,
+          step === 'ship' ? SHIPMENT : null,
+          actor,
+          new Date()
+        )
+      );
+    expect(await run('prepare')).toMatchObject({ fulfillment: 'PREPARING' });
+    expect(await statusOf(number)).toBe(7);
+    expect(await run('prepare')).toBe('ORDER_STATUS_CONFLICT');
+    expect(await run('ship')).toMatchObject({
+      fulfillment: 'SHIPPED',
+      carrier: 'DHL',
+      trackingNumber: '1234567890',
+    });
+    expect(await run('deliver')).toMatchObject({ fulfillment: 'DELIVERED' });
+    expect(await statusOf(number)).toBe(9);
+    const queued = await db.query<{ event_type: string }>(
+      "SELECT event_type FROM outbox_events WHERE event_type IN ('ORDER_PREPARED', 'ORDER_SHIPPED') AND payload LIKE CONCAT('%', (SELECT id FROM orders WHERE order_number = ?), '%') ORDER BY id",
+      [number]
+    );
+    expect(queued.map((row) => row.event_type)).toEqual([
+      'ORDER_PREPARED',
+      'ORDER_SHIPPED',
+    ]);
+    await reset(number);
+  });
+
+  it('refuses to fulfil an order that was not paid, and writes nothing (T2.1)', async () => {
+    const { actor } = await paidOrder();
+    const [pending] = await db.query<{ order_number: string }>(
+      'SELECT order_number FROM orders WHERE status_id <> 2 ORDER BY id LIMIT 1'
+    );
+    const before = await statusOf(pending.order_number);
+    const outcome = await db.transaction((tx) =>
+      transitionOrder(
+        tx,
+        'deliver',
+        pending.order_number,
+        null,
+        actor,
+        new Date()
+      )
+    );
+    expect(outcome).toBe('ORDER_STATUS_CONFLICT');
+    expect(await statusOf(pending.order_number)).toBe(before);
+    expect(
+      await db.transaction((tx) =>
+        transitionOrder(
+          tx,
+          'prepare',
+          'YEK-2026-NOPE0000',
+          null,
+          actor,
+          new Date()
+        )
+      )
+    ).toBe('ORDER_NOT_FOUND');
+  });
+
+  it('the database itself keeps a shipped or delivered order from losing its parcel, and a paid order in fulfillment keeps its payment', async () => {
+    const { number } = await paidOrder();
+    await expect(
+      db.query('UPDATE orders SET status_id = 8 WHERE order_number = ?', [
+        number,
+      ])
+    ).rejects.toThrow('ck_orders_fulfillment');
+    await expect(
+      db.query(
+        "UPDATE orders SET status_id = 9, carrier = 'DHL', tracking_number = '1', shipped_at = NOW() WHERE order_number = ?",
+        [number]
+      )
+    ).rejects.toThrow('ck_orders_fulfillment');
+    // An order being prepared is still a paid one: the paid-at check allows it.
+    await db.query('UPDATE orders SET status_id = 7 WHERE order_number = ?', [
+      number,
+    ]);
+    expect(await statusOf(number)).toBe(7);
+    await reset(number);
   });
 });

@@ -294,3 +294,54 @@ describe('the order block (FC 066 T2.3)', () => {
     expect(english.text).not.toContain('Total pagado');
   });
 });
+
+describe('the parcel of an order (FC 068 T2.3 of the template)', () => {
+  const ORDER = {
+    number: 'YEK-2026-AB12CD34',
+    date: '22 de noviembre de 2026, 12:00',
+    method: 'Tarjeta',
+    lines: [
+      {
+        name: 'Tienda',
+        sku: 'TENT',
+        quantity: 1,
+        unitPrice: '$925.00 MXN',
+        lineTotal: '$925.00 MXN',
+      },
+    ],
+    itemsTotal: '$925.00 MXN',
+    shipping: '$150.00 MXN',
+    tax: '$148.00 MXN',
+    total: '$1,075.00 MXN',
+    address: ['Av. Barones 209'],
+    parcel: { carrier: 'DHL <Express>', trackingNumber: '12&34' },
+  };
+
+  it('shows the carrier and the tracking number in the summary of both bodies', () => {
+    const { html, text } = renderEmail({ ...CONTENT, order: ORDER }, SITE);
+    expect(html).toContain('Transportista');
+    expect(html).toContain('Guía de rastreo');
+    expect(text).toContain('Transportista: DHL <Express>');
+    expect(text).toContain('Guía de rastreo: 12&34');
+  });
+
+  it('escapes them in the HTML', () => {
+    const { html } = renderEmail({ ...CONTENT, order: ORDER }, SITE);
+    expect(html).toContain('DHL &lt;Express&gt;');
+    expect(html).toContain('12&amp;34');
+    expect(html).not.toContain('<Express>');
+  });
+
+  it('uses the English words for an English message, and shows nothing without a parcel', () => {
+    const english = renderEmail(
+      { ...CONTENT, locale: 'en', order: ORDER },
+      SITE
+    );
+    expect(english.text).toContain('Carrier: DHL <Express>');
+    expect(english.text).toContain('Tracking number: 12&34');
+    const withoutParcel = { ...ORDER, parcel: undefined };
+    const plain = renderEmail({ ...CONTENT, order: withoutParcel }, SITE);
+    expect(plain.text).not.toContain('Transportista');
+    expect(plain.html).not.toContain('Guía de rastreo');
+  });
+});

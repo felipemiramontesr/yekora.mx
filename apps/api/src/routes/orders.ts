@@ -11,7 +11,10 @@
  */
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { orderViewSchema } from '../../../../lib/checkout/checkoutTypes';
+import {
+  orderViewSchema,
+  splitStatus,
+} from '../../../../lib/checkout/checkoutTypes';
 import type { PaymentsConfig } from '../config';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { expireOverdueOrders } from '../services/checkout';
@@ -144,9 +147,11 @@ export function registerOrderRoutes(
         return notFound();
       }
       // Validated on the way out: the same contract the return pages parse.
+      const { status, fulfillment } = splitStatus(row.status);
       return orderViewSchema.parse({
         orderNumber: row.order_number,
-        status: row.status,
+        status,
+        fulfillment,
         method: row.method,
         itemsTotalMxnCents: Number(row.items_total_mxn_cents),
         shippingTotalMxnCents: Number(row.shipping_total_mxn_cents),

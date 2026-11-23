@@ -518,6 +518,102 @@ describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => 
     return { send, ...made };
   }
 
+  const shipped = (over: Record<string, unknown> = {}) =>
+    orderRow({
+      carrier: 'DHL',
+      tracking_number: '1234567890',
+      tracking_url: 'https://www.dhl.com/track?id=1234567890',
+      ...over,
+    });
+
+  it('ORDER_PREPARED tells the buyer the order is being prepared, with a link to it (FC 068 T2.4)', async () => {
+    const { send } = await sentFor([event('ORDER_PREPARED')]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(
+      `Estamos preparando tu pedido ${ORDER_NUMBER}`
+    );
+    expect(message.to).toBe('ana@example.test');
+    for (const body of [message.text, message.html ?? '']) {
+      expect(body).toContain('en preparación');
+      expect(body).toContain('TENT');
+    }
+    expect(message.text).toContain(`https://yekora.mx/cuenta/${ORDER_NUMBER}/`);
+    // Nothing has shipped: no carrier and no tracking number.
+    expect(message.text).not.toContain('Guía de rastreo');
+  });
+
+  it('ORDER_SHIPPED in English without a link points the button to the English order page', async () => {
+    const made = orderDb(
+      [event('ORDER_SHIPPED', 'en')],
+      shipped({ tracking_url: null })
+    );
+    const { send } = await sentFor([], made);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.text).toContain(
+      `Track my shipment: https://yekora.mx/en/account/${ORDER_NUMBER}/`
+    );
+  });
+
+  it('ORDER_PREPARED in English, with the English link', async () => {
+    const { send } = await sentFor([event('ORDER_PREPARED', 'en')]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(`We are preparing your order ${ORDER_NUMBER}`);
+    expect(message.text).toContain('is being prepared');
+    expect(message.text).toContain(
+      `https://yekora.mx/en/account/${ORDER_NUMBER}/`
+    );
+    expect(message.text).not.toMatch(/Estamos|pedido/);
+  });
+
+  it('ORDER_SHIPPED shows the carrier and the tracking number in both bodies and a button to follow the parcel', async () => {
+    const made = orderDb([event('ORDER_SHIPPED')], shipped());
+    const { send } = await sentFor([], made);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(`Tu pedido ${ORDER_NUMBER} va en camino`);
+    for (const body of [message.text, message.html ?? '']) {
+      expect(body).toContain('DHL');
+      expect(body).toContain('1234567890');
+      expect(body).toContain('Transportista');
+      expect(body).toContain('Guía de rastreo');
+    }
+    expect(message.text).toContain(
+      'Rastrear mi envío: https://www.dhl.com/track?id=1234567890'
+    );
+    expect(message.html).toContain(
+      'href="https://www.dhl.com/track?id=1234567890"'
+    );
+  });
+
+  it('ORDER_SHIPPED in English, from the preference of the account (FC 067 and FC 068 T2.4)', async () => {
+    const made = orderDb([event('ORDER_SHIPPED', 'en')], shipped());
+    const { send } = await sentFor([], made);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(`Your order ${ORDER_NUMBER} is on its way`);
+    expect(message.text).toContain('Carrier: DHL');
+    expect(message.text).toContain('Tracking number: 1234567890');
+    expect(message.text).toContain(
+      'Track my shipment: https://www.dhl.com/track?id=1234567890'
+    );
+    expect(message.text).not.toMatch(/Transportista|Guía/);
+  });
+
+  it('ORDER_SHIPPED without a usable link points the button to the order, and never to a script (T2.3)', async () => {
+    for (const link of [null, 'javascript:alert(1)', 'ftp://x.test/a']) {
+      const made = orderDb(
+        [event('ORDER_SHIPPED')],
+        shipped({ tracking_url: link })
+      );
+      const { send } = await sentFor([], made);
+      const [message] = send.mock.calls.map(([sent]) => sent);
+      expect(message.text).toContain(
+        `Rastrear mi envío: https://yekora.mx/cuenta/${ORDER_NUMBER}/`
+      );
+      expect(message.html).not.toContain('javascript:');
+      expect(message.html).not.toContain('ftp://');
+      vi.clearAllMocks();
+    }
+  });
+
   it('sends the confirmation to the buyer’s own address, decrypted in memory, with the whole order in both bodies (T2.2, T2.3)', async () => {
     const { send } = await sentFor([event('ORDER_CONFIRMED')]);
     const [message] = send.mock.calls.map(([sent]) => sent);

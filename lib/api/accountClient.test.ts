@@ -298,7 +298,16 @@ describe('account client (FC 028 F2)', () => {
     expect(sent(panel)[0]).toBe(
       'https://apiv1.yekora.mx/v1/admin/orders?page=1&status=PAID'
     );
-    const detail = { ...summary, lines: [], paymentEvents: [] };
+    const detail = {
+      ...summary,
+      lines: [],
+      paymentEvents: [],
+      carrier: null,
+      trackingNumber: null,
+      trackingUrl: null,
+      shippedAt: null,
+      deliveredAt: null,
+    };
     const one = answer(200, detail);
     expect(await readOrder('admin', ORDER, { fetchImpl: one })).toEqual({
       ok: true,

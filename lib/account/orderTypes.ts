@@ -57,6 +57,13 @@ const paymentEventSchema = z.object({
 export const orderDetailSchema = orderSummarySchema.extend({
   lines: z.array(orderLineSchema),
   paymentEvents: z.array(paymentEventSchema),
+  /** The parcel (FC 068): who carries it and under which tracking number, null until it ships. */
+  carrier: z.string().nullable(),
+  trackingNumber: z.string().nullable(),
+  trackingUrl: z.string().nullable(),
+  /** When it left and when it arrived, ISO 8601, null while they have not happened. */
+  shippedAt: z.string().nullable(),
+  deliveredAt: z.string().nullable(),
 });
 
 /** The detail of one order. */
