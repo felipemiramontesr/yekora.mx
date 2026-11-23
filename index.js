@@ -99637,6 +99637,11 @@ var ORDER_STATUS_CODES = [
   "REFUNDED",
   "NEEDS_REVIEW"
 ];
+var FULFILLMENT_CODES = ["PREPARING", "SHIPPED", "DELIVERED"];
+function splitStatus(code2) {
+  const step = FULFILLMENT_CODES.find((candidate) => candidate === code2);
+  return step === void 0 ? { status: code2, fulfillment: null } : { status: "PAID", fulfillment: step };
+}
 var orderViewSchema = external_exports.object({
   orderNumber: external_exports.string(),
   status: external_exports.enum(ORDER_STATUS_CODES),
@@ -99647,7 +99652,12 @@ var orderViewSchema = external_exports.object({
   /** End of the payment window, ISO 8601. */
   expiresAt: external_exports.string(),
   /** When the payment was settled, ISO 8601, or null. */
-  paidAt: external_exports.string().nullable()
+  paidAt: external_exports.string().nullable(),
+  /**
+   * Where a paid order is in its fulfillment (FC 068): being prepared, shipped or delivered, or
+   * null before that. Its `status` stays `PAID` meanwhile.
+   */
+  fulfillment: external_exports.enum(FULFILLMENT_CODES).nullable().optional()
 });
 var CHECKOUT_RETURN_PATHS = {
   "es-MX": { success: "/checkout/exito/", cancel: "/checkout/cancelado/" },
@@ -99886,7 +99896,14 @@ var paymentEventSchema = external_exports.object({
 });
 var orderDetailSchema = orderSummarySchema.extend({
   lines: external_exports.array(orderLineSchema),
-  paymentEvents: external_exports.array(paymentEventSchema)
+  paymentEvents: external_exports.array(paymentEventSchema),
+  /** The parcel (FC 068): who carries it and under which tracking number, null until it ships. */
+  carrier: external_exports.string().nullable(),
+  trackingNumber: external_exports.string().nullable(),
+  trackingUrl: external_exports.string().nullable(),
+  /** When it left and when it arrived, ISO 8601, null while they have not happened. */
+  shippedAt: external_exports.string().nullable(),
+  deliveredAt: external_exports.string().nullable()
 });
 var paging = {
   page: external_exports.coerce.number().int().min(1).max(1e3).default(1),
@@ -99968,6 +99985,25 @@ var adminUserSchema = external_exports.object({
 });
 var adminUserListSchema = external_exports.object({
   items: external_exports.array(adminUserSchema)
+});
+
+// ../../lib/account/fulfillmentTypes.ts
+var trackingLink = external_exports.string().trim().max(512).pipe(external_exports.url()).refine((link) => /^https?:\/\//i.test(link));
+var shipRequestSchema = external_exports.strictObject({
+  carrier: external_exports.string().trim().min(1).max(64),
+  trackingNumber: external_exports.string().trim().min(1).max(128),
+  trackingUrl: trackingLink.optional()
+});
+var fulfillmentResultSchema = external_exports.object({
+  orderNumber: external_exports.string(),
+  fulfillment: external_exports.enum(FULFILLMENT_CODES),
+  carrier: external_exports.string().nullable(),
+  trackingNumber: external_exports.string().nullable(),
+  trackingUrl: external_exports.string().nullable(),
+  /** When it left, ISO 8601, or null while it has not. */
+  shippedAt: external_exports.string().nullable(),
+  /** When it arrived, ISO 8601, or null while it has not. */
+  deliveredAt: external_exports.string().nullable()
 });
 
 // ../../lib/account/shippingAdminTypes.ts
@@ -101311,7 +101347,7 @@ var iso = (date5) => new Date(date5).toISOString();
 function summary(row3) {
   return {
     orderNumber: row3.order_number,
-    status: row3.status,
+    ...splitStatus(row3.status),
     method: row3.method,
     itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
     shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
@@ -101348,7 +101384,7 @@ async function listOrders(db, scope, paging2) {
 }
 async function findOrder(db, orderNumber) {
   const [row3] = await db.query(
-    "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
+    "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test, o.carrier, o.tracking_number, o.tracking_url, o.shipped_at, o.delivered_at FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
     [orderNumber]
   );
   if (row3 === void 0) return null;
@@ -101366,6 +101402,11 @@ async function findOrder(db, orderNumber) {
     ownerId: row3.user_id,
     order: {
       ...summary(row3),
+      carrier: row3.carrier,
+      trackingNumber: row3.tracking_number,
+      trackingUrl: row3.tracking_url,
+      shippedAt: row3.shipped_at === null ? null : iso(row3.shipped_at),
+      deliveredAt: row3.delivered_at === null ? null : iso(row3.delivered_at),
       lines: lines.map((line) => ({
         sku: line.sku,
         quantity: Number(line.quantity),
@@ -101435,9 +101476,11 @@ function registerOrderRoutes(app, deps) {
       )) {
         return notFound();
       }
+      const { status, fulfillment } = splitStatus(row3.status);
       return orderViewSchema.parse({
         orderNumber: row3.order_number,
-        status: row3.status,
+        status,
+        fulfillment,
         method: row3.method,
         itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
         shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
@@ -101907,6 +101950,29 @@ var ROUTE_CONTRACTS = [
       ...SIGNED_IN_REFUSALS
     }
   },
+  // FC 068 F1: the fulfillment of a paid order. Every step needs orders:manage and an Idempotency-Key.
+  ...["prepare", "ship", "deliver"].map((step) => ({
+    method: "POST",
+    path: `/v1/admin/orders/:order_number/${step}`,
+    summary: {
+      prepare: "Moves a paid order to PREPARING and tells the buyer (audited)",
+      ship: "Registers the carrier and the tracking number, moves the order to SHIPPED and tells the buyer (audited)",
+      deliver: "Moves a shipped order to DELIVERED (audited)"
+    }[step],
+    permission: "orders:manage",
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      ...step === "ship" && { body: shipRequestSchema }
+    },
+    responses: {
+      200: fulfillmentResultSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  })),
   // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
   {
     method: "GET",
@@ -102981,6 +103047,135 @@ function registerAdminRoutes(app, deps) {
   });
 }
 
+// src/services/ordersFsm.ts
+var PAID = 2;
+var PREPARING = 7;
+var SHIPPED = 8;
+var DELIVERED = 9;
+var STEPS = {
+  prepare: { from: [PAID], to: PREPARING, label: "ORDER_PREPARED" },
+  ship: { from: [PAID, PREPARING], to: SHIPPED, label: "ORDER_SHIPPED" },
+  deliver: { from: [SHIPPED], to: DELIVERED, label: "ORDER_DELIVERED" }
+};
+var iso2 = (date5) => date5 === null ? null : new Date(date5).toISOString();
+async function transitionOrder(tx, step, orderNumber, parcel, actor, now) {
+  const [order2] = await tx.query(
+    "SELECT id, status_id FROM orders WHERE order_number = ? FOR UPDATE",
+    [orderNumber]
+  );
+  if (order2 === void 0) return "ORDER_NOT_FOUND";
+  const rule = STEPS[step];
+  const before = Number(order2.status_id);
+  if (!rule.from.includes(before)) return "ORDER_STATUS_CONFLICT";
+  if (step === "ship") {
+    const shipment = parcel;
+    await tx.query(
+      "UPDATE orders SET status_id = ?, carrier = ?, tracking_number = ?, tracking_url = ?, shipped_at = ? WHERE id = ?",
+      [
+        rule.to,
+        shipment.carrier,
+        shipment.trackingNumber,
+        shipment.trackingUrl ?? null,
+        now,
+        order2.id
+      ]
+    );
+  } else if (step === "deliver") {
+    await tx.query(
+      "UPDATE orders SET status_id = ?, delivered_at = ? WHERE id = ?",
+      [rule.to, now, order2.id]
+    );
+  } else {
+    await tx.query("UPDATE orders SET status_id = ? WHERE id = ?", [
+      rule.to,
+      order2.id
+    ]);
+  }
+  if (step === "prepare") {
+    await enqueueMail(tx, { type: "ORDER_PREPARED", orderId: order2.id });
+  } else if (step === "ship") {
+    await enqueueMail(tx, { type: "ORDER_SHIPPED", orderId: order2.id });
+  }
+  const [after] = await tx.query(
+    "SELECT s.code AS status, o.carrier, o.tracking_number, o.tracking_url, o.shipped_at, o.delivered_at FROM orders o JOIN order_statuses s ON s.id = o.status_id WHERE o.id = ?",
+    [order2.id]
+  );
+  const result = {
+    orderNumber,
+    fulfillment: after.status,
+    carrier: after.carrier,
+    trackingNumber: after.tracking_number,
+    trackingUrl: after.tracking_url,
+    shippedAt: iso2(after.shipped_at),
+    deliveredAt: iso2(after.delivered_at)
+  };
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: rule.label,
+    entityType: "orders",
+    entityId: orderNumber,
+    before: { statusId: before },
+    after: { fulfillment: result.fulfillment, carrier: result.carrier },
+    ip: actor.ip
+  });
+  return result;
+}
+
+// src/routes/adminOrders.ts
+var REFUSALS2 = {
+  ORDER_NOT_FOUND: [404, "Not found"],
+  ORDER_STATUS_CONFLICT: [409, "The order is not in a status that allows it"]
+};
+var STEP_ROUTES = ["prepare", "ship", "deliver"];
+function registerAdminOrderRoutes(app, deps) {
+  for (const step of STEP_ROUTES) {
+    app.post(
+      `/v1/admin/orders/:order_number/${step}`,
+      async (request, reply) => {
+        const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+        if (key.code !== "IDEMP_KEY_ACCEPTED") {
+          return refuse(reply, 400, "Idempotency-Key required", key.code);
+        }
+        const { order_number: orderNumber } = request.params;
+        if (!ORDER_NUMBER.test(orderNumber)) {
+          return refuse(reply, 400, "Invalid order", "ORDER_PAYLOAD_INVALID");
+        }
+        let parcel = null;
+        if (step === "ship") {
+          const body = shipRequestSchema.safeParse(request.body);
+          if (!body.success) {
+            return refuse(
+              reply,
+              400,
+              "The shipment is incomplete",
+              "ORDER_PAYLOAD_INVALID"
+            );
+          }
+          parcel = body.data;
+        }
+        return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+          const outcome = await transitionOrder(
+            tx,
+            step,
+            orderNumber,
+            parcel,
+            { userId, ip: request.ip },
+            deps.now()
+          );
+          if (typeof outcome !== "string") {
+            return { status: 200, body: outcome };
+          }
+          const [status, title] = REFUSALS2[outcome];
+          return {
+            status,
+            body: problem(status, title, outcome)
+          };
+        });
+      }
+    );
+  }
+}
+
 // src/services/shippingAdmin.ts
 async function readConfig(db) {
   const [row3] = await db.query(
@@ -103109,13 +103304,13 @@ async function updateShippingRules(tx, body, actor) {
 }
 
 // src/routes/adminShipping.ts
-var REFUSALS2 = {
+var REFUSALS3 = {
   SHIPPING_STRATEGY_UNAVAILABLE: [409, "The strategy has no active rates"],
   SHIPPING_ZONE_UNKNOWN: [400, "Unknown state"]
 };
 function answerOf(outcome) {
   if (typeof outcome !== "string") return { status: 200, body: outcome };
-  const [status, title] = REFUSALS2[outcome];
+  const [status, title] = REFUSALS3[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminShippingRoutes(app, deps) {
@@ -103375,7 +103570,7 @@ async function updateAdmin(tx, input2, actor) {
 }
 
 // src/routes/adminUsers.ts
-var REFUSALS3 = {
+var REFUSALS4 = {
   OWNER_IMMUTABLE: [403, "The owner account cannot be changed"],
   ADMIN_ALREADY_EXISTS: [409, "Already an administrator"],
   ADMIN_NOT_FOUND: [404, "Not found"]
@@ -103391,7 +103586,7 @@ function answerOf2(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS3[outcome];
+  const [status, title] = REFUSALS4[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminUserRoutes(app, deps) {
@@ -118029,6 +118224,8 @@ var FRAME = {
       number: "Pedido",
       date: "Fecha",
       method: "M\xE9todo de pago",
+      carrier: "Transportista",
+      tracking: "Gu\xEDa de rastreo",
       product: "Producto",
       quantity: "Cant.",
       unit: "Precio",
@@ -118050,6 +118247,8 @@ var FRAME = {
       number: "Order",
       date: "Date",
       method: "Payment method",
+      carrier: "Carrier",
+      tracking: "Tracking number",
       product: "Product",
       quantity: "Qty",
       unit: "Price",
@@ -118097,7 +118296,11 @@ function orderHtml(order2, words) {
   const summary2 = [
     [words.number, order2.number],
     [words.date, order2.date],
-    [words.method, order2.method]
+    [words.method, order2.method],
+    ...order2.parcel === void 0 ? [] : [
+      [words.carrier, order2.parcel.carrier],
+      [words.tracking, order2.parcel.trackingNumber]
+    ]
   ];
   const lines = order2.lines.map(
     (line) => row2([
@@ -118119,7 +118322,11 @@ function orderText(order2, words) {
     [
       `${words.number}: ${order2.number}`,
       `${words.date}: ${order2.date}`,
-      `${words.method}: ${order2.method}`
+      `${words.method}: ${order2.method}`,
+      ...order2.parcel === void 0 ? [] : [
+        `${words.carrier}: ${order2.parcel.carrier}`,
+        `${words.tracking}: ${order2.parcel.trackingNumber}`
+      ]
     ].join("\n"),
     [
       ...order2.lines.map(
@@ -118303,7 +118510,7 @@ function copyOf(keys, event, locale) {
 }
 var ORDER_COPY = {
   ORDER_CONFIRMED: {
-    "es-MX": (name2, number4, site) => ({
+    "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Confirmamos tu pedido ${number4} en Y\u0112KORA`,
       content: {
         heading: "Gracias por tu compra",
@@ -118317,7 +118524,7 @@ var ORDER_COPY = {
         notice: `Si no reconoces esta compra, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
       }
     }),
-    en: (name2, number4, site) => ({
+    en: ({ name: name2, number: number4, site }) => ({
       subject: `We confirmed your order ${number4} at Y\u0112KORA`,
       content: {
         heading: "Thank you for your purchase",
@@ -118333,7 +118540,7 @@ var ORDER_COPY = {
     })
   },
   ORDER_EXPIRED: {
-    "es-MX": (name2, number4, site) => ({
+    "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Tu pedido ${number4} venci\xF3 sin pago`,
       content: {
         heading: "Tu pedido venci\xF3",
@@ -118343,7 +118550,7 @@ var ORDER_COPY = {
         button: { label: "Volver a la tienda", url: `${site}/catalogo/` }
       }
     }),
-    en: (name2, number4, site) => ({
+    en: ({ name: name2, number: number4, site }) => ({
       subject: `Your order ${number4} expired unpaid`,
       content: {
         heading: "Your order expired",
@@ -118355,7 +118562,7 @@ var ORDER_COPY = {
     })
   },
   ORDER_CANCELLED: {
-    "es-MX": (name2, number4, site) => ({
+    "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Cancelamos tu pedido ${number4}`,
       content: {
         heading: "Cancelamos tu pedido",
@@ -118365,7 +118572,7 @@ var ORDER_COPY = {
         button: { label: "Volver a la tienda", url: `${site}/catalogo/` }
       }
     }),
-    en: (name2, number4, site) => ({
+    en: ({ name: name2, number: number4, site }) => ({
       subject: `We cancelled your order ${number4}`,
       content: {
         heading: "We cancelled your order",
@@ -118373,6 +118580,76 @@ var ORDER_COPY = {
           `Hello ${name2}: we could not open the payment page of your order ${number4}, so we cancelled it and released the products. You were not charged. You can try your purchase again.`
         ],
         button: { label: "Back to the store", url: `${site}/en/catalog/` }
+      }
+    })
+  },
+  ORDER_PREPARED: {
+    "es-MX": ({ name: name2, number: number4, site }) => ({
+      subject: `Estamos preparando tu pedido ${number4}`,
+      content: {
+        heading: "Estamos preparando tu pedido",
+        paragraphs: [
+          `Hola ${name2}: tu pedido ${number4} ya est\xE1 en preparaci\xF3n. Te avisaremos en cuanto salga.`
+        ],
+        button: {
+          label: "Ver mi pedido",
+          url: `${site}/cuenta/${number4}/`
+        }
+      }
+    }),
+    en: ({ name: name2, number: number4, site }) => ({
+      subject: `We are preparing your order ${number4}`,
+      content: {
+        heading: "We are preparing your order",
+        paragraphs: [
+          `Hello ${name2}: your order ${number4} is being prepared. We will let you know as soon as it ships.`
+        ],
+        button: {
+          label: "View my order",
+          url: `${site}/en/account/${number4}/`
+        }
+      }
+    })
+  },
+  ORDER_SHIPPED: {
+    "es-MX": ({
+      name: name2,
+      number: number4,
+      site,
+      carrier,
+      trackingNumber,
+      trackingUrl
+    }) => ({
+      subject: `Tu pedido ${number4} va en camino`,
+      content: {
+        heading: "Tu pedido va en camino",
+        paragraphs: [
+          `Hola ${name2}: tu pedido ${number4} sali\xF3 con ${carrier}. Tu gu\xEDa de rastreo es ${trackingNumber}.`
+        ],
+        button: {
+          label: "Rastrear mi env\xEDo",
+          url: trackingUrl ?? `${site}/cuenta/${number4}/`
+        }
+      }
+    }),
+    en: ({
+      name: name2,
+      number: number4,
+      site,
+      carrier,
+      trackingNumber,
+      trackingUrl
+    }) => ({
+      subject: `Your order ${number4} is on its way`,
+      content: {
+        heading: "Your order is on its way",
+        paragraphs: [
+          `Hello ${name2}: your order ${number4} shipped with ${carrier}. Your tracking number is ${trackingNumber}.`
+        ],
+        button: {
+          label: "Track my shipment",
+          url: trackingUrl ?? `${site}/en/account/${number4}/`
+        }
       }
     })
   }
@@ -118397,7 +118674,7 @@ function addressLines(address, state) {
 async function renderOrder(db, keys, event) {
   if (keys.piiKey === null) throw new Error("CHECKOUT_PII_KEY is not set");
   const [order2] = await db.query(
-    "SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?",
+    "SELECT o.order_number, o.locale AS order_locale, u.preferred_locale AS account_locale, o.carrier, o.tracking_number, o.tracking_url, o.created_at, m.name_es AS method_es, m.name_en AS method_en, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.items_tax_mxn_cents, o.shipping_tax_mxn_cents, o.total_mxn_cents, o.customer_name_enc, o.customer_email_enc, o.shipping_address_enc FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?",
     [event.orderId]
   );
   if (order2 === void 0) throw new Error("Order not found");
@@ -118443,11 +118720,15 @@ async function renderOrder(db, keys, event) {
     timeStyle: "short",
     timeZone: "America/Mexico_City"
   }).format(order2.created_at);
-  const { subject, content } = ORDER_COPY[event.type][locale](
-    name2,
-    number4,
-    keys.siteUrl
-  );
+  const trackingUrl = order2.tracking_url && /^https?:\/\//i.test(order2.tracking_url) ? order2.tracking_url : null;
+  const { subject, content } = ORDER_COPY[event.type][locale]({
+    name: name2,
+    number: number4,
+    site: keys.siteUrl,
+    carrier: order2.carrier,
+    trackingNumber: order2.tracking_number,
+    trackingUrl
+  });
   const block = {
     number: number4,
     date: date5,
@@ -118466,7 +118747,13 @@ async function renderOrder(db, keys, event) {
       locale
     ),
     total: money(order2.total_mxn_cents, locale),
-    address: addressLines(address, english ? zone.name_en : zone.name_es)
+    address: addressLines(address, english ? zone.name_en : zone.name_es),
+    ...order2.carrier && order2.tracking_number ? {
+      parcel: {
+        carrier: order2.carrier,
+        trackingNumber: order2.tracking_number
+      }
+    } : {}
   };
   const { html, text: text3 } = renderEmail(
     { ...content, locale, order: block },
@@ -119135,6 +119422,7 @@ async function buildApp(deps) {
   });
   registerAdminRoutes(app, { db: deps.db, now });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAdminOrderRoutes(app, { db: deps.db, now });
   registerAdminShippingRoutes(app, { db: deps.db, now });
   registerCatalogAdminRoutes(app, {
     db: deps.db,
@@ -119454,7 +119742,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "93e5029dcdc20c2c5d0be69bf8255800f6fa8b5b" : void 0;
+var sha = true ? "0b7eb294a7e43aaffd8aa2ece97e202ce78ced25" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
