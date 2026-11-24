@@ -99458,7 +99458,9 @@ var itemSchema = external_exports.object({
   ).default([]),
   priceMxnCents: external_exports.number().int().positive(),
   priceUsdCents: external_exports.number().int().nonnegative().nullable(),
-  inStock: external_exports.boolean()
+  inStock: external_exports.boolean(),
+  /** Whether it may be returned after delivery (FC 071); a snapshot made before it existed allows it. */
+  allowsReturn: external_exports.boolean().default(true)
 });
 var productSchema = itemSchema.extend({
   images: external_exports.array(
@@ -100017,6 +100019,54 @@ var fulfillmentResultSchema = external_exports.object({
   deliveredAt: external_exports.string().nullable()
 });
 
+// ../../lib/account/returnTypes.ts
+var RETURN_REASONS = ["DEFECT", "NOT_AS_DESCRIBED", "CHANGED_MIND"];
+var RETURN_STATUSES = [
+  "REQUESTED",
+  "PREPARED",
+  "REFUNDING",
+  "REFUNDED"
+];
+var returnLineSchema = external_exports.strictObject({
+  sku: external_exports.string().min(1).max(64),
+  quantity: external_exports.number().int().min(1).max(99)
+});
+var returnRequestSchema = external_exports.strictObject({
+  items: external_exports.array(returnLineSchema).min(1).max(50),
+  reason: external_exports.enum(RETURN_REASONS),
+  comment: external_exports.string().trim().max(500).optional()
+});
+var returnSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  orderNumber: external_exports.string(),
+  status: external_exports.enum(RETURN_STATUSES),
+  reason: external_exports.enum(RETURN_REASONS),
+  comment: external_exports.string().nullable(),
+  items: external_exports.array(returnLineSchema),
+  refundMxnCents: external_exports.number().int().positive().nullable(),
+  restock: external_exports.boolean().nullable(),
+  createdAt: external_exports.string(),
+  preparedAt: external_exports.string().nullable(),
+  confirmedAt: external_exports.string().nullable()
+});
+var returnListSchema = external_exports.strictObject({
+  items: external_exports.array(returnSchema),
+  total: external_exports.number().int().min(0)
+});
+var returnListQuery = external_exports.strictObject({
+  status: external_exports.enum(RETURN_STATUSES).optional()
+});
+var returnPrepareRequestSchema = external_exports.strictObject({
+  refundMxnCents: external_exports.number().int().min(1).max(1e8),
+  restock: external_exports.boolean()
+});
+var returnConfirmRequestSchema = external_exports.strictObject({
+  manualReference: external_exports.string().trim().min(1).max(128).optional()
+});
+var returnParams = external_exports.strictObject({
+  id: external_exports.coerce.number().int().positive()
+});
+
 // ../../lib/account/shippingAdminTypes.ts
 var ZONE_RATE_STRATEGY_ID = 2;
 var STATE_COUNT = 32;
@@ -100316,7 +100366,7 @@ async function listProducts(db, query) {
     filters
   );
   const items = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.allows_return, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.is_active = 1 AND c.is_active = 1 AND (? IS NULL OR c.slug = ?) ORDER BY CASE WHEN ? = 'price_asc' THEN p.price_mxn_cents END ASC, CASE WHEN ? = 'price_desc' THEN p.price_mxn_cents END DESC, CASE WHEN ? = 'en' THEN p.name_en ELSE p.name_es END ASC, p.id ASC LIMIT ? OFFSET ?",
     [
       ...filters,
       query.sort,
@@ -100342,7 +100392,7 @@ function findProductProperties(db, slug3) {
 }
 async function findProduct(db, slug3) {
   const [product] = await db.query(
-    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1",
+    "SELECT p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.allows_return, c.slug AS discipline, c.name_es AS discipline_name_es, c.name_en AS discipline_name_en, b.slug AS brand, b.name AS brand_name FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id AND b.is_active = 1 WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1",
     [slug3]
   );
   return product ?? null;
@@ -100382,7 +100432,8 @@ function present(row3, language, fix, properties) {
     properties: presentProperties(properties, language),
     priceMxnCents: Number(row3.price_mxn_cents),
     priceUsdCents: usdCents(Number(row3.price_mxn_cents), fix),
-    inStock: Number(row3.stock) > 0
+    inStock: Number(row3.stock) > 0,
+    allowsReturn: Number(row3.allows_return) === 1
   };
 }
 function registerCatalogRoutes(app, deps) {
@@ -101267,6 +101318,10 @@ async function persist(deps, admitted, quote, order2) {
           ])
         ]
       );
+      await tx.query(
+        "UPDATE order_items i JOIN products p ON p.id = i.product_id SET i.allows_return = p.allows_return WHERE i.order_id = ?",
+        [id]
+      );
       return id;
     });
   } catch (error63) {
@@ -101995,6 +102050,70 @@ var ROUTE_CONTRACTS = [
       ...SIGNED_IN_REFUSALS
     }
   })),
+  // FC 071 F1: the returns. The buyer asks; the board lists; one operator prepares, another confirms.
+  {
+    method: "POST",
+    path: "/v1/account/orders/:order_number/returns",
+    summary: "The buyer asks to return units of a delivered order within 60 days (audited)",
+    permission: "account:self",
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      body: returnRequestSchema
+    },
+    responses: {
+      201: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/returns",
+    summary: "The board of returns, newest first, optionally of one stage",
+    permission: "returns:view",
+    request: { query: returnListQuery },
+    responses: {
+      200: returnListSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/returns/:id/prepare",
+    summary: "Sets the amount to refund and whether the units go back to the shelf (audited)",
+    permission: "returns:prepare",
+    request: {
+      params: returnParams,
+      headers: mutationHeaders,
+      body: returnPrepareRequestSchema
+    },
+    responses: {
+      200: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/returns/:id/confirm",
+    summary: "Another operator confirms and executes the refund through the processor (audited, four eyes)",
+    permission: "returns:confirm",
+    request: { params: returnParams, body: returnConfirmRequestSchema },
+    responses: {
+      200: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
   // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
   {
     method: "GET",
@@ -103225,6 +103344,432 @@ function registerAdminOrderRoutes(app, deps) {
       }
     );
   }
+}
+
+// src/services/returnsEligibility.ts
+var RETURN_WINDOW_DAYS = 60;
+var DAY_MS = 24 * 60 * 60 * 1e3;
+function decideReturnLine(inputs) {
+  if (!inputs.owner) return "DATA_DOMAIN_FORBIDDEN";
+  if (!inputs.delivered) return "ORDER_NOT_DELIVERED_REJECT";
+  if (!inputs.withinWindow) return "WINDOW_EXPIRED_REJECT";
+  if (!inputs.allowsReturn) return "PRODUCT_NON_RETURNABLE_REJECT";
+  return inputs.validQuantity ? "RETURN_ELIGIBLE_OK" : "INVALID_QUANTITY_REJECT";
+}
+function withinReturnWindow(deliveredAt, now) {
+  return deliveredAt !== null && now.getTime() <= new Date(deliveredAt).getTime() + RETURN_WINDOW_DAYS * DAY_MS;
+}
+function decideConfirmation(inputs) {
+  if (!inputs.prepared) return "RETURN_NOT_PREPARED_REJECT";
+  if (!inputs.authorized) return "UNAUTHORIZED_CONFIRMER_REJECT";
+  if (inputs.samePerson) return "DUAL_CONTROL_VIOLATION_REJECT";
+  return inputs.amountOk ? "REFUND_CONFIRMED_EXECUTE" : "INVALID_REFUND_AMOUNT_REJECT";
+}
+
+// src/services/returnsService.ts
+var RETURN_REFUSALS = {
+  DATA_DOMAIN_FORBIDDEN: [403, "This order is not yours"],
+  ORDER_NOT_FOUND: [404, "Not found"],
+  RETURN_NOT_FOUND: [404, "Not found"],
+  ORDER_NOT_DELIVERED_REJECT: [409, "The order has not been delivered"],
+  WINDOW_EXPIRED_REJECT: [409, "The window of 60 days to return is over"],
+  PRODUCT_NON_RETURNABLE_REJECT: [
+    409,
+    "A product of the request cannot be returned"
+  ],
+  INVALID_QUANTITY_REJECT: [400, "The units asked cannot be returned"],
+  RETURN_PAYLOAD_INVALID: [
+    400,
+    "The request names a line twice or one the order lacks"
+  ],
+  RETURN_STATUS_CONFLICT: [409, "The request is not in a stage that allows it"],
+  RETURN_NOT_PREPARED_REJECT: [409, "The refund has not been prepared"],
+  UNAUTHORIZED_CONFIRMER_REJECT: [403, "You cannot confirm refunds"],
+  DUAL_CONTROL_VIOLATION_REJECT: [
+    403,
+    "Another person has to confirm what you prepared"
+  ],
+  INVALID_REFUND_AMOUNT_REJECT: [409, "The amount exceeds what the order paid"],
+  MANUAL_REFERENCE_REQUIRED: [
+    400,
+    "The reference of the refund made by hand is required"
+  ],
+  REFUND_PROCESSOR_UNAVAILABLE: [503, "The processor cannot refund now"],
+  REFUND_PROCESSOR_ERROR: [502, "The processor did not accept the refund"]
+};
+var REFUNDED_ORDER = 5;
+var PAID_STATUSES = /* @__PURE__ */ new Set([2, 7, 8, 9]);
+var iso3 = (date5) => date5 === null ? null : new Date(date5).toISOString();
+async function withLines(db, rows) {
+  if (rows.length === 0) return [];
+  const lines = await db.query(
+    "SELECT ri.return_id, i.sku, ri.quantity FROM order_return_items ri JOIN order_items i ON i.id = ri.order_item_id WHERE ri.return_id IN (?) ORDER BY ri.id",
+    [rows.map((row3) => row3.id)]
+  );
+  return rows.map((row3) => ({
+    id: row3.id,
+    orderNumber: row3.order_number,
+    status: row3.status,
+    reason: row3.reason,
+    comment: row3.comment,
+    items: lines.filter((line) => line.return_id === row3.id).map((line) => ({ sku: line.sku, quantity: Number(line.quantity) })),
+    refundMxnCents: row3.refund_mxn_cents === null ? null : Number(row3.refund_mxn_cents),
+    restock: row3.restock === null ? null : Number(row3.restock) === 1,
+    createdAt: iso3(row3.created_at),
+    preparedAt: iso3(row3.prepared_at),
+    confirmedAt: iso3(row3.confirmed_at)
+  }));
+}
+async function viewOf2(db, id) {
+  const rows = await db.query(
+    "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ?",
+    [id]
+  );
+  return (await withLines(db, rows))[0];
+}
+async function requestReturn(tx, input2, actor) {
+  const [order2] = await tx.query(
+    "SELECT id, user_id, status_id, delivered_at FROM orders WHERE order_number = ? FOR UPDATE",
+    [input2.orderNumber]
+  );
+  if (order2 === void 0) return "ORDER_NOT_FOUND";
+  const skus = input2.request.items.map((line) => line.sku);
+  if (new Set(skus).size !== skus.length) return "RETURN_PAYLOAD_INVALID";
+  const lines = await tx.query(
+    "SELECT i.id, i.sku, i.quantity, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.allows_return",
+    [order2.id]
+  );
+  const owner = order2.user_id === input2.userId;
+  const delivered = Number(order2.status_id) === 9;
+  const withinWindow = withinReturnWindow(order2.delivered_at, input2.now);
+  const chosen = [];
+  for (const asked of input2.request.items) {
+    const line = lines.find((candidate) => candidate.sku === asked.sku);
+    if (line === void 0) {
+      return owner ? "RETURN_PAYLOAD_INVALID" : "DATA_DOMAIN_FORBIDDEN";
+    }
+    const verdict = decideReturnLine({
+      owner,
+      delivered,
+      withinWindow,
+      allowsReturn: Number(line.allows_return) === 1,
+      validQuantity: asked.quantity <= Number(line.quantity) - Number(line.returned)
+    });
+    if (verdict !== "RETURN_ELIGIBLE_OK") return verdict;
+    chosen.push({ id: line.id, quantity: asked.quantity });
+  }
+  const comment = input2.request.comment ?? null;
+  const inserted = await tx.query(
+    "INSERT INTO order_returns (order_id, reason, comment, requested_by) VALUES (?, ?, ?, ?)",
+    [
+      order2.id,
+      input2.request.reason,
+      comment === "" ? null : comment,
+      input2.userId
+    ]
+  );
+  const insertId = inserted.insertId;
+  await tx.query(
+    "INSERT INTO order_return_items (return_id, order_item_id, quantity) VALUES ?",
+    [chosen.map((line) => [insertId, line.id, line.quantity])]
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "RETURN_REQUESTED",
+    entityType: "order_returns",
+    entityId: String(insertId),
+    before: null,
+    after: { order: input2.orderNumber, lines: chosen.length },
+    ip: actor.ip
+  });
+  return viewOf2(tx, insertId);
+}
+async function listReturns(db, status) {
+  const [rows, [count]] = await Promise.all([
+    db.query(
+      "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200",
+      [status, status]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM order_returns WHERE (? IS NULL OR status = ?)",
+      [status, status]
+    )
+  ]);
+  return { items: await withLines(db, rows), total: Number(count.n) };
+}
+async function committedCents(tx, orderId, id) {
+  const [row3] = await tx.query(
+    "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND id <> ? AND status IN ('REFUNDING', 'REFUNDED')",
+    [orderId, id]
+  );
+  return Number(row3.n);
+}
+async function prepareReturn(tx, id, input2, actor, now) {
+  const [row3] = await tx.query(
+    "SELECT r.order_id, r.status, o.total_mxn_cents FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ? FOR UPDATE",
+    [id]
+  );
+  if (row3 === void 0) return "RETURN_NOT_FOUND";
+  if (row3.status !== "REQUESTED") return "RETURN_STATUS_CONFLICT";
+  const committed = await committedCents(tx, row3.order_id, id);
+  if (committed + input2.refundMxnCents > Number(row3.total_mxn_cents)) {
+    return "INVALID_REFUND_AMOUNT_REJECT";
+  }
+  await tx.query(
+    "UPDATE order_returns SET status = 'PREPARED', refund_mxn_cents = ?, restock = ?, prepared_by = ?, prepared_at = ? WHERE id = ?",
+    [input2.refundMxnCents, input2.restock ? 1 : 0, actor.userId, now, id]
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "RETURN_PREPARED",
+    entityType: "order_returns",
+    entityId: String(id),
+    before: { status: "REQUESTED" },
+    after: {
+      status: "PREPARED",
+      refundCents: input2.refundMxnCents,
+      restock: input2.restock
+    },
+    ip: actor.ip
+  });
+  return viewOf2(tx, id);
+}
+async function beginRefund(tx, id, confirmer, now, ip) {
+  const [row3] = await tx.query(
+    "SELECT r.order_id, o.order_number, r.status, r.prepared_by, r.refund_mxn_cents, o.total_mxn_cents, o.payment_resource_id, p.code AS processor_code FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ? FOR UPDATE",
+    [id]
+  );
+  if (row3 === void 0) return { kind: "refusal", code: "RETURN_NOT_FOUND" };
+  if (row3.status === "REFUNDED") return { kind: "done" };
+  const refundCents = Number(row3.refund_mxn_cents ?? 0);
+  const committed = await committedCents(tx, row3.order_id, id);
+  const verdict = decideConfirmation({
+    prepared: row3.status === "PREPARED" || row3.status === "REFUNDING",
+    authorized: confirmer.canConfirm,
+    samePerson: row3.prepared_by === confirmer.userId,
+    amountOk: refundCents > 0 && committed + refundCents <= Number(row3.total_mxn_cents)
+  });
+  if (verdict !== "REFUND_CONFIRMED_EXECUTE") {
+    return { kind: "refusal", code: verdict };
+  }
+  if (row3.processor_code === "MERCADO_PAGO" && !confirmer.hasManualReference) {
+    return { kind: "refusal", code: "MANUAL_REFERENCE_REQUIRED" };
+  }
+  await tx.query(
+    "UPDATE order_returns SET status = 'REFUNDING', confirmed_by = ?, confirmed_at = ? WHERE id = ?",
+    [confirmer.userId, now, id]
+  );
+  await recordAudit(tx, {
+    userId: confirmer.userId,
+    action: "RETURN_REFUND_INTENT",
+    entityType: "order_returns",
+    entityId: String(id),
+    before: { status: row3.status },
+    after: { status: "REFUNDING", refundCents },
+    ip
+  });
+  return {
+    kind: "go",
+    intent: {
+      returnId: id,
+      orderId: row3.order_id,
+      orderNumber: row3.order_number,
+      processor: row3.processor_code,
+      paymentResourceId: row3.payment_resource_id,
+      refundMxnCents: refundCents
+    }
+  };
+}
+async function finishRefund(tx, intent, reference, confirmer) {
+  const [row3] = await tx.query(
+    "SELECT status, restock FROM order_returns WHERE id = ? FOR UPDATE",
+    [intent.returnId]
+  );
+  if (row3.status !== "REFUNDING") return viewOf2(tx, intent.returnId);
+  await tx.query(
+    "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ? WHERE id = ?",
+    [reference.refundId, reference.manualReference, intent.returnId]
+  );
+  if (Number(row3.restock) === 1) {
+    await tx.query(
+      "UPDATE products p JOIN order_items i ON i.product_id = p.id JOIN order_return_items ri ON ri.order_item_id = i.id SET p.stock = p.stock + ri.quantity WHERE ri.return_id = ?",
+      [intent.returnId]
+    );
+  }
+  const [order2] = await tx.query("SELECT status_id, total_mxn_cents FROM orders WHERE id = ? FOR UPDATE", [
+    intent.orderId
+  ]);
+  const refunded = await committedCents(tx, intent.orderId, intent.returnId) + intent.refundMxnCents;
+  const total = refunded >= Number(order2.total_mxn_cents);
+  const settles = total && PAID_STATUSES.has(Number(order2.status_id));
+  if (settles) {
+    await tx.query("UPDATE orders SET status_id = ? WHERE id = ?", [
+      REFUNDED_ORDER,
+      intent.orderId
+    ]);
+  }
+  await enqueueMail(tx, {
+    type: "RETURN_REFUNDED",
+    orderId: intent.orderId,
+    refundMxnCents: intent.refundMxnCents
+  });
+  await recordAudit(tx, {
+    userId: confirmer.userId,
+    action: "RETURN_REFUNDED",
+    entityType: "order_returns",
+    entityId: String(intent.returnId),
+    before: { status: "REFUNDING" },
+    after: {
+      status: "REFUNDED",
+      refundCents: intent.refundMxnCents,
+      restocked: Number(row3.restock) === 1,
+      orderRefunded: settles
+    },
+    ip: confirmer.ip
+  });
+  return viewOf2(tx, intent.returnId);
+}
+var refusalAnswer = (code2) => {
+  const [status, title] = RETURN_REFUSALS[code2];
+  return { status, body: problem(status, title, code2) };
+};
+async function confirmReturn(deps, id, confirmer, ip) {
+  const begun = await deps.db.transaction(
+    (tx) => beginRefund(
+      tx,
+      id,
+      {
+        userId: confirmer.userId,
+        canConfirm: confirmer.canConfirm,
+        hasManualReference: confirmer.manualReference !== null
+      },
+      deps.now(),
+      ip
+    )
+  );
+  if (begun.kind === "refusal") return refusalAnswer(begun.code);
+  if (begun.kind === "done") {
+    return { status: 200, body: await viewOf2(deps.db, id) };
+  }
+  const { intent } = begun;
+  let refundId = null;
+  if (intent.processor === "STRIPE") {
+    const processor = deps.processors.STRIPE;
+    if (processor?.createRefund === void 0 || intent.paymentResourceId === null) {
+      return refusalAnswer("REFUND_PROCESSOR_UNAVAILABLE");
+    }
+    try {
+      refundId = (await processor.createRefund({
+        paymentResourceId: intent.paymentResourceId,
+        amountMxnCents: intent.refundMxnCents,
+        idempotencyKey: `yekora-return-${intent.returnId}`
+      })).refundId;
+    } catch (error63) {
+      if (!(error63 instanceof PaymentProcessorError)) throw error63;
+      return refusalAnswer("REFUND_PROCESSOR_ERROR");
+    }
+  }
+  const view = await deps.db.transaction(
+    (tx) => finishRefund(
+      tx,
+      intent,
+      { refundId, manualReference: confirmer.manualReference },
+      { userId: confirmer.userId, ip }
+    )
+  );
+  return { status: 200, body: view };
+}
+async function isReturnRefund(db, orderId, refundIds) {
+  if (refundIds.length === 0) return false;
+  const [[known], [inFlight]] = await Promise.all([
+    db.query(
+      "SELECT COUNT(*) AS n FROM order_returns WHERE order_id = ? AND processor_refund_id IN (?)",
+      [orderId, [...refundIds]]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDING'",
+      [orderId]
+    )
+  ]);
+  return refundIds.length - Number(known.n) <= Number(inFlight.n);
+}
+
+// src/routes/returns.ts
+function refusalOf2(code2) {
+  const [status, title] = RETURN_REFUSALS[code2];
+  return { status, body: problem(status, title, code2) };
+}
+function registerReturnRoutes(app, deps) {
+  app.post(
+    "/v1/account/orders/:order_number/returns",
+    async (request, reply) => {
+      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      if (key.code !== "IDEMP_KEY_ACCEPTED") {
+        return refuse(reply, 400, "Idempotency-Key required", key.code);
+      }
+      const { order_number: orderNumber } = request.params;
+      const body = returnRequestSchema.safeParse(request.body);
+      if (!ORDER_NUMBER.test(orderNumber) || !body.success) {
+        return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
+      }
+      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        const outcome = await requestReturn(
+          tx,
+          { orderNumber, userId, request: body.data, now: deps.now() },
+          { userId, ip: request.ip }
+        );
+        return typeof outcome === "string" ? refusalOf2(outcome) : { status: 201, body: outcome };
+      });
+    }
+  );
+  app.get("/v1/admin/returns", async (request, reply) => {
+    const query = returnListQuery.safeParse(request.query);
+    if (!query.success) {
+      return refuse(reply, 400, "Invalid filter", "RETURN_PAYLOAD_INVALID");
+    }
+    return listReturns(deps.db, query.data.status ?? null);
+  });
+  app.post("/v1/admin/returns/:id/prepare", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const params = returnParams.safeParse(request.params);
+    const body = returnPrepareRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
+    }
+    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      const outcome = await prepareReturn(
+        tx,
+        params.data.id,
+        body.data,
+        { userId, ip: request.ip },
+        deps.now()
+      );
+      return typeof outcome === "string" ? refusalOf2(outcome) : { status: 200, body: outcome };
+    });
+  });
+  app.post("/v1/admin/returns/:id/confirm", async (request, reply) => {
+    const params = returnParams.safeParse(request.params);
+    const body = returnConfirmRequestSchema.safeParse(request.body ?? {});
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
+    }
+    const user = request.user;
+    const answer = await confirmReturn(
+      deps,
+      params.data.id,
+      {
+        userId: user.userId,
+        canConfirm: user.permissions.includes("returns:confirm"),
+        manualReference: body.data.manualReference ?? null
+      },
+      request.ip
+    );
+    if (answer.status >= 400) reply.type(PROBLEM_TYPE);
+    return reply.code(answer.status).send(answer.body);
+  });
 }
 
 // src/services/shippingAdmin.ts
@@ -105038,15 +105583,18 @@ async function reconcile(deps, code2, processor, event) {
   const confirmed = payment.paid && order2 !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order2.total_mxn_cents);
   return { payment, order: order2 ?? null, confirmed };
 }
-function recordRefundAlert(deps, base2, code2) {
+function recordRefundEvent(deps, base2, code2, alert) {
   return deps.db.transaction(async (tx) => {
     const recorded = await recordEvent(tx, {
       ...base2,
       resultingStatusId: null,
-      alert: true
+      alert
     });
     return { status: 200, code: recorded ? code2 : "IDEMPOTENT_IGNORED" };
   });
+}
+function recordRefundAlert(deps, base2, code2) {
+  return recordRefundEvent(deps, base2, code2, true);
 }
 function refundOrder(deps, base2, order2) {
   return deps.db.transaction(async (tx) => {
@@ -105113,6 +105661,9 @@ async function receiveRefund(deps, code2, processor, event, isTest) {
     reconciliation: { payment, order: order2, confirmed: true },
     isTest
   };
+  if (await isReturnRefund(deps.db, order2.id, refund.refundIds)) {
+    return recordRefundEvent(deps, base2, "REFUND_LINKED_TO_RETURN", false);
+  }
   return refund.refundedMxnCents >= refund.amountMxnCents ? refundOrder(deps, base2, order2) : recordRefundAlert(deps, base2, "PARTIAL_REFUND_ALERT");
 }
 function settleOrder(deps, base2, order2) {
@@ -118790,6 +119341,34 @@ var ORDER_COPY = {
       }
     })
   },
+  RETURN_REFUNDED: {
+    "es-MX": ({ name: name2, number: number4, site, refund }) => ({
+      subject: `Reembolsamos tu devoluci\xF3n del pedido ${number4}`,
+      content: {
+        heading: "Reembolsamos tu devoluci\xF3n",
+        paragraphs: [
+          `Hola ${name2}: reembolsamos ${refund} por la devoluci\xF3n de tu pedido ${number4}. El dinero regresa a tu m\xE9todo de pago; seg\xFAn tu banco puede tardar unos d\xEDas en verse reflejado.`
+        ],
+        button: {
+          label: "Ver mi pedido",
+          url: `${site}/cuenta/${number4}/`
+        }
+      }
+    }),
+    en: ({ name: name2, number: number4, site, refund }) => ({
+      subject: `We refunded your return of order ${number4}`,
+      content: {
+        heading: "We refunded your return",
+        paragraphs: [
+          `Hello ${name2}: we refunded ${refund} for the return of your order ${number4}. The money goes back to your payment method; depending on your bank it may take a few days to show.`
+        ],
+        button: {
+          label: "View my order",
+          url: `${site}/en/account/${number4}/`
+        }
+      }
+    })
+  },
   ORDER_PREPARED: {
     "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Estamos preparando tu pedido ${number4}`,
@@ -118934,7 +119513,8 @@ async function renderOrder(db, keys, event) {
     site: keys.siteUrl,
     carrier: order2.carrier,
     trackingNumber: order2.tracking_number,
-    trackingUrl
+    trackingUrl,
+    refund: event.type === "RETURN_REFUNDED" ? money(event.refundMxnCents, locale) : null
   });
   const block = {
     number: number4,
@@ -119420,9 +120000,10 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       }
     },
     async fetchRefund(chargeId) {
-      const charge = await call(`/charges/${encodeURIComponent(chargeId)}`, {
-        method: "GET"
-      });
+      const charge = await call(
+        `/charges/${encodeURIComponent(chargeId)}?expand[]=refunds`,
+        { method: "GET" }
+      );
       if (typeof charge.payment_intent !== "string" || !Number.isInteger(charge.amount) || !Number.isInteger(charge.amount_refunded)) {
         return null;
       }
@@ -119437,8 +120018,34 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
         amountMxnCents: charge.amount,
         refundedMxnCents: charge.amount_refunded,
-        currency: typeof charge.currency === "string" ? charge.currency.toUpperCase() : null
+        currency: typeof charge.currency === "string" ? charge.currency.toUpperCase() : null,
+        refundIds: (charge.refunds?.data ?? []).map((refund) => refund.id).filter((id) => typeof id === "string")
       };
+    },
+    async createRefund(request) {
+      const session = await call(
+        `/checkout/sessions/${encodeURIComponent(request.paymentResourceId)}`,
+        { method: "GET" }
+      );
+      if (typeof session.payment_intent !== "string") {
+        throw new PaymentProcessorError("Stripe: the session has no payment");
+      }
+      const refund = await call("/refunds", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Idempotency-Key": request.idempotencyKey
+        },
+        body: new URLSearchParams({
+          payment_intent: session.payment_intent,
+          amount: String(request.amountMxnCents),
+          reason: "requested_by_customer"
+        }).toString()
+      });
+      if (typeof refund.id !== "string") {
+        throw new PaymentProcessorError("Stripe: unexpected refund answer");
+      }
+      return { refundId: refund.id };
     }
   };
 }
@@ -119664,6 +120271,7 @@ async function buildApp(deps) {
   });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerAdminOrderRoutes(app, { db: deps.db, now });
+  registerReturnRoutes(app, { db: deps.db, now, processors });
   registerAdminShippingRoutes(app, { db: deps.db, now });
   registerCatalogAdminRoutes(app, {
     db: deps.db,
@@ -119983,7 +120591,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "270d6cd9656079e50a4236d31ea95168152f1f2c" : void 0;
+var sha = true ? "e2f1ee27c74771d672b8a2368ae35e9e1d7a0780" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
