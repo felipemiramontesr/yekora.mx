@@ -39,10 +39,16 @@ export interface SessionRequest {
   /** Webhook endpoint of this processor in Yekora's API. */
   notificationUrl: string;
   /**
-   * FC 054 T1.3: the processor's customer of the signed-in buyer who ticked «save this card»; the
-   * session then ties the card to that customer for later purchases. Only Stripe's CARD uses it.
+   * FC 060 T1.1: the processor's customer of the signed-in buyer paying by card. The hosted page
+   * then recognises the buyer and offers the card they keep, whether or not they keep a new one.
+   * Only Stripe's CARD uses it.
    */
-  futureUsageCustomerId?: string;
+  customerId?: string;
+  /**
+   * FC 060 T2.2: the buyer asked to keep the card they pay with. The hosted page then saves it to
+   * the customer to be offered again (`allow_redisplay = always`). Needs {@link customerId}.
+   */
+  saveCard?: boolean;
 }
 
 /** A hosted session ready for the buyer. */

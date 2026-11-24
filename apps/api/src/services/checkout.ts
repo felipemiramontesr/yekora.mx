@@ -381,24 +381,20 @@ async function persist(
 }
 
 /**
- * The Stripe customer a card paid now should be kept for (FC 054 T1.3): only for a signed-in buyer
- * paying by card who ticked the box. If Stripe cannot give the customer, the buyer pays all the
- * same and the card is simply not kept: saving it is never a reason to refuse a purchase.
+ * The Stripe customer a card payment is made as (FC 060 T1.1): every signed-in buyer paying by
+ * card, whether or not they ask to keep the card, so the hosted page offers the one they keep. If
+ * Stripe cannot give the customer, the buyer pays all the same as a guest: neither offering nor
+ * keeping a card is ever a reason to refuse a purchase.
  *
- * @returns The customer id, or undefined when no card is to be kept.
+ * @returns The customer id, or undefined for a guest, another method or without Stripe.
  */
-async function customerToKeepCard(
+async function customerForCard(
   deps: CheckoutDeps,
   admitted: Admitted,
   userId: string | null
 ): Promise<string | undefined> {
   const cards = deps.cards;
-  if (
-    userId === null ||
-    admitted.method !== 'CARD' ||
-    admitted.request.savePaymentMethod !== true ||
-    !cards
-  ) {
+  if (userId === null || admitted.method !== 'CARD' || !cards) {
     return undefined;
   }
   try {
@@ -451,11 +447,7 @@ export async function createCheckout(
   if (typeof orderId !== 'number') return orderId;
 
   const paths = CHECKOUT_RETURN_PATHS[lang];
-  const futureUsageCustomerId = await customerToKeepCard(
-    deps,
-    admitted,
-    userId
-  );
+  const customerId = await customerForCard(deps, admitted, userId);
   const webhook =
     admitted.processorCode === 'STRIPE' ? 'stripe' : 'mercadopago';
   const total = quote.summary.totalMxnCents;
@@ -470,7 +462,10 @@ export async function createCheckout(
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
       notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook}`,
-      ...(futureUsageCustomerId !== undefined && { futureUsageCustomerId }),
+      ...(customerId !== undefined && {
+        customerId,
+        saveCard: admitted.request.savePaymentMethod === true,
+      }),
     });
     await deps.db.query(
       'UPDATE orders SET processor_reference = ? WHERE id = ?',

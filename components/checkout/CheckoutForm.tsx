@@ -390,6 +390,9 @@ export function CheckoutForm({
         />
         {canKeepCard && (
           <div className="flex flex-col gap-1">
+            <p className="text-sm text-petroleo/80">
+              {messages.saved.quickPay}
+            </p>
             <label className="flex min-h-11 items-center gap-3">
               <input
                 type="checkbox"

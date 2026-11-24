@@ -785,7 +785,8 @@
       "manage": "Administrar mis domicilios",
       "profile": "Usamos tu nombre y tu teléfono de tu cuenta; puedes cambiarlos aquí solo para este pedido.",
       "saveCard": "Guardar esta tarjeta en mi cuenta para próximas compras",
-      "saveCardHint": "La guarda Stripe, no YĒKORA. Puedes eliminarla cuando quieras en Mi cuenta › Métodos de pago."
+      "saveCardHint": "La guarda Stripe, no YĒKORA. Puedes eliminarla cuando quieras en Mi cuenta › Métodos de pago.",
+      "quickPay": "Si ya guardaste una tarjeta, aparecerá en la página segura de Stripe para pagar con un clic; también puedes usar otra."
     }
   },
   "account": {

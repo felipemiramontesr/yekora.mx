@@ -22,10 +22,12 @@ import type {
   VerifiedEvent,
   WebhookInput,
 } from './paymentPort';
+import { settleSavedCards } from './accountPaymentMethods';
 import { enqueueMail } from './outbox';
 import { applyRefund, decideRefund } from './refundFsm';
 import { isReturnRefund } from './returnsService';
 import { settle } from './settlement';
+import type { StripeCardsPort } from './stripeAdapter';
 
 /** Dependencies of the webhook receiver. */
 export interface WebhookDeps {
@@ -35,6 +37,8 @@ export interface WebhookDeps {
   processors: Partial<Record<ProcessorCode, PaymentProcessorPort>>;
   /** Payments mode: sandbox events are marked as tests. */
   payments: PaymentsConfig;
+  /** The saved-cards client of Stripe, or null without a Stripe key (FC 060 T1.2). */
+  cards?: StripeCardsPort | null;
   /** Clock, injectable for tests. */
   now: () => Date;
 }
@@ -320,6 +324,24 @@ function settleOrder(
 }
 
 /**
+ * FC 060 T1.2 and T2.3: once a card payment of a signed-in buyer is confirmed, the account is left
+ * with one card, the newest, and any older one is detached. Settling is idempotent and a failure
+ * half way is finished by the next call, so it never fails the delivery: the payment is already
+ * recorded, and Stripe would only repeat the event for nothing.
+ */
+async function keepOneCard(deps: WebhookDeps, orderId: number): Promise<void> {
+  if (!deps.cards) return;
+  const [buyer] = await deps.db.query<{ user_id: string | null }>(
+    "SELECT o.user_id FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ? AND m.code = 'CARD'",
+    [orderId]
+  );
+  if (!buyer?.user_id) return;
+  await settleSavedCards(deps.db, deps.cards, buyer.user_id).catch(
+    () => undefined
+  );
+}
+
+/**
  * Handles one webhook delivery.
  *
  * @param deps - Database, processors, configuration and clock.
@@ -377,5 +399,8 @@ export async function receiveWebhook(
       ? { status: 200, code: 'PAYMENT_UNCONFIRMED' }
       : { status: 200, code: 'IDEMPOTENT_IGNORED' };
   }
-  return settleOrder(deps, base, reconciliation.order as OrderRow);
+  const order = reconciliation.order as OrderRow;
+  const outcome = await settleOrder(deps, base, order);
+  if (outcome.code === 'ORDER_PAID') await keepOneCard(deps, order.id);
+  return outcome;
 }

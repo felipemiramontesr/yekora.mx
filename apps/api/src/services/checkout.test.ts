@@ -889,7 +889,7 @@ describe('the address a signed-in buyer asks to keep (FC 051 T1.4, T2.5)', () =>
   });
 });
 
-describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () => {
+describe('T1.1 · CheckoutCustomerBindingGate(U, M) (FC 060)', () => {
   const BUYER = 'b0000000-0000-4000-8000-000000000001';
   const cardsDouble = (failing = false) => {
     const made: string[] = [];
@@ -934,7 +934,8 @@ describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () =>
       port
     );
     expect(outcome).toMatchObject({ ok: true });
-    expect(request.futureUsageCustomerId).toBe('cus_buyer');
+    expect(request.customerId).toBe('cus_buyer');
+    expect(request.saveCard).toBe(true);
     expect(made).toEqual([BUYER]);
     expect(state.links[BUYER]).toBe('cus_buyer');
   });
@@ -944,22 +945,36 @@ describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () =>
     const { request } = await run({ savePaymentMethod: true }, BUYER, port, {
       [BUYER]: 'cus_old',
     });
-    expect(request.futureUsageCustomerId).toBe('cus_old');
+    expect(request.customerId).toBe('cus_old');
     expect(made).toEqual([]);
   });
 
   it.each([
-    ['A ⊤ S ⊤ C ⊤ F ⊥', BUYER, { savePaymentMethod: false }],
-    ['A ⊤ S ⊤ C ⊤ F ⊥ (box absent)', BUYER, {}],
-    ['A ⊤ S ⊤ C ⊥ F ⊤ (a guest)', null, { savePaymentMethod: true }],
-    ['A ⊤ S ⊤ C ⊥ F ⊥', null, {}],
+    ['U ⊤ M ⊤ (box unticked)', { savePaymentMethod: false }],
+    ['U ⊤ M ⊤ (box absent)', {}],
   ])(
-    '%s: NO_FUTURE_USAGE, the order and its session are created all the same (201)',
-    async (_row, userId, over) => {
+    '%s: CUSTOMER_BOUND_200, so Stripe offers the card the buyer keeps, but nothing new is kept',
+    async (_row, over) => {
       const { port, made } = cardsDouble();
-      const { outcome, request } = await run(over, userId, port);
+      const { outcome, request } = await run(over, BUYER, port);
       expect(outcome).toMatchObject({ ok: true });
-      expect(request.futureUsageCustomerId).toBeUndefined();
+      expect(request.customerId).toBe('cus_buyer');
+      expect(request.saveCard).toBe(false);
+      expect(made).toEqual([BUYER]);
+    }
+  );
+
+  it.each([
+    ['U ⊥ M ⊤ (a guest, box ticked)', { savePaymentMethod: true }],
+    ['U ⊥ M ⊤ (a guest)', {}],
+  ])(
+    '%s: GUEST_OR_NON_CARD_SESSION_200, no customer is created and the session is made all the same (201)',
+    async (_row, over) => {
+      const { port, made } = cardsDouble();
+      const { outcome, request } = await run(over, null, port);
+      expect(outcome).toMatchObject({ ok: true });
+      expect(request.customerId).toBeUndefined();
+      expect(request.saveCard).toBeUndefined();
       expect(made).toEqual([]);
     }
   );
@@ -970,12 +985,12 @@ describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () =>
     ['A ⊤ S ⊥ C ⊥ F ⊤', null, { method: 'OXXO', savePaymentMethod: true }],
     ['A ⊤ S ⊥ C ⊥ F ⊥', null, { method: 'OXXO' }],
   ])(
-    '%s: NON_STRIPE_PAYMENT, nothing is kept (201)',
+    '%s: GUEST_OR_NON_CARD_SESSION_200, nothing is bound (201)',
     async (_row, userId, over) => {
       const { port, made } = cardsDouble();
       const { outcome, request } = await run(over, userId, port);
       expect(outcome).toMatchObject({ ok: true });
-      expect(request.futureUsageCustomerId).toBeUndefined();
+      expect(request.customerId).toBeUndefined();
       expect(made).toEqual([]);
     }
   );
@@ -1001,7 +1016,7 @@ describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () =>
         cards
       );
       expect(outcome).toMatchObject({ ok: true });
-      expect(request.futureUsageCustomerId).toBeUndefined();
+      expect(request.customerId).toBeUndefined();
     }
   });
 
@@ -1013,7 +1028,7 @@ describe('T1.3 · FutureUsageConfigured ⟺ A ∧ S ∧ C ∧ F (FC 054)', () =>
       port
     );
     expect(outcome).toMatchObject({ ok: true });
-    expect(request.futureUsageCustomerId).toBeUndefined();
+    expect(request.customerId).toBeUndefined();
     expect(state.links).toEqual({});
   });
 });

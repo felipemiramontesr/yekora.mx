@@ -7,6 +7,7 @@ import type {
   RefundStatus,
   VerifiedEvent,
 } from './paymentPort';
+import type { StripeCardsPort } from './stripeAdapter';
 import { receiveWebhook, type WebhookDeps } from './webhooks';
 
 const NOW = new Date('2026-10-21T19:00:00Z');
@@ -53,6 +54,8 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
     audit: [] as unknown[],
     /** The rows of `outbox_events` the receiver queued (FC 066): event type and payload. */
     outbox: [] as { type: string; payload: Record<string, unknown> }[],
+    /** The signed-in buyer of a card order (FC 060), or null for a guest or another method. */
+    buyer: null as string | null,
     /** What the returns of the order say (FC 071): refunds recorded in a request, requests in flight. */
     returns: { known: 0, inFlight: 0 },
   };
@@ -121,6 +124,14 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
         state.order.status = status as number;
         return { affectedRows: 1 };
       },
+    ],
+    [
+      'SELECT o.user_id FROM orders o JOIN payment_methods m',
+      () => (state.buyer === null ? [] : [{ user_id: state.buyer }]),
+    ],
+    [
+      'SELECT stripe_customer_id FROM user_stripe_customers',
+      () => [{ stripe_customer_id: 'cus_buyer' }],
     ],
     [
       'SELECT COUNT(*) AS n FROM order_returns WHERE order_id = ? AND processor_refund_id IN (?)',
@@ -236,6 +247,100 @@ const INPUT = {
   headers: { 'stripe-signature': 't=1,v1=x' },
   query: {},
 };
+
+describe('T1.2 · CardReconciliationGate(P, N): one card per account after a card payment (FC 060)', () => {
+  const card = (id: string, created: number) => ({
+    id,
+    brand: 'visa',
+    last4: '4242',
+    expMonth: 12,
+    expYear: 2030,
+    created,
+  });
+  const cardsDouble = (held: ReturnType<typeof card>[] | Error) => {
+    const detached: string[] = [];
+    const port: StripeCardsPort = {
+      createCustomer: vi.fn(),
+      listCards: vi.fn(async () => {
+        if (held instanceof Error) throw held;
+        return held;
+      }),
+      cardOwner: vi.fn(),
+      detachCard: vi.fn(async (id: string) => {
+        detached.push(id);
+      }),
+      createSetupSession: vi.fn(),
+    };
+    return { port, detached };
+  };
+  const pay = async (
+    cards: StripeCardsPort | null | undefined,
+    buyer: string | null,
+    order: Partial<OrderState> = {}
+  ) => {
+    const { db, state } = webhookDb(order);
+    state.buyer = buyer;
+    const { port } = processor();
+    const outcome = await receiveWebhook(
+      { ...deps(db, port), ...(cards !== undefined && { cards }) },
+      'STRIPE',
+      INPUT
+    );
+    return { outcome, state };
+  };
+
+  it('P ⊤ N ⊤: the newest card stays and the older one is detached, RECONCILIATION_DETACH_PREVIOUS', async () => {
+    const { port, detached } = cardsDouble([
+      card('pm_old', 10),
+      card('pm_new', 20),
+    ]);
+    const { outcome } = await pay(port, 'buyer-1');
+    expect(outcome).toEqual({ status: 200, code: 'ORDER_PAID' });
+    expect(detached).toEqual(['pm_old']);
+    expect(port.listCards).toHaveBeenCalledWith('cus_buyer');
+  });
+
+  it('P ⊤ N ⊥: a single card needs nothing, RECONCILIATION_NOOP_SINGLE_CARD', async () => {
+    const { port, detached } = cardsDouble([card('pm_only', 10)]);
+    const { outcome } = await pay(port, 'buyer-1');
+    expect(outcome.code).toBe('ORDER_PAID');
+    expect(detached).toEqual([]);
+  });
+
+  it.each([['a guest or a payment that is not by card', null]])(
+    'P ⊥: %s, nobody is asked, RECONCILIATION_NOOP_INACTIVE',
+    async (_name, buyer) => {
+      const { port } = cardsDouble([card('pm_a', 1), card('pm_b', 2)]);
+      const { outcome } = await pay(port, buyer);
+      expect(outcome.code).toBe('ORDER_PAID');
+      expect(port.listCards).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does nothing without a Stripe client of cards, and the payment is settled all the same', async () => {
+    for (const cards of [null, undefined]) {
+      const { outcome } = await pay(cards, 'buyer-1');
+      expect(outcome).toEqual({ status: 200, code: 'ORDER_PAID' });
+    }
+  });
+
+  it('settles only a payment that has just been confirmed: a repeated delivery asks nobody', async () => {
+    const { port } = cardsDouble([card('pm_a', 1), card('pm_b', 2)]);
+    const { outcome } = await pay(port, 'buyer-1', {
+      status: 2,
+      resource: 'cs_test_1',
+    });
+    expect(outcome.code).toBe('ALREADY_PAID');
+    expect(port.listCards).not.toHaveBeenCalled();
+  });
+
+  it('never fails the delivery when Stripe cannot be reached: the payment is recorded and the next call converges', async () => {
+    const { port } = cardsDouble(new Error('Stripe: HTTP 500'));
+    const { outcome, state } = await pay(port, 'buyer-1');
+    expect(outcome).toEqual({ status: 200, code: 'ORDER_PAID' });
+    expect(state.order.status).toBe(2);
+  });
+});
 
 describe('T1.3 · WebhookIngestionGate(V, N, R), in order V → N → R', () => {
   it('a processor without secrets answers 503 and reads nothing', async () => {

@@ -321,6 +321,8 @@ test('a signed-in buyer paying by card may ask Stripe to keep it, and only then 
     .check();
   await expect(keep).not.toBeChecked();
   await expect(form.getByText('La guarda Stripe, no YĒKORA.')).toBeVisible();
+  // FC 060 T2.4: a card already kept is offered on Stripe's page for one-click payment.
+  await expect(form.getByText(/pagar con un clic/)).toBeVisible();
   await keep.check();
   await form.getByRole('checkbox', { name: /privacidad/i }).check();
   await payButton(page).click();
@@ -341,6 +343,7 @@ test('a guest never sees the box to keep the card', async ({ page }) => {
   await expect(
     form.getByLabel('Guardar esta tarjeta en mi cuenta')
   ).toHaveCount(0);
+  await expect(form.getByText(/pagar con un clic/)).toHaveCount(0);
 });
 
 test('SPEI goes to Mercado Pago; back from cancel, the same payment page is offered', async ({

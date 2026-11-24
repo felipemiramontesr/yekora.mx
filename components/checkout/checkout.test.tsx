@@ -899,6 +899,12 @@ describe('keeping the card for next time (FC 054 T1.3)', () => {
     fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
     expect(screen.getByLabelText(KEEP)).toHaveProperty('checked', false);
     expect(screen.getByText(/La guarda Stripe, no YĒKORA/)).toBeTruthy();
+    // FC 060 T2.4: it says that a card already kept appears on Stripe's page for one-click payment.
+    expect(
+      screen.getByText(
+        /aparecerá en la página segura de Stripe para pagar con un clic/
+      )
+    ).toBeTruthy();
   });
 
   it('never offers it to a guest', () => {
@@ -906,6 +912,7 @@ describe('keeping the card for next time (FC 054 T1.3)', () => {
     renderForm();
     fireEvent.click(screen.getByLabelText(/Tarjeta de crédito o débito/));
     expect(screen.queryByLabelText(KEEP)).toBeNull();
+    expect(screen.queryByText(/pagar con un clic/)).toBeNull();
   });
 
   it('asks the API to keep the card only when the buyer ticked the box', async () => {

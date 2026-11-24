@@ -785,7 +785,8 @@
       "manage": "Manage my addresses",
       "profile": "We use the name and phone of your account; you can change them here for this order only.",
       "saveCard": "Save this card to my account for future purchases",
-      "saveCardHint": "Stripe keeps it, not YĒKORA. You can remove it any time in My account › Payment methods."
+      "saveCardHint": "Stripe keeps it, not YĒKORA. You can remove it any time in My account › Payment methods.",
+      "quickPay": "If you already saved a card, it will appear on Stripe's secure page for one-click payment; you can also use another."
     }
   },
   "account": {

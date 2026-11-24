@@ -369,7 +369,7 @@ describe('verifyWebhook with a bare v1', () => {
   });
 });
 
-describe('createSession keeps the card for later (FC 054 T1.3)', () => {
+describe('createSession binds the customer and keeps the card (FC 060 T1.1, T2.2)', () => {
   const create = async (over: Partial<SessionRequest>) => {
     const fetchMock = answering({
       id: 'cs_test_1',
@@ -379,12 +379,26 @@ describe('createSession keeps the card for later (FC 054 T1.3)', () => {
     return sentForm(fetchMock);
   };
 
-  it('ties the session to the customer and asks Stripe to keep the card, for a card payment', async () => {
-    const form = await create({ futureUsageCustomerId: 'cus_ana' });
+  it('ties the session to the customer for a card payment, so Stripe offers the card they keep, and keeps nothing new', async () => {
+    const form = await create({ customerId: 'cus_ana' });
     expect(form.get('customer')).toBe('cus_ana');
-    expect(form.get('payment_intent_data[setup_future_usage]')).toBe(
-      'off_session'
+    expect(form.has('saved_payment_method_options[payment_method_save]')).toBe(
+      false
     );
+    expect(form.has('payment_intent_data[setup_future_usage]')).toBe(false);
+  });
+
+  it('asks Stripe to keep the card with its own option, and never with setup_future_usage (allow_redisplay always)', async () => {
+    const form = await create({ customerId: 'cus_ana', saveCard: true });
+    expect(form.get('customer')).toBe('cus_ana');
+    expect(form.get('saved_payment_method_options[payment_method_save]')).toBe(
+      'enabled'
+    );
+    expect(form.has('payment_intent_data[setup_future_usage]')).toBe(false);
+    const unticked = await create({ customerId: 'cus_ana', saveCard: false });
+    expect(
+      unticked.has('saved_payment_method_options[payment_method_save]')
+    ).toBe(false);
   });
 
   it('sends neither without the customer, nor for OXXO', async () => {
@@ -394,12 +408,16 @@ describe('createSession keeps the card for later (FC 054 T1.3)', () => {
         method: 'OXXO' as const,
         // An OXXO voucher is held 72 hours.
         expiresAt: new Date(NOW.getTime() + 72 * 60 * MIN),
-        futureUsageCustomerId: 'cus_ana',
+        customerId: 'cus_ana',
+        saveCard: true,
       },
     ]) {
       const form = await create(over);
       expect(form.has('customer')).toBe(false);
       expect(form.has('payment_intent_data[setup_future_usage]')).toBe(false);
+      expect(
+        form.has('saved_payment_method_options[payment_method_save]')
+      ).toBe(false);
     }
   });
 });

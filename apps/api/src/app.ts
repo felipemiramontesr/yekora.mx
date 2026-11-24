@@ -269,6 +269,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     db: deps.db,
     processors,
     payments: deps.config.payments,
+    cards,
     now,
   });
   return app;

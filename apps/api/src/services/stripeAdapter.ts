@@ -107,14 +107,16 @@ function sessionForm(
   if (request.method === 'OXXO') {
     form.set('payment_method_options[oxxo][expires_after_days]', '1');
   }
-  // FC 054 T1.3: a buyer who asked to keep the card pays as the customer of their account, and
-  // Stripe ties the card to it when the charge succeeds.
-  if (
-    request.method === 'CARD' &&
-    request.futureUsageCustomerId !== undefined
-  ) {
-    form.set('customer', request.futureUsageCustomerId);
-    form.set('payment_intent_data[setup_future_usage]', 'off_session');
+  // FC 060 T1.1: a signed-in buyer paying by card pays as the customer of their account, so the
+  // hosted page offers the card they already keep.
+  if (request.method === 'CARD' && request.customerId !== undefined) {
+    form.set('customer', request.customerId);
+    // FC 060 T2.2: to keep the card, Stripe's own option, which saves it with
+    // `allow_redisplay = always`. `setup_future_usage` is not sent: it saves the card as
+    // `limited`, which Checkout does not offer again.
+    if (request.saveCard === true) {
+      form.set('saved_payment_method_options[payment_method_save]', 'enabled');
+    }
   }
   return form;
 }
