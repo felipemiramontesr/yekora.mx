@@ -93,7 +93,7 @@ interface Actor {
 
 /** The statuses of `order_statuses` a refund moves between. */
 const REFUNDED_ORDER = 5;
-const PAID_STATUSES = [2, 7, 8, 9];
+const PAID_STATUSES: ReadonlySet<number> = new Set([2, 7, 8, 9]);
 
 const iso = (date: Date | null) =>
   date === null ? null : new Date(date).toISOString();
@@ -451,7 +451,7 @@ async function finishRefund(
     (await committedCents(tx, intent.orderId, intent.returnId)) +
     intent.refundMxnCents;
   const total = refunded >= Number(order.total_mxn_cents);
-  const settles = total && PAID_STATUSES.includes(Number(order.status_id));
+  const settles = total && PAID_STATUSES.has(Number(order.status_id));
   if (settles) {
     await tx.query('UPDATE orders SET status_id = ? WHERE id = ?', [
       REFUNDED_ORDER,
