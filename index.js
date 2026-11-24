@@ -826,23 +826,23 @@ var require_vary = __commonJS({
       } else if (header3.indexOf(",") === -1) {
         result.push(header3);
       } else {
-        const il = header3.length;
-        let i = 0;
-        let pos = 0;
-        let char;
-        for (i; i < il; ++i) {
-          char = header3[i];
-          if (char === " ") {
-            pos = i + 1;
-          } else if (char === ",") {
-            if (pos !== i) {
-              result.push(header3.slice(pos, i));
+        const len = header3.length;
+        let start2 = 0;
+        for (let i = 0; i <= len; ++i) {
+          if (i === len || header3.charCodeAt(i) === 44) {
+            let tokenStart = start2;
+            let tokenEnd = i;
+            while (tokenStart < tokenEnd && (header3.charCodeAt(tokenStart) === 32 || header3.charCodeAt(tokenStart) === 9)) {
+              tokenStart++;
             }
-            pos = i + 1;
+            while (tokenEnd > tokenStart && (header3.charCodeAt(tokenEnd - 1) === 32 || header3.charCodeAt(tokenEnd - 1) === 9)) {
+              tokenEnd--;
+            }
+            if (tokenStart < tokenEnd) {
+              result.push(header3.slice(tokenStart, tokenEnd));
+            }
+            start2 = i + 1;
           }
-        }
-        if (pos !== i) {
-          result.push(header3.slice(pos, i));
         }
       }
       return result;
@@ -916,19 +916,18 @@ var require_cors = __commonJS({
       "preParsing",
       "preValidation",
       "preHandler",
-      "preSerialization",
-      "onSend"
+      "preSerialization"
     ];
     var hookWithPayload = [
       "preSerialization",
-      "preParsing",
-      "onSend"
+      "preParsing"
     ];
     function validateHook(value, next) {
       if (validHooks.indexOf(value) !== -1) {
-        return;
+        return true;
       }
       next(new TypeError("@fastify/cors: Invalid hook option provided."));
+      return false;
     }
     function fastifyCors(fastify, opts, next) {
       fastify.decorateRequest("corsPreflightEnabled", false);
@@ -938,10 +937,10 @@ var require_cors = __commonJS({
         handleCorsOptionsDelegator(opts, fastify, { hook: defaultOptions.hook }, next);
       } else if (opts.delegator) {
         const { delegator, ...options } = opts;
-        handleCorsOptionsDelegator(delegator, fastify, options, next);
+        if (!handleCorsOptionsDelegator(delegator, fastify, options, next)) return;
       } else {
         const corsOptions = normalizeCorsOptions(opts);
-        validateHook(corsOptions.hook, next);
+        if (!validateHook(corsOptions.hook, next)) return;
         if (hookWithPayload.indexOf(corsOptions.hook) !== -1) {
           fastify.addHook(corsOptions.hook, function handleCors(req, reply, _payload, next2) {
             addCorsHeadersHandler(fastify, corsOptions, req, reply, next2);
@@ -965,7 +964,7 @@ var require_cors = __commonJS({
     }
     function handleCorsOptionsDelegator(optionsResolver, fastify, opts, next) {
       const hook = opts?.hook || defaultOptions.hook;
-      validateHook(hook, next);
+      if (!validateHook(hook, next)) return false;
       if (optionsResolver.length === 2) {
         if (hookWithPayload.indexOf(hook) !== -1) {
           fastify.addHook(hook, function handleCors(req, reply, _payload, next2) {
@@ -997,6 +996,7 @@ var require_cors = __commonJS({
           });
         }
       }
+      return true;
     }
     function handleCorsOptionsCallbackDelegator(optionsResolver, fastify, req, reply, next) {
       optionsResolver(req, (err, options) => {
@@ -1021,6 +1021,9 @@ var require_cors = __commonJS({
       return corsOptions;
     }
     function addCorsHeadersHandler(fastify, globalOptions, req, reply, next) {
+      if (req.routeOptions.config?.cors === false) {
+        return next();
+      }
       const options = { ...globalOptions, ...req.routeOptions.config?.cors };
       if (typeof options.origin !== "string" && options.origin !== false || options.dynamic) {
         addOriginToVaryHeader(reply);
@@ -1031,9 +1034,6 @@ var require_cors = __commonJS({
           return next(error63);
         }
         if (resolvedOriginOption === false) {
-          return next();
-        }
-        if (req.routeOptions.config?.cors === false) {
           return next();
         }
         if (!resolvedOriginOption) {
@@ -1103,6 +1103,9 @@ var require_cors = __commonJS({
       };
     }
     function getAccessControlAllowOriginHeader(reqOrigin, originOption) {
+      if (Array.isArray(originOption) && originOption.indexOf("*") !== -1) {
+        return "*";
+      }
       if (typeof originOption === "string") {
         return originOption;
       }
@@ -120671,7 +120674,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "7c48d57978ed208486092e35c492266281cedeef" : void 0;
+var sha = true ? "4cba09022fbf7eee6c569bba0c0a65d6a66de94a" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
