@@ -103504,6 +103504,29 @@ async function committedCents(tx, orderId, id) {
   );
   return Number(row3.n);
 }
+async function outsideRefundedCents(tx, orderId, processorRefundedCents) {
+  const [row3] = await tx.query(
+    "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDED'",
+    [orderId]
+  );
+  return Math.max(0, processorRefundedCents - Number(row3.n));
+}
+async function readProcessorRefunded(deps, id) {
+  const [row3] = await deps.db.query(
+    "SELECT p.code AS processor_code, o.payment_resource_id FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ?",
+    [id]
+  );
+  const processor = row3?.processor_code === "STRIPE" ? deps.processors.STRIPE : void 0;
+  if (processor?.fetchRefundedTotal === void 0 || row3.payment_resource_id === null) {
+    return 0;
+  }
+  try {
+    return await processor.fetchRefundedTotal(row3.payment_resource_id);
+  } catch (error63) {
+    if (!(error63 instanceof PaymentProcessorError)) throw error63;
+    return "REFUND_PROCESSOR_ERROR";
+  }
+}
 async function prepareReturn(tx, id, input2, actor, now) {
   const [row3] = await tx.query(
     "SELECT r.order_id, r.status, o.total_mxn_cents FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ? FOR UPDATE",
@@ -103511,7 +103534,11 @@ async function prepareReturn(tx, id, input2, actor, now) {
   );
   if (row3 === void 0) return "RETURN_NOT_FOUND";
   if (row3.status !== "REQUESTED") return "RETURN_STATUS_CONFLICT";
-  const committed = await committedCents(tx, row3.order_id, id);
+  const committed = await committedCents(tx, row3.order_id, id) + await outsideRefundedCents(
+    tx,
+    row3.order_id,
+    input2.processorRefundedCents
+  );
   if (committed + input2.refundMxnCents > Number(row3.total_mxn_cents)) {
     return "INVALID_REFUND_AMOUNT_REJECT";
   }
@@ -103534,7 +103561,7 @@ async function prepareReturn(tx, id, input2, actor, now) {
   });
   return viewOf2(tx, id);
 }
-async function beginRefund(tx, id, confirmer, now, ip) {
+async function beginRefund(tx, id, confirmer, now, ip, processorRefundedCents) {
   const [row3] = await tx.query(
     "SELECT r.order_id, o.order_number, r.status, r.prepared_by, r.refund_mxn_cents, o.total_mxn_cents, o.payment_resource_id, p.code AS processor_code FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ? FOR UPDATE",
     [id]
@@ -103542,7 +103569,8 @@ async function beginRefund(tx, id, confirmer, now, ip) {
   if (row3 === void 0) return { kind: "refusal", code: "RETURN_NOT_FOUND" };
   if (row3.status === "REFUNDED") return { kind: "done" };
   const refundCents = Number(row3.refund_mxn_cents ?? 0);
-  const committed = await committedCents(tx, row3.order_id, id);
+  const outside = row3.status === "PREPARED" ? await outsideRefundedCents(tx, row3.order_id, processorRefundedCents) : 0;
+  const committed = await committedCents(tx, row3.order_id, id) + outside;
   const verdict = decideConfirmation({
     prepared: row3.status === "PREPARED" || row3.status === "REFUNDING",
     authorized: confirmer.canConfirm,
@@ -103634,6 +103662,10 @@ var refusalAnswer = (code2) => {
   return { status, body: problem(status, title, code2) };
 };
 async function confirmReturn(deps, id, confirmer, ip) {
+  const processorRefunded = await readProcessorRefunded(deps, id);
+  if (processorRefunded === "REFUND_PROCESSOR_ERROR") {
+    return refusalAnswer(processorRefunded);
+  }
   const begun = await deps.db.transaction(
     (tx) => beginRefund(
       tx,
@@ -103644,7 +103676,8 @@ async function confirmReturn(deps, id, confirmer, ip) {
         hasManualReference: confirmer.manualReference !== null
       },
       deps.now(),
-      ip
+      ip,
+      processorRefunded
     )
   );
   if (begun.kind === "refusal") return refusalAnswer(begun.code);
@@ -103739,11 +103772,19 @@ function registerReturnRoutes(app, deps) {
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
     }
+    const processorRefundedCents = await readProcessorRefunded(
+      deps,
+      params.data.id
+    );
+    if (processorRefundedCents === "REFUND_PROCESSOR_ERROR") {
+      const [status, title] = RETURN_REFUSALS[processorRefundedCents];
+      return refuse(reply, status, title, processorRefundedCents);
+    }
     return runOnce(deps, request, reply, key.key, async (tx, userId) => {
       const outcome = await prepareReturn(
         tx,
         params.data.id,
-        body.data,
+        { ...body.data, processorRefundedCents },
         { userId, ip: request.ip },
         deps.now()
       );
@@ -120022,6 +120063,24 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         refundIds: (charge.refunds?.data ?? []).map((refund) => refund.id).filter((id) => typeof id === "string")
       };
     },
+    async fetchRefundedTotal(sessionId) {
+      const session = await call(
+        `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "GET" }
+      );
+      if (typeof session.payment_intent !== "string") {
+        throw new PaymentProcessorError("Stripe: the session has no payment");
+      }
+      const intent = await call(
+        `/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`,
+        { method: "GET" }
+      );
+      const refunded = intent.latest_charge?.amount_refunded;
+      if (!Number.isInteger(refunded)) {
+        throw new PaymentProcessorError("Stripe: the payment has no charge");
+      }
+      return refunded;
+    },
     async createRefund(request) {
       const session = await call(
         `/checkout/sessions/${encodeURIComponent(request.paymentResourceId)}`,
@@ -120591,7 +120650,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "e2f1ee27c74771d672b8a2368ae35e9e1d7a0780" : void 0;
+var sha = true ? "939b234669a69e2e6c63e3f16af6358931114ee1" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
