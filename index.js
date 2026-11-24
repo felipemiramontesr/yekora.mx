@@ -101331,9 +101331,9 @@ async function persist(deps, admitted, quote, order2) {
     throw error63;
   }
 }
-async function customerToKeepCard(deps, admitted, userId) {
+async function customerForCard(deps, admitted, userId) {
   const cards = deps.cards;
-  if (userId === null || admitted.method !== "CARD" || admitted.request.savePaymentMethod !== true || !cards) {
+  if (userId === null || admitted.method !== "CARD" || !cards) {
     return void 0;
   }
   try {
@@ -101368,11 +101368,7 @@ async function createCheckout(deps, body, lang, userId = null) {
   const orderId = await persist(deps, admitted, quote, order2);
   if (typeof orderId !== "number") return orderId;
   const paths = CHECKOUT_RETURN_PATHS[lang];
-  const futureUsageCustomerId = await customerToKeepCard(
-    deps,
-    admitted,
-    userId
-  );
+  const customerId = await customerForCard(deps, admitted, userId);
   const webhook2 = admitted.processorCode === "STRIPE" ? "stripe" : "mercadopago";
   const total = quote.summary.totalMxnCents;
   try {
@@ -101386,7 +101382,10 @@ async function createCheckout(deps, body, lang, userId = null) {
       successUrl: `${deps.payments.siteUrl}${paths.success}`,
       cancelUrl: `${deps.payments.siteUrl}${paths.cancel}`,
       notificationUrl: `${deps.payments.apiUrl}/v1/webhooks/${webhook2}`,
-      ...futureUsageCustomerId !== void 0 && { futureUsageCustomerId }
+      ...customerId !== void 0 && {
+        customerId,
+        saveCard: admitted.request.savePaymentMethod === true
+      }
     });
     await deps.db.query(
       "UPDATE orders SET processor_reference = ? WHERE id = ?",
@@ -105749,6 +105748,17 @@ function settleOrder(deps, base2, order2) {
     return { status: row3.httpStatus, code: row3.code };
   });
 }
+async function keepOneCard(deps, orderId) {
+  if (!deps.cards) return;
+  const [buyer] = await deps.db.query(
+    "SELECT o.user_id FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.id = ? AND m.code = 'CARD'",
+    [orderId]
+  );
+  if (!buyer?.user_id) return;
+  await settleSavedCards(deps.db, deps.cards, buyer.user_id).catch(
+    () => void 0
+  );
+}
 async function receiveWebhook(deps, code2, input2) {
   const processor = deps.processors[code2];
   if (processor === void 0) {
@@ -105789,7 +105799,10 @@ async function receiveWebhook(deps, code2, input2) {
     );
     return recorded ? { status: 200, code: "PAYMENT_UNCONFIRMED" } : { status: 200, code: "IDEMPOTENT_IGNORED" };
   }
-  return settleOrder(deps, base2, reconciliation.order);
+  const order2 = reconciliation.order;
+  const outcome = await settleOrder(deps, base2, order2);
+  if (outcome.code === "ORDER_PAID") await keepOneCard(deps, order2.id);
+  return outcome;
 }
 
 // src/routes/webhooks.ts
@@ -119929,9 +119942,11 @@ function sessionForm(request, expiresAt) {
   if (request.method === "OXXO") {
     form.set("payment_method_options[oxxo][expires_after_days]", "1");
   }
-  if (request.method === "CARD" && request.futureUsageCustomerId !== void 0) {
-    form.set("customer", request.futureUsageCustomerId);
-    form.set("payment_intent_data[setup_future_usage]", "off_session");
+  if (request.method === "CARD" && request.customerId !== void 0) {
+    form.set("customer", request.customerId);
+    if (request.saveCard === true) {
+      form.set("saved_payment_method_options[payment_method_save]", "enabled");
+    }
   }
   return form;
 }
@@ -120348,6 +120363,7 @@ async function buildApp(deps) {
     db: deps.db,
     processors,
     payments: deps.config.payments,
+    cards,
     now
   });
   return app;
@@ -120655,7 +120671,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "4e6cdbba70839c070339fa613f9617e24ac8bce8" : void 0;
+var sha = true ? "7c48d57978ed208486092e35c492266281cedeef" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
