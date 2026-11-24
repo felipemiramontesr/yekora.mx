@@ -53640,7 +53640,7 @@ var require_parse_url = __commonJS({
 var require_form_data = __commonJS({
   "../../node_modules/light-my-request/lib/form-data.js"(exports2, module2) {
     "use strict";
-    var { randomUUID: randomUUID4 } = require("node:crypto");
+    var { randomUUID: randomUUID5 } = require("node:crypto");
     var { Readable } = require("node:stream");
     var textEncoder;
     function isFormDataLike(payload) {
@@ -53648,7 +53648,7 @@ var require_form_data = __commonJS({
     }
     function formDataToStream(formdata) {
       textEncoder = textEncoder ?? new TextEncoder();
-      const boundary = `----formdata-${randomUUID4()}`;
+      const boundary = `----formdata-${randomUUID5()}`;
       const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
       const escape2 = (str) => str.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
@@ -70972,7 +70972,7 @@ var require_change_user = __commonJS({
       // ChangeUser.fromPacket = function(packet)
       // };
       serializeToBuffer(buffer) {
-        const isSet = (flag2) => this.flags & ClientConstants[flag2];
+        const isSet = (flag3) => this.flags & ClientConstants[flag3];
         const packet = new Packet(0, buffer, 0, buffer.length);
         packet.offset = 4;
         const encoding = CharsetToEncoding[this.charsetNumber];
@@ -72143,7 +72143,7 @@ var require_handshake_response = __commonJS({
         this.connectAttributes = handshake.connectAttributes;
       }
       serializeResponse(buffer) {
-        const isSet = (flag2) => this.clientFlags & ClientConstants[flag2];
+        const isSet = (flag3) => this.clientFlags & ClientConstants[flag3];
         const packet = new Packet(0, buffer, 0, buffer.length);
         packet.offset = 4;
         packet.writeInt32(this.clientFlags);
@@ -72208,8 +72208,8 @@ var require_handshake_response = __commonJS({
       static fromPacket(packet, serverFlags = 4294967295) {
         const args = {};
         args.clientFlags = packet.readInt32();
-        function isSet(flag2) {
-          return args.clientFlags & serverFlags & ClientConstants[flag2];
+        function isSet(flag3) {
+          return args.clientFlags & serverFlags & ClientConstants[flag3];
         }
         args.maxPacketSize = packet.readInt32();
         args.charsetNumber = packet.readInt8();
@@ -72587,8 +72587,8 @@ var require_resultset_header = __commonJS({
         const bigNumberStrings = connection.config.bigNumberStrings;
         const encoding = connection.serverEncoding;
         const flags = connection._handshakePacket.capabilityFlags;
-        const isSet = function(flag2) {
-          return flags & ClientConstants[flag2];
+        const isSet = function(flag3) {
+          return flags & ClientConstants[flag3];
         };
         if (packet.buffer[packet.offset] !== 0) {
           this.fieldCount = packet.readLengthCodedNumber();
@@ -100022,6 +100022,60 @@ var fulfillmentResultSchema = external_exports.object({
   deliveredAt: external_exports.string().nullable()
 });
 
+// ../../lib/account/staffTypes.ts
+var ROLE_ID_PATTERN = /^[a-z][a-z0-9_]{2,30}$/;
+var RESERVED_ROLE_IDS = /* @__PURE__ */ new Set([
+  "owner",
+  "admin",
+  "customer",
+  "staff_orders",
+  "staff_catalog"
+]);
+var roleId = external_exports.string().regex(ROLE_ID_PATTERN);
+var permissionId = external_exports.string().regex(/^[a-z]+:[a-z]+$/);
+var staffCreateRequestSchema = external_exports.strictObject({
+  email: external_exports.string().trim().pipe(external_exports.email().max(255)),
+  fullName: external_exports.string().trim().min(2).max(150),
+  roles: external_exports.array(roleId).min(1).max(5)
+});
+var staffUpdateRequestSchema = external_exports.strictObject({
+  isActive: external_exports.boolean().optional(),
+  roles: external_exports.array(roleId).min(1).max(5).optional()
+}).refine((body) => body.isActive !== void 0 || body.roles !== void 0);
+var roleSchema = external_exports.strictObject({
+  id: roleId,
+  name: external_exports.string(),
+  description: external_exports.string().nullable(),
+  isActive: external_exports.boolean(),
+  /** A role of the system (owner, customer): the panel never edits it. */
+  isSystem: external_exports.boolean(),
+  /** Whether an administrator may give it to someone. */
+  assignableByAdmin: external_exports.boolean(),
+  /** Permission slugs, in alphabetical order. */
+  permissions: external_exports.array(permissionId)
+});
+var roleListSchema = external_exports.strictObject({
+  items: external_exports.array(roleSchema),
+  catalog: external_exports.array(permissionId)
+});
+var roleCreateRequestSchema = external_exports.strictObject({
+  id: roleId,
+  name: external_exports.string().trim().min(2).max(100),
+  description: external_exports.string().trim().max(500).optional(),
+  permissions: external_exports.array(permissionId).max(40),
+  assignableByAdmin: external_exports.boolean().default(true)
+});
+var rolePatchRequestSchema = external_exports.strictObject({
+  name: external_exports.string().trim().min(2).max(100).optional(),
+  description: external_exports.string().trim().max(500).optional(),
+  isActive: external_exports.boolean().optional(),
+  assignableByAdmin: external_exports.boolean().optional(),
+  permissions: external_exports.array(permissionId).max(40).optional()
+}).refine((body) => Object.values(body).some((value) => value !== void 0));
+var roleParams = external_exports.strictObject({
+  id: external_exports.string().regex(ROLE_ID_PATTERN)
+});
+
 // ../../lib/account/returnTypes.ts
 var RETURN_REASONS = ["DEFECT", "NOT_AS_DESCRIBED", "CHANGED_MIND"];
 var RETURN_STATUSES = [
@@ -102052,6 +102106,86 @@ var ROUTE_CONTRACTS = [
       ...SIGNED_IN_REFUSALS
     }
   })),
+  // FC 072 F1: the staff, the roles and the matrix. The owner and the administrator list and manage
+  // the staff by the hierarchy; only the owner creates and edits roles.
+  {
+    method: "GET",
+    path: "/v1/admin/users",
+    summary: "The staff the actor may see: all of it for the owner, the sellers and support roles for an administrator",
+    permission: "sellers:manage",
+    request: {},
+    responses: { 200: adminUserListSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/users",
+    summary: "Brings a person into the staff with its roles and a 15-minute link, no password (audited)",
+    permission: "sellers:manage",
+    request: { headers: mutationHeaders, body: staffCreateRequestSchema },
+    responses: {
+      201: adminUserSchema,
+      400: problemSchema,
+      409: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PATCH",
+    path: "/v1/admin/users/:id",
+    summary: "Switches an account of the staff on or off or replaces its roles, ending its sessions (audited)",
+    permission: "sellers:manage",
+    request: {
+      params: adminUserParams,
+      headers: mutationHeaders,
+      body: staffUpdateRequestSchema
+    },
+    responses: {
+      200: adminUserSchema,
+      400: problemSchema,
+      404: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/roles",
+    summary: "The roles with their permissions and the catalog the matrix is made of",
+    permission: "sellers:manage",
+    request: {},
+    responses: { 200: roleListSchema, ...SIGNED_IN_REFUSALS }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/roles",
+    summary: "Creates a role of support with its matrix; only the owner (audited)",
+    permission: "roles:manage",
+    request: { headers: mutationHeaders, body: roleCreateRequestSchema },
+    responses: {
+      201: roleSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PATCH",
+    path: "/v1/admin/roles/:id",
+    summary: "Edits a role and its matrix; only the owner, never a role of the system (audited)",
+    permission: "roles:manage",
+    request: {
+      params: roleParams,
+      headers: mutationHeaders,
+      body: rolePatchRequestSchema
+    },
+    responses: {
+      200: roleSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
   // FC 071 F1: the returns. The buyer asks; the board lists; one operator prepares, another confirms.
   {
     method: "POST",
@@ -102856,8 +102990,8 @@ function registerAccountRoutes(app, deps) {
     );
   });
   app.patch("/v1/account/profile", async (request, reply) => {
-    const gate = writeGate(deps, request, reply);
-    if (gate === null) return reply;
+    const gate2 = writeGate(deps, request, reply);
+    if (gate2 === null) return reply;
     if (unsupportedLocale(request.body, "preferredLocale")) {
       return refuse(
         reply,
@@ -102870,8 +103004,8 @@ function registerAccountRoutes(app, deps) {
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
-      await updateProfile(tx, gate.pii, userId, body.data);
+    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+      await updateProfile(tx, gate2.pii, userId, body.data);
       await recordAudit(tx, {
         userId,
         action: "ACCOUNT_PROFILE_UPDATED",
@@ -102909,17 +103043,17 @@ function registerAccountRoutes(app, deps) {
     return addressListSchema.parse({ items, max: MAX_USER_ADDRESSES });
   });
   app.post("/v1/account/addresses", async (request, reply) => {
-    const gate = writeGate(deps, request, reply);
-    if (gate === null) return reply;
+    const gate2 = writeGate(deps, request, reply);
+    if (gate2 === null) return reply;
     const body = addressUpsertRequestSchema.safeParse(request.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
     const { isDefault, ...address } = body.data;
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
       const saved = await createAddress(
         tx,
-        gate.pii,
+        gate2.pii,
         userId,
         address,
         isDefault === true
@@ -102930,17 +103064,17 @@ function registerAccountRoutes(app, deps) {
     });
   });
   app.patch("/v1/account/addresses/:id", async (request, reply) => {
-    const gate = writeGate(deps, request, reply);
-    if (gate === null) return reply;
+    const gate2 = writeGate(deps, request, reply);
+    if (gate2 === null) return reply;
     const params = addressParams.safeParse(request.params);
     const body = addressPatchRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
       const saved = await updateAddress(
         tx,
-        gate.pii,
+        gate2.pii,
         userId,
         params.data.id,
         body.data
@@ -102951,13 +103085,13 @@ function registerAccountRoutes(app, deps) {
     });
   });
   app.delete("/v1/account/addresses/:id", async (request, reply) => {
-    const gate = writeGate(deps, request, reply);
-    if (gate === null) return reply;
+    const gate2 = writeGate(deps, request, reply);
+    if (gate2 === null) return reply;
     const params = addressParams.safeParse(request.params);
     if (!params.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
-    return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
       const refusal = await deleteAddress(tx, userId, params.data.id);
       if (refusal !== null) return refusalOf(refusal);
       await auditAddress(tx, request, userId, "ADDRESS_DELETED", {
@@ -103004,13 +103138,13 @@ function registerAccountRoutes(app, deps) {
     "/v1/account/payment-methods/setup",
     CARDS_LIMIT,
     async (request, reply) => {
-      const gate = cardsWriteGate(deps, request, reply);
-      if (gate === null) return reply;
+      const gate2 = cardsWriteGate(deps, request, reply);
+      if (gate2 === null) return reply;
       const lang = request.query.lang === "en" ? "en" : "es-MX";
       const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
-      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
         try {
-          const redirectUrl = await startCardSetup(tx, gate.cards, userId, {
+          const redirectUrl = await startCardSetup(tx, gate2.cards, userId, {
             successUrl: `${page}${CARD_ADDED_MARK}`,
             cancelUrl: page
           });
@@ -103033,17 +103167,17 @@ function registerAccountRoutes(app, deps) {
     "/v1/account/payment-methods/:id",
     CARDS_LIMIT,
     async (request, reply) => {
-      const gate = cardsWriteGate(deps, request, reply);
-      if (gate === null) return reply;
+      const gate2 = cardsWriteGate(deps, request, reply);
+      if (gate2 === null) return reply;
       const params = paymentMethodParams.safeParse(request.params);
       if (!params.success) {
         return refuse(reply, 404, "Not found", "PAYMENT_METHOD_NOT_FOUND");
       }
-      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
         try {
           const refusal = await detachSavedCard(
             tx,
-            gate.cards,
+            gate2.cards,
             userId,
             params.data.id
           );
@@ -103080,11 +103214,11 @@ function registerAccountRoutes(app, deps) {
     "/v1/account/payment-methods/settle",
     CARDS_LIMIT,
     async (request, reply) => {
-      const gate = cardsWriteGate(deps, request, reply);
-      if (gate === null) return reply;
-      return runOnce(deps, request, reply, gate.key, async (tx, userId) => {
+      const gate2 = cardsWriteGate(deps, request, reply);
+      if (gate2 === null) return reply;
+      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
         try {
-          const settled = await settleSavedCards(tx, gate.cards, userId);
+          const settled = await settleSavedCards(tx, gate2.cards, userId);
           if (settled === "CARD_ATTACH_FAILED") {
             return {
               status: 400,
@@ -103348,6 +103482,232 @@ function registerAdminOrderRoutes(app, deps) {
       }
     );
   }
+}
+
+// src/services/staffGates.ts
+function decideStaffMutation(inputs) {
+  if (!inputs.privileged) return "ACTOR_UNAUTHORIZED_401";
+  if (!inputs.rolePermitted) return "TARGET_ROLE_FORBIDDEN_403";
+  return inputs.valid ? "MUTATION_PERMITTED_200" : "VALIDATION_OR_2FA_FAILED_400";
+}
+function decideRoleMutation(inputs) {
+  if (!inputs.owner || !inputs.manager) return "OWNER_ONLY_FORBIDDEN_403";
+  if (!inputs.notSystem) return "SYSTEM_ROLE_PROTECTED_403";
+  return inputs.valid ? "ROLE_MUTATION_PERMITTED_200" : "TWO_FACTOR_REQUIRED_403";
+}
+
+// src/services/adminRoles.ts
+function refusalOf2(code2) {
+  if (code2 === "OWNER_ONLY_FORBIDDEN_403") return "OWNER_ONLY_FORBIDDEN";
+  return code2 === "SYSTEM_ROLE_PROTECTED_403" ? "SYSTEM_ROLE_PROTECTED" : "TWO_FACTOR_REQUIRED";
+}
+var CATALOG = [...PERMISSIONS].sort(
+  (first, second) => first.localeCompare(second)
+);
+var CATALOG_SET = new Set(CATALOG);
+var flag = (value) => value === void 0 ? null : Number(value);
+function breaksMatrix(roleId2, permissions) {
+  return !permissions.includes("account:self") || permissions.includes("roles:manage") || permissions.includes("users:manage") && roleId2 !== "admin" || permissions.some((permission) => !CATALOG_SET.has(permission));
+}
+var toRoleView = (row3) => ({
+  id: row3.id,
+  name: row3.name,
+  description: row3.description,
+  isActive: Number(row3.is_active) === 1,
+  isSystem: Number(row3.is_system) === 1,
+  assignableByAdmin: Number(row3.assignable_by_admin) === 1,
+  permissions: row3.permissions === null ? [] : row3.permissions.split(",")
+});
+async function listRoles(db) {
+  const rows = await db.query(
+    "SELECT r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin, GROUP_CONCAT(rp.permission_id ORDER BY rp.permission_id) AS permissions FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id GROUP BY r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin ORDER BY r.is_system DESC, r.id"
+  );
+  return { items: rows.map(toRoleView), catalog: [...CATALOG] };
+}
+async function roleOf(tx, id) {
+  const [row3] = await tx.query(
+    "SELECT r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin, GROUP_CONCAT(rp.permission_id ORDER BY rp.permission_id) AS permissions FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id WHERE r.id = ? GROUP BY r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin",
+    [id]
+  );
+  return toRoleView(row3);
+}
+function gate(actor, notSystem) {
+  return decideRoleMutation({
+    owner: actor.roles.includes("owner"),
+    manager: actor.permissions.includes("roles:manage"),
+    notSystem,
+    valid: actor.totpEnabled
+  });
+}
+async function setPermissions(tx, roleId2, permissions) {
+  await tx.query("DELETE FROM role_permissions WHERE role_id = ?", [roleId2]);
+  await tx.query(
+    "INSERT INTO role_permissions (role_id, permission_id) VALUES ?",
+    [[...new Set(permissions)].map((permission) => [roleId2, permission])]
+  );
+}
+async function createRole(tx, input2, actor) {
+  const verdict = gate(actor, true);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf2(verdict);
+  if (RESERVED_ROLE_IDS.has(input2.id)) return "ROLE_ID_RESERVED";
+  if (breaksMatrix(input2.id, input2.permissions))
+    return "MATRIX_INVARIANT_VIOLATED";
+  const [taken] = await tx.query(
+    "SELECT id FROM roles WHERE id = ? FOR UPDATE",
+    [input2.id]
+  );
+  if (taken !== void 0) return "ROLE_ALREADY_EXISTS";
+  await tx.query(
+    "INSERT INTO roles (id, name, description, is_active, is_system, assignable_by_admin) VALUES (?, ?, ?, 1, 0, ?)",
+    [
+      input2.id,
+      input2.name,
+      input2.description ?? null,
+      Number(input2.assignableByAdmin)
+    ]
+  );
+  await setPermissions(tx, input2.id, input2.permissions);
+  const created = await roleOf(tx, input2.id);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "ROLE_CREATED",
+    entityType: "roles",
+    entityId: input2.id,
+    before: null,
+    after: {
+      assignableByAdmin: created.assignableByAdmin,
+      permissions: created.permissions
+    },
+    ip: actor.ip
+  });
+  return created;
+}
+async function patchRole(tx, id, input2, actor) {
+  const closed = gate(actor, true);
+  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf2(closed);
+  const [target] = await tx.query(
+    "SELECT is_system FROM roles WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  if (target === void 0) return "ROLE_NOT_FOUND";
+  const verdict = gate(actor, Number(target.is_system) === 0);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf2(verdict);
+  if (id === "admin" && (input2.assignableByAdmin === true || input2.isActive === false)) {
+    return "ROLE_INVARIANT_VIOLATED";
+  }
+  if (input2.permissions && breaksMatrix(id, input2.permissions)) {
+    return "MATRIX_INVARIANT_VIOLATED";
+  }
+  const before = await roleOf(tx, id);
+  await tx.query(
+    "UPDATE roles SET name = COALESCE(?, name), description = COALESCE(?, description), is_active = COALESCE(?, is_active), assignable_by_admin = COALESCE(?, assignable_by_admin) WHERE id = ?",
+    [
+      input2.name ?? null,
+      input2.description ?? null,
+      flag(input2.isActive),
+      flag(input2.assignableByAdmin),
+      id
+    ]
+  );
+  if (input2.permissions) await setPermissions(tx, id, input2.permissions);
+  const after = await roleOf(tx, id);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "ROLE_UPDATED",
+    entityType: "roles",
+    entityId: id,
+    before: {
+      isActive: before.isActive,
+      assignableByAdmin: before.assignableByAdmin,
+      permissions: before.permissions
+    },
+    after: {
+      isActive: after.isActive,
+      assignableByAdmin: after.assignableByAdmin,
+      permissions: after.permissions
+    },
+    ip: actor.ip
+  });
+  return after;
+}
+
+// src/routes/adminRoles.ts
+var REFUSALS3 = {
+  OWNER_ONLY_FORBIDDEN: [403, "Only the owner edits the roles"],
+  SYSTEM_ROLE_PROTECTED: [403, "A role of the system cannot be edited"],
+  TWO_FACTOR_REQUIRED: [403, "The second factor is required"],
+  ROLE_NOT_FOUND: [404, "Not found"],
+  ROLE_ALREADY_EXISTS: [409, "That role already exists"],
+  ROLE_ID_RESERVED: [409, "That slug belongs to the system"],
+  MATRIX_INVARIANT_VIOLATED: [
+    400,
+    "The matrix breaks a rule of the permissions"
+  ],
+  ROLE_INVARIANT_VIOLATED: [
+    400,
+    "The administrator role cannot be changed that way"
+  ]
+};
+function actorOf(request) {
+  const user = request.user;
+  return {
+    userId: user.userId,
+    roles: user.roles,
+    permissions: user.permissions,
+    totpEnabled: user.totpEnabled,
+    ip: request.ip
+  };
+}
+function answerOf(outcome, created) {
+  if (typeof outcome !== "string") {
+    return { status: created ? 201 : 200, body: outcome };
+  }
+  const [status, title] = REFUSALS3[outcome];
+  return { status, body: problem(status, title, outcome) };
+}
+function registerAdminRoleRoutes(app, deps) {
+  app.get(
+    "/v1/admin/roles",
+    async () => roleListSchema.parse(await listRoles(deps.db))
+  );
+  app.post("/v1/admin/roles", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = roleCreateRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx) => answerOf(await createRole(tx, body.data, actorOf(request)), true)
+    );
+  });
+  app.patch("/v1/admin/roles/:id", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const params = roleParams.safeParse(request.params);
+    const body = rolePatchRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx) => answerOf(
+        await patchRole(tx, params.data.id, body.data, actorOf(request)),
+        false
+      )
+    );
+  });
 }
 
 // src/services/returnsEligibility.ts
@@ -103737,7 +104097,7 @@ async function isReturnRefund(db, orderId, refundIds) {
 }
 
 // src/routes/returns.ts
-function refusalOf2(code2) {
+function refusalOf3(code2) {
   const [status, title] = RETURN_REFUSALS[code2];
   return { status, body: problem(status, title, code2) };
 }
@@ -103760,7 +104120,7 @@ function registerReturnRoutes(app, deps) {
           { orderNumber, userId, request: body.data, now: deps.now() },
           { userId, ip: request.ip }
         );
-        return typeof outcome === "string" ? refusalOf2(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
       });
     }
   );
@@ -103797,7 +104157,7 @@ function registerReturnRoutes(app, deps) {
         { userId, ip: request.ip },
         deps.now()
       );
-      return typeof outcome === "string" ? refusalOf2(outcome) : { status: 200, body: outcome };
+      return typeof outcome === "string" ? refusalOf3(outcome) : { status: 200, body: outcome };
     });
   });
   app.post("/v1/admin/returns/:id/confirm", async (request, reply) => {
@@ -103819,6 +104179,372 @@ function registerReturnRoutes(app, deps) {
     );
     if (answer.status >= 400) reply.type(PROBLEM_TYPE);
     return reply.code(answer.status).send(answer.body);
+  });
+}
+
+// src/services/staffUsers.ts
+var import_node_crypto11 = require("node:crypto");
+
+// src/services/passwordResets.ts
+var import_node_crypto9 = require("node:crypto");
+var RESET_TTL_MS = 15 * 6e4;
+async function openReset(tx, userId, now) {
+  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
+  await tx.query(
+    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+    [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
+  );
+  return token;
+}
+async function mailResetLink(tx, userId, totpKey, now) {
+  const token = await openReset(tx, userId, now);
+  await enqueueMail(tx, {
+    type: "PASSWORD_RESET",
+    userId,
+    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, "utf8"))
+  });
+}
+function decoyReset(totpKey) {
+  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
+  return encryptTotpSecret(
+    totpKey,
+    tokenHash2(token),
+    Buffer.from(token, "utf8")
+  );
+}
+async function liveReset(db, token, now) {
+  const [row3] = await db.query(
+    "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
+    [tokenHash2(token), now]
+  );
+  return row3 ? {
+    id: Number(row3.id),
+    userId: row3.user_id,
+    email: row3.email,
+    fullName: row3.full_name
+  } : null;
+}
+function completeReset(db, reset, passwordHash, now, ip) {
+  return db.transaction(async (tx) => {
+    const spent = await tx.query(
+      "UPDATE password_reset_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+      [now, reset.id]
+    );
+    if (spent.affectedRows !== 1) return false;
+    await tx.query("UPDATE users SET password_hash = ? WHERE id = ?", [
+      passwordHash,
+      reset.userId
+    ]);
+    await tx.query(
+      "UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+      [now, reset.userId]
+    );
+    await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [
+      reset.userId
+    ]);
+    await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
+      reset.userId
+    ]);
+    await recordAudit(tx, {
+      userId: reset.userId,
+      action: "PASSWORD_RESET",
+      entityType: "users",
+      entityId: reset.userId,
+      before: null,
+      after: { sessionsRevoked: true },
+      ip
+    });
+    await enqueueMail(tx, { type: "PASSWORD_CHANGED", userId: reset.userId });
+    return true;
+  });
+}
+
+// src/services/passwords.ts
+var import_node_crypto10 = require("node:crypto");
+var import_hash_wasm = __toESM(require_index_umd(), 1);
+var PARAMETERS = {
+  memorySize: 19456,
+  iterations: 2,
+  parallelism: 1,
+  hashLength: 32
+};
+function hashPassword(password) {
+  return (0, import_hash_wasm.argon2id)({
+    ...PARAMETERS,
+    password,
+    salt: (0, import_node_crypto10.randomBytes)(16),
+    outputType: "encoded"
+  });
+}
+async function verifyPassword(hash2, password) {
+  try {
+    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
+  } catch {
+    return false;
+  }
+}
+function unmatchableHash() {
+  return hashPassword((0, import_node_crypto10.randomBytes)(64).toString("hex"));
+}
+var decoy;
+function decoyHash() {
+  decoy ??= hashPassword((0, import_node_crypto10.randomBytes)(32).toString("base64url"));
+  return decoy;
+}
+
+// src/services/staffUsers.ts
+var toStaffUser = (row3) => ({
+  id: row3.id,
+  email: row3.email,
+  fullName: row3.full_name,
+  roles: row3.roles.split(","),
+  isActive: Number(row3.is_active) === 1,
+  totpEnabled: Number(row3.totp_enabled) === 1,
+  createdAt: row3.created_at.toISOString()
+});
+async function listStaff(db, asOwner) {
+  const rows = asOwner ? await db.query(
+    "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at HAVING SUM(ur.role_id <> 'customer') > 0 ORDER BY SUM(ur.role_id = 'owner') DESC, SUM(ur.role_id = 'admin') DESC, u.email"
+  ) : await db.query(
+    "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id LEFT JOIN two_factor_auth t ON t.user_id = u.id GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at HAVING SUM(ur.role_id <> 'customer') > 0 AND SUM(ur.role_id <> 'customer' AND r.assignable_by_admin = 0) = 0 ORDER BY u.email"
+  );
+  return rows.map(toStaffUser);
+}
+async function accountOf(tx, id) {
+  const [row3] = await tx.query(
+    "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id WHERE u.id = ? GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at",
+    [id]
+  );
+  return toStaffUser(row3);
+}
+async function lockedRoles(tx, userId) {
+  const rows = await tx.query(
+    "SELECT role_id FROM user_roles WHERE user_id = ? FOR UPDATE",
+    [userId]
+  );
+  return rows.map((row3) => row3.role_id);
+}
+var OUT_OF_BAND = /* @__PURE__ */ new Set(["owner", "customer"]);
+async function checkRoles(tx, requested, asOwner) {
+  const wanted = [...new Set(requested)];
+  const rows = await tx.query("SELECT id, is_active, assignable_by_admin FROM roles WHERE id IN (?)", [
+    wanted
+  ]);
+  const active = rows.filter((row3) => Number(row3.is_active) === 1);
+  return {
+    found: active.length === wanted.length,
+    permitted: asOwner ? wanted.every((id) => !OUT_OF_BAND.has(id)) : active.every((row3) => Number(row3.assignable_by_admin) === 1)
+  };
+}
+function refusalOf4(code2, asOwner) {
+  if (code2 === "ACTOR_UNAUTHORIZED_401") return "ACTOR_UNAUTHORIZED";
+  if (code2 === "VALIDATION_OR_2FA_FAILED_400")
+    return "VALIDATION_OR_2FA_FAILED";
+  return asOwner ? "TARGET_ROLE_FORBIDDEN" : "ADMIN_CANNOT_ELEVATE_ADMIN";
+}
+var isStaff = (roles) => roles.some((role) => role !== "customer");
+async function createStaff(tx, input2, actor) {
+  const asOwner = actor.roles.includes("owner");
+  const privileged = asOwner || actor.roles.includes("admin");
+  const check2 = await checkRoles(tx, input2.roles, asOwner);
+  if (privileged && !check2.found) return "ROLE_NOT_FOUND";
+  const verdict = decideStaffMutation({
+    privileged,
+    rolePermitted: check2.permitted,
+    valid: actor.totpEnabled
+  });
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf4(verdict, asOwner);
+  const [existing] = await tx.query(
+    "SELECT id FROM users WHERE email = ? FOR UPDATE",
+    [input2.email]
+  );
+  const id = existing?.id ?? (0, import_node_crypto11.randomUUID)();
+  if (existing) {
+    const held = await lockedRoles(tx, id);
+    if (held.includes("owner")) return "OWNER_IMMUTABLE";
+    if (isStaff(held)) return "STAFF_ALREADY_EXISTS";
+    await tx.query("UPDATE users SET is_active = 1 WHERE id = ?", [id]);
+    await revokeAccess(tx, id);
+  } else {
+    await tx.query(
+      "INSERT INTO users (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)",
+      [id, input2.email, await unmatchableHash(), input2.fullName]
+    );
+  }
+  const wanted = [.../* @__PURE__ */ new Set(["customer", ...input2.roles])];
+  await tx.query("INSERT IGNORE INTO user_roles (user_id, role_id) VALUES ?", [
+    wanted.map((role) => [id, role])
+  ]);
+  await mailResetLink(tx, id, input2.totpKey, input2.now);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "STAFF_CREATED",
+    entityType: "users",
+    entityId: id,
+    before: null,
+    after: { roles: wanted, created: !existing },
+    ip: actor.ip
+  });
+  return accountOf(tx, id);
+}
+async function updateStaff(tx, input2, actor) {
+  const asOwner = actor.roles.includes("owner");
+  const privileged = asOwner || actor.roles.includes("admin");
+  const held = await lockedRoles(tx, input2.id);
+  const check2 = input2.roles ? await checkRoles(tx, input2.roles, asOwner) : { found: true, permitted: true };
+  if (privileged && !check2.found) return "ROLE_NOT_FOUND";
+  const verdict = decideStaffMutation({
+    privileged,
+    rolePermitted: check2.permitted,
+    valid: actor.totpEnabled
+  });
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf4(verdict, asOwner);
+  if (held.includes("owner")) return "OWNER_IMMUTABLE";
+  if (!isStaff(held)) return "USER_NOT_FOUND";
+  if (!asOwner) {
+    const own2 = await checkRoles(
+      tx,
+      held.filter((role) => role !== "customer"),
+      false
+    );
+    if (!own2.permitted) return "ADMIN_CANNOT_ELEVATE_ADMIN";
+  }
+  const before = await accountOf(tx, input2.id);
+  if (input2.isActive !== void 0) {
+    await tx.query("UPDATE users SET is_active = ? WHERE id = ?", [
+      input2.isActive ? 1 : 0,
+      input2.id
+    ]);
+  }
+  if (input2.roles) {
+    await tx.query(
+      "DELETE FROM user_roles WHERE user_id = ? AND role_id <> 'customer'",
+      [input2.id]
+    );
+    await tx.query(
+      "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES ?",
+      [[...new Set(input2.roles)].map((role) => [input2.id, role])]
+    );
+  }
+  if (input2.isActive === false || input2.roles) {
+    await revokeAccess(tx, input2.id);
+  }
+  const after = await accountOf(tx, input2.id);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "STAFF_UPDATED",
+    entityType: "users",
+    entityId: input2.id,
+    before: { isActive: before.isActive, roles: before.roles },
+    after: { isActive: after.isActive, roles: after.roles },
+    ip: actor.ip
+  });
+  return after;
+}
+
+// src/routes/staffUsers.ts
+var REFUSALS4 = {
+  ACTOR_UNAUTHORIZED: [
+    403,
+    "Only the owner and the administrators manage the staff"
+  ],
+  TARGET_ROLE_FORBIDDEN: [403, "That role cannot be given here"],
+  ADMIN_CANNOT_ELEVATE_ADMIN: [
+    403,
+    "An administrator cannot reach that account or role"
+  ],
+  OWNER_IMMUTABLE: [403, "The owner account cannot be changed"],
+  VALIDATION_OR_2FA_FAILED: [
+    400,
+    "The request or the second factor is not valid"
+  ],
+  USER_NOT_FOUND: [404, "Not found"],
+  ROLE_NOT_FOUND: [422, "Unknown or retired role"],
+  STAFF_ALREADY_EXISTS: [409, "Already part of the staff"]
+};
+function actorOf2(request) {
+  const user = request.user;
+  return {
+    userId: user.userId,
+    roles: user.roles,
+    totpEnabled: user.totpEnabled,
+    ip: request.ip
+  };
+}
+function answerOf2(outcome, created) {
+  if (typeof outcome !== "string") {
+    return { status: created ? 201 : 200, body: outcome };
+  }
+  const [status, title] = REFUSALS4[outcome];
+  return { status, body: problem(status, title, outcome) };
+}
+function registerStaffUserRoutes(app, deps) {
+  app.get(
+    "/v1/admin/users",
+    async (request) => adminUserListSchema.parse({
+      items: await listStaff(
+        deps.db,
+        request.user.roles.includes("owner")
+      )
+    })
+  );
+  app.post("/v1/admin/users", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = staffCreateRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    const { totpKey } = deps.auth;
+    const sent = await runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx) => answerOf2(
+        await createStaff(
+          tx,
+          {
+            email: canonicalEmail(body.data.email),
+            fullName: body.data.fullName,
+            roles: body.data.roles,
+            totpKey,
+            now: deps.now()
+          },
+          actorOf2(request)
+        ),
+        true
+      )
+    );
+    request.outboxQueued = reply.statusCode === 201;
+    return sent;
+  });
+  app.patch("/v1/admin/users/:id", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const params = adminUserParams.safeParse(request.params);
+    const body = staffUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return runOnce(
+      deps,
+      request,
+      reply,
+      key.key,
+      async (tx) => answerOf2(
+        await updateStaff(
+          tx,
+          { id: params.data.id, ...body.data },
+          actorOf2(request)
+        ),
+        false
+      )
+    );
   });
 }
 
@@ -103950,13 +104676,13 @@ async function updateShippingRules(tx, body, actor) {
 }
 
 // src/routes/adminShipping.ts
-var REFUSALS3 = {
+var REFUSALS5 = {
   SHIPPING_STRATEGY_UNAVAILABLE: [409, "The strategy has no active rates"],
   SHIPPING_ZONE_UNKNOWN: [400, "Unknown state"]
 };
-function answerOf(outcome) {
+function answerOf3(outcome) {
   if (typeof outcome !== "string") return { status: 200, body: outcome };
-  const [status, title] = REFUSALS3[outcome];
+  const [status, title] = REFUSALS5[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminShippingRoutes(app, deps) {
@@ -103978,7 +104704,7 @@ function registerAdminShippingRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf(
+      async (tx, userId) => answerOf3(
         await updateShippingConfig(tx, body.data, { userId, ip: request.ip })
       )
     );
@@ -103997,7 +104723,7 @@ function registerAdminShippingRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf(
+      async (tx, userId) => answerOf3(
         await updateShippingRules(tx, body.data, { userId, ip: request.ip })
       )
     );
@@ -104005,116 +104731,7 @@ function registerAdminShippingRoutes(app, deps) {
 }
 
 // src/services/adminUsers.ts
-var import_node_crypto11 = require("node:crypto");
-
-// src/services/passwordResets.ts
-var import_node_crypto9 = require("node:crypto");
-var RESET_TTL_MS = 15 * 6e4;
-async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
-  await tx.query(
-    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
-    [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
-  );
-  return token;
-}
-async function mailResetLink(tx, userId, totpKey, now) {
-  const token = await openReset(tx, userId, now);
-  await enqueueMail(tx, {
-    type: "PASSWORD_RESET",
-    userId,
-    token: encryptTotpSecret(totpKey, userId, Buffer.from(token, "utf8"))
-  });
-}
-function decoyReset(totpKey) {
-  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
-  return encryptTotpSecret(
-    totpKey,
-    tokenHash2(token),
-    Buffer.from(token, "utf8")
-  );
-}
-async function liveReset(db, token, now) {
-  const [row3] = await db.query(
-    "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
-    [tokenHash2(token), now]
-  );
-  return row3 ? {
-    id: Number(row3.id),
-    userId: row3.user_id,
-    email: row3.email,
-    fullName: row3.full_name
-  } : null;
-}
-function completeReset(db, reset, passwordHash, now, ip) {
-  return db.transaction(async (tx) => {
-    const spent = await tx.query(
-      "UPDATE password_reset_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
-      [now, reset.id]
-    );
-    if (spent.affectedRows !== 1) return false;
-    await tx.query("UPDATE users SET password_hash = ? WHERE id = ?", [
-      passwordHash,
-      reset.userId
-    ]);
-    await tx.query(
-      "UPDATE password_reset_tokens SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
-      [now, reset.userId]
-    );
-    await tx.query("DELETE FROM user_sessions WHERE user_id = ?", [
-      reset.userId
-    ]);
-    await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
-      reset.userId
-    ]);
-    await recordAudit(tx, {
-      userId: reset.userId,
-      action: "PASSWORD_RESET",
-      entityType: "users",
-      entityId: reset.userId,
-      before: null,
-      after: { sessionsRevoked: true },
-      ip
-    });
-    await enqueueMail(tx, { type: "PASSWORD_CHANGED", userId: reset.userId });
-    return true;
-  });
-}
-
-// src/services/passwords.ts
-var import_node_crypto10 = require("node:crypto");
-var import_hash_wasm = __toESM(require_index_umd(), 1);
-var PARAMETERS = {
-  memorySize: 19456,
-  iterations: 2,
-  parallelism: 1,
-  hashLength: 32
-};
-function hashPassword(password) {
-  return (0, import_hash_wasm.argon2id)({
-    ...PARAMETERS,
-    password,
-    salt: (0, import_node_crypto10.randomBytes)(16),
-    outputType: "encoded"
-  });
-}
-async function verifyPassword(hash2, password) {
-  try {
-    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
-  } catch {
-    return false;
-  }
-}
-function unmatchableHash() {
-  return hashPassword((0, import_node_crypto10.randomBytes)(64).toString("hex"));
-}
-var decoy;
-function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto10.randomBytes)(32).toString("base64url"));
-  return decoy;
-}
-
-// src/services/adminUsers.ts
+var import_node_crypto12 = require("node:crypto");
 var toAdminUser = (row3) => ({
   id: row3.id,
   email: row3.email,
@@ -104130,14 +104747,14 @@ async function listAdmins(db) {
   );
   return rows.map(toAdminUser);
 }
-async function accountOf(tx, id) {
+async function accountOf2(tx, id) {
   const [row3] = await tx.query(
     "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id WHERE u.id = ? GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at",
     [id]
   );
   return toAdminUser(row3);
 }
-async function lockedRoles(tx, userId) {
+async function lockedRoles2(tx, userId) {
   const rows = await tx.query(
     "SELECT role_id FROM user_roles WHERE user_id = ? FOR UPDATE",
     [userId]
@@ -104149,9 +104766,9 @@ async function createAdmin(tx, input2, actor) {
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto11.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto12.randomUUID)();
   if (existing) {
-    const roles = await lockedRoles(tx, id);
+    const roles = await lockedRoles2(tx, id);
     if (roles.includes("owner")) return "OWNER_IMMUTABLE";
     if (roles.includes("admin")) return "ADMIN_ALREADY_EXISTS";
     await tx.query("UPDATE users SET is_active = 1 WHERE id = ?", [id]);
@@ -104176,13 +104793,13 @@ async function createAdmin(tx, input2, actor) {
     after: { role: "admin", created: !existing },
     ip: actor.ip
   });
-  return accountOf(tx, id);
+  return accountOf2(tx, id);
 }
 async function updateAdmin(tx, input2, actor) {
-  const roles = await lockedRoles(tx, input2.id);
+  const roles = await lockedRoles2(tx, input2.id);
   if (roles.includes("owner")) return "OWNER_IMMUTABLE";
   if (!roles.includes("admin")) return "ADMIN_NOT_FOUND";
-  const before = await accountOf(tx, input2.id);
+  const before = await accountOf2(tx, input2.id);
   if (input2.isActive !== void 0) {
     await tx.query("UPDATE users SET is_active = ? WHERE id = ?", [
       input2.isActive ? 1 : 0,
@@ -104202,7 +104819,7 @@ async function updateAdmin(tx, input2, actor) {
   if (input2.isActive === false || input2.revokeAdmin === true) {
     await revokeAccess(tx, input2.id);
   }
-  const after = await accountOf(tx, input2.id);
+  const after = await accountOf2(tx, input2.id);
   await recordAudit(tx, {
     userId: actor.userId,
     action: "ADMIN_UPDATED",
@@ -104216,7 +104833,7 @@ async function updateAdmin(tx, input2, actor) {
 }
 
 // src/routes/adminUsers.ts
-var REFUSALS4 = {
+var REFUSALS6 = {
   OWNER_IMMUTABLE: [403, "The owner account cannot be changed"],
   ADMIN_ALREADY_EXISTS: [409, "Already an administrator"],
   ADMIN_NOT_FOUND: [404, "Not found"]
@@ -104228,11 +104845,11 @@ var notOwner = (reply) => refuse(
   "Only the owner manages administrators",
   "OWNER_ROLE_REQUIRED"
 );
-function answerOf2(outcome, created) {
+function answerOf4(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS4[outcome];
+  const [status, title] = REFUSALS6[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminUserRoutes(app, deps) {
@@ -104256,7 +104873,7 @@ function registerAdminUserRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf2(
+      async (tx, userId) => answerOf4(
         await createAdmin(
           tx,
           {
@@ -104289,7 +104906,7 @@ function registerAdminUserRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx, userId) => answerOf2(
+      async (tx, userId) => answerOf4(
         await updateAdmin(
           tx,
           { id: params.data.id, ...body.data },
@@ -104413,7 +105030,7 @@ var PASSWORD_PROBLEMS = {
 };
 
 // src/services/botChallenge.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -104424,16 +105041,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto12.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto13.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto12.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto13.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto12.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto12.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto13.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto13.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto12.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto12.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto13.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto13.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -104885,17 +105502,17 @@ async function updateBrand(tx, id, patch) {
   );
   return { before, after };
 }
-var flag = (value) => Number(value) === 1;
+var flag2 = (value) => Number(value) === 1;
 var groupOf = (row3, values = []) => ({
   id: Number(row3.id),
   code: row3.code,
   nameEs: row3.name_es,
   nameEn: row3.name_en,
-  isRequired: flag(row3.is_required),
-  isOrdered: flag(row3.is_ordered),
-  isFilterable: flag(row3.is_filterable),
-  showOnLanding: flag(row3.show_on_landing),
-  isActive: flag(row3.is_active),
+  isRequired: flag2(row3.is_required),
+  isOrdered: flag2(row3.is_ordered),
+  isFilterable: flag2(row3.is_filterable),
+  showOnLanding: flag2(row3.show_on_landing),
+  isActive: flag2(row3.is_active),
   sortOrder: Number(row3.sort_order),
   values
 });
@@ -105848,7 +106465,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var MP_API = "https://api.mercadopago.com";
 var TIMEOUT_MS2 = 1e4;
 var PAYMENT_TYPES = [
@@ -105976,9 +106593,9 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto13.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+      const expected = (0, import_node_crypto14.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto13.timingSafeEqual)(received, expected)) {
+      if (received.length !== expected.length || !(0, import_node_crypto14.timingSafeEqual)(received, expected)) {
         return null;
       }
       let event;
@@ -106104,8 +106721,8 @@ var basicToDigit = function(codePoint) {
   }
   return base;
 };
-var digitToBasic = function(digit, flag2) {
-  return digit + 22 + 75 * Number(digit < 26) - (Number(flag2 != 0) << 5);
+var digitToBasic = function(digit, flag3) {
+  return digit + 22 + 75 * Number(digit < 26) - (Number(flag3 != 0) << 5);
 };
 var adapt = function(delta, numPoints, firstTime) {
   let k = 0;
@@ -109649,7 +110266,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 
@@ -111502,7 +112119,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto14.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto15.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -112204,10 +112821,10 @@ var MimeNode = class _MimeNode {
    * @return true if this node or an ancestor closed that access
    * @internal
    */
-  _accessDisabled(flag2) {
+  _accessDisabled(flag3) {
     let node2 = this;
     while (node2) {
-      if (node2[flag2]) {
+      if (node2[flag3]) {
         return true;
       }
       node2 = node2.parentNode;
@@ -112679,8 +113296,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto14.default.randomBytes(len).toString("hex"),
-      import_node_crypto14.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto15.default.randomBytes(len).toString("hex"),
+      import_node_crypto15.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -113368,7 +113985,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -113379,7 +113996,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto15.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto16.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -113489,7 +114106,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -113504,7 +114121,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto16.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto17.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -113571,7 +114188,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -113584,7 +114201,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto17.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto18.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -114194,7 +114811,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 function isAbortSignal(value) {
   return typeof value === "object" && value !== null && "aborted" in value && typeof value.addEventListener === "function" && typeof value.removeEventListener === "function";
@@ -114554,7 +115171,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto18.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto19.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -114589,7 +115206,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto19 = __toESM(require("node:crypto"), 1);
+var import_node_crypto20 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -114754,7 +115371,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto19.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto20.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -116110,7 +116727,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto19.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto20.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -116444,7 +117061,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto20 = __toESM(require("node:crypto"), 1);
+var import_node_crypto21 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -116767,7 +117384,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto20.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto21.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -120208,7 +120825,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto21 = require("node:crypto");
+var import_node_crypto22 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -120277,7 +120894,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto21.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto22.timingSafeEqual)(a, b);
 }
 async function refusalReason(answer) {
   const body = await answer.json().catch(() => null);
@@ -120340,7 +120957,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto21.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
+      const expected = (0, import_node_crypto22.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
       if (!candidates.some((candidate) => sameHex2(expected, candidate)))
         return null;
       let event;
@@ -120669,6 +121286,8 @@ async function buildApp(deps) {
     mode: deps.config.payments.mode
   });
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerStaffUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAdminRoleRoutes(app, { db: deps.db, now });
   registerAdminOrderRoutes(app, { db: deps.db, now });
   registerReturnRoutes(app, { db: deps.db, now, processors });
   registerAdminShippingRoutes(app, { db: deps.db, now });
@@ -120991,7 +121610,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "beded1e4c01f2d683ffa2d3c3ca1f00dd9dcfb93" : void 0;
+var sha = true ? "c47aa41506e5f03d9e6334315fd44bde9f295883" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
