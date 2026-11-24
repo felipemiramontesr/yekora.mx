@@ -498,7 +498,8 @@ async function finishRefund(
   tx: TxQuery,
   intent: RefundIntent,
   reference: { refundId: string | null; manualReference: string | null },
-  confirmer: Actor
+  confirmer: Actor,
+  processorRefundedCents: number
 ): Promise<ReturnView> {
   const [row] = await tx.query<{ status: string; restock: number }>(
     'SELECT status, restock FROM order_returns WHERE id = ? FOR UPDATE',
@@ -521,9 +522,13 @@ async function finishRefund(
   }>('SELECT status_id, total_mxn_cents FROM orders WHERE id = ? FOR UPDATE', [
     intent.orderId,
   ]);
-  const refunded =
+  // The order is settled when everything it paid has gone back: the requests of the store add up
+  // to it, or the processor says so, which also counts a refund made outside the store (T2.2).
+  const refunded = Math.max(
     (await committedCents(tx, intent.orderId, intent.returnId)) +
-    intent.refundMxnCents;
+      intent.refundMxnCents,
+    processorRefundedCents
+  );
   const total = refunded >= Number(order.total_mxn_cents);
   const settles = total && PAID_STATUSES.has(Number(order.status_id));
   if (settles) {
@@ -634,12 +639,16 @@ export async function confirmReturn(
       return refusalAnswer('REFUND_PROCESSOR_ERROR');
     }
   }
+  // The money has moved: ask the processor again, since what it holds now includes this refund
+  // and any made outside the store. If it cannot answer, the closing goes on with our requests.
+  const settled = await readProcessorRefunded(deps, id);
   const view = await deps.db.transaction((tx) =>
     finishRefund(
       tx,
       intent,
       { refundId, manualReference: confirmer.manualReference },
-      { userId: confirmer.userId, ip }
+      { userId: confirmer.userId, ip },
+      typeof settled === 'number' ? settled : 0
     )
   );
   return { status: 200, body: view };

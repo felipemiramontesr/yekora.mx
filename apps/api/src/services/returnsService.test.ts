@@ -689,6 +689,37 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
       await expect(result).resolves.toMatchObject({ status: 200 });
     });
 
+    it('settles the order when the processor says everything went back, though the requests alone do not add up', async () => {
+      const processor = {
+        fetchRefundedTotal: vi
+          .fn<() => Promise<number>>()
+          .mockResolvedValueOnce(155000)
+          .mockResolvedValueOnce(200000),
+        createRefund: vi.fn(async () => ({ refundId: 're_rest' })),
+      } as unknown as PaymentProcessorPort;
+      const { harness, result } = run({}, { STRIPE: processor });
+      await expect(result).resolves.toMatchObject({ status: 200 });
+      expect(harness.wrote('UPDATE orders SET status_id')[0].params).toEqual([
+        5, 7,
+      ]);
+    });
+
+    it('closes with the requests alone when the processor cannot answer once the money moved', async () => {
+      const processor = {
+        fetchRefundedTotal: vi
+          .fn<() => Promise<number>>()
+          .mockResolvedValueOnce(155000)
+          .mockRejectedValueOnce(new PaymentProcessorError('Stripe: 500', 500)),
+        createRefund: vi.fn(async () => ({ refundId: 're_late' })),
+      } as unknown as PaymentProcessorPort;
+      const { harness, result } = run({}, { STRIPE: processor });
+      await expect(result).resolves.toMatchObject({ status: 200 });
+      expect(
+        harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")
+      ).toHaveLength(1);
+      expect(harness.wrote('UPDATE orders SET status_id')).toEqual([]);
+    });
+
     it('answers 502 and records nothing when Stripe cannot be asked how much is refunded', async () => {
       const processor = {
         fetchRefundedTotal: vi.fn(async () => {
