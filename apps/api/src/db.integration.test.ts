@@ -548,11 +548,15 @@ describe('identity schema of migration 004 (FC 028 F0)', () => {
   const ARGON =
     '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
 
-  it('gives admin the union of every permission, and each other role its own set', async () => {
+  it('gives admin every permission but roles:manage (FC 072: the owner alone edits the roles), and each other role its own set', async () => {
     const [{ missing }] = await db.query<{ missing: number }>(
-      "SELECT COUNT(*) AS missing FROM permissions p WHERE NOT EXISTS (SELECT 1 FROM role_permissions r WHERE r.role_id = 'admin' AND r.permission_id = p.id)"
+      "SELECT COUNT(*) AS missing FROM permissions p WHERE p.id <> 'roles:manage' AND NOT EXISTS (SELECT 1 FROM role_permissions r WHERE r.role_id = 'admin' AND r.permission_id = p.id)"
     );
     expect(Number(missing)).toBe(0);
+    const [{ editor }] = await db.query<{ editor: number }>(
+      "SELECT COUNT(*) AS editor FROM role_permissions WHERE role_id = 'admin' AND permission_id = 'roles:manage'"
+    );
+    expect(Number(editor)).toBe(0);
     const customer = await db.query<{ permission_id: string }>(
       "SELECT permission_id FROM role_permissions WHERE role_id = 'customer'"
     );
