@@ -55,7 +55,9 @@ function refusalOf(
 }
 
 /** The catalog of permissions the matrix is made of, in alphabetical order. */
-const CATALOG: readonly string[] = [...PERMISSIONS].sort();
+const CATALOG: readonly string[] = [...PERMISSIONS].sort((first, second) =>
+  first.localeCompare(second)
+);
 const CATALOG_SET: ReadonlySet<string> = new Set(CATALOG);
 
 /** A flag as MySQL stores it, or null to leave a column as it is. */
