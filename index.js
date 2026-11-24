@@ -103608,7 +103608,7 @@ async function beginRefund(tx, id, confirmer, now, ip, processorRefundedCents) {
     }
   };
 }
-async function finishRefund(tx, intent, reference, confirmer) {
+async function finishRefund(tx, intent, reference, confirmer, processorRefundedCents) {
   const [row3] = await tx.query(
     "SELECT status, restock FROM order_returns WHERE id = ? FOR UPDATE",
     [intent.returnId]
@@ -103627,7 +103627,10 @@ async function finishRefund(tx, intent, reference, confirmer) {
   const [order2] = await tx.query("SELECT status_id, total_mxn_cents FROM orders WHERE id = ? FOR UPDATE", [
     intent.orderId
   ]);
-  const refunded = await committedCents(tx, intent.orderId, intent.returnId) + intent.refundMxnCents;
+  const refunded = Math.max(
+    await committedCents(tx, intent.orderId, intent.returnId) + intent.refundMxnCents,
+    processorRefundedCents
+  );
   const total = refunded >= Number(order2.total_mxn_cents);
   const settles = total && PAID_STATUSES.has(Number(order2.status_id));
   if (settles) {
@@ -103702,12 +103705,14 @@ async function confirmReturn(deps, id, confirmer, ip) {
       return refusalAnswer("REFUND_PROCESSOR_ERROR");
     }
   }
+  const settled = await readProcessorRefunded(deps, id);
   const view = await deps.db.transaction(
     (tx) => finishRefund(
       tx,
       intent,
       { refundId, manualReference: confirmer.manualReference },
-      { userId: confirmer.userId, ip }
+      { userId: confirmer.userId, ip },
+      typeof settled === "number" ? settled : 0
     )
   );
   return { status: 200, body: view };
@@ -120650,7 +120655,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "939b234669a69e2e6c63e3f16af6358931114ee1" : void 0;
+var sha = true ? "4e6cdbba70839c070339fa613f9617e24ac8bce8" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
