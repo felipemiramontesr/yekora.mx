@@ -53,6 +53,8 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
     audit: [] as unknown[],
     /** The rows of `outbox_events` the receiver queued (FC 066): event type and payload. */
     outbox: [] as { type: string; payload: Record<string, unknown> }[],
+    /** What the returns of the order say (FC 071): refunds recorded in a request, requests in flight. */
+    returns: { known: 0, inFlight: 0 },
   };
   const sql: string[] = [];
   const handlers: [string, (p: unknown[]) => unknown][] = [
@@ -119,6 +121,14 @@ function webhookDb(order: Partial<OrderState> = {}, insertError?: Error) {
         state.order.status = status as number;
         return { affectedRows: 1 };
       },
+    ],
+    [
+      'SELECT COUNT(*) AS n FROM order_returns WHERE order_id = ? AND processor_refund_id IN (?)',
+      () => [{ n: state.returns.known }],
+    ],
+    [
+      "SELECT COUNT(*) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDING'",
+      () => [{ n: state.returns.inFlight }],
     ],
     [
       'UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock + i.quantity',
@@ -497,6 +507,7 @@ describe('FC 069 · a refunded charge (T1.1, T1.2, T1.3)', () => {
     amountMxnCents: 200000,
     refundedMxnCents: 200000,
     currency: 'MXN',
+    refundIds: ['re_test_1'],
   };
   /** A processor that reads the refund back as `refund`, or fails when it is an Error. */
   function refunding(
@@ -597,6 +608,52 @@ describe('FC 069 · a refunded charge (T1.1, T1.2, T1.3)', () => {
     expect(state.order.status).toBe(2);
     expect(state.outbox).toEqual([]);
     expect(state.events[0].params.slice(7, 9)).toEqual([null, 1]);
+  });
+
+  it('a refund that our own return made is linked to its request: recorded, nothing else moves (FC 071 T2.2)', async () => {
+    const { db, state } = webhookDb(paidOrder(9));
+    state.returns.known = 1;
+    const { port } = refunding(WHOLE);
+    await expect(
+      receiveWebhook(deps(db, port), 'STRIPE', INPUT)
+    ).resolves.toEqual({ status: 200, code: 'REFUND_LINKED_TO_RETURN' });
+    expect(state.order.status).toBe(9);
+    expect(state.outbox).toEqual([]);
+    expect(state.restocked).toEqual([]);
+    expect(state.events[0].params.slice(7, 9)).toEqual([null, 0]);
+  });
+
+  it('a partial refund of our own return does not alert, even before its id is recorded (request in flight)', async () => {
+    const { db, state } = webhookDb(paidOrder(8));
+    state.returns.inFlight = 1;
+    const { port } = refunding({ ...WHOLE, refundedMxnCents: 50000 });
+    await expect(
+      receiveWebhook(deps(db, port), 'STRIPE', INPUT)
+    ).resolves.toEqual({ status: 200, code: 'REFUND_LINKED_TO_RETURN' });
+    expect(state.order.status).toBe(8);
+    expect(state.events[0].params.slice(7, 9)).toEqual([null, 0]);
+  });
+
+  it('a refund made elsewhere is not ours: one request in flight covers only one refund', async () => {
+    const { db, state } = webhookDb(paidOrder(2));
+    state.returns.inFlight = 1;
+    const { port } = refunding({
+      ...WHOLE,
+      refundedMxnCents: 50000,
+      refundIds: ['re_a', 're_b'],
+    });
+    await expect(
+      receiveWebhook(deps(db, port), 'STRIPE', INPUT)
+    ).resolves.toEqual({ status: 200, code: 'PARTIAL_REFUND_ALERT' });
+  });
+
+  it('a charge that lists no refund cannot be linked to a request', async () => {
+    const { db, state } = webhookDb(paidOrder(2));
+    state.returns.inFlight = 1;
+    const { port } = refunding({ ...WHOLE, refundIds: [] });
+    await expect(
+      receiveWebhook(deps(db, port), 'STRIPE', INPUT)
+    ).resolves.toEqual({ status: 200, code: 'REFUND_PROCESSED' });
   });
 
   it.each([

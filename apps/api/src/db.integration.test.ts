@@ -52,6 +52,12 @@ import {
   updateProfile,
 } from './services/accountAddresses';
 import { createDb } from './services/db';
+import {
+  confirmReturn,
+  listReturns,
+  prepareReturn,
+  requestReturn,
+} from './services/returnsService';
 import { ensureCustomer, linkedCustomer } from './services/stripeCustomer';
 import { runIdempotent } from './services/idempotency';
 import { inspectMedia, readMedia, storeMedia } from './services/media';
@@ -463,6 +469,7 @@ describe('webhook settlement (webhooks.ts)', () => {
         amountMxnCents: TOTAL_ONE,
         refundedMxnCents: TOTAL_ONE,
         currency: 'MXN',
+        refundIds: ['re_itest_69'],
       }),
     });
     const webhookDeps = {
@@ -2642,5 +2649,205 @@ describe('the fulfillment of an order on real SQL (migration 016, ordersFsm.ts, 
     ]);
     expect(await statusOf(number)).toBe(7);
     await reset(number);
+  });
+});
+
+describe('returns and refunds on real SQL (migration 017, returnsService.ts, FC 071 F0 F1)', () => {
+  const ARGON =
+    '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA';
+
+  async function user(email: string, name: string) {
+    await createCustomer(db, { email, passwordHash: ARGON, fullName: name });
+    const [row] = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+    return row.id;
+  }
+
+  /** A delivered order of a buyer, from a paid one the suite already made; `undo` puts it back. */
+  async function deliveredOrder() {
+    const buyer = await user('returns.buyer@example.test', 'Compradora');
+    const [order] = await db.query<{
+      id: number;
+      order_number: string;
+      total_mxn_cents: number;
+    }>(
+      'SELECT id, order_number, total_mxn_cents FROM orders WHERE status_id = 2 ORDER BY id LIMIT 1'
+    );
+    await db.query(
+      "UPDATE orders SET user_id = ?, status_id = 9, carrier = 'DHL', tracking_number = '1', shipped_at = NOW(), delivered_at = NOW() WHERE id = ?",
+      [buyer, order.id]
+    );
+    const [item] = await db.query<{ sku: string; quantity: number }>(
+      'SELECT sku, quantity FROM order_items WHERE order_id = ? ORDER BY id LIMIT 1',
+      [order.id]
+    );
+    const undo = async () => {
+      await db.query(
+        'DELETE FROM order_return_items WHERE return_id IN (SELECT id FROM order_returns WHERE order_id = ?)',
+        [order.id]
+      );
+      await db.query('DELETE FROM order_returns WHERE order_id = ?', [
+        order.id,
+      ]);
+      await db.query(
+        'UPDATE orders SET user_id = NULL, status_id = 2, carrier = NULL, tracking_number = NULL, shipped_at = NULL, delivered_at = NULL WHERE id = ?',
+        [order.id]
+      );
+    };
+    return { buyer, order, item, undo };
+  }
+
+  it('adds allows_return to products and lines (default returnable), the permissions and who holds them (T0.1)', async () => {
+    const columns = await db.query<{ table_name: string }>(
+      "SELECT TABLE_NAME AS table_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'allows_return' ORDER BY TABLE_NAME"
+    );
+    expect(columns.map((row) => row.table_name)).toEqual([
+      'order_items',
+      'products',
+    ]);
+    const [{ n }] = await db.query<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM products WHERE allows_return = 0'
+    );
+    expect(Number(n)).toBe(0);
+    const grants = await db.query<{ permission_id: string; role_id: string }>(
+      "SELECT permission_id, role_id FROM role_permissions WHERE permission_id LIKE 'returns:%' ORDER BY permission_id, role_id"
+    );
+    expect(grants.map((row) => `${row.permission_id}/${row.role_id}`)).toEqual([
+      'returns:confirm/admin',
+      'returns:confirm/owner',
+      'returns:prepare/admin',
+      'returns:prepare/owner',
+      'returns:prepare/staff_orders',
+      'returns:view/admin',
+      'returns:view/owner',
+      'returns:view/staff_orders',
+    ]);
+  });
+
+  it('the lines of an order carry allows_return as a historical value of their product (T0.1)', async () => {
+    const { order, undo } = await deliveredOrder();
+    const lines = await db.query<{ allows_return: number }>(
+      'SELECT allows_return FROM order_items WHERE order_id = ?',
+      [order.id]
+    );
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.every((line) => Number(line.allows_return) === 1)).toBe(true);
+    await undo();
+  });
+
+  it('the database refuses the same user as preparer and confirmer, and a prepared request without its amount (T2.1)', async () => {
+    const { buyer, order, undo } = await deliveredOrder();
+    await expect(
+      db.query(
+        "INSERT INTO order_returns (order_id, status, reason, refund_mxn_cents, restock, prepared_by, confirmed_by, prepared_at, confirmed_at) VALUES (?, 'REFUNDING', 'DEFECT', 100, 1, ?, ?, NOW(), NOW())",
+        [order.id, buyer, buyer]
+      )
+    ).rejects.toThrow('ck_order_returns_dual');
+    await expect(
+      db.query(
+        "INSERT INTO order_returns (order_id, status, reason) VALUES (?, 'PREPARED', 'DEFECT')",
+        [order.id]
+      )
+    ).rejects.toThrow('ck_order_returns_prepared');
+    await undo();
+  });
+
+  it('a request goes from the buyer to the refund: four eyes, stock back, order REFUNDED, one notice (T1.1, T1.2, T2.2, T2.3, T2.4)', async () => {
+    const { buyer, order, item, undo } = await deliveredOrder();
+    const preparer = await user('returns.preparer@example.test', 'Vendedor');
+    const confirmer = await user('returns.confirmer@example.test', 'Admin');
+    const stockOf = async () =>
+      Number(
+        (
+          await db.query<{ stock: number }>(
+            'SELECT p.stock FROM products p JOIN order_items i ON i.product_id = p.id WHERE i.order_id = ? ORDER BY i.id LIMIT 1',
+            [order.id]
+          )
+        )[0].stock
+      );
+    const before = await stockOf();
+    const asked = await db.transaction((tx) =>
+      requestReturn(
+        tx,
+        {
+          orderNumber: order.order_number,
+          userId: buyer,
+          request: {
+            items: [{ sku: item.sku, quantity: Number(item.quantity) }],
+            reason: 'DEFECT',
+          },
+          now: new Date(),
+        },
+        { userId: buyer, ip: null }
+      )
+    );
+    if (typeof asked === 'string') throw new Error(asked);
+    expect(asked).toMatchObject({
+      status: 'REQUESTED',
+      items: [{ sku: item.sku }],
+    });
+    const board = await listReturns(db, 'REQUESTED');
+    expect(board.items.map((row) => row.id)).toContain(asked.id);
+    const prepared = await db.transaction((tx) =>
+      prepareReturn(
+        tx,
+        asked.id,
+        { refundMxnCents: Number(order.total_mxn_cents), restock: true },
+        { userId: preparer, ip: null },
+        new Date()
+      )
+    );
+    expect(prepared).toMatchObject({ status: 'PREPARED' });
+    const processors = {
+      STRIPE: {
+        createRefund: async () => ({ refundId: `re_itest_${asked.id}` }),
+      } as unknown as PaymentProcessorPort,
+    };
+    const deps = { db, processors, now: () => new Date() };
+    const manualReference = 'SPEI-ITEST';
+    const self = await confirmReturn(
+      deps,
+      asked.id,
+      { userId: preparer, canConfirm: true, manualReference },
+      null
+    );
+    expect(self.status).toBe(403);
+    const done = await confirmReturn(
+      deps,
+      asked.id,
+      { userId: confirmer, canConfirm: true, manualReference },
+      null
+    );
+    expect(done.status).toBe(200);
+    expect(done.body).toMatchObject({ status: 'REFUNDED' });
+    const [{ status_id: orderStatus }] = await db.query<{ status_id: number }>(
+      'SELECT status_id FROM orders WHERE id = ?',
+      [order.id]
+    );
+    expect(Number(orderStatus)).toBe(5);
+    expect(await stockOf()).toBe(before + Number(item.quantity));
+    const [{ n: notices }] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type = 'RETURN_REFUNDED'"
+    );
+    expect(Number(notices)).toBe(1);
+    const again = await confirmReturn(
+      deps,
+      asked.id,
+      { userId: confirmer, canConfirm: true, manualReference },
+      null
+    );
+    expect(again.status).toBe(200);
+    const [{ n: afterAgain }] = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox_events WHERE event_type = 'RETURN_REFUNDED'"
+    );
+    expect(Number(afterAgain)).toBe(1);
+    await db.query(
+      'UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity WHERE i.order_id = ?',
+      [order.id]
+    );
+    await db.query('UPDATE orders SET status_id = 9 WHERE id = ?', [order.id]);
+    await undo();
   });
 });

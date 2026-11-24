@@ -55,6 +55,8 @@ interface Order {
 interface State {
   products: Product[];
   orders: Order[];
+  /** The orders whose lines copied `allows_return` (FC 071 T0.1). */
+  copied: number[];
   items: {
     orderId: number;
     productId: number;
@@ -98,6 +100,7 @@ function memoryDb(
       { id: 2, sku: 'LAMP', price: 35000, stock: 1, reserved: 0, active: true },
     ],
     orders: [],
+    copied: [],
     items: [],
     methods: [
       { code: 'CARD', id: 1, hold: 60, active: true },
@@ -253,6 +256,14 @@ function memoryDb(
           });
         }
         return { affectedRows: rows.length };
+      },
+    ],
+    [
+      // FC 071 T0.1: the lines copy `allows_return` of their products in the same transaction.
+      'UPDATE order_items i JOIN products p ON p.id = i.product_id SET i.allows_return = p.allows_return WHERE i.order_id = ?',
+      ([id]) => {
+        state.copied.push(id as number);
+        return { affectedRows: 1 };
       },
     ],
     [
@@ -591,6 +602,8 @@ describe('cart quotable, then T1.2 · SessionCreated ⟺ D ∧ P ∧ I (D → P 
     });
     const { orderNumber, accessToken } = outcome.session;
     const [order] = state().orders;
+    // FC 071 T0.1: the lines of the order copied `allows_return` of their products, once.
+    expect(state().copied).toEqual([order.id]);
     const p = order.params as unknown[];
     expect(order.status).toBe(1);
     expect(order.reference).toBe(`ref_${orderNumber}`);

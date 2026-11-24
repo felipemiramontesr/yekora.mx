@@ -261,6 +261,8 @@ interface OrderContext {
   trackingNumber: string | null;
   /** The link to follow the parcel, when the carrier gave one and it is http or https. */
   trackingUrl: string | null;
+  /** What a return refunded, as an amount with its currency, for the refund message (FC 071). */
+  refund: string | null;
 }
 
 /** The columns of an order a message needs, as MariaDB returns them. */
@@ -404,6 +406,34 @@ const ORDER_COPY = {
         heading: 'We refunded your order',
         paragraphs: [
           `Hello ${name}: we refunded the full payment of your order ${number}. The money goes back to your payment method; depending on your bank it may take a few days to show.`,
+        ],
+        button: {
+          label: 'View my order',
+          url: `${site}/en/account/${number}/`,
+        },
+      },
+    }),
+  },
+  RETURN_REFUNDED: {
+    'es-MX': ({ name, number, site, refund }: OrderContext): Copy => ({
+      subject: `Reembolsamos tu devolución del pedido ${number}`,
+      content: {
+        heading: 'Reembolsamos tu devolución',
+        paragraphs: [
+          `Hola ${name}: reembolsamos ${refund} por la devolución de tu pedido ${number}. El dinero regresa a tu método de pago; según tu banco puede tardar unos días en verse reflejado.`,
+        ],
+        button: {
+          label: 'Ver mi pedido',
+          url: `${site}/cuenta/${number}/`,
+        },
+      },
+    }),
+    en: ({ name, number, site, refund }: OrderContext): Copy => ({
+      subject: `We refunded your return of order ${number}`,
+      content: {
+        heading: 'We refunded your return',
+        paragraphs: [
+          `Hello ${name}: we refunded ${refund} for the return of your order ${number}. The money goes back to your payment method; depending on your bank it may take a few days to show.`,
         ],
         button: {
           label: 'View my order',
@@ -578,6 +608,10 @@ async function renderOrder(
     carrier: order.carrier,
     trackingNumber: order.tracking_number,
     trackingUrl,
+    refund:
+      event.type === 'RETURN_REFUNDED'
+        ? money(event.refundMxnCents, locale)
+        : null,
   });
   const block: OrderBlock = {
     number,

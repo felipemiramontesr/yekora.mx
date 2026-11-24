@@ -91,6 +91,18 @@ export interface RefundStatus {
   refundedMxnCents: number;
   /** Currency as the processor reports it, upper case. */
   currency: string | null;
+  /** The ids of the refunds of the charge (FC 071): the ones a return of ours made are linked by them. */
+  refundIds: readonly string[];
+}
+
+/** A refund the store asks the processor to make (FC 071). */
+export interface RefundRequest {
+  /** The hosted session that took the payment: `orders.payment_resource_id`. */
+  paymentResourceId: string;
+  /** What goes back, MXN cents; never more than what was charged. */
+  amountMxnCents: number;
+  /** Same key, same refund: a retry never refunds twice. */
+  idempotencyKey: string;
 }
 
 /** Headers and query of an incoming webhook, as the route received them. */
@@ -136,6 +148,14 @@ export interface PaymentProcessorPort {
    *   payment intent or no session of ours.
    */
   fetchRefund?(chargeId: string): Promise<RefundStatus | null>;
+  /**
+   * Refunds part or all of a payment (FC 071). Only a processor whose refunds the store can make
+   * through its API implements it; Mercado Pago refunds are made by hand.
+   *
+   * @param request - The payment, the amount and the idempotency key.
+   * @returns The processor's id of the refund, or rejects with {@link PaymentProcessorError}.
+   */
+  createRefund?(request: RefundRequest): Promise<{ refundId: string }>;
   /**
    * Asks the processor, with a read-only call, whether it can be reached and still accepts the
    * credentials (FC 070 T2.2). It charges nothing, writes nothing and reveals no secret.

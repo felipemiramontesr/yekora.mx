@@ -549,6 +549,47 @@ describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => 
     expect(message.text).not.toMatch(/Reembolsamos|pedido/);
   });
 
+  it('RETURN_REFUNDED tells the buyer how much of the return went back, with a link to the order (FC 071)', async () => {
+    const { send } = await sentFor([
+      row(1, {
+        event_type: 'RETURN_REFUNDED',
+        payload: JSON.stringify({ orderId: 7, refundMxnCents: 45000 }),
+      }),
+    ]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(
+      `Reembolsamos tu devolución del pedido ${ORDER_NUMBER}`
+    );
+    expect(message.to).toBe('ana@example.test');
+    for (const body of [message.text, message.html ?? '']) {
+      expect(body).toContain('reembolsamos');
+      expect(body).toContain('450.00');
+    }
+    expect(message.text).toContain(`https://yekora.mx/cuenta/${ORDER_NUMBER}/`);
+  });
+
+  it('RETURN_REFUNDED in English, with the English link and no Spanish', async () => {
+    const { send } = await sentFor([
+      row(1, {
+        event_type: 'RETURN_REFUNDED',
+        payload: JSON.stringify({
+          orderId: 7,
+          refundMxnCents: 45000,
+          locale: 'en',
+        }),
+      }),
+    ]);
+    const [message] = send.mock.calls.map(([sent]) => sent);
+    expect(message.subject).toBe(
+      `We refunded your return of order ${ORDER_NUMBER}`
+    );
+    expect(message.text).toContain('for the return of your order');
+    expect(message.text).toContain(
+      `https://yekora.mx/en/account/${ORDER_NUMBER}/`
+    );
+    expect(message.text).not.toMatch(/Reembolsamos|devolución/);
+  });
+
   it('ORDER_PREPARED tells the buyer the order is being prepared, with a link to it (FC 068 T2.4)', async () => {
     const { send } = await sentFor([event('ORDER_PREPARED')]);
     const [message] = send.mock.calls.map(([sent]) => sent);

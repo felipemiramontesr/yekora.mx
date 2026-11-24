@@ -55,6 +55,8 @@ const itemSchema = z.object({
   priceMxnCents: z.number().int().positive(),
   priceUsdCents: z.number().int().nonnegative().nullable(),
   inStock: z.boolean(),
+  /** Whether it may be returned after delivery (FC 071); a snapshot made before it existed allows it. */
+  allowsReturn: z.boolean().default(true),
 });
 
 /**

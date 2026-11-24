@@ -22,6 +22,7 @@ import {
   type CreatedSession,
   type PaymentProcessorPort,
   type PaymentStatus,
+  type RefundRequest,
   type RefundStatus,
   PaymentProcessorError,
   remoteDeadline,
@@ -310,13 +311,15 @@ export function createStripeAdapter(
 
     async fetchRefund(chargeId): Promise<RefundStatus | null> {
       // The event carries a charge (`ch_…`); only its payment intent (`pi_…`) finds the session.
-      const charge = (await call(`/charges/${encodeURIComponent(chargeId)}`, {
-        method: 'GET',
-      })) as {
+      const charge = (await call(
+        `/charges/${encodeURIComponent(chargeId)}?expand[]=refunds`,
+        { method: 'GET' }
+      )) as {
         payment_intent?: unknown;
         amount?: unknown;
         amount_refunded?: unknown;
         currency?: unknown;
+        refunds?: { data?: { id?: unknown }[] };
       };
       if (
         typeof charge.payment_intent !== 'string' ||
@@ -343,7 +346,37 @@ export function createStripeAdapter(
           typeof charge.currency === 'string'
             ? charge.currency.toUpperCase()
             : null,
+        refundIds: (charge.refunds?.data ?? [])
+          .map((refund) => refund.id)
+          .filter((id): id is string => typeof id === 'string'),
       };
+    },
+
+    async createRefund(request: RefundRequest): Promise<{ refundId: string }> {
+      // A refund is made against the payment intent of the session that took the payment.
+      const session = (await call(
+        `/checkout/sessions/${encodeURIComponent(request.paymentResourceId)}`,
+        { method: 'GET' }
+      )) as { payment_intent?: unknown };
+      if (typeof session.payment_intent !== 'string') {
+        throw new PaymentProcessorError('Stripe: the session has no payment');
+      }
+      const refund = (await call('/refunds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Idempotency-Key': request.idempotencyKey,
+        },
+        body: new URLSearchParams({
+          payment_intent: session.payment_intent,
+          amount: String(request.amountMxnCents),
+          reason: 'requested_by_customer',
+        }).toString(),
+      })) as { id?: unknown };
+      if (typeof refund.id !== 'string') {
+        throw new PaymentProcessorError('Stripe: unexpected refund answer');
+      }
+      return { refundId: refund.id };
     },
   };
 }

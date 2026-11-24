@@ -24,6 +24,7 @@ import type {
 } from './paymentPort';
 import { enqueueMail } from './outbox';
 import { applyRefund, decideRefund } from './refundFsm';
+import { isReturnRefund } from './returnsService';
 import { settle } from './settlement';
 
 /** Dependencies of the webhook receiver. */
@@ -148,20 +149,30 @@ interface RefundOrderRow extends OrderRow {
   order_number: string;
 }
 
+/** Records a refund event that changes nothing; `alert` says whether someone has to look. */
+function recordRefundEvent(
+  deps: WebhookDeps,
+  base: Omit<EventRecord, 'resultingStatusId' | 'alert'>,
+  code: string,
+  alert: boolean
+): Promise<WebhookOutcome> {
+  return deps.db.transaction(async (tx) => {
+    const recorded = await recordEvent(tx, {
+      ...base,
+      resultingStatusId: null,
+      alert,
+    });
+    return { status: 200, code: recorded ? code : 'IDEMPOTENT_IGNORED' };
+  });
+}
+
 /** The unreconciled and partial refunds are recorded as alerts: nothing changes but someone looks. */
 function recordRefundAlert(
   deps: WebhookDeps,
   base: Omit<EventRecord, 'resultingStatusId' | 'alert'>,
   code: string
 ): Promise<WebhookOutcome> {
-  return deps.db.transaction(async (tx) => {
-    const recorded = await recordEvent(tx, {
-      ...base,
-      resultingStatusId: null,
-      alert: true,
-    });
-    return { status: 200, code: recorded ? code : 'IDEMPOTENT_IGNORED' };
-  });
+  return recordRefundEvent(deps, base, code, true);
 }
 
 /** T1.2 and T1.3 of FC 069 on the locked order, with the event recorded in the same transaction. */
@@ -250,6 +261,11 @@ async function receiveRefund(
     reconciliation: { payment, order, confirmed: true },
     isTest,
   };
+  // FC 071 T2.2: a refund our own return made is governed by its request (stock, order status and
+  // notice), so the event is recorded and nothing else changes, partial or total.
+  if (await isReturnRefund(deps.db, order.id, refund.refundIds)) {
+    return recordRefundEvent(deps, base, 'REFUND_LINKED_TO_RETURN', false);
+  }
   return refund.refundedMxnCents >= refund.amountMxnCents
     ? refundOrder(deps, base, order)
     : recordRefundAlert(deps, base, 'PARTIAL_REFUND_ALERT');

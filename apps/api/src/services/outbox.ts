@@ -70,6 +70,13 @@ export type MailEvent = (
       orderId: number;
     }
   | {
+      /** A return was refunded, whole or in part (FC 071, K-80). */
+      type: 'RETURN_REFUNDED';
+      orderId: number;
+      /** What went back, MXN cents. */
+      refundMxnCents: number;
+    }
+  | {
       /** An operator shipped a paid order and registered its parcel (FC 068, K-48). */
       type: 'ORDER_SHIPPED';
       orderId: number;

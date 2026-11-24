@@ -556,6 +556,7 @@ describe('fetchRefund (FC 069)', () => {
     amount: 200000,
     amount_refunded: 200000,
     currency: 'mxn',
+    refunds: { data: [{ id: 're_1' }, { id: 're_2' }, {}] },
   };
 
   it('reads the charge, then finds the session of its payment intent', async () => {
@@ -570,9 +571,10 @@ describe('fetchRefund (FC 069)', () => {
       amountMxnCents: 200000,
       refundedMxnCents: 200000,
       currency: 'MXN',
+      refundIds: ['re_1', 're_2'],
     });
     expect(fetchMock.mock.calls[0][0]).toBe(
-      'https://api.stripe.com/v1/charges/ch%2F1'
+      'https://api.stripe.com/v1/charges/ch%2F1?expand[]=refunds'
     );
     expect(fetchMock.mock.calls[1][0]).toBe(
       'https://api.stripe.com/v1/checkout/sessions?payment_intent=pi_1&limit=1'
@@ -587,7 +589,21 @@ describe('fetchRefund (FC 069)', () => {
     );
     await expect(
       createStripeAdapter(SECRETS, fetchMock).fetchRefund?.('ch_1')
-    ).resolves.toMatchObject({ orderNumber: null, currency: null });
+    ).resolves.toMatchObject({
+      orderNumber: null,
+      currency: null,
+      refundIds: ['re_1', 're_2'],
+    });
+  });
+
+  it('a charge without a list of refunds has none to link', async () => {
+    const fetchMock = twoCalls(
+      { ...CHARGE, refunds: undefined },
+      { data: [{ id: 'cs_test_1' }] }
+    );
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).fetchRefund?.('ch_1')
+    ).resolves.toMatchObject({ refundIds: [] });
   });
 
   it.each([
@@ -645,5 +661,64 @@ describe('ping (FC 070 T2.2)', () => {
     await expect(createStripeAdapter(SECRETS, down).ping()).resolves.toBe(
       false
     );
+  });
+});
+
+describe('createRefund (FC 071 T2.4)', () => {
+  it('finds the payment intent of the session and refunds the amount with the idempotency key', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ payment_intent: 'pi_9' }))
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 're_9' })));
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).createRefund?.({
+        paymentResourceId: 'cs/1',
+        amountMxnCents: 45000,
+        idempotencyKey: 'yekora-return-12',
+      })
+    ).resolves.toEqual({ refundId: 're_9' });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.stripe.com/v1/checkout/sessions/cs%2F1'
+    );
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toBe('https://api.stripe.com/v1/refunds');
+    expect(init?.method).toBe('POST');
+    expect(init?.headers).toMatchObject({
+      'Idempotency-Key': 'yekora-return-12',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
+    expect(String(init?.body)).toBe(
+      'payment_intent=pi_9&amount=45000&reason=requested_by_customer'
+    );
+  });
+
+  it('refuses a session that took no payment, and an answer without an id', async () => {
+    const noPayment = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ payment_intent: null }))
+      );
+    await expect(
+      createStripeAdapter(SECRETS, noPayment).createRefund?.({
+        paymentResourceId: 'cs_1',
+        amountMxnCents: 1,
+        idempotencyKey: 'k',
+      })
+    ).rejects.toThrow('Stripe: the session has no payment');
+    const noId = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ payment_intent: 'pi_1' }))
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({})));
+    await expect(
+      createStripeAdapter(SECRETS, noId).createRefund?.({
+        paymentResourceId: 'cs_1',
+        amountMxnCents: 1,
+        idempotencyKey: 'k',
+      })
+    ).rejects.toThrow('Stripe: unexpected refund answer');
   });
 });

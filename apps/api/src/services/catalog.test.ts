@@ -17,6 +17,7 @@ const tent: ProductRow = {
   description_en: 'Four seasons.',
   price_mxn_cents: 485000,
   stock: 3,
+  allows_return: 1,
   discipline: 'montana',
   discipline_name_es: 'Montaña',
   discipline_name_en: 'Mountaineering',

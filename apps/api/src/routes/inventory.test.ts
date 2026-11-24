@@ -51,6 +51,8 @@ const INVENTORY = [
   '├── /v1/account/logout (POST)',
   '├── /v1/account/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
+  // FC 071: the buyer asks to return units of a delivered order.
+  '│       └── /returns (POST)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 068: the three steps of the fulfillment (orders:manage); PUT, PATCH and DELETE on the
@@ -63,6 +65,11 @@ const INVENTORY = [
   // FC 044 F1: the owner's console of administrators (users:manage, then the role owner).
   '├── /v1/admin/admins (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
+  // FC 071: the board of returns (returns:view), prepared (returns:prepare) and confirmed by
+  // another person (returns:confirm).
+  '├── /v1/admin/returns (GET, HEAD)',
+  '│   ├── /:id/prepare (POST)',
+  '│   └── /:id/confirm (POST)',
   // FC 061: the shipping console (shipping:manage).
   '├── /v1/admin/shipping (GET, HEAD)',
   '│   ├── /config (PUT)',
@@ -253,6 +260,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
       '├── /v1/admin/payments/health (GET, HEAD)',
       '├── /v1/admin/admins (GET, HEAD, POST)',
+      '├── /v1/admin/returns (GET, HEAD)',
       '├── /v1/admin/shipping (GET, HEAD)',
       '├── /v1/admin/catalog/media (POST)',
       '├── /v1/admin/catalog/brands (GET, HEAD, POST)',

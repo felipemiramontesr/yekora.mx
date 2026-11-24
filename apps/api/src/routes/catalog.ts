@@ -86,6 +86,7 @@ function present(
     priceMxnCents: Number(row.price_mxn_cents),
     priceUsdCents: usdCents(Number(row.price_mxn_cents), fix),
     inStock: Number(row.stock) > 0,
+    allowsReturn: Number(row.allows_return) === 1,
   };
 }
 

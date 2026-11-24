@@ -101,6 +101,15 @@ import {
   shipRequestSchema,
 } from '../../../lib/account/fulfillmentTypes';
 import {
+  returnConfirmRequestSchema,
+  returnListQuery,
+  returnListSchema,
+  returnParams,
+  returnPrepareRequestSchema,
+  returnRequestSchema,
+  returnSchema,
+} from '../../../lib/account/returnTypes';
+import {
   shippingAdminViewSchema,
   shippingConfigRequestSchema,
   shippingRulesRequestSchema,
@@ -705,6 +714,73 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       ...SIGNED_IN_REFUSALS,
     },
   })),
+  // FC 071 F1: the returns. The buyer asks; the board lists; one operator prepares, another confirms.
+  {
+    method: 'POST',
+    path: '/v1/account/orders/:order_number/returns',
+    summary:
+      'The buyer asks to return units of a delivered order within 60 days (audited)',
+    permission: 'account:self',
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      body: returnRequestSchema,
+    },
+    responses: {
+      201: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/returns',
+    summary: 'The board of returns, newest first, optionally of one stage',
+    permission: 'returns:view',
+    request: { query: returnListQuery },
+    responses: {
+      200: returnListSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/returns/:id/prepare',
+    summary:
+      'Sets the amount to refund and whether the units go back to the shelf (audited)',
+    permission: 'returns:prepare',
+    request: {
+      params: returnParams,
+      headers: mutationHeaders,
+      body: returnPrepareRequestSchema,
+    },
+    responses: {
+      200: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/returns/:id/confirm',
+    summary:
+      'Another operator confirms and executes the refund through the processor (audited, four eyes)',
+    permission: 'returns:confirm',
+    request: { params: returnParams, body: returnConfirmRequestSchema },
+    responses: {
+      200: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      502: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
   // FC 061 F1: the shipping console. Every write needs shipping:manage and an Idempotency-Key.
   {
     method: 'GET',

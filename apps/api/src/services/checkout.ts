@@ -364,6 +364,12 @@ async function persist(
           ]),
         ]
       );
+      // FC 071 T0.1: each line keeps, as a historical copy, whether its product allowed returns at
+      // this moment; a later change of the product never rewrites it.
+      await tx.query(
+        'UPDATE order_items i JOIN products p ON p.id = i.product_id SET i.allows_return = p.allows_return WHERE i.order_id = ?',
+        [id]
+      );
       return id;
     });
   } catch (error) {

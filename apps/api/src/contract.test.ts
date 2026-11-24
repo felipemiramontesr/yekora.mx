@@ -91,6 +91,10 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
     )
   )
     return 'orders:manage';
+  // FC 071: the board lists, one operator prepares and another confirms.
+  if (route.path === '/v1/admin/returns') return 'returns:view';
+  if (route.path === '/v1/admin/returns/:id/prepare') return 'returns:prepare';
+  if (route.path === '/v1/admin/returns/:id/confirm') return 'returns:confirm';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';
   return 'public';
 }
