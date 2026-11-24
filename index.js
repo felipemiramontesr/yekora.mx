@@ -106418,6 +106418,9 @@ var Cookies = class {
     if (!cookie2.expires) {
       cookie2.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1e3);
     }
+    if (urlparts.protocol !== "https:" && (cookie2.secure || this.cookies.some((stored) => stored.secure && this.compare(stored, cookie2)))) {
+      return false;
+    }
     return this.add(cookie2);
   }
   /**
@@ -106458,6 +106461,7 @@ var Cookies = class {
   parse(cookieStr) {
     const cookie2 = {};
     let hasNameValue = false;
+    let hasMaxAge = false;
     (cookieStr || "").toString().split(";").forEach((cookiePart) => {
       if (!cookiePart.trim()) {
         return;
@@ -106477,7 +106481,7 @@ var Cookies = class {
       switch (name2.toLowerCase()) {
         case "expires": {
           const expires = new Date(value);
-          if (expires.toString() !== "Invalid Date") {
+          if (expires.toString() !== "Invalid Date" && !hasMaxAge) {
             cookie2.expires = expires;
           }
           break;
@@ -106494,6 +106498,7 @@ var Cookies = class {
           break;
         case "max-age":
           cookie2.expires = new Date(Date.now() + (Number(value) || 0) * 1e3);
+          hasMaxAge = true;
           break;
         case "secure":
           cookie2.secure = true;
@@ -106553,14 +106558,16 @@ var Cookies = class {
     return true;
   }
   /**
-   * Checks if two cookie objects are the same
+   * Checks if two cookie objects are the same cookie. A cookie is identified by its
+   * name, domain and path (RFC 6265 section 5.3), the Secure and HttpOnly flags are
+   * attributes of the stored cookie that an update replaces
    *
    * @param a Cookie to check against
    * @param b Cookie to check against
    * @returns True, if the cookies are the same
    */
   compare(a, b) {
-    return a.name === b.name && a.path === b.path && a.domain === b.domain && a.secure === b.secure && a.httponly === b.httponly;
+    return a.name === b.name && a.path === b.path && a.domain === b.domain;
   }
   /**
    * Checks if a cookie is expired
@@ -106593,7 +106600,7 @@ var cookies_default = Cookies;
 
 // ../../node_modules/nodemailer/dist/esm/package-info.js
 var name = "nodemailer";
-var version2 = "10.5.0";
+var version2 = "10.6.1";
 var homepage = "https://nodemailer.com/";
 
 // ../../node_modules/nodemailer/dist/esm/fetch/index.js
@@ -113488,7 +113495,7 @@ function unsupportedHashAlgoError(hashAlgo) {
 }
 function sign2(headers, hashAlgo, bodyHash, options) {
   options = options || {};
-  const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive:OTP-Token";
+  const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Unsubscribe-Post:List-Subscribe:List-Post:List-Owner:List-Archive:OTP-Token";
   const fieldNames = options.headerFieldNames || defaultFieldNames;
   const canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
   const dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
@@ -115021,11 +115028,13 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return;
     }
     this._closing = true;
-    const closeMethod = this.stage === "init" ? "destroy" : "end";
+    const configuredCloseTimeout = this.options.socketCloseTimeout;
+    const socketCloseTimeout = typeof configuredCloseTimeout === "number" && Number.isFinite(configuredCloseTimeout) && configuredCloseTimeout >= 0 ? configuredCloseTimeout : CLOSE_TIMEOUT;
+    const closeMethod = this.stage === "init" || socketCloseTimeout === 0 ? "destroy" : "end";
     this.logger.debug({
       tnx: "smtp"
     }, 'Closing connection to the server using "%s"', closeMethod);
-    const socket = this._socket && this._socket.socket || this._socket;
+    const socket = this._socket;
     if (this._currentDataStream) {
       try {
         this._currentDataStream.unpipe(this._socket);
@@ -115054,7 +115063,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
         socket.on("error", TEARDOWN_NOOP);
         socket[closeMethod]();
         if (closeMethod === "end") {
-          const closeTimer = setTimeout(() => socket.destroy(), CLOSE_TIMEOUT);
+          const closeTimer = setTimeout(() => socket.destroy(), socketCloseTimeout);
           if (typeof closeTimer.unref === "function") {
             closeTimer.unref();
           }
@@ -117520,6 +117529,12 @@ var services = {
     ],
     "host": "smtp-relay.brevo.com",
     "port": 587
+  },
+  "Sendora": {
+    "description": "Sendora",
+    "host": "smtp.sendora.se",
+    "port": 465,
+    "secure": true
   },
   "SendPulse": {
     "description": "SendPulse",
@@ -120974,7 +120989,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "e383f702794fe2a29b3b3e26fb80f4a81d154ada" : void 0;
+var sha = true ? "198a09687f9d1037fde588cecab1c308117929bc" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
