@@ -2794,7 +2794,11 @@ describe('returns and refunds on real SQL (migration 017, returnsService.ts, FC 
       prepareReturn(
         tx,
         asked.id,
-        { refundMxnCents: Number(order.total_mxn_cents), restock: true },
+        {
+          refundMxnCents: Number(order.total_mxn_cents),
+          restock: true,
+          processorRefundedCents: 0,
+        },
         { userId: preparer, ip: null },
         new Date()
       )

@@ -664,6 +664,54 @@ describe('ping (FC 070 T2.2)', () => {
   });
 });
 
+describe('fetchRefundedTotal (FC 071 T2.2)', () => {
+  it('reads the payment intent of the session and the refunded amount of its latest charge', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ payment_intent: 'pi_7' }))
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ latest_charge: { amount_refunded: 125000 } })
+        )
+      );
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).fetchRefundedTotal?.('cs/1')
+    ).resolves.toBe(125000);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.stripe.com/v1/checkout/sessions/cs%2F1'
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      'https://api.stripe.com/v1/payment_intents/pi_7?expand[]=latest_charge'
+    );
+  });
+
+  it.each([
+    ['a session without payment', { payment_intent: null }, {}],
+    [
+      'a payment without a charge',
+      { payment_intent: 'pi_7' },
+      { latest_charge: null },
+    ],
+    [
+      'a charge without a refunded amount',
+      { payment_intent: 'pi_7' },
+      { latest_charge: { amount_refunded: 'x' } },
+    ],
+  ])('refuses %s', async (_name, session, intent) => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(session)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(intent)));
+    await expect(
+      createStripeAdapter(SECRETS, fetchMock).fetchRefundedTotal?.('cs_1')
+    ).rejects.toThrow(
+      /Stripe: the (session has no payment|payment has no charge)/
+    );
+  });
+});
+
 describe('createRefund (FC 071 T2.4)', () => {
   it('finds the payment intent of the session and refunds the amount with the idempotency key', async () => {
     const fetchMock = vi

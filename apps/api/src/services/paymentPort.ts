@@ -157,6 +157,14 @@ export interface PaymentProcessorPort {
    */
   createRefund?(request: RefundRequest): Promise<{ refundId: string }>;
   /**
+   * Reads how much of a payment the processor has already refunded, whoever made the refunds
+   * (FC 071 T2.2): the cap of a new refund counts what was refunded outside the store too.
+   *
+   * @param paymentResourceId - The hosted session that took the payment.
+   * @returns MXN cents refunded so far, or rejects with {@link PaymentProcessorError}.
+   */
+  fetchRefundedTotal?(paymentResourceId: string): Promise<number>;
+  /**
    * Asks the processor, with a read-only call, whether it can be reached and still accepts the
    * credentials (FC 070 T2.2). It charges nothing, writes nothing and reveals no secret.
    *

@@ -15,6 +15,7 @@ import {
   isReturnRefund,
   listReturns,
   prepareReturn,
+  readProcessorRefunded,
   requestReturn,
   RETURN_REFUSALS,
 } from './returnsService';
@@ -31,6 +32,10 @@ interface Scenario {
   rows: Record<string, unknown>[];
   total: number;
   committed: number;
+  /** What the requests already REFUNDED here add up to (the part of the processor's total that is ours). */
+  ours: number;
+  /** The order's processor and payment, as the read of the processor needs them. */
+  target: Record<string, unknown> | null;
   prep: Record<string, unknown> | null;
   begin: Record<string, unknown> | null;
   fin: Record<string, unknown>;
@@ -67,6 +72,8 @@ function scenario(over: Partial<Scenario> = {}): Scenario {
     rows: [VIEW_ROW],
     total: 1,
     committed: 0,
+    ours: 0,
+    target: { processor_code: 'STRIPE', payment_resource_id: 'cs_test_1' },
     prep: { order_id: 7, status: 'REQUESTED', total_mxn_cents: '200000' },
     begin: null,
     fin: { status: 'REFUNDING', restock: 1 },
@@ -107,7 +114,15 @@ function fakeDb(s: Scenario) {
       'SELECT COUNT(*) AS n FROM order_returns WHERE (? IS NULL',
       () => [{ n: s.total }],
     ],
+    [
+      "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDED'",
+      () => [{ n: String(s.ours) }],
+    ],
     ['SELECT COALESCE(SUM', () => [{ n: String(s.committed) }]],
+    [
+      'SELECT p.code AS processor_code, o.payment_resource_id',
+      () => (s.target ? [s.target] : []),
+    ],
     ['SELECT r.order_id, r.status', () => (s.prep ? [s.prep] : [])],
     ['SELECT r.order_id, o.order_number', () => (s.begin ? [s.begin] : [])],
     ['SELECT status, restock FROM order_returns', () => [s.fin]],
@@ -407,14 +422,19 @@ describe('listReturns', () => {
 });
 
 describe('prepareReturn (T2.2 balance)', () => {
-  const prepare = (s: Scenario, refundMxnCents = 45000, restock = true) => {
+  const prepare = (
+    s: Scenario,
+    refundMxnCents = 45000,
+    restock = true,
+    processorRefundedCents = 0
+  ) => {
     const harness = fakeDb(s);
     return {
       harness,
       result: prepareReturn(
         harness.db,
         5,
-        { refundMxnCents, restock },
+        { refundMxnCents, restock, processorRefundedCents },
         ACTOR,
         NOW
       ),
@@ -445,6 +465,28 @@ describe('prepareReturn (T2.2 balance)', () => {
     await expect(prepare(s, 45000).result).resolves.toMatchObject({ id: 5 });
     await expect(prepare(s, 45001).result).resolves.toBe(
       'INVALID_REFUND_AMOUNT_REJECT'
+    );
+  });
+
+  it('counts what the processor refunded outside the store (T2.2): the part no request of ours explains', async () => {
+    const s = scenario({ ours: 30000 });
+    // The processor says 130 000 are refunded; 30 000 are our requests, so 100 000 are outside.
+    await expect(
+      prepare(s, 100000, true, 130000).result
+    ).resolves.toMatchObject({
+      status: 'REQUESTED',
+    });
+    await expect(prepare(s, 100001, true, 130000).result).resolves.toBe(
+      'INVALID_REFUND_AMOUNT_REJECT'
+    );
+  });
+
+  it('never counts less than nothing when the requests here refunded more than the processor reports', async () => {
+    const s = scenario({ ours: 90000 });
+    await expect(prepare(s, 200000, true, 50000).result).resolves.toMatchObject(
+      {
+        status: 'REQUESTED',
+      }
     );
   });
 
@@ -517,10 +559,10 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
     });
     const order = harness.log.map((entry) => entry.sql);
     const intent = order.findIndex((sql) =>
-      sql.includes("status = 'REFUNDING'")
+      sql.startsWith("UPDATE order_returns SET status = 'REFUNDING'")
     );
     const closed = order.findIndex((sql) =>
-      sql.includes("status = 'REFUNDED'")
+      sql.startsWith("UPDATE order_returns SET status = 'REFUNDED'")
     );
     expect(intent).toBeGreaterThan(-1);
     expect(closed).toBeGreaterThan(intent);
@@ -608,6 +650,58 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
     expect(createRefund).toHaveBeenCalledWith(
       expect.objectContaining({ idempotencyKey: 'yekora-return-5' })
     );
+  });
+
+  describe('what the processor refunded outside the store counts (T2.2)', () => {
+    const withTotal = (refunded: number) =>
+      ({
+        fetchRefundedTotal: vi.fn(async () => refunded),
+        createRefund: vi.fn(async () => ({ refundId: 're_out' })),
+      }) as unknown as PaymentProcessorPort;
+
+    it('refuses when the refund, with what was refunded in the dashboard, would pass the total', async () => {
+      const processor = withTotal(160000);
+      const { harness, result } = run({}, { STRIPE: processor });
+      const answer = await result;
+      expect(answer.status).toBe(409);
+      expect(answer.body).toMatchObject({
+        detail: 'INVALID_REFUND_AMOUNT_REJECT',
+      });
+      expect(processor.createRefund).not.toHaveBeenCalled();
+      expect(
+        harness.wrote("UPDATE order_returns SET status = 'REFUNDING'")
+      ).toEqual([]);
+    });
+
+    it('accepts it when it fits exactly in what is left', async () => {
+      const processor = withTotal(155000);
+      const { result } = run({}, { STRIPE: processor });
+      await expect(result).resolves.toMatchObject({ status: 200 });
+      expect(processor.createRefund).toHaveBeenCalledOnce();
+    });
+
+    it('does not count it again on the retry of a request that stayed REFUNDING: its own refund is already there', async () => {
+      const processor = withTotal(200000);
+      const { result } = run(
+        { begin: { ...BEGIN, status: 'REFUNDING' } },
+        { STRIPE: processor }
+      );
+      await expect(result).resolves.toMatchObject({ status: 200 });
+    });
+
+    it('answers 502 and records nothing when Stripe cannot be asked how much is refunded', async () => {
+      const processor = {
+        fetchRefundedTotal: vi.fn(async () => {
+          throw new PaymentProcessorError('Stripe: HTTP 500', 500);
+        }),
+        createRefund: vi.fn(),
+      } as unknown as PaymentProcessorPort;
+      const { harness, result } = run({}, { STRIPE: processor });
+      const answer = await result;
+      expect(answer.status).toBe(502);
+      expect(answer.body).toMatchObject({ detail: 'REFUND_PROCESSOR_ERROR' });
+      expect(harness.wrote('UPDATE')).toEqual([]);
+    });
   });
 
   it('answers an already refunded request as it is, without asking the processor again', async () => {
@@ -761,6 +855,71 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
         harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")[0].params
       ).toEqual([null, 'SPEI-778', 5]);
     });
+  });
+});
+
+describe('readProcessorRefunded (T2.2: the cap counts the processor too)', () => {
+  const read = (
+    s: Scenario,
+    fetchRefundedTotal?: PaymentProcessorPort['fetchRefundedTotal']
+  ) =>
+    readProcessorRefunded(
+      {
+        db: fakeDb(s).db,
+        processors: {
+          STRIPE: { fetchRefundedTotal } as unknown as PaymentProcessorPort,
+        },
+      },
+      5
+    );
+
+  it('asks Stripe how much of the payment of the order is refunded', async () => {
+    const fetchRefundedTotal = vi.fn(async () => 125000);
+    await expect(read(scenario(), fetchRefundedTotal)).resolves.toBe(125000);
+    expect(fetchRefundedTotal).toHaveBeenCalledWith('cs_test_1');
+  });
+
+  it.each([
+    ['a request that does not exist', { target: null }],
+    [
+      'an order with no payment',
+      { target: { processor_code: 'STRIPE', payment_resource_id: null } },
+    ],
+    [
+      'an order paid at Mercado Pago, whose refunds are made by hand',
+      {
+        target: { processor_code: 'MERCADO_PAGO', payment_resource_id: 'p_1' },
+      },
+    ],
+  ])('counts nothing for %s, and asks nobody', async (_name, over) => {
+    const fetchRefundedTotal = vi.fn(async () => 1);
+    await expect(
+      read(scenario(over as Partial<Scenario>), fetchRefundedTotal)
+    ).resolves.toBe(0);
+    expect(fetchRefundedTotal).not.toHaveBeenCalled();
+  });
+
+  it('counts nothing when the adapter cannot say', async () => {
+    await expect(read(scenario(), undefined)).resolves.toBe(0);
+  });
+
+  it('refuses when Stripe does not answer, since the cap could not be checked, and lets other errors through', async () => {
+    await expect(
+      read(
+        scenario(),
+        vi.fn(async () => {
+          throw new PaymentProcessorError('Stripe: HTTP 500', 500);
+        })
+      )
+    ).resolves.toBe('REFUND_PROCESSOR_ERROR');
+    await expect(
+      read(
+        scenario(),
+        vi.fn(async () => {
+          throw new TypeError('boom');
+        })
+      )
+    ).rejects.toThrow('boom');
   });
 });
 

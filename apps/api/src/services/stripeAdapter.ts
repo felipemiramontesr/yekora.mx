@@ -352,6 +352,25 @@ export function createStripeAdapter(
       };
     },
 
+    async fetchRefundedTotal(sessionId): Promise<number> {
+      const session = (await call(
+        `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+        { method: 'GET' }
+      )) as { payment_intent?: unknown };
+      if (typeof session.payment_intent !== 'string') {
+        throw new PaymentProcessorError('Stripe: the session has no payment');
+      }
+      const intent = (await call(
+        `/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`,
+        { method: 'GET' }
+      )) as { latest_charge?: { amount_refunded?: unknown } | null };
+      const refunded = intent.latest_charge?.amount_refunded;
+      if (!Number.isInteger(refunded)) {
+        throw new PaymentProcessorError('Stripe: the payment has no charge');
+      }
+      return refunded as number;
+    },
+
     async createRefund(request: RefundRequest): Promise<{ refundId: string }> {
       // A refund is made against the payment intent of the session that took the payment.
       const session = (await call(

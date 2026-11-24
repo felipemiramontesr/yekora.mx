@@ -13,6 +13,10 @@ import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { tokenHash } from '../services/authCrypto';
 import type { Db, Transactional } from '../services/db';
+import {
+  PaymentProcessorError,
+  type PaymentProcessorPort,
+} from '../services/paymentPort';
 
 const KEY = Buffer.alloc(32, 7);
 const NOW = new Date('2026-11-23T18:00:00Z');
@@ -51,6 +55,8 @@ const store = {
   status: 'REQUESTED',
   preparedBy: null as string | null,
   processor: 'STRIPE',
+  /** What the processor says is already refunded, or null when it fails to answer. */
+  refunded: 0 as number | null,
   inserted: [] as unknown[][],
   audit: [] as unknown[][],
   keys: new Map<string, Record<string, unknown>>(),
@@ -182,6 +188,12 @@ const HANDLERS: [string, Handler][] = [
     ],
   ],
   [
+    'SELECT p.code AS processor_code, o.payment_resource_id',
+    () => [
+      { processor_code: store.processor, payment_resource_id: 'cs_test_1' },
+    ],
+  ],
+  [
     'SELECT status, restock FROM order_returns',
     () => [{ status: 'REFUNDING', restock: 1 }],
   ],
@@ -210,6 +222,17 @@ const db: Db & Transactional = {
   close: async () => undefined,
 };
 
+/** Stripe as a double: what it says is refunded comes from the store, and it refunds anything. */
+const stripe = {
+  fetchRefundedTotal: async () => {
+    if (store.refunded === null) {
+      throw new PaymentProcessorError('Stripe: 500', 500);
+    }
+    return store.refunded;
+  },
+  createRefund: async () => ({ refundId: 're_route_1' }),
+} as unknown as PaymentProcessorPort;
+
 let app: FastifyInstance;
 
 beforeAll(async () => {
@@ -222,6 +245,7 @@ beforeAll(async () => {
       TOTP_ENCRYPTION_KEY: KEY.toString('base64'),
     }),
     db,
+    processors: { STRIPE: stripe },
     rate: async () => null,
     logger: false,
     now: () => NOW,
@@ -238,6 +262,7 @@ beforeEach(() => {
   store.status = 'REQUESTED';
   store.preparedBy = null;
   store.processor = 'STRIPE';
+  store.refunded = 0;
   store.inserted = [];
   store.audit = [];
   store.keys.clear();
@@ -408,6 +433,25 @@ describe('POST /v1/admin/returns/:id/prepare', () => {
     expect(store.audit.flat()).toContain('RETURN_PREPARED');
   });
 
+  it('counts what Stripe already refunded: 409 when the amount would pass the total, 502 when Stripe cannot say (T2.2)', async () => {
+    store.refunded = 180000;
+    const over = await send('POST', '/v1/admin/returns/5/prepare', {
+      who: 's',
+      key: 'p-over',
+      payload: PREPARE,
+    });
+    expect(over.statusCode).toBe(409);
+    expect(over.json().detail).toBe('INVALID_REFUND_AMOUNT_REJECT');
+    store.refunded = null;
+    const down = await send('POST', '/v1/admin/returns/5/prepare', {
+      who: 's',
+      key: 'p-down',
+      payload: PREPARE,
+    });
+    expect(down.statusCode).toBe(502);
+    expect(down.json().detail).toBe('REFUND_PROCESSOR_ERROR');
+  });
+
   it('refuses a request already prepared with 409 and a buyer with 403', async () => {
     store.status = 'PREPARED';
     const again = await send('POST', '/v1/admin/returns/5/prepare', {
@@ -472,15 +516,26 @@ describe('POST /v1/admin/returns/:id/confirm', () => {
     expect(answer.json().detail).toBe('PERMISSION_DENIED');
   });
 
-  it('answers 503 when the processor of the order is not configured, leaving the request to be retried', async () => {
+  it('executes the refund through Stripe: 200 and the request closed', async () => {
     store.status = 'PREPARED';
     store.preparedBy = SELLER;
     const answer = await send('POST', '/v1/admin/returns/5/confirm', {
       who: 'w',
-      payload: {},
     });
-    expect(answer.statusCode).toBe(503);
-    expect(answer.json().detail).toBe('REFUND_PROCESSOR_UNAVAILABLE');
+    expect(answer.statusCode).toBe(200);
+    expect(store.audit.flat()).toContain('RETURN_REFUNDED');
+  });
+
+  it('refuses with 502 when Stripe cannot say how much is refunded, before any intent (T2.2)', async () => {
+    store.status = 'PREPARED';
+    store.preparedBy = SELLER;
+    store.refunded = null;
+    const answer = await send('POST', '/v1/admin/returns/5/confirm', {
+      who: 'w',
+    });
+    expect(answer.statusCode).toBe(502);
+    expect(answer.json().detail).toBe('REFUND_PROCESSOR_ERROR');
+    expect(store.audit.flat()).not.toContain('RETURN_REFUND_INTENT');
   });
 
   it('executes a refund made by hand at Mercado Pago when the reference comes with it: 200 and the request closed', async () => {

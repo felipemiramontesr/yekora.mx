@@ -39,6 +39,7 @@ import {
   confirmReturn,
   listReturns,
   prepareReturn,
+  readProcessorRefunded,
   RETURN_REFUSALS,
   type ReturnRefusal,
   requestReturn,
@@ -117,11 +118,20 @@ export function registerReturnRoutes(
     if (!params.success || !body.success) {
       return refuse(reply, 400, 'Invalid request', 'RETURN_PAYLOAD_INVALID');
     }
+    // T2.2: the cap counts what the processor already refunded, read before the transaction.
+    const processorRefundedCents = await readProcessorRefunded(
+      deps,
+      params.data.id
+    );
+    if (processorRefundedCents === 'REFUND_PROCESSOR_ERROR') {
+      const [status, title] = RETURN_REFUSALS[processorRefundedCents];
+      return refuse(reply, status, title, processorRefundedCents);
+    }
     return runOnce(deps, request, reply, key.key, async (tx, userId) => {
       const outcome = await prepareReturn(
         tx,
         params.data.id,
-        body.data,
+        { ...body.data, processorRefundedCents },
         { userId, ip: request.ip },
         deps.now()
       );

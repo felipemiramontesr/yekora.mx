@@ -279,8 +279,65 @@ async function committedCents(
 }
 
 /**
+ * What the processor refunded that no request of ours accounts for: its total refunded minus the
+ * requests already REFUNDED here (T2.2, a refund made in the processor's dashboard counts).
+ */
+async function outsideRefundedCents(
+  tx: TxQuery,
+  orderId: number,
+  processorRefundedCents: number
+): Promise<number> {
+  const [row] = await tx.query<{ n: number | string }>(
+    "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDED'",
+    [orderId]
+  );
+  return Math.max(0, processorRefundedCents - Number(row.n));
+}
+
+/**
+ * Reads from the processor how much of the payment of a request's order is already refunded,
+ * whoever refunded it, so the cap of T2.2 counts it. A processor that cannot say, or an order
+ * with no payment to read, counts as nothing; a processor that fails to answer refuses, since the
+ * cap could not be checked.
+ *
+ * @param deps - Database and the configured processors.
+ * @param id - `order_returns.id`.
+ * @returns MXN cents refunded so far, or `REFUND_PROCESSOR_ERROR`.
+ */
+export async function readProcessorRefunded(
+  deps: {
+    db: Db;
+    processors: Partial<Record<ProcessorCode, PaymentProcessorPort>>;
+  },
+  id: number
+): Promise<number | 'REFUND_PROCESSOR_ERROR'> {
+  const [row] = await deps.db.query<{
+    processor_code: ProcessorCode;
+    payment_resource_id: string | null;
+  }>(
+    'SELECT p.code AS processor_code, o.payment_resource_id FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ?',
+    [id]
+  );
+  const processor =
+    row?.processor_code === 'STRIPE' ? deps.processors.STRIPE : undefined;
+  if (
+    processor?.fetchRefundedTotal === undefined ||
+    row.payment_resource_id === null
+  ) {
+    return 0;
+  }
+  try {
+    return await processor.fetchRefundedTotal(row.payment_resource_id);
+  } catch (error) {
+    if (!(error instanceof PaymentProcessorError)) throw error;
+    return 'REFUND_PROCESSOR_ERROR';
+  }
+}
+
+/**
  * An operator prepares the refund of a request: the amount and whether the units go back to the
- * shelf. The amount cannot exceed what the order paid minus what is already being refunded (T2.2).
+ * shelf. The amount cannot exceed what the order paid minus what is already refunded or being
+ * refunded, here or at the processor (T2.2).
  *
  * @param tx - The caller's transaction.
  * @param id - `order_returns.id`.
@@ -292,7 +349,11 @@ async function committedCents(
 export async function prepareReturn(
   tx: TxQuery,
   id: number,
-  input: { refundMxnCents: number; restock: boolean },
+  input: {
+    refundMxnCents: number;
+    restock: boolean;
+    processorRefundedCents: number;
+  },
   actor: Actor,
   now: Date
 ): Promise<ReturnView | ReturnRefusal> {
@@ -306,7 +367,13 @@ export async function prepareReturn(
   );
   if (row === undefined) return 'RETURN_NOT_FOUND';
   if (row.status !== 'REQUESTED') return 'RETURN_STATUS_CONFLICT';
-  const committed = await committedCents(tx, row.order_id, id);
+  const committed =
+    (await committedCents(tx, row.order_id, id)) +
+    (await outsideRefundedCents(
+      tx,
+      row.order_id,
+      input.processorRefundedCents
+    ));
   if (committed + input.refundMxnCents > Number(row.total_mxn_cents)) {
     return 'INVALID_REFUND_AMOUNT_REJECT';
   }
@@ -353,7 +420,8 @@ async function beginRefund(
     hasManualReference: boolean;
   },
   now: Date,
-  ip: string | null
+  ip: string | null,
+  processorRefundedCents: number
 ): Promise<
   | { kind: 'refusal'; code: ReturnRefusal }
   | { kind: 'done' }
@@ -375,7 +443,13 @@ async function beginRefund(
   if (row === undefined) return { kind: 'refusal', code: 'RETURN_NOT_FOUND' };
   if (row.status === 'REFUNDED') return { kind: 'done' };
   const refundCents = Number(row.refund_mxn_cents ?? 0);
-  const committed = await committedCents(tx, row.order_id, id);
+  // What the processor refunded outside the store counts only the first time: a retry of a
+  // request that stayed REFUNDING finds its own refund there already.
+  const outside =
+    row.status === 'PREPARED'
+      ? await outsideRefundedCents(tx, row.order_id, processorRefundedCents)
+      : 0;
+  const committed = (await committedCents(tx, row.order_id, id)) + outside;
   const verdict = decideConfirmation({
     prepared: row.status === 'PREPARED' || row.status === 'REFUNDING',
     authorized: confirmer.canConfirm,
@@ -515,6 +589,10 @@ export async function confirmReturn(
   },
   ip: string | null
 ): Promise<Answer> {
+  const processorRefunded = await readProcessorRefunded(deps, id);
+  if (processorRefunded === 'REFUND_PROCESSOR_ERROR') {
+    return refusalAnswer(processorRefunded);
+  }
   const begun = await deps.db.transaction((tx) =>
     beginRefund(
       tx,
@@ -525,7 +603,8 @@ export async function confirmReturn(
         hasManualReference: confirmer.manualReference !== null,
       },
       deps.now(),
-      ip
+      ip,
+      processorRefunded
     )
   );
   if (begun.kind === 'refusal') return refusalAnswer(begun.code);
