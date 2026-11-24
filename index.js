@@ -102181,7 +102181,10 @@ var PERMISSIONS = [
   "users:manage",
   "audit:read",
   "shipping:manage",
-  "orders:manage"
+  "orders:manage",
+  "returns:view",
+  "returns:prepare",
+  "returns:confirm"
 ];
 function isPrivileged(roles) {
   return roles.some((role) => role !== "customer");
@@ -119980,7 +119983,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "0a46e701cb49ccf24892704fc353f166810a95aa" : void 0;
+var sha = true ? "270d6cd9656079e50a4236d31ea95168152f1f2c" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
