@@ -16,6 +16,7 @@ const migration004 = migration('004');
 const migration008 = migration('008');
 const migration014 = migration('014');
 const migration016 = migration('016');
+const migration017 = migration('017');
 
 describe('permission catalog (FC 028)', () => {
   it('names exactly the permissions migration 004 seeds, so code and database never drift', () => {
@@ -31,7 +32,9 @@ describe('permission catalog (FC 028)', () => {
     expect(seeded.sort()).toEqual(
       PERMISSIONS.filter(
         (permission) =>
-          permission !== 'shipping:manage' && permission !== 'orders:manage'
+          permission !== 'shipping:manage' &&
+          permission !== 'orders:manage' &&
+          !permission.startsWith('returns:')
       ).sort()
     );
   });
@@ -44,6 +47,25 @@ describe('permission catalog (FC 028)', () => {
       /SELECT r\.id, 'orders:manage' FROM roles r WHERE r\.id IN \('owner', 'admin', 'staff_orders'\)/
     );
     expect(PERMISSIONS).toContain('orders:manage');
+  });
+
+  it('opens the three returns permissions in migration 017: view and prepare for owner, admin and staff_orders, confirm for owner and admin (FC 071 T0.1)', () => {
+    for (const id of ['returns:view', 'returns:prepare', 'returns:confirm']) {
+      expect(migration017).toContain(`('${id}', 'returns', `);
+    }
+    expect(migration017).toMatch(
+      /p\.id IN \('returns:view', 'returns:prepare'\)\s+WHERE r\.id IN \('owner', 'admin', 'staff_orders'\)/
+    );
+    expect(migration017).toMatch(
+      /SELECT r\.id, 'returns:confirm' FROM roles r WHERE r\.id IN \('owner', 'admin'\)/
+    );
+    expect(PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'returns:view',
+        'returns:prepare',
+        'returns:confirm',
+      ])
+    );
   });
 
   it('opens shipping:manage in migration 014 and grants it to owner and admin (FC 061 T0.1)', () => {
