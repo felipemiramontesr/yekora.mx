@@ -91,6 +91,10 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
     )
   )
     return 'orders:manage';
+  // FC 072: the staff and the roles; only the owner writes the matrix.
+  if (route.path.startsWith('/v1/admin/roles') && route.method !== 'GET')
+    return 'roles:manage';
+  if (/^\/v1\/admin\/(users|roles)/.test(route.path)) return 'sellers:manage';
   // FC 071: the board lists, one operator prepares and another confirms.
   if (route.path === '/v1/admin/returns') return 'returns:view';
   if (route.path === '/v1/admin/returns/:id/prepare') return 'returns:prepare';

@@ -23,7 +23,9 @@ import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAdminRoutes } from './routes/admin';
 import { registerAdminOrderRoutes } from './routes/adminOrders';
+import { registerAdminRoleRoutes } from './routes/adminRoles';
 import { registerReturnRoutes } from './routes/returns';
+import { registerStaffUserRoutes } from './routes/staffUsers';
 import { registerAdminShippingRoutes } from './routes/adminShipping';
 import { registerAdminUserRoutes } from './routes/adminUsers';
 import { registerAuthRoutes } from './routes/auth';
@@ -251,6 +253,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   // FC 044 F1: the owner's console of administrators.
   registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  // FC 072 F1: the staff, the roles and the matrix of permissions (sellers:manage, roles:manage).
+  registerStaffUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
+  registerAdminRoleRoutes(app, { db: deps.db, now });
   // FC 068 F1: prepare, ship and deliver a paid order (orders:manage).
   registerAdminOrderRoutes(app, { db: deps.db, now });
   // FC 071 F1: returns and refunds, with the board and four eyes (returns:*).

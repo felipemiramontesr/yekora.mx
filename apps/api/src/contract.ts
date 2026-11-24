@@ -101,6 +101,15 @@ import {
   shipRequestSchema,
 } from '../../../lib/account/fulfillmentTypes';
 import {
+  roleCreateRequestSchema,
+  roleListSchema,
+  roleParams,
+  rolePatchRequestSchema,
+  roleSchema,
+  staffCreateRequestSchema,
+  staffUpdateRequestSchema,
+} from '../../../lib/account/staffTypes';
+import {
   returnConfirmRequestSchema,
   returnListQuery,
   returnListSchema,
@@ -714,6 +723,92 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       ...SIGNED_IN_REFUSALS,
     },
   })),
+  // FC 072 F1: the staff, the roles and the matrix. The owner and the administrator list and manage
+  // the staff by the hierarchy; only the owner creates and edits roles.
+  {
+    method: 'GET',
+    path: '/v1/admin/users',
+    summary:
+      'The staff the actor may see: all of it for the owner, the sellers and support roles for an administrator',
+    permission: 'sellers:manage',
+    request: {},
+    responses: { 200: adminUserListSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/users',
+    summary:
+      'Brings a person into the staff with its roles and a 15-minute link, no password (audited)',
+    permission: 'sellers:manage',
+    request: { headers: mutationHeaders, body: staffCreateRequestSchema },
+    responses: {
+      201: adminUserSchema,
+      400: problemSchema,
+      409: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'PATCH',
+    path: '/v1/admin/users/:id',
+    summary:
+      'Switches an account of the staff on or off or replaces its roles, ending its sessions (audited)',
+    permission: 'sellers:manage',
+    request: {
+      params: adminUserParams,
+      headers: mutationHeaders,
+      body: staffUpdateRequestSchema,
+    },
+    responses: {
+      200: adminUserSchema,
+      400: problemSchema,
+      404: problemSchema,
+      422: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/roles',
+    summary:
+      'The roles with their permissions and the catalog the matrix is made of',
+    permission: 'sellers:manage',
+    request: {},
+    responses: { 200: roleListSchema, ...SIGNED_IN_REFUSALS },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/roles',
+    summary:
+      'Creates a role of support with its matrix; only the owner (audited)',
+    permission: 'roles:manage',
+    request: { headers: mutationHeaders, body: roleCreateRequestSchema },
+    responses: {
+      201: roleSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'PATCH',
+    path: '/v1/admin/roles/:id',
+    summary:
+      'Edits a role and its matrix; only the owner, never a role of the system (audited)',
+    permission: 'roles:manage',
+    request: {
+      params: roleParams,
+      headers: mutationHeaders,
+      body: rolePatchRequestSchema,
+    },
+    responses: {
+      200: roleSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
   // FC 071 F1: the returns. The buyer asks; the board lists; one operator prepares, another confirms.
   {
     method: 'POST',

@@ -65,6 +65,11 @@ const INVENTORY = [
   // FC 044 F1: the owner's console of administrators (users:manage, then the role owner).
   '├── /v1/admin/admins (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
+  // FC 072: the staff and the roles of the panel «Usuarios, roles y permisos».
+  '├── /v1/admin/users (GET, HEAD, POST)',
+  '│   └── /:id (PATCH)',
+  '├── /v1/admin/roles (GET, HEAD, POST)',
+  '│   └── /:id (PATCH)',
   // FC 071: the board of returns (returns:view), prepared (returns:prepare) and confirmed by
   // another person (returns:confirm).
   '├── /v1/admin/returns (GET, HEAD)',
@@ -260,6 +265,8 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
       '├── /v1/admin/payments/health (GET, HEAD)',
       '├── /v1/admin/admins (GET, HEAD, POST)',
+      '├── /v1/admin/users (GET, HEAD, POST)',
+      '├── /v1/admin/roles (GET, HEAD, POST)',
       '├── /v1/admin/returns (GET, HEAD)',
       '├── /v1/admin/shipping (GET, HEAD)',
       '├── /v1/admin/catalog/media (POST)',

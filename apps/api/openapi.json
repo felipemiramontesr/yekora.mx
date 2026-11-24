@@ -8729,6 +8729,1357 @@
         }
       }
     },
+    "/v1/admin/users": {
+      "get": {
+        "summary": "The staff the actor may see: all of it for the owner, the sellers and support roles for an administrator",
+        "x-permission": "sellers:manage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "totpEnabled": {
+                            "type": "boolean"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email",
+                          "fullName",
+                          "roles",
+                          "isActive",
+                          "totpEnabled",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Brings a person into the staff with its roles and a 15-minute link, no password (audited)",
+        "x-permission": "sellers:manage",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 150
+                  },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                    }
+                  }
+                },
+                "required": ["email", "fullName", "roles"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "totpEnabled": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "fullName",
+                    "roles",
+                    "isActive",
+                    "totpEnabled",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/users/{id}": {
+      "patch": {
+        "summary": "Switches an account of the staff on or off or replaces its roles, ending its sessions (audited)",
+        "x-permission": "sellers:manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "totpEnabled": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "fullName",
+                    "roles",
+                    "isActive",
+                    "totpEnabled",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/roles": {
+      "get": {
+        "summary": "The roles with their permissions and the catalog the matrix is made of",
+        "x-permission": "sellers:manage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": ["string", "null"]
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "isSystem": {
+                            "type": "boolean"
+                          },
+                          "assignableByAdmin": {
+                            "type": "boolean"
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z]+:[a-z]+$"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "isActive",
+                          "isSystem",
+                          "assignableByAdmin",
+                          "permissions"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "catalog": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z]+:[a-z]+$"
+                      }
+                    }
+                  },
+                  "required": ["items", "catalog"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Creates a role of support with its matrix; only the owner (audited)",
+        "x-permission": "roles:manage",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "permissions": {
+                    "maxItems": 40,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z]+:[a-z]+$"
+                    }
+                  },
+                  "assignableByAdmin": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "name", "permissions"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": ["string", "null"]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "isSystem": {
+                      "type": "boolean"
+                    },
+                    "assignableByAdmin": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z]+:[a-z]+$"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "isActive",
+                    "isSystem",
+                    "assignableByAdmin",
+                    "permissions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/roles/{id}": {
+      "patch": {
+        "summary": "Edits a role and its matrix; only the owner, never a role of the system (audited)",
+        "x-permission": "roles:manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{2,30}$"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "assignableByAdmin": {
+                    "type": "boolean"
+                  },
+                  "permissions": {
+                    "maxItems": 40,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z]+:[a-z]+$"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{2,30}$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": ["string", "null"]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "isSystem": {
+                      "type": "boolean"
+                    },
+                    "assignableByAdmin": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z]+:[a-z]+$"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "isActive",
+                    "isSystem",
+                    "assignableByAdmin",
+                    "permissions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "title", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/account/orders/{order_number}/returns": {
       "post": {
         "summary": "The buyer asks to return units of a delivered order within 60 days (audited)",

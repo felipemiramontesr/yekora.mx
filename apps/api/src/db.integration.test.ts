@@ -11,7 +11,9 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PaymentsConfig } from './config';
 import { PERMISSIONS } from './lib/permissions';
+import { createRole, listRoles, patchRole } from './services/adminRoles';
 import { createAdmin, listAdmins, updateAdmin } from './services/adminUsers';
+import { createStaff, listStaff, updateStaff } from './services/staffUsers';
 import { auditTrail, recordAudit } from './services/audit';
 import {
   createBrand,
@@ -2858,5 +2860,197 @@ describe('returns and refunds on real SQL (migration 017, returnsService.ts, FC 
     );
     await db.query('UPDATE orders SET status_id = 9 WHERE id = ?', [order.id]);
     await undo();
+  });
+});
+
+describe('the staff, the roles and the matrix on real SQL (migration 018, staffUsers.ts, adminRoles.ts, FC 072 F0 F1)', () => {
+  const OWNER_ROLES = ['owner', 'customer'];
+  const ADMIN_ROLES = ['admin', 'customer'];
+  const EMAIL = 'staff.itest@example.test';
+
+  async function actors() {
+    const [owner] = await db.query<{ id: string }>(
+      "SELECT user_id AS id FROM user_roles WHERE role_id = 'owner' LIMIT 1"
+    );
+    const permissions = await db.query<{ permission_id: string }>(
+      "SELECT permission_id FROM role_permissions WHERE role_id = 'owner'"
+    );
+    const asOwner = {
+      userId: owner.id,
+      roles: OWNER_ROLES,
+      permissions: permissions.map((row) => row.permission_id),
+      totpEnabled: true,
+      ip: null,
+    };
+    const asAdmin = {
+      userId: owner.id,
+      roles: ADMIN_ROLES,
+      permissions: ['account:self', 'sellers:manage'],
+      totpEnabled: true,
+      ip: null,
+    };
+    return { asOwner, asAdmin };
+  }
+
+  async function cleanUp() {
+    await db.query(
+      'DELETE FROM user_roles WHERE user_id IN (SELECT id FROM users WHERE email = ?)',
+      [EMAIL]
+    );
+    await db.query(
+      'DELETE FROM password_reset_tokens WHERE user_id IN (SELECT id FROM users WHERE email = ?)',
+      [EMAIL]
+    );
+    await db.query('DELETE FROM users WHERE email = ?', [EMAIL]);
+    await db.query(
+      "DELETE FROM role_permissions WHERE role_id = 'itest_bodega'"
+    );
+    await db.query("DELETE FROM roles WHERE id = 'itest_bodega'");
+  }
+
+  it('flags the system roles, names the seller and the support role, and opens the two permissions (T0.1)', async () => {
+    const roles = await db.query<{
+      id: string;
+      name: string;
+      is_system: number;
+      assignable_by_admin: number;
+    }>(
+      "SELECT id, name, is_system, assignable_by_admin FROM roles WHERE id IN ('owner', 'customer', 'admin', 'staff_orders', 'staff_catalog') ORDER BY id"
+    );
+    expect(
+      roles.map((row) => [
+        row.id,
+        row.name,
+        Number(row.is_system),
+        Number(row.assignable_by_admin),
+      ])
+    ).toEqual([
+      ['admin', 'Administrador', 0, 0],
+      ['customer', 'Cliente', 1, 0],
+      ['owner', 'Dueño', 1, 0],
+      ['staff_catalog', 'Staff · Catálogo', 0, 1],
+      ['staff_orders', 'Vendedor', 0, 1],
+    ]);
+    const holders = await db.query<{ permission_id: string; n: number }>(
+      "SELECT permission_id, COUNT(*) AS n FROM role_permissions WHERE permission_id IN ('roles:manage', 'sellers:manage') GROUP BY permission_id ORDER BY permission_id"
+    );
+    expect(holders.map((row) => [row.permission_id, Number(row.n)])).toEqual([
+      ['roles:manage', 1],
+      ['sellers:manage', 2],
+    ]);
+  });
+
+  it('brings a seller into the staff, shows it to an administrator, and never lets an administrator reach the owner or an administrator (T1.1, T2.1, T2.2)', async () => {
+    const { asOwner, asAdmin } = await actors();
+    const created = await db.transaction((tx) =>
+      createStaff(
+        tx,
+        {
+          email: EMAIL,
+          fullName: 'Prueba Personal',
+          roles: ['staff_orders'],
+          totpKey: Buffer.alloc(32, 7),
+          now: new Date(),
+        },
+        asOwner
+      )
+    );
+    if (typeof created === 'string') throw new Error(created);
+    expect(created.roles).toEqual(['customer', 'staff_orders']);
+    const forOwner = await listStaff(db, true);
+    expect(forOwner[0].roles).toContain('owner');
+    expect(forOwner.map((row) => row.email)).toContain(EMAIL);
+    const forAdmin = await listStaff(db, false);
+    expect(forAdmin.map((row) => row.email)).toContain(EMAIL);
+    expect(forAdmin.some((row) => row.roles.includes('owner'))).toBe(false);
+    expect(forAdmin.some((row) => row.roles.includes('admin'))).toBe(false);
+    const [owner] = await db.query<{ id: string }>(
+      "SELECT user_id AS id FROM user_roles WHERE role_id = 'owner' LIMIT 1"
+    );
+    await expect(
+      db.transaction((tx) =>
+        updateStaff(tx, { id: owner.id, isActive: false }, asAdmin)
+      )
+    ).resolves.toBe('OWNER_IMMUTABLE');
+    await expect(
+      db.transaction((tx) =>
+        createStaff(
+          tx,
+          {
+            email: 'other.itest@example.test',
+            fullName: 'Otra Persona',
+            roles: ['admin'],
+            totpKey: Buffer.alloc(32, 7),
+            now: new Date(),
+          },
+          asAdmin
+        )
+      )
+    ).resolves.toBe('ADMIN_CANNOT_ELEVATE_ADMIN');
+    const switchedOff = await db.transaction((tx) =>
+      updateStaff(tx, { id: created.id, isActive: false }, asAdmin)
+    );
+    expect(switchedOff).toMatchObject({ isActive: false });
+    const changed = await db.transaction((tx) =>
+      updateStaff(tx, { id: created.id, roles: ['staff_catalog'] }, asOwner)
+    );
+    expect(changed).toMatchObject({ roles: ['customer', 'staff_catalog'] });
+    await cleanUp();
+  });
+
+  it('lets the owner create and edit a role of support, keeps the matrix inside its rules and the system roles untouched (T1.2, T2.7)', async () => {
+    const { asOwner, asAdmin } = await actors();
+    const made = await db.transaction((tx) =>
+      createRole(
+        tx,
+        {
+          id: 'itest_bodega',
+          name: 'Bodega',
+          permissions: ['account:self', 'orders:read'],
+          assignableByAdmin: true,
+        },
+        asOwner
+      )
+    );
+    expect(made).toMatchObject({
+      id: 'itest_bodega',
+      permissions: ['account:self', 'orders:read'],
+      isSystem: false,
+    });
+    const edited = await db.transaction((tx) =>
+      patchRole(
+        tx,
+        'itest_bodega',
+        { permissions: ['account:self', 'orders:manage'], isActive: false },
+        asOwner
+      )
+    );
+    expect(edited).toMatchObject({
+      permissions: ['account:self', 'orders:manage'],
+      isActive: false,
+    });
+    await expect(
+      db.transaction((tx) =>
+        patchRole(
+          tx,
+          'itest_bodega',
+          { permissions: ['account:self', 'roles:manage'] },
+          asOwner
+        )
+      )
+    ).resolves.toBe('MATRIX_INVARIANT_VIOLATED');
+    await expect(
+      db.transaction((tx) => patchRole(tx, 'owner', { name: 'Otro' }, asOwner))
+    ).resolves.toBe('SYSTEM_ROLE_PROTECTED');
+    await expect(
+      db.transaction((tx) =>
+        patchRole(tx, 'itest_bodega', { name: 'Otro' }, asAdmin)
+      )
+    ).resolves.toBe('OWNER_ONLY_FORBIDDEN');
+    const { items, catalog } = await listRoles(db);
+    expect(items.find((role) => role.id === 'owner')?.permissions).toEqual(
+      catalog
+    );
+    await cleanUp();
   });
 });
