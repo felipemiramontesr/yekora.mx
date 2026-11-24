@@ -223,6 +223,9 @@ jobs:
       DB_USER: root
       DB_PASSWORD: ci-only-root
       DB_NAME: yekora_ci
+      # 018 (FC 072 F0) adds is_system and assignable_by_admin to roles and the permissions roles:manage
+      # and sellers:manage: the fingerprint is now a08aa4f5… (615 elementos), 4 more than after 017
+      # (c5223f31…, 611). Production must match it once 018 is applied with db-migrations.yml.
       # 017 (FC 071 F0) adds allows_return to products and order_items, the two tables of the returns
       # and three permissions: the fingerprint is now c5223f31… (611 elementos), 51 more than after 016
       # (d3e9f9bb…, 560). Production must match it once 017 is applied with db-migrations.yml.
@@ -248,7 +251,7 @@ jobs:
       # (541 elementos); after 001–006 it was fa8a845a….
       # 008 (FC 044 F0) only seeds the owner role: data, so the schema fingerprint stayed.
       # 009 (FC 047 F0) adds two columns, a check and a foreign key to users: 5 more elements.
-      EXPECTED_FINGERPRINT: c5223f31bed41972dda88eb5c8775340 (611 elementos)
+      EXPECTED_FINGERPRINT: a08aa4f5d424de14af75e12eb0f5dbdc (615 elementos)
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup Bun
@@ -257,11 +260,11 @@ jobs:
           bun-version: '1.3.14'
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Migrations from scratch (001–017) with their verify counters
+      - name: Migrations from scratch (001–018) with their verify counters
         run: |
           set -euo pipefail
           bun scripts/migrateDb.ts | tee migrate.log
-          for n in 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017; do
+          for n in 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018; do
             grep -q "^\[VERIFY\] $n " migrate.log || { echo "FATAL: no [VERIFY] $n"; exit 1; }
           done
       - name: Idempotency (DB_LAW) — a second run applies nothing
@@ -272,10 +275,10 @@ jobs:
           grep -q '^\[OK\] migrations: 0 applied' rerun.log
       - name: Schema fingerprint equals production's (Rule 23)
         run: bun scripts/dbParityCheck.ts --expect "$EXPECTED_FINGERPRINT"
-      - name: Reversibility — down 017, 016, 015, 014, 013, 012, 011, 010, 009, 008, 007, 006, 005, 004, 003, 002, 001, then up again with the same fingerprint
+      - name: Reversibility — down 018, 017, 016, 015, 014, 013, 012, 011, 010, 009, 008, 007, 006, 005, 004, 003, 002, 001, then up again with the same fingerprint
         run: |
           set -euo pipefail
-          for n in 017 016 015 014 013 012 011 010 009 008 007 006 005 004 003 002 001; do bun scripts/migrateDb.ts --down "$n"; done
+          for n in 018 017 016 015 014 013 012 011 010 009 008 007 006 005 004 003 002 001; do bun scripts/migrateDb.ts --down "$n"; done
           bun scripts/migrateDb.ts --plan | tee plan.log
           grep -q '^\[PLAN\] tables=1$' plan.log || { echo "FATAL: business tables left after the rollback"; exit 1; }
           bun scripts/migrateDb.ts

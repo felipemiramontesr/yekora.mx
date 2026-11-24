@@ -661,6 +661,7 @@ describe('identity repository on real SQL (identity.ts, FC 028 F0)', () => {
       'returns:confirm',
       'returns:prepare',
       'returns:view',
+      'sellers:manage',
       'shipping:manage',
       'users:manage',
     ]);

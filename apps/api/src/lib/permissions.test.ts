@@ -17,6 +17,7 @@ const migration008 = migration('008');
 const migration014 = migration('014');
 const migration016 = migration('016');
 const migration017 = migration('017');
+const migration018 = migration('018');
 
 describe('permission catalog (FC 028)', () => {
   it('names exactly the permissions migration 004 seeds, so code and database never drift', () => {
@@ -34,7 +35,9 @@ describe('permission catalog (FC 028)', () => {
         (permission) =>
           permission !== 'shipping:manage' &&
           permission !== 'orders:manage' &&
-          !permission.startsWith('returns:')
+          !permission.startsWith('returns:') &&
+          permission !== 'roles:manage' &&
+          permission !== 'sellers:manage'
       ).sort()
     );
   });
@@ -47,6 +50,18 @@ describe('permission catalog (FC 028)', () => {
       /SELECT r\.id, 'orders:manage' FROM roles r WHERE r\.id IN \('owner', 'admin', 'staff_orders'\)/
     );
     expect(PERMISSIONS).toContain('orders:manage');
+  });
+
+  it('opens roles:manage for the owner alone and sellers:manage for owner and admin in migration 018 (FC 072 T0.1)', () => {
+    expect(migration018).toContain("('roles:manage', 'roles', ");
+    expect(migration018).toContain("('sellers:manage', 'users', ");
+    // The owner takes every permission with the union of 008; the admin takes only sellers:manage.
+    expect(migration018).toMatch(/SELECT 'owner', id FROM permissions;/);
+    expect(migration018).toContain("('admin', 'sellers:manage')");
+    expect(migration018).not.toContain("('admin', 'roles:manage')");
+    expect(PERMISSIONS).toEqual(
+      expect.arrayContaining(['roles:manage', 'sellers:manage'])
+    );
   });
 
   it('opens the three returns permissions in migration 017: view and prepare for owner, admin and staff_orders, confirm for owner and admin (FC 071 T0.1)', () => {
