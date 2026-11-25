@@ -99351,7 +99351,9 @@ var fields = {
   weightGrams: positive,
   lengthMm: positive,
   widthMm: positive,
-  heightMm: positive
+  heightMm: positive,
+  /** Whether the product may be returned (FC 073, K-80); a sold line keeps the value it sold with. */
+  allowsReturn: external_exports.boolean()
 };
 var altText = external_exports.string().trim().max(255).nullable().default(null);
 var MAX_GALLERY_PHOTOS = 5;
@@ -99370,6 +99372,7 @@ var productCreate = external_exports.strictObject({
   slug: productSlug(160),
   ...fields,
   brandId: fields.brandId.default(null),
+  allowsReturn: fields.allowsReturn.default(true),
   facetValueIds: facetIds.default([]),
   images: galleryImages
 });
@@ -99403,6 +99406,7 @@ var adminProductSchema = external_exports.object({
   lengthMm: external_exports.number().int().positive(),
   widthMm: external_exports.number().int().positive(),
   heightMm: external_exports.number().int().positive(),
+  allowsReturn: external_exports.boolean(),
   isActive: external_exports.boolean(),
   isTest: external_exports.boolean(),
   facetValueIds: external_exports.array(external_exports.number().int().positive()),
@@ -99896,7 +99900,11 @@ var orderLineSchema = external_exports.object({
   sku: external_exports.string(),
   quantity: external_exports.number().int().positive(),
   unitPriceMxnCents: external_exports.number().int().positive(),
-  lineTotalMxnCents: external_exports.number().int().positive()
+  lineTotalMxnCents: external_exports.number().int().positive(),
+  /** Whether this line may be returned: the value it sold with (FC 073 T2.5), not the product's now. */
+  allowsReturn: external_exports.boolean(),
+  /** Units already asked back, in every request (FC 073): what is left to return is `quantity` minus this. */
+  returnedQuantity: external_exports.number().int().min(0)
 });
 var paymentEventSchema = external_exports.object({
   processor: external_exports.enum(["STRIPE", "MERCADO_PAGO"]),
@@ -101502,7 +101510,7 @@ async function findOrder(db, orderNumber) {
   if (row3 === void 0) return null;
   const [lines, events] = await Promise.all([
     db.query(
-      "SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id",
+      "SELECT i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return ORDER BY i.id",
       [row3.id]
     ),
     db.query(
@@ -101523,7 +101531,9 @@ async function findOrder(db, orderNumber) {
         sku: line.sku,
         quantity: Number(line.quantity),
         unitPriceMxnCents: Number(line.unit_price_mxn_cents),
-        lineTotalMxnCents: Number(line.line_total_mxn_cents)
+        lineTotalMxnCents: Number(line.line_total_mxn_cents),
+        allowsReturn: Number(line.allows_return) === 1,
+        returnedQuantity: Number(line.returned)
       })),
       paymentEvents: events.map((event) => ({
         processor: event.processor,
@@ -105444,6 +105454,7 @@ var productOf = (row3, facetValueIds = [], gallery = []) => ({
   lengthMm: Number(row3.length_mm),
   widthMm: Number(row3.width_mm),
   heightMm: Number(row3.height_mm),
+  allowsReturn: Number(row3.allows_return) === 1,
   isActive: Number(row3.is_active) === 1,
   isTest: Number(row3.is_test) === 1,
   facetValueIds,
@@ -105454,7 +105465,7 @@ async function listAdminProducts(db, paging2) {
     "SELECT COUNT(*) AS total FROM products"
   );
   const rows = await db.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
     [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
   );
   const items = await Promise.all(rows.map((row3) => fullProduct(db, row3)));
@@ -105462,7 +105473,7 @@ async function listAdminProducts(db, paging2) {
 }
 async function productRow(tx, id) {
   const [row3] = await tx.query(
-    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
+    "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
     [id]
   );
   return row3;
@@ -105550,7 +105561,7 @@ async function createProduct(tx, input2) {
   if (refs === null || !await checkedBlobs(tx, input2.images))
     return "CAT_REFERENCE_INVALID";
   await tx.query(
-    "INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id, allows_return) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
       input2.sku,
       input2.slug,
@@ -105566,7 +105577,8 @@ async function createProduct(tx, input2) {
       input2.lengthMm,
       input2.widthMm,
       input2.heightMm,
-      refs.shipping
+      refs.shipping,
+      input2.allowsReturn ? 1 : 0
     ]
   );
   const [{ id }] = await tx.query(
@@ -105596,7 +105608,7 @@ async function updateProduct(tx, id, patch) {
   const refs = await references(tx, next);
   if (refs === null) return "CAT_REFERENCE_INVALID";
   await tx.query(
-    "UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?",
+    "UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, allows_return = ?, is_active = ? WHERE id = ?",
     [
       refs.category,
       next.brandId,
@@ -105611,6 +105623,7 @@ async function updateProduct(tx, id, patch) {
       next.widthMm,
       next.heightMm,
       refs.shipping,
+      next.allowsReturn ? 1 : 0,
       next.isActive ? 1 : 0,
       id
     ]
@@ -121370,7 +121383,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "a3823e1e31fb79fa87126091503f76b566ecc867" : void 0;
+var sha = true ? "a16062c3cba28e2d3bbca52eda62d613dfa7afa1" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
