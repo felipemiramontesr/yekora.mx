@@ -182,22 +182,103 @@ const staffAccounts = (): StaffAccount[] => [
   },
 ];
 
-/** The roles `/v1/admin/roles` answers: the owner's, the administrator's and the two of the staff. */
-const STAFF_ROLES = [
-  ['owner', 'Dueño', true, false],
-  ['customer', 'Cliente', true, false],
-  ['admin', 'Administrador', false, false],
-  ['staff_orders', 'Vendedor', false, true],
-  ['staff_catalog', 'Staff · Catálogo', false, true],
-].map(([id, name, isSystem, assignableByAdmin]) => ({
-  id,
-  name,
-  description: null,
-  isActive: true,
-  isSystem,
-  assignableByAdmin,
-  permissions: ['account:self'],
-}));
+/** A role of the panel with its permissions (FC 072). */
+interface StaffRole {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  isSystem: boolean;
+  assignableByAdmin: boolean;
+  permissions: string[];
+}
+
+/** The permissions the matrix is made of, as the API names them. */
+const STAFF_CATALOG = [
+  'account:self',
+  'orders:manage',
+  'orders:read',
+  'returns:view',
+  'roles:manage',
+  'sellers:manage',
+  'users:manage',
+];
+
+/** The roles `/v1/admin/roles` starts with: the owner's, the administrator's and the two of the staff. */
+const staffRoles = (): StaffRole[] =>
+  [
+    ['owner', 'Dueño', true, false, STAFF_CATALOG],
+    ['customer', 'Cliente', true, false, ['account:self']],
+    [
+      'admin',
+      'Administrador',
+      false,
+      false,
+      ['account:self', 'orders:read', 'users:manage'],
+    ],
+    [
+      'staff_orders',
+      'Vendedor',
+      false,
+      true,
+      ['account:self', 'orders:manage', 'orders:read'],
+    ],
+    ['staff_catalog', 'Staff · Catálogo', false, true, ['account:self']],
+  ].map(([id, name, isSystem, assignableByAdmin, permissions]) => ({
+    id: id as string,
+    name: name as string,
+    description: null,
+    isActive: true,
+    isSystem: isSystem as boolean,
+    assignableByAdmin: assignableByAdmin as boolean,
+    permissions: permissions as string[],
+  }));
+
+/**
+ * `/v1/admin/roles` for the owner (FC 072 T1.2): the roles with the catalog of the matrix, a role
+ * of support that is created, and the changes of a role and its permissions. Writes need an
+ * Idempotency-Key and a role of the system is protected.
+ */
+function answerRoles(route: Route, roles: StaffRole[]) {
+  const request = route.request();
+  const method = request.method();
+  if (method === 'GET') {
+    return json(route, 200, { items: roles, catalog: STAFF_CATALOG });
+  }
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  const body = request.postDataJSON() as Record<string, unknown>;
+  if (method === 'POST') {
+    if (roles.some((candidate) => candidate.id === body.id)) {
+      return problem(route, 409, 'ROLE_ALREADY_EXISTS');
+    }
+    const created: StaffRole = {
+      id: String(body.id),
+      name: String(body.name),
+      description:
+        typeof body.description === 'string' ? body.description : null,
+      isActive: true,
+      isSystem: false,
+      assignableByAdmin: body.assignableByAdmin !== false,
+      permissions: [...(body.permissions as string[])].sort(),
+    };
+    roles.push(created);
+    return json(route, 201, created);
+  }
+  const id = new URL(request.url()).pathname.split('/').pop();
+  const role = roles.find((candidate) => candidate.id === id);
+  if (!role) return problem(route, 404, 'ROLE_NOT_FOUND');
+  if (role.isSystem) return problem(route, 403, 'SYSTEM_ROLE_PROTECTED');
+  if (Array.isArray(body.permissions)) {
+    role.permissions = [...(body.permissions as string[])].sort();
+  }
+  if (typeof body.isActive === 'boolean') role.isActive = body.isActive;
+  if (typeof body.assignableByAdmin === 'boolean') {
+    role.assignableByAdmin = body.assignableByAdmin;
+  }
+  return json(route, 200, role);
+}
 
 /**
  * `/v1/admin/users` for the owner (FC 072 T1.1, T2.1): writes need an Idempotency-Key, the
@@ -631,6 +712,7 @@ export async function mockAccountApi(
   };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   const staffRows = staffAccounts();
+  const roleRows = staffRoles();
   const fulfillment = newFulfillment();
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
@@ -700,10 +782,7 @@ export async function mockAccountApi(
       }
       if (path.startsWith('/v1/admin/roles')) {
         return user === 'owner'
-          ? json(route, 200, {
-              items: STAFF_ROLES,
-              catalog: ['account:self'],
-            })
+          ? answerRoles(route, roleRows)
           : problem(route, 403, 'PERMISSION_DENIED');
       }
       if (path.startsWith('/v1/admin/shipping')) {

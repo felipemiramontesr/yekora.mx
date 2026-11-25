@@ -231,6 +231,71 @@ test('the owner invites, switches off and changes the roles of the staff; the ow
   ).toBeVisible();
 });
 
+test('the owner creates a role from a template and edits its permissions in the matrix, confirming the summary (FC 072 F3, T1.2, T2.7)', async ({
+  page,
+}) => {
+  await mockAccountApi(page, { signedIn: 'owner' });
+  await page.goto('/cuenta/');
+  const header = page.getByRole('banner');
+  await header.locator('summary').click();
+  await header.getByRole('link', { name: 'Administración' }).click();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Usuarios, roles y permisos/ })
+    .click();
+  await page.getByRole('tab', { name: 'Roles' }).click();
+  await expect(
+    page.getByRole('row').filter({ hasText: 'Vendedor' })
+  ).toContainText('El dueño y los administradores');
+  // The owner and the buyer are roles of the system: nothing in their rows can change them.
+  await expect(
+    page
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: 'Dueño', exact: true }) })
+  ).toContainText('Del sistema: no se edita');
+  await page.getByRole('button', { name: 'Bodeguero' }).click();
+  await expect(page.getByLabel('Identificador')).toHaveValue('warehouse');
+  await page.getByRole('button', { name: 'Crear rol' }).click();
+  await expect(
+    page.getByText('Listo. Creamos el rol Bodeguero.')
+  ).toBeVisible();
+  await expect(
+    page.getByRole('row').filter({ hasText: 'Bodeguero' })
+  ).toContainText('warehouse');
+  await page.getByRole('tab', { name: 'Permisos' }).click();
+  // T2.7: account:self and roles:manage are locked in every role; users:manage only in the administrator's.
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Ver y editar su propia cuenta: Bodeguero',
+    })
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Crear y editar roles y la matriz: Bodeguero',
+    })
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'Administrar cuentas de usuarios: Bodeguero',
+    })
+  ).toBeDisabled();
+  const seeBoard = page.getByRole('checkbox', {
+    name: 'Ver el tablero de devoluciones: Bodeguero',
+  });
+  await expect(seeBoard).not.toBeChecked();
+  await seeBoard.check();
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Confirma los cambios' })
+  ).toBeVisible();
+  await expect(
+    page.getByText('Se agrega: Ver el tablero de devoluciones')
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Confirmar y guardar' }).click();
+  await expect(page.getByText('Matriz guardada.')).toBeVisible();
+  await expect(seeBoard).toBeChecked();
+});
+
 test('the panel of users and roles has its own address in English, and only who may manage the staff is offered it (FC 072 T1.1)', async ({
   page,
 }) => {

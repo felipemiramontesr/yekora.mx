@@ -18,7 +18,10 @@ import {
   adminUserSchema,
 } from '@/lib/account/adminUserTypes';
 import {
+  type roleCreateRequestSchema,
   roleListSchema,
+  type rolePatchRequestSchema,
+  roleSchema,
   type staffCreateRequestSchema,
   type staffUpdateRequestSchema,
 } from '@/lib/account/staffTypes';
@@ -37,6 +40,13 @@ const CODES = [
   'USER_NOT_FOUND',
   'ROLE_NOT_FOUND',
   'STAFF_ALREADY_EXISTS',
+  'OWNER_ONLY_FORBIDDEN',
+  'SYSTEM_ROLE_PROTECTED',
+  'TWO_FACTOR_REQUIRED',
+  'ROLE_ALREADY_EXISTS',
+  'ROLE_ID_RESERVED',
+  'MATRIX_INVARIANT_VIOLATED',
+  'ROLE_INVARIANT_VIOLATED',
   'INVALID_REQUEST',
   'SESSION_INVALID_OR_EXPIRED',
 ] as const;
@@ -139,6 +149,42 @@ export function updateStaffUser(
   return request(
     `/v1/admin/users/${id}`,
     adminUserSchema,
+    'PATCH',
+    change,
+    fetchImpl
+  );
+}
+
+/**
+ * Creates a role of support with its matrix; only the owner may (FC 072 T1.2).
+ *
+ * @param input - Identifier, name, description, permissions and whether administrators may give it.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The role, or why it was refused.
+ */
+export function createStaffRole(
+  input: z.input<typeof roleCreateRequestSchema>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request('/v1/admin/roles', roleSchema, 'POST', input, fetchImpl);
+}
+
+/**
+ * Edits a role and its matrix; only the owner may, and never a role of the system.
+ *
+ * @param id - The role.
+ * @param change - What to change.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The role after the change, or why it was refused.
+ */
+export function updateStaffRole(
+  id: string,
+  change: z.input<typeof rolePatchRequestSchema>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    `/v1/admin/roles/${id}`,
+    roleSchema,
     'PATCH',
     change,
     fetchImpl

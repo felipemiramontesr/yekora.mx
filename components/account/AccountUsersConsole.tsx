@@ -1,27 +1,24 @@
 'use client';
 
 import { type SubmitEvent, useCallback, useEffect, useState } from 'react';
-import type { Messages } from '@/app/i18n';
 import type { AdminUser } from '@/lib/account/adminUserTypes';
 import type { RoleView } from '@/lib/account/staffTypes';
 import {
   inviteStaffUser,
   listStaffRoles,
   listStaffUsers,
-  type StaffFailure,
   updateStaffUser,
 } from '@/lib/api/staffClient';
 import { fill } from '@/lib/catalog/format';
 import { Field } from '../ui/Field';
+import { AccountMatrixPanel } from './AccountMatrixPanel';
+import { AccountRolesPanel } from './AccountRolesPanel';
+import { FIELD, failureText, type Note, type UsersTexts } from './usersShared';
 
-/** `account.users` texts. */
-export type UsersTexts = Messages['account']['users'];
+export type { UsersTexts } from './usersShared';
 
-/** What the console says after an action: a confirmation or the refusal. */
-type Note = { kind: 'ok' | 'error'; text: string } | null;
-
-/** A text field, like the checkout's. */
-const FIELD = 'min-h-11 rounded-md border border-petroleo/30 bg-white px-3';
+/** The tabs of the panel, in order. */
+const TABS = ['staff', 'roles', 'matrix'] as const;
 
 /** The roles an account of the staff never receives through this panel. */
 const OUT_OF_BAND = new Set(['owner', 'customer']);
@@ -39,13 +36,6 @@ function rolesOf(form: HTMLFormElement): string[] {
   );
 }
 
-/** The message of a refusal: the console names each code; anything else is generic. */
-function failureText(texts: UsersTexts, reason: StaffFailure) {
-  return reason in texts.errors
-    ? texts.errors[reason as keyof UsersTexts['errors']]
-    : texts.errors.unknown;
-}
-
 /** The roles the session may give: the owner any but its own and the buyer's, an administrator those marked for it. */
 function grantableRoles(roles: readonly RoleView[], owner: boolean) {
   return roles.filter(
@@ -57,11 +47,10 @@ function grantableRoles(roles: readonly RoleView[], owner: boolean) {
 }
 
 /**
- * The panel of users and roles of `/cuenta/usuarios` (FC 072 F2): its first tab, the staff. It is
- * shown to the owner and to an administrator, and only as a convenience, since the API decides by
- * the hierarchy. It lists the staff the session may see (the owner protected: no control changes
- * it, T2.1), brings a person in by e-mail with its roles (the API mails a 15-minute link; no
- * password is ever typed or shown here, T2.4) and switches an account on or off or changes its roles.
+ * The panel of users and roles of `/cuenta/usuarios` (FC 072 F2, F3): three tabs, the staff, the
+ * roles and the matrix of permissions. It is shown to the owner and to an administrator, and only
+ * as a convenience, since the API decides by the hierarchy: the owner edits the roles and the
+ * matrix, an administrator reads them. The roles are read once here and shared by the three tabs.
  *
  * @param texts - `account.users` texts.
  * @param owner - Whether the session is the owner's: it may give every role of support and the administrator.
@@ -70,22 +59,95 @@ export function AccountUsersConsole({
   texts,
   owner,
 }: Readonly<{ texts: UsersTexts; owner: boolean }>) {
-  const [accounts, setAccounts] = useState<AdminUser[] | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number]>('staff');
   const [roles, setRoles] = useState<RoleView[]>([]);
+  const [catalog, setCatalog] = useState<string[]>([]);
+
+  const loadRoles = useCallback(async () => {
+    const answer = await listStaffRoles();
+    if (answer.ok) {
+      setRoles(answer.data.items);
+      setCatalog(answer.data.catalog);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRoles();
+  }, [loadRoles]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div role="tablist" aria-label={texts.tabs.label} className="flex gap-2">
+        {TABS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            role="tab"
+            id={`users-tab-${name}`}
+            aria-selected={tab === name}
+            aria-controls={`users-panel-${name}`}
+            onClick={() => setTab(name)}
+            className={`tap-target rounded-lg px-4 ${tab === name ? 'bg-petroleo text-marfil' : 'border border-petroleo/40'}`}
+          >
+            {texts.tabs[name]}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        id={`users-panel-${tab}`}
+        aria-labelledby={`users-tab-${tab}`}
+      >
+        {tab === 'staff' && (
+          <StaffPanel texts={texts} owner={owner} roles={roles} />
+        )}
+        {tab === 'roles' && (
+          <AccountRolesPanel
+            texts={texts}
+            owner={owner}
+            roles={roles}
+            onChanged={loadRoles}
+          />
+        )}
+        {tab === 'matrix' && (
+          <AccountMatrixPanel
+            texts={texts}
+            owner={owner}
+            roles={roles}
+            catalog={catalog}
+            onChanged={loadRoles}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The staff tab: it lists the staff the session may see (the owner protected: no control changes
+ * it, T2.1), brings a person in by e-mail with its roles (the API mails a 15-minute link; no
+ * password is ever typed or shown here, T2.4) and switches an account on or off or changes its roles.
+ */
+function StaffPanel({
+  texts,
+  owner,
+  roles,
+}: Readonly<{
+  texts: UsersTexts;
+  owner: boolean;
+  roles: readonly RoleView[];
+}>) {
+  const [accounts, setAccounts] = useState<AdminUser[] | null>(null);
   const [note, setNote] = useState<Note>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [people, catalog] = await Promise.all([
-      listStaffUsers(),
-      listStaffRoles(),
-    ]);
+    const people = await listStaffUsers();
     if (!people.ok) {
       setNote({ kind: 'error', text: failureText(texts, people.reason) });
       return;
     }
     setAccounts(people.data.items);
-    if (catalog.ok) setRoles(catalog.data.items);
   }, [texts]);
 
   useEffect(() => {

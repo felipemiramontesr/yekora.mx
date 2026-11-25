@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createStaffRole,
   inviteStaffUser,
   listStaffRoles,
   listStaffUsers,
+  updateStaffRole,
   updateStaffUser,
 } from './staffClient';
 
@@ -98,6 +100,41 @@ describe('client of the panel of users and roles (FC 072 F2)', () => {
     expect(init?.headers).toHaveProperty('Idempotency-Key');
   });
 
+  it('creates a role with its matrix under a fresh Idempotency-Key (FC 072 T1.2)', async () => {
+    const fetchImpl = answering(201, ROLE);
+    const input = {
+      id: 'warehouse',
+      name: 'Bodeguero',
+      permissions: ['account:self', 'orders:manage'],
+      assignableByAdmin: true,
+    };
+    await expect(createStaffRole(input, fetchImpl)).resolves.toEqual({
+      ok: true,
+      data: ROLE,
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://apiv1.yekora.mx/v1/admin/roles');
+    expect(init).toMatchObject({ method: 'POST' });
+    expect(init?.headers).toHaveProperty('Idempotency-Key');
+  });
+
+  it('sends a PATCH to the role with the change', async () => {
+    const fetchImpl = answering(200, ROLE);
+    await expect(
+      updateStaffRole(
+        'staff_orders',
+        { permissions: ['account:self'] },
+        fetchImpl
+      )
+    ).resolves.toMatchObject({ ok: true, data: { id: 'staff_orders' } });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://apiv1.yekora.mx/v1/admin/roles/staff_orders');
+    expect(init).toMatchObject({
+      method: 'PATCH',
+      body: '{"permissions":["account:self"]}',
+    });
+  });
+
   it.each([
     [403, { detail: 'ACTOR_UNAUTHORIZED' }, 'ACTOR_UNAUTHORIZED'],
     [403, { detail: 'TARGET_ROLE_FORBIDDEN' }, 'TARGET_ROLE_FORBIDDEN'],
@@ -111,6 +148,13 @@ describe('client of the panel of users and roles (FC 072 F2)', () => {
     [404, { detail: 'USER_NOT_FOUND' }, 'USER_NOT_FOUND'],
     [422, { detail: 'ROLE_NOT_FOUND' }, 'ROLE_NOT_FOUND'],
     [409, { detail: 'STAFF_ALREADY_EXISTS' }, 'STAFF_ALREADY_EXISTS'],
+    [403, { detail: 'OWNER_ONLY_FORBIDDEN' }, 'OWNER_ONLY_FORBIDDEN'],
+    [403, { detail: 'SYSTEM_ROLE_PROTECTED' }, 'SYSTEM_ROLE_PROTECTED'],
+    [403, { detail: 'TWO_FACTOR_REQUIRED' }, 'TWO_FACTOR_REQUIRED'],
+    [409, { detail: 'ROLE_ALREADY_EXISTS' }, 'ROLE_ALREADY_EXISTS'],
+    [409, { detail: 'ROLE_ID_RESERVED' }, 'ROLE_ID_RESERVED'],
+    [400, { detail: 'MATRIX_INVARIANT_VIOLATED' }, 'MATRIX_INVARIANT_VIOLATED'],
+    [400, { detail: 'ROLE_INVARIANT_VIOLATED' }, 'ROLE_INVARIANT_VIOLATED'],
     [400, { detail: 'INVALID_REQUEST' }, 'INVALID_REQUEST'],
     [429, undefined, 'rate_limited'],
     [500, { detail: 'SOMETHING_ELSE' }, 'unknown'],
@@ -145,7 +189,14 @@ describe('client of the panel of users and roles (FC 072 F2)', () => {
       roles: ['staff_orders'],
     });
     await updateStaffUser(ID, { roles: ['staff_catalog'] });
-    expect(spy).toHaveBeenCalledTimes(4);
+    await createStaffRole({
+      id: 'warehouse',
+      name: 'Bodeguero',
+      permissions: ['account:self'],
+      assignableByAdmin: true,
+    });
+    await updateStaffRole('warehouse', { isActive: false });
+    expect(spy).toHaveBeenCalledTimes(6);
     spy.mockRestore();
   });
 });

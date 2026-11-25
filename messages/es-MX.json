@@ -1329,7 +1329,9 @@
     "users": {
       "tabs": {
         "label": "Secciones de usuarios y roles",
-        "staff": "Personal"
+        "staff": "Personal",
+        "roles": "Roles",
+        "matrix": "Permisos"
       },
       "loading": "Cargando…",
       "caption": "Personal de la tienda",
@@ -1372,7 +1374,14 @@
         "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
         "offline": "Parece que no tienes conexión.",
         "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
-        "unknown": "Algo falló. Inténtalo de nuevo."
+        "unknown": "Algo falló. Inténtalo de nuevo.",
+        "OWNER_ONLY_FORBIDDEN": "Solo el dueño puede crear y editar roles.",
+        "SYSTEM_ROLE_PROTECTED": "Los roles del sistema (dueño y cliente) no se pueden editar.",
+        "TWO_FACTOR_REQUIRED": "Se necesita tu verificación en dos pasos activa.",
+        "ROLE_ALREADY_EXISTS": "Ya existe un rol con ese identificador.",
+        "ROLE_ID_RESERVED": "Ese identificador pertenece al sistema; elige otro.",
+        "MATRIX_INVARIANT_VIOLATED": "La matriz rompe una regla de los permisos: revisa los cambios.",
+        "ROLE_INVARIANT_VIOLATED": "El rol de administrador no se puede cambiar de esa manera."
       },
       "exampleLabel": "Ejemplo",
       "fields": {
@@ -1383,6 +1392,98 @@
         "email": {
           "description": "El correo al que llegará el enlace para que elija su contraseña.",
           "example": "ana@ejemplo.com"
+        }
+      },
+      "rolesTab": {
+        "caption": "Roles de la tienda",
+        "name": "Nombre",
+        "slug": "Identificador",
+        "description": "Para qué sirve",
+        "state": "Estado",
+        "givenBy": "Quién lo asigna",
+        "permissions": "Permisos",
+        "actions": "Acciones",
+        "active": "Activo",
+        "inactive": "Desactivado",
+        "system": "Del sistema: no se edita",
+        "ownerOnly": "Solo el dueño",
+        "adminToo": "El dueño y los administradores",
+        "deactivate": "Desactivar",
+        "activate": "Activar",
+        "allowAdmin": "Permitir a los administradores",
+        "denyAdmin": "Solo el dueño",
+        "saved": "Rol guardado.",
+        "created": "Listo. Creamos el rol {name}.",
+        "new": "Crear un rol de apoyo",
+        "explain": "Un rol agrupa permisos. Parte de una plantilla o elige los permisos en la pestaña Permisos después de crearlo.",
+        "templates": "Plantillas rápidas",
+        "fieldSlug": "Identificador",
+        "slugHelp": "Minúsculas, números y guion bajo; de 3 a 31 caracteres; empieza con letra.",
+        "slugExample": "bodeguero",
+        "fieldName": "Nombre",
+        "nameHelp": "Cómo quieres ver el rol en las listas.",
+        "nameExample": "Bodeguero",
+        "fieldDescription": "Para qué sirve",
+        "descriptionHelp": "Una frase sobre lo que hace quien tiene el rol. Es opcional.",
+        "descriptionExample": "Prepara pedidos en la bodega.",
+        "assignable": "Los administradores pueden asignarlo",
+        "create": "Crear rol",
+        "creating": "Creando…",
+        "readOnly": "Solo el dueño crea y edita roles. Aquí puedes consultarlos.",
+        "templateList": {
+          "customer_care": {
+            "name": "Atención al cliente",
+            "description": "Consulta pedidos y prepara devoluciones."
+          },
+          "warehouse": {
+            "name": "Bodeguero",
+            "description": "Prepara, envía y entrega pedidos."
+          },
+          "accountant": {
+            "name": "Contador",
+            "description": "Consulta pedidos y la bitácora de auditoría."
+          }
+        }
+      },
+      "matrixTab": {
+        "caption": "Matriz de permisos por rol",
+        "permission": "Permiso",
+        "readOnly": "Solo el dueño edita la matriz. Aquí puedes consultarla.",
+        "save": "Guardar cambios",
+        "saving": "Guardando…",
+        "reset": "Descartar cambios",
+        "noChanges": "No hay cambios que guardar.",
+        "summaryTitle": "Confirma los cambios",
+        "summaryIntro": "Estos cambios se aplican al momento a todas las personas con cada rol.",
+        "added": "Se agrega",
+        "removed": "Se quita",
+        "confirm": "Confirmar y guardar",
+        "back": "Volver",
+        "saved": "Matriz guardada.",
+        "modules": {
+          "account": "Cuenta",
+          "audit": "Auditoría",
+          "catalog": "Catálogo",
+          "orders": "Pedidos",
+          "returns": "Devoluciones",
+          "roles": "Roles",
+          "sellers": "Personal",
+          "shipping": "Envíos",
+          "users": "Usuarios"
+        },
+        "names": {
+          "account:self": "Ver y editar su propia cuenta",
+          "audit:read": "Consultar la bitácora de auditoría",
+          "catalog:write": "Crear y editar productos y catálogo",
+          "orders:manage": "Preparar, enviar y entregar pedidos",
+          "orders:read": "Consultar pedidos",
+          "returns:confirm": "Confirmar y ejecutar reembolsos",
+          "returns:prepare": "Preparar el reembolso de una devolución",
+          "returns:view": "Ver el tablero de devoluciones",
+          "roles:manage": "Crear y editar roles y la matriz",
+          "sellers:manage": "Invitar y gestionar al personal",
+          "shipping:manage": "Editar tarifas y envío gratis",
+          "users:manage": "Administrar cuentas de usuarios"
         }
       }
     },

@@ -1329,7 +1329,9 @@
     "users": {
       "tabs": {
         "label": "Sections of users and roles",
-        "staff": "Staff"
+        "staff": "Staff",
+        "roles": "Roles",
+        "matrix": "Permissions"
       },
       "loading": "Loading…",
       "caption": "Staff of the store",
@@ -1372,7 +1374,14 @@
         "rate_limited": "Too many attempts in a row. Wait a few minutes.",
         "offline": "You seem to be offline.",
         "timeout": "The server took too long. Try again.",
-        "unknown": "Something went wrong. Try again."
+        "unknown": "Something went wrong. Try again.",
+        "OWNER_ONLY_FORBIDDEN": "Only the owner creates and edits roles.",
+        "SYSTEM_ROLE_PROTECTED": "The roles of the system (owner and customer) cannot be edited.",
+        "TWO_FACTOR_REQUIRED": "Your two-step verification has to be on.",
+        "ROLE_ALREADY_EXISTS": "A role with that identifier already exists.",
+        "ROLE_ID_RESERVED": "That identifier belongs to the system; choose another.",
+        "MATRIX_INVARIANT_VIOLATED": "The matrix breaks a rule of the permissions: check the changes.",
+        "ROLE_INVARIANT_VIOLATED": "The administrator role cannot be changed that way."
       },
       "exampleLabel": "Example",
       "fields": {
@@ -1383,6 +1392,98 @@
         "email": {
           "description": "The e-mail the link to choose a password will go to.",
           "example": "ana@example.com"
+        }
+      },
+      "rolesTab": {
+        "caption": "Roles of the store",
+        "name": "Name",
+        "slug": "Identifier",
+        "description": "What it is for",
+        "state": "Status",
+        "givenBy": "Who gives it",
+        "permissions": "Permissions",
+        "actions": "Actions",
+        "active": "Active",
+        "inactive": "Switched off",
+        "system": "Of the system: not edited",
+        "ownerOnly": "The owner only",
+        "adminToo": "The owner and the administrators",
+        "deactivate": "Switch off",
+        "activate": "Switch on",
+        "allowAdmin": "Allow the administrators",
+        "denyAdmin": "The owner only",
+        "saved": "Role saved.",
+        "created": "Done. We created the role {name}.",
+        "new": "Create a role of support",
+        "explain": "A role groups permissions. Start from a template, or choose the permissions in the Permissions tab after creating it.",
+        "templates": "Quick templates",
+        "fieldSlug": "Identifier",
+        "slugHelp": "Lower case, numbers and underscore; 3 to 31 characters; starts with a letter.",
+        "slugExample": "warehouse",
+        "fieldName": "Name",
+        "nameHelp": "How you want to see the role in the lists.",
+        "nameExample": "Warehouse",
+        "fieldDescription": "What it is for",
+        "descriptionHelp": "A sentence about what the people who hold the role do. It is optional.",
+        "descriptionExample": "Prepares orders in the warehouse.",
+        "assignable": "Administrators may give it",
+        "create": "Create role",
+        "creating": "Creating…",
+        "readOnly": "Only the owner creates and edits roles. Here you can read them.",
+        "templateList": {
+          "customer_care": {
+            "name": "Customer care",
+            "description": "Reads orders and prepares returns."
+          },
+          "warehouse": {
+            "name": "Warehouse",
+            "description": "Prepares, ships and delivers orders."
+          },
+          "accountant": {
+            "name": "Accountant",
+            "description": "Reads orders and the audit log."
+          }
+        }
+      },
+      "matrixTab": {
+        "caption": "Matrix of permissions by role",
+        "permission": "Permission",
+        "readOnly": "Only the owner edits the matrix. Here you can read it.",
+        "save": "Save changes",
+        "saving": "Saving…",
+        "reset": "Discard changes",
+        "noChanges": "There are no changes to save.",
+        "summaryTitle": "Confirm the changes",
+        "summaryIntro": "These changes apply at once to everyone who holds each role.",
+        "added": "Added",
+        "removed": "Removed",
+        "confirm": "Confirm and save",
+        "back": "Go back",
+        "saved": "Matrix saved.",
+        "modules": {
+          "account": "Account",
+          "audit": "Audit",
+          "catalog": "Catalog",
+          "orders": "Orders",
+          "returns": "Returns",
+          "roles": "Roles",
+          "sellers": "Staff",
+          "shipping": "Shipping",
+          "users": "Users"
+        },
+        "names": {
+          "account:self": "See and edit their own account",
+          "audit:read": "Read the audit log",
+          "catalog:write": "Create and edit products and the catalog",
+          "orders:manage": "Prepare, ship and deliver orders",
+          "orders:read": "Read orders",
+          "returns:confirm": "Confirm and execute refunds",
+          "returns:prepare": "Prepare the refund of a return",
+          "returns:view": "See the board of returns",
+          "roles:manage": "Create and edit roles and the matrix",
+          "sellers:manage": "Invite and manage the staff",
+          "shipping:manage": "Edit rates and free shipping",
+          "users:manage": "Administer user accounts"
         }
       }
     },
