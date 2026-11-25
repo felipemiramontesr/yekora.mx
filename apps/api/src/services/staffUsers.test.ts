@@ -104,10 +104,10 @@ describe('T1.1 · StaffUserMutationGate(P, T, V), the 8 rows', () => {
     [true, true, false, 'VALIDATION_OR_2FA_FAILED_400'],
     [true, false, true, 'TARGET_ROLE_FORBIDDEN_403'],
     [true, false, false, 'TARGET_ROLE_FORBIDDEN_403'],
-    [false, true, true, 'ACTOR_UNAUTHORIZED_401'],
-    [false, true, false, 'ACTOR_UNAUTHORIZED_401'],
-    [false, false, true, 'ACTOR_UNAUTHORIZED_401'],
-    [false, false, false, 'ACTOR_UNAUTHORIZED_401'],
+    [false, true, true, 'ACTOR_UNAUTHORIZED_403'],
+    [false, true, false, 'ACTOR_UNAUTHORIZED_403'],
+    [false, false, true, 'ACTOR_UNAUTHORIZED_403'],
+    [false, false, false, 'ACTOR_UNAUTHORIZED_403'],
   ] as const;
 
   it.each(rows)(

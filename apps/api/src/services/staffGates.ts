@@ -9,7 +9,7 @@
 /** The rows of T1.1 as the machine names them. */
 export type StaffMutationCode =
   | 'MUTATION_PERMITTED_200'
-  | 'ACTOR_UNAUTHORIZED_401'
+  | 'ACTOR_UNAUTHORIZED_403'
   | 'TARGET_ROLE_FORBIDDEN_403'
   | 'VALIDATION_OR_2FA_FAILED_400';
 
@@ -25,7 +25,7 @@ export function decideStaffMutation(inputs: {
   rolePermitted: boolean;
   valid: boolean;
 }): StaffMutationCode {
-  if (!inputs.privileged) return 'ACTOR_UNAUTHORIZED_401';
+  if (!inputs.privileged) return 'ACTOR_UNAUTHORIZED_403';
   if (!inputs.rolePermitted) return 'TARGET_ROLE_FORBIDDEN_403';
   return inputs.valid
     ? 'MUTATION_PERMITTED_200'

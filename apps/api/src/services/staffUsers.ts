@@ -147,7 +147,7 @@ function refusalOf(
   code: Exclude<StaffMutationCode, 'MUTATION_PERMITTED_200'>,
   asOwner: boolean
 ): StaffRefusal {
-  if (code === 'ACTOR_UNAUTHORIZED_401') return 'ACTOR_UNAUTHORIZED';
+  if (code === 'ACTOR_UNAUTHORIZED_403') return 'ACTOR_UNAUTHORIZED';
   if (code === 'VALIDATION_OR_2FA_FAILED_400')
     return 'VALIDATION_OR_2FA_FAILED';
   return asOwner ? 'TARGET_ROLE_FORBIDDEN' : 'ADMIN_CANNOT_ELEVATE_ADMIN';
