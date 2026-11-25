@@ -103435,7 +103435,7 @@ function registerAdminOrderRoutes(app, deps) {
 
 // src/services/staffGates.ts
 function decideStaffMutation(inputs) {
-  if (!inputs.privileged) return "ACTOR_UNAUTHORIZED_401";
+  if (!inputs.privileged) return "ACTOR_UNAUTHORIZED_403";
   if (!inputs.rolePermitted) return "TARGET_ROLE_FORBIDDEN_403";
   return inputs.valid ? "MUTATION_PERMITTED_200" : "VALIDATION_OR_2FA_FAILED_400";
 }
@@ -104286,7 +104286,7 @@ async function checkRoles(tx, requested, asOwner) {
   };
 }
 function refusalOf4(code2, asOwner) {
-  if (code2 === "ACTOR_UNAUTHORIZED_401") return "ACTOR_UNAUTHORIZED";
+  if (code2 === "ACTOR_UNAUTHORIZED_403") return "ACTOR_UNAUTHORIZED";
   if (code2 === "VALIDATION_OR_2FA_FAILED_400")
     return "VALIDATION_OR_2FA_FAILED";
   return asOwner ? "TARGET_ROLE_FORBIDDEN" : "ADMIN_CANNOT_ELEVATE_ADMIN";
@@ -121370,7 +121370,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "9ee7a7ceadfd286b16b231dc6da0503d3805138c" : void 0;
+var sha = true ? "a3823e1e31fb79fa87126091503f76b566ecc867" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
