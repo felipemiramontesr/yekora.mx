@@ -26,6 +26,19 @@ const FIELD = 'min-h-11 rounded-md border border-petroleo/30 bg-white px-3';
 /** The roles an account of the staff never receives through this panel. */
 const OUT_OF_BAND = new Set(['owner', 'customer']);
 
+/** A text field of a form, trimmed. */
+function textOf(form: HTMLFormElement, name: 'email' | 'fullName'): string {
+  return (form.elements.namedItem(name) as HTMLInputElement).value.trim();
+}
+
+/** The roles ticked in a form. */
+function rolesOf(form: HTMLFormElement): string[] {
+  return Array.from(
+    form.querySelectorAll<HTMLInputElement>('input[name="roles"]:checked'),
+    (box) => box.value
+  );
+}
+
 /** The message of a refusal: the console names each code; anything else is generic. */
 function failureText(texts: UsersTexts, reason: StaffFailure) {
   return reason in texts.errors
@@ -99,10 +112,9 @@ export function AccountUsersConsole({
   async function invite(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get('email')).trim();
-    const fullName = String(data.get('fullName')).trim();
-    const chosen = data.getAll('roles').map(String);
+    const email = textOf(form, 'email');
+    const fullName = textOf(form, 'fullName');
+    const chosen = rolesOf(form);
     if (chosen.length === 0) {
       setNote({ kind: 'error', text: texts.noRoles });
       return;
@@ -252,9 +264,7 @@ function StaffTable({
     account: AdminUser
   ) {
     event.preventDefault();
-    const chosen = new FormData(event.currentTarget)
-      .getAll('roles')
-      .map(String);
+    const chosen = rolesOf(event.currentTarget);
     if (chosen.length === 0) return;
     if (await onChange(account.id, { roles: chosen })) setEditing(null);
   }
