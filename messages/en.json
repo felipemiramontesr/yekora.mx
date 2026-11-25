@@ -908,7 +908,7 @@
       "forgettingDevice": "Forgetting…",
       "deviceForgotten": "Done. Next time you sign in from here we will ask for the code.",
       "catalog": "Catalog",
-      "admins": "Administrators",
+      "users": "Users, roles and permissions",
       "shipping": "Shipping",
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
@@ -1326,17 +1326,19 @@
       },
       "exampleLabel": "Example"
     },
-    "admins": {
+    "users": {
+      "tabs": {
+        "label": "Sections of users and roles",
+        "staff": "Staff"
+      },
       "loading": "Loading…",
-      "caption": "Owner and administrator accounts",
+      "caption": "Staff of the store",
       "name": "Name",
       "email": "E-mail",
-      "role": "Role",
+      "roles": "Roles",
       "status": "Status",
       "twoStep": "Two-step verification",
       "actions": "Actions",
-      "roleOwner": "Owner",
-      "roleAdmin": "Administrator",
       "active": "Active",
       "inactive": "Switched off",
       "twoStepOn": "On",
@@ -1344,19 +1346,28 @@
       "protected": "Protected: nobody can change it",
       "deactivate": "Switch off",
       "activate": "Switch on",
-      "revoke": "Withdraw the role",
+      "changeRoles": "Change roles",
+      "saveRoles": "Save roles",
+      "cancel": "Cancel",
+      "rolesLegend": "Roles of {name}",
       "saved": "Changes saved.",
-      "new": "Invite an administrator",
-      "explain": "We will send a link that lasts 15 minutes to choose a password. An existing customer account keeps its orders.",
+      "new": "Invite a person to the staff",
+      "explain": "We will send a link that lasts 15 minutes so they can choose a password. If they already have a customer account, they keep their orders.",
+      "rolesField": "Roles",
+      "noRoles": "Choose at least one role.",
       "invite": "Send invitation",
       "inviting": "Sending…",
       "invited": "Done. We sent the link to {email}.",
       "errors": {
-        "OWNER_ROLE_REQUIRED": "Only the owner can manage these accounts.",
+        "ACTOR_UNAUTHORIZED": "Only the owner and the administrators can manage the staff.",
+        "TARGET_ROLE_FORBIDDEN": "That role cannot be given from here.",
+        "ADMIN_CANNOT_ELEVATE_ADMIN": "An administrator cannot create or change other administrators.",
         "OWNER_IMMUTABLE": "The owner account cannot be changed.",
-        "ADMIN_ALREADY_EXISTS": "That account is already an administrator.",
-        "ADMIN_NOT_FOUND": "That account is no longer an administrator. Reload the page.",
-        "INVALID_REQUEST": "Check the name and the e-mail.",
+        "VALIDATION_OR_2FA_FAILED": "Check the data and that your two-step verification is on.",
+        "USER_NOT_FOUND": "That account is no longer part of the staff. Reload the page.",
+        "ROLE_NOT_FOUND": "That role no longer exists or is switched off. Reload the page.",
+        "STAFF_ALREADY_EXISTS": "That person is already part of the staff; change their roles in the list.",
+        "INVALID_REQUEST": "Check the name, the e-mail and the roles.",
         "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
         "rate_limited": "Too many attempts in a row. Wait a few minutes.",
         "offline": "You seem to be offline.",
@@ -1366,11 +1377,11 @@
       "exampleLabel": "Example",
       "fields": {
         "name": {
-          "description": "How you want to see the person in the list of administrators.",
-          "example": "Ana López"
+          "description": "How you want to see the person in the staff list.",
+          "example": "Ana Lopez"
         },
         "email": {
-          "description": "The address the link to choose their password will be sent to.",
+          "description": "The e-mail the link to choose a password will go to.",
           "example": "ana@example.com"
         }
       }
@@ -1619,9 +1630,9 @@
           "name": "Shipping",
           "description": "What shipping costs to each state and from which amount it is free."
         },
-        "admins": {
-          "name": "Administrators",
-          "description": "Invite, switch on or withdraw those who run the store. The owner only."
+        "users": {
+          "name": "Users, roles and permissions",
+          "description": "Invite the staff, give them roles and switch accounts on or off. The owner also edits the roles."
         }
       }
     },

@@ -35,6 +35,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'orders:read',
         'catalog:write',
         'shipping:manage',
+        'sellers:manage',
       ],
     });
     expect(screen.getByRole('heading', { name: texts.title })).toBeTruthy();
@@ -60,9 +61,9 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       ['Envíos'],
     ],
     [
-      'the owner role',
-      { roles: ['owner'], permissions: [] },
-      ['Administradores'],
+      'sellers:manage',
+      { roles: ['admin'], permissions: ['sellers:manage'] },
+      ['Usuarios, roles y permisos'],
     ],
   ])(
     'shows, for %s, only the cards that privilege grants',
@@ -76,7 +77,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'Productos',
         'Catálogo',
         'Envíos',
-        'Administradores',
+        'Usuarios, roles y permisos',
       ]) {
         if (!shown.includes(absent)) {
           expect(found.some((text) => text.startsWith(absent))).toBe(false);
@@ -89,7 +90,12 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
     const open = show(
       {
         roles: ['owner'],
-        permissions: ['orders:read', 'catalog:write', 'shipping:manage'],
+        permissions: [
+          'orders:read',
+          'catalog:write',
+          'shipping:manage',
+          'sellers:manage',
+        ],
       },
       'en'
     );
@@ -99,7 +105,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       '/en/account/catalogo/productos/',
       '/en/account/catalogo/marcas/',
       '/en/account/envios/',
-      '/en/account/administradores/',
+      '/en/account/usuarios/',
     ]);
     // Each click is a navigation of the area, never a reload of the page.
     expect(fireEvent.click(links[1])).toBe(false);
@@ -116,7 +122,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
     });
     fireEvent.click(links[4]);
     expect(open).toHaveBeenLastCalledWith({
-      tab: 'admins',
+      tab: 'users',
       orderNumber: null,
       section: null,
     });

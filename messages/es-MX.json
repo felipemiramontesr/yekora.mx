@@ -908,7 +908,7 @@
       "forgettingDevice": "Olvidando…",
       "deviceForgotten": "Listo. La próxima vez que entres desde aquí te pediremos el código.",
       "catalog": "Catálogo",
-      "admins": "Administradores",
+      "users": "Usuarios, roles y permisos",
       "shipping": "Envíos",
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
@@ -1326,17 +1326,19 @@
       },
       "exampleLabel": "Ejemplo"
     },
-    "admins": {
+    "users": {
+      "tabs": {
+        "label": "Secciones de usuarios y roles",
+        "staff": "Personal"
+      },
       "loading": "Cargando…",
-      "caption": "Cuentas de dueño y de administrador",
+      "caption": "Personal de la tienda",
       "name": "Nombre",
       "email": "Correo",
-      "role": "Rol",
+      "roles": "Roles",
       "status": "Estado",
       "twoStep": "Verificación en dos pasos",
       "actions": "Acciones",
-      "roleOwner": "Dueño",
-      "roleAdmin": "Administrador",
       "active": "Activa",
       "inactive": "Desactivada",
       "twoStepOn": "Activada",
@@ -1344,19 +1346,28 @@
       "protected": "Protegida: nadie puede cambiarla",
       "deactivate": "Desactivar",
       "activate": "Activar",
-      "revoke": "Quitar el rol",
+      "changeRoles": "Cambiar roles",
+      "saveRoles": "Guardar roles",
+      "cancel": "Cancelar",
+      "rolesLegend": "Roles de {name}",
       "saved": "Cambios guardados.",
-      "new": "Invitar a un administrador",
+      "new": "Invitar a una persona al personal",
       "explain": "Le enviaremos un enlace que dura 15 minutos para que elija su contraseña. Si ya tiene cuenta de cliente, conserva sus pedidos.",
+      "rolesField": "Roles",
+      "noRoles": "Elige al menos un rol.",
       "invite": "Enviar invitación",
       "inviting": "Enviando…",
       "invited": "Listo. Enviamos el enlace a {email}.",
       "errors": {
-        "OWNER_ROLE_REQUIRED": "Solo el dueño puede administrar estas cuentas.",
+        "ACTOR_UNAUTHORIZED": "Solo el dueño y los administradores pueden gestionar al personal.",
+        "TARGET_ROLE_FORBIDDEN": "Ese rol no se puede asignar desde aquí.",
+        "ADMIN_CANNOT_ELEVATE_ADMIN": "Un administrador no puede crear ni cambiar a otros administradores.",
         "OWNER_IMMUTABLE": "La cuenta del dueño no se puede cambiar.",
-        "ADMIN_ALREADY_EXISTS": "Esa cuenta ya es de administrador.",
-        "ADMIN_NOT_FOUND": "Esa cuenta ya no es de administrador. Recarga la página.",
-        "INVALID_REQUEST": "Revisa el nombre y el correo.",
+        "VALIDATION_OR_2FA_FAILED": "Revisa los datos y que tu verificación en dos pasos esté activa.",
+        "USER_NOT_FOUND": "Esa cuenta ya no es del personal. Recarga la página.",
+        "ROLE_NOT_FOUND": "Ese rol ya no existe o está desactivado. Recarga la página.",
+        "STAFF_ALREADY_EXISTS": "Esa persona ya es parte del personal; cambia sus roles en la lista.",
+        "INVALID_REQUEST": "Revisa el nombre, el correo y los roles.",
         "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
         "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
         "offline": "Parece que no tienes conexión.",
@@ -1366,7 +1377,7 @@
       "exampleLabel": "Ejemplo",
       "fields": {
         "name": {
-          "description": "Cómo quieres ver a la persona en la lista de administradores.",
+          "description": "Cómo quieres ver a la persona en la lista del personal.",
           "example": "Ana López"
         },
         "email": {
@@ -1619,9 +1630,9 @@
           "name": "Envíos",
           "description": "Cuánto cuesta el envío a cada estado y desde qué monto es gratis."
         },
-        "admins": {
-          "name": "Administradores",
-          "description": "Invita, activa o retira a quienes administran la tienda. Solo el dueño."
+        "users": {
+          "name": "Usuarios, roles y permisos",
+          "description": "Invita al personal, asigna sus roles y activa o desactiva cuentas. El dueño también edita los roles."
         }
       }
     },

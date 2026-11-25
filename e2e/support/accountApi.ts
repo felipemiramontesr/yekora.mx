@@ -14,7 +14,7 @@ import {
  * responsive.spec.ts (signed out by default). FC 042: sign-up, «¿Olvidaste tu contraseña?» and
  * the reset through {@link E2E_RESET_TOKEN}, refusing a new password with the shared policy, as
  * the API does. Enmienda 2: `reset-password/check` names the account of that link.
- * FC 044 F2: the owner persona gets `/v1/admin/admins`, which keeps its accounts in memory, never
+ * FC 072 F2: the owner persona gets `/v1/admin/users` and `/v1/admin/roles`, which keeps its accounts in memory, never
  * changes the owner's and answers everyone else 403, as the API does.
  * FC 029 F3d: {@link mockCatalogApi} stands in for the catalog backoffice and records every image
  * the browser uploads, with the size it really has.
@@ -143,12 +143,14 @@ const USERS: Record<Persona, object> = {
       'orders:manage',
       'shipping:manage',
       'users:manage',
+      'sellers:manage',
+      'roles:manage',
     ],
   },
 };
 
-/** An account of the administrators console (FC 044). */
-interface AdminAccount {
+/** An account of the staff panel (FC 044, FC 072). */
+interface StaffAccount {
   id: string;
   email: string;
   fullName: string;
@@ -158,13 +160,13 @@ interface AdminAccount {
   createdAt: string;
 }
 
-/** The accounts `/v1/admin/admins` starts with: the owner and one administrator. */
-const adminAccounts = (): AdminAccount[] => [
+/** The accounts `/v1/admin/users` starts with: the owner and one administrator. */
+const staffAccounts = (): StaffAccount[] => [
   {
     id: OWNER_ID,
     email: 'owner@example.test',
     fullName: 'GrayMan',
-    roles: ['owner'],
+    roles: ['customer', 'owner'],
     isActive: true,
     totpEnabled: true,
     createdAt: '2026-11-11T18:00:00.000Z',
@@ -180,11 +182,29 @@ const adminAccounts = (): AdminAccount[] => [
   },
 ];
 
+/** The roles `/v1/admin/roles` answers: the owner's, the administrator's and the two of the staff. */
+const STAFF_ROLES = [
+  ['owner', 'Dueño', true, false],
+  ['customer', 'Cliente', true, false],
+  ['admin', 'Administrador', false, false],
+  ['staff_orders', 'Vendedor', false, true],
+  ['staff_catalog', 'Staff · Catálogo', false, true],
+].map(([id, name, isSystem, assignableByAdmin]) => ({
+  id,
+  name,
+  description: null,
+  isActive: true,
+  isSystem,
+  assignableByAdmin,
+  permissions: ['account:self'],
+}));
+
 /**
- * `/v1/admin/admins` for the owner (FC 044 T1.2, T1.3): writes need an Idempotency-Key, the
- * owner's account is immutable, and a withdrawn administrator leaves the list.
+ * `/v1/admin/users` for the owner (FC 072 T1.1, T2.1): writes need an Idempotency-Key, the
+ * owner's account is immutable, a person already in the staff is a conflict and the roles that
+ * come with a write replace the ones an account held.
  */
-function answerAdmins(route: Route, accounts: AdminAccount[]) {
+function answerStaff(route: Route, accounts: StaffAccount[]) {
   const request = route.request();
   const method = request.method();
   if (method === 'GET') return json(route, 200, { items: accounts });
@@ -198,13 +218,13 @@ function answerAdmins(route: Route, accounts: AdminAccount[]) {
     if (taken) {
       return taken.id === OWNER_ID
         ? problem(route, 403, 'OWNER_IMMUTABLE')
-        : problem(route, 409, 'ADMIN_ALREADY_EXISTS');
+        : problem(route, 409, 'STAFF_ALREADY_EXISTS');
     }
-    const created: AdminAccount = {
+    const created: StaffAccount = {
       id: `d0000000-0000-4000-8000-0000000000${accounts.length + 10}`,
       email,
       fullName: String(body.fullName),
-      roles: ['admin', 'customer'],
+      roles: ['customer', ...(body.roles as string[])].sort(),
       isActive: true,
       totpEnabled: false,
       createdAt: '2026-11-11T19:00:00.000Z',
@@ -215,11 +235,10 @@ function answerAdmins(route: Route, accounts: AdminAccount[]) {
   const id = new URL(request.url()).pathname.split('/').pop();
   if (id === OWNER_ID) return problem(route, 403, 'OWNER_IMMUTABLE');
   const account = accounts.find((candidate) => candidate.id === id);
-  if (!account) return problem(route, 404, 'ADMIN_NOT_FOUND');
+  if (!account) return problem(route, 404, 'USER_NOT_FOUND');
   if (typeof body.isActive === 'boolean') account.isActive = body.isActive;
-  if (body.revokeAdmin === true) {
-    account.roles = ['customer'];
-    accounts.splice(accounts.indexOf(account), 1);
+  if (Array.isArray(body.roles)) {
+    account.roles = ['customer', ...(body.roles as string[])].sort();
   }
   return json(route, 200, account);
 }
@@ -611,7 +630,7 @@ export async function mockAccountApi(
     next: 10,
   };
   const persona = options.persona ?? options.signedIn ?? 'buyer';
-  const admins = adminAccounts();
+  const staffRows = staffAccounts();
   const fulfillment = newFulfillment();
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
@@ -674,10 +693,18 @@ export async function mockAccountApi(
     'https://apiv1.yekora.mx/v1/admin/**',
     withCors((route) => {
       const path = new URL(route.request().url()).pathname;
-      if (path.startsWith('/v1/admin/admins')) {
+      if (path.startsWith('/v1/admin/users')) {
         return user === 'owner'
-          ? answerAdmins(route, admins)
-          : problem(route, 403, 'OWNER_ROLE_REQUIRED');
+          ? answerStaff(route, staffRows)
+          : problem(route, 403, 'PERMISSION_DENIED');
+      }
+      if (path.startsWith('/v1/admin/roles')) {
+        return user === 'owner'
+          ? json(route, 200, {
+              items: STAFF_ROLES,
+              catalog: ['account:self'],
+            })
+          : problem(route, 403, 'PERMISSION_DENIED');
       }
       if (path.startsWith('/v1/admin/shipping')) {
         return user === 'owner'

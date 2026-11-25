@@ -12,7 +12,7 @@
  *   (FC 052);
  * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`), and one tab of it:
  *   `{area}catalogo/{productos,marcas,propiedades,publicar}/`;
- * - `{area}administradores/` the administrators console (FC 044 F2, the owner only);
+ * - `{area}usuarios/` the panel of users and roles (FC 072 F2, the owner and the administrators);
  * - `{area}envios/` the shipping console (FC 061, `shipping:manage`): strategy, free shipping and the
  *   rate of each state. The sub-path is the same in both languages.
  *
@@ -22,8 +22,8 @@
 /** Which list, and which order of it, the area shows. */
 export interface AccountView {
   /**
-   * The buyer's own orders, their data, their saved cards, the administration hub, the panel's orders, the catalog or
-   * the administrators console.
+   * The buyer's own orders, their data, their saved cards, the administration hub, the panel's orders, the catalog,
+   * the shipping console or the panel of users and roles.
    */
   tab:
     | 'orders'
@@ -32,7 +32,7 @@ export interface AccountView {
     | 'admin'
     | 'panel'
     | 'catalog'
-    | 'admins'
+    | 'users'
     | 'shipping';
   /** The open order, or null for the list. */
   orderNumber: string | null;
@@ -73,7 +73,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
     const section = CATALOG_SECTIONS.find((name) => name === second) ?? null;
     return { tab: 'catalog', orderNumber: null, section };
   }
-  if (first === 'administradores') return { tab: 'admins', orderNumber: null };
+  if (first === 'usuarios') return { tab: 'users', orderNumber: null };
   if (first === 'envios') return { tab: 'shipping', orderNumber: null };
   if (first === 'panel') {
     return {
@@ -102,7 +102,7 @@ export function accountPath(area: string, view: AccountView): string {
     const section = view.section ? `${view.section}/` : '';
     return `${area}catalogo/${section}`;
   }
-  if (view.tab === 'admins') return `${area}administradores/`;
+  if (view.tab === 'users') return `${area}usuarios/`;
   if (view.tab === 'shipping') return `${area}envios/`;
   const tab = view.tab === 'panel' ? 'panel/' : '';
   const order = view.orderNumber ? `${view.orderNumber}/` : '';

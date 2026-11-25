@@ -90,8 +90,6 @@ import {
 } from '../../../lib/account/paymentMethodTypes';
 import { languageQuery } from './lib/language';
 import {
-  adminCreateRequestSchema,
-  adminUpdateRequestSchema,
   adminUserListSchema,
   adminUserParams,
   adminUserSchema,
@@ -657,49 +655,6 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     },
   },
   ...ORDER_PATHS.flatMap(readOnly),
-  // FC 044 F1: the administrators console. `users:manage` gets past the guard; the handlers
-  // then demand the role `owner` (403 OWNER_ROLE_REQUIRED), which no route grants.
-  {
-    method: 'GET',
-    path: '/v1/admin/admins',
-    summary: 'Owner only: every owner and administrator account',
-    permission: 'users:manage',
-    request: {},
-    responses: { 200: adminUserListSchema, ...SIGNED_IN_REFUSALS },
-  },
-  {
-    method: 'POST',
-    path: '/v1/admin/admins',
-    summary:
-      'Owner only: grants admin to an e-mail and mails its 15-minute link; no temporary password',
-    permission: 'users:manage',
-    request: { headers: mutationHeaders, body: adminCreateRequestSchema },
-    responses: {
-      201: adminUserSchema,
-      400: problemSchema,
-      409: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-  },
-  {
-    method: 'PATCH',
-    path: '/v1/admin/admins/:id',
-    summary:
-      'Owner only: switches an administrator on or off, or withdraws the role (revokeAdmin)',
-    permission: 'users:manage',
-    request: {
-      params: adminUserParams,
-      headers: mutationHeaders,
-      body: adminUpdateRequestSchema,
-    },
-    responses: {
-      200: adminUserSchema,
-      400: problemSchema,
-      404: problemSchema,
-      409: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-  },
   // FC 068 F1: the fulfillment of a paid order. Every step needs orders:manage and an Idempotency-Key.
   ...(['prepare', 'ship', 'deliver'] as const).map((step): RouteContract => ({
     method: 'POST',

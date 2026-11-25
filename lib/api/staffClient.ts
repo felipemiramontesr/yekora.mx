@@ -1,44 +1,52 @@
 /**
- * Administrators console client (FC 044 F2): what `/cuenta/administradores` asks
- * `/v1/admin/admins`. Only the owner's session gets an answer; the API decides, this client
- * only carries the request.
+ * Client of the panel «Usuarios, roles y permisos» (FC 072 F2): what `/cuenta/usuarios` asks
+ * `/v1/admin/users` and `/v1/admin/roles`. The owner's and the administrator's sessions get an
+ * answer; the API decides by the hierarchy, this client only carries the request.
  *
  * Every request carries credentials (the session cookie), and every write a fresh
  * `Idempotency-Key`, so a double click or a retried request never applies twice (ADR 0014).
- * Answers are checked against the same schemas the API uses (lib/account/adminUserTypes.ts).
- * Like the other clients it never throws: offline, a timeout, an answer outside the contract or
- * a refusal become a typed reason, the refusal by its machine code (the problem's `detail`).
+ * Answers are checked against the same schemas the API uses (lib/account/adminUserTypes.ts and
+ * lib/account/staffTypes.ts). Like the other clients it never throws: offline, a timeout, an
+ * answer outside the contract or a refusal become a typed reason, the refusal by its machine code
+ * (the problem's `detail`).
  *
  * @module
  */
 import type { z } from 'zod';
 import {
-  type adminCreateRequestSchema,
-  type adminUpdateRequestSchema,
   adminUserListSchema,
   adminUserSchema,
 } from '@/lib/account/adminUserTypes';
+import {
+  roleListSchema,
+  type staffCreateRequestSchema,
+  type staffUpdateRequestSchema,
+} from '@/lib/account/staffTypes';
 import { sessionRequest, type TransportFailure } from './http';
 
 /** Hostinger may wake the API from sleep; the first request pays its start-up. */
 const TIMEOUT_MS = 25_000;
 
-/** Refusals the console explains by name. */
+/** Refusals the panel explains by name. */
 const CODES = [
-  'OWNER_ROLE_REQUIRED',
+  'ACTOR_UNAUTHORIZED',
+  'TARGET_ROLE_FORBIDDEN',
+  'ADMIN_CANNOT_ELEVATE_ADMIN',
   'OWNER_IMMUTABLE',
-  'ADMIN_ALREADY_EXISTS',
-  'ADMIN_NOT_FOUND',
+  'VALIDATION_OR_2FA_FAILED',
+  'USER_NOT_FOUND',
+  'ROLE_NOT_FOUND',
+  'STAFF_ALREADY_EXISTS',
   'INVALID_REQUEST',
   'SESSION_INVALID_OR_EXPIRED',
 ] as const;
 
 /** Why a request gave no usable answer. */
-export type AdminUsersFailure =
+export type StaffFailure =
   (typeof CODES)[number] | 'rate_limited' | 'unknown' | TransportFailure;
 
 /** The refusal of an answer, by its machine code or its status. */
-function refusal(status: number, body: unknown): AdminUsersFailure {
+function refusal(status: number, body: unknown): StaffFailure {
   if (status === 429) return 'rate_limited';
   const detail = (body as { detail?: unknown } | undefined)?.detail;
   return CODES.find((code) => code === detail) ?? 'unknown';
@@ -68,14 +76,15 @@ function request<T>(
 }
 
 /**
- * Every owner and administrator account, the owner first.
+ * The staff the session may see: all of it for the owner, the sellers and support roles for an
+ * administrator.
  *
  * @param fetchImpl - `fetch`, injectable for tests.
  * @returns The accounts, or why there are none.
  */
-export function listAdminUsers(fetchImpl: typeof fetch = fetch) {
+export function listStaffUsers(fetchImpl: typeof fetch = fetch) {
   return request(
-    '/v1/admin/admins',
+    '/v1/admin/users',
     adminUserListSchema,
     'GET',
     undefined,
@@ -84,35 +93,51 @@ export function listAdminUsers(fetchImpl: typeof fetch = fetch) {
 }
 
 /**
- * Invites an administrator: the API creates or promotes the account and mails it a 15-minute
- * link to choose a password. No password is sent or shown (FC 044 T2.2).
+ * The roles with their permissions, which the panel names and offers when it gives roles.
  *
- * @param input - E-mail and name.
  * @param fetchImpl - `fetch`, injectable for tests.
- * @returns The account, or why it was refused.
+ * @returns The roles and the catalog of permissions, or why there are none.
  */
-export function inviteAdminUser(
-  input: z.input<typeof adminCreateRequestSchema>,
-  fetchImpl: typeof fetch = fetch
-) {
-  return request('/v1/admin/admins', adminUserSchema, 'POST', input, fetchImpl);
+export function listStaffRoles(fetchImpl: typeof fetch = fetch) {
+  return request(
+    '/v1/admin/roles',
+    roleListSchema,
+    'GET',
+    undefined,
+    fetchImpl
+  );
 }
 
 /**
- * Switches an administrator on or off, or withdraws its role (`revokeAdmin: true`).
+ * Brings a person into the staff: the API creates or promotes the account and mails it a
+ * 15-minute link to choose a password. No password is sent or shown (FC 072 T2.4).
+ *
+ * @param input - E-mail, name and roles.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The account, or why it was refused.
+ */
+export function inviteStaffUser(
+  input: z.input<typeof staffCreateRequestSchema>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request('/v1/admin/users', adminUserSchema, 'POST', input, fetchImpl);
+}
+
+/**
+ * Switches an account of the staff on or off, or replaces its roles.
  *
  * @param id - The account.
  * @param change - What to change.
  * @param fetchImpl - `fetch`, injectable for tests.
  * @returns The account after the change, or why it was refused.
  */
-export function updateAdminUser(
+export function updateStaffUser(
   id: string,
-  change: z.input<typeof adminUpdateRequestSchema>,
+  change: z.input<typeof staffUpdateRequestSchema>,
   fetchImpl: typeof fetch = fetch
 ) {
   return request(
-    `/v1/admin/admins/${id}`,
+    `/v1/admin/users/${id}`,
     adminUserSchema,
     'PATCH',
     change,

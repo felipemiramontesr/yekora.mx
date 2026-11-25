@@ -166,11 +166,12 @@ test('a spent or expired link says so and offers another', async ({ page }) => {
 });
 
 /**
- * FC 044 F2 · The administrators console of the owner, against the emulated `/v1/admin/admins`:
- * the owner's badge and tab, the protected owner row, an invitation without any password and
- * switching an administrator off and withdrawing its role.
+ * FC 072 F2 · The staff tab of the panel «Usuarios, roles y permisos» of the owner, against the
+ * emulated `/v1/admin/users` and `/v1/admin/roles`: the owner's badge and card, the protected
+ * owner row, an invitation with roles and without any password, switching an account off, changing
+ * its roles and the refusal of a person already in the staff.
  */
-test('the owner invites, switches off and withdraws administrators; the owner row has no controls (FC 044 T1.4, T2.1, T2.2)', async ({
+test('the owner invites, switches off and changes the roles of the staff; the owner row has no controls (FC 072 T1.1, T2.1, T2.4)', async ({
   page,
 }) => {
   await mockAccountApi(page, { signedIn: 'owner' });
@@ -183,38 +184,54 @@ test('the owner invites, switches off and withdraws administrators; the owner ro
   await header.getByRole('link', { name: 'Administración' }).click();
   await page
     .getByRole('main')
-    .getByRole('link', { name: /^Administradores/ })
+    .getByRole('link', { name: /^Usuarios, roles y permisos/ })
     .click();
-  await expect(page).toHaveURL(/\/cuenta\/administradores\/$/);
+  await expect(page).toHaveURL(/\/cuenta\/usuarios\/$/);
   const row = (name: string) => page.getByRole('row').filter({ hasText: name });
   await expect(row('GrayMan')).toContainText(
     'Protegida: nadie puede cambiarla'
   );
   await expect(row('GrayMan').getByRole('button')).toHaveCount(0);
-  await expect(row('Zoe E2E')).toContainText('Activa');
-  // T2.2: an invitation is a name and an e-mail; the page has no password field at all.
+  await expect(row('Zoe E2E')).toContainText('Administrador');
+  // T2.4: an invitation is a name, an e-mail and roles; the page has no password field at all.
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  const invite = page
+    .getByRole('heading', { name: 'Invitar a una persona al personal' })
+    .locator('xpath=ancestor::form');
   await page.getByLabel('Nombre').fill('Leo Nuevo');
   await page.getByLabel('Correo').fill('leo@example.test');
+  await invite.getByLabel('Vendedor').check();
   await page.getByRole('button', { name: 'Enviar invitación' }).click();
   await expect(
     page.getByText('Listo. Enviamos el enlace a leo@example.test.')
   ).toBeVisible();
+  await expect(row('Leo Nuevo')).toContainText('Vendedor');
   await expect(row('Leo Nuevo')).toContainText('Sin activar');
   await page.getByRole('button', { name: 'Desactivar: Zoe E2E' }).click();
   await expect(row('Zoe E2E')).toContainText('Desactivada');
-  await page.getByRole('button', { name: 'Quitar el rol: Zoe E2E' }).click();
-  await expect(row('Zoe E2E')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cambiar roles: Zoe E2E' }).click();
+  const roles = page.getByRole('group', { name: 'Roles de Zoe E2E' });
+  await roles.getByLabel('Administrador').uncheck();
+  await roles.getByLabel('Staff · Catálogo').check();
+  await roles
+    .locator('xpath=ancestor::form')
+    .getByRole('button', { name: 'Guardar roles' })
+    .click();
+  await expect(row('Zoe E2E')).toContainText('Staff · Catálogo');
+  await expect(row('Zoe E2E')).not.toContainText('Administrador');
   // A second invitation of the same e-mail is refused by name.
   await page.getByLabel('Nombre').fill('Leo Nuevo');
   await page.getByLabel('Correo').fill('leo@example.test');
+  await invite.getByLabel('Vendedor').check();
   await page.getByRole('button', { name: 'Enviar invitación' }).click();
   await expect(
-    page.getByText('Esa cuenta ya es de administrador.')
+    page.getByText(
+      'Esa persona ya es parte del personal; cambia sus roles en la lista.'
+    )
   ).toBeVisible();
 });
 
-test('the administrators console has its own address in English, and only the owner is offered it (FC 044 T1.4)', async ({
+test('the panel of users and roles has its own address in English, and only who may manage the staff is offered it (FC 072 T1.1)', async ({
   page,
 }) => {
   await mockAccountApi(page, { signedIn: 'owner' });
@@ -223,9 +240,9 @@ test('the administrators console has its own address in English, and only the ow
   await page.getByRole('link', { name: 'Administration' }).click();
   await page
     .getByRole('main')
-    .getByRole('link', { name: /^Administrators/ })
+    .getByRole('link', { name: /^Users, roles and permissions/ })
     .click();
-  await expect(page).toHaveURL(/\/en\/account\/administradores\/$/);
+  await expect(page).toHaveURL(/\/en\/account\/usuarios\/$/);
   await expect(
     page.getByRole('row').filter({ hasText: 'GrayMan' })
   ).toContainText('Protected: nobody can change it');
@@ -240,7 +257,9 @@ test('the administrators console has its own address in English, and only the ow
     page.getByRole('region', { name: 'Administration' }).getByRole('link')
   ).toHaveCount(1);
   await expect(
-    page.getByRole('main').getByRole('link', { name: /^Administrators/ })
+    page
+      .getByRole('main')
+      .getByRole('link', { name: /^Users, roles and permissions/ })
   ).toHaveCount(0);
 });
 

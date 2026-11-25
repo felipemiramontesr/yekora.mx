@@ -42,7 +42,7 @@ import { AccountAdminHub } from './AccountAdminHub';
 import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
-import type { AdminUsersTexts } from './AdminUsersConsole';
+import type { UsersTexts } from './AccountUsersConsole';
 import type { ShippingAdminTexts } from './ShippingAdminConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -65,12 +65,14 @@ const CatalogConsole = dynamic<{
 );
 
 /**
- * The administrators console, in its own chunk too (FC 044 F2): only the owner opens it, so
- * nobody else downloads it with `/cuenta/`.
+ * The panel of users and roles, in its own chunk too (FC 072 F2): only the owner and the
+ * administrators open it, so nobody else downloads it with `/cuenta/`.
  */
-const AdminUsersConsole = dynamic<{ texts: AdminUsersTexts }>(
+const AccountUsersConsole = dynamic<{ texts: UsersTexts; owner: boolean }>(
   () =>
-    import('./AdminUsersConsole').then((module) => module.AdminUsersConsole),
+    import('./AccountUsersConsole').then(
+      (module) => module.AccountUsersConsole
+    ),
   { ssr: false }
 );
 
@@ -375,7 +377,7 @@ export function AccountApp({
 function crumbOf(view: AccountView, texts: Messages['account']): string {
   const cards = texts.adminHub.cards;
   if (view.tab === 'panel') return cards.orders.name;
-  if (view.tab === 'admins') return cards.admins.name;
+  if (view.tab === 'users') return cards.users.name;
   if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
     return (view.section === 'productos' ? cards.products : cards.catalog).name;
@@ -413,7 +415,7 @@ function Dashboard({
   const underAdmin =
     tab === 'panel' ||
     tab === 'catalog' ||
-    tab === 'admins' ||
+    tab === 'users' ||
     tab === 'shipping';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
@@ -495,7 +497,12 @@ function Dashboard({
           }
         />
       )}
-      {tab === 'admins' && <AdminUsersConsole texts={texts.account.admins} />}
+      {tab === 'users' && (
+        <AccountUsersConsole
+          texts={texts.account.users}
+          owner={user.roles.includes('owner')}
+        />
+      )}
       {tab === 'shipping' && (
         <ShippingAdminConsole texts={texts.account.shipping} locale={locale} />
       )}

@@ -27,7 +27,6 @@ import { registerAdminRoleRoutes } from './routes/adminRoles';
 import { registerReturnRoutes } from './routes/returns';
 import { registerStaffUserRoutes } from './routes/staffUsers';
 import { registerAdminShippingRoutes } from './routes/adminShipping';
-import { registerAdminUserRoutes } from './routes/adminUsers';
 import { registerAuthRoutes } from './routes/auth';
 import { registerCartRoutes } from './routes/cart';
 import { registerCatalogRoutes } from './routes/catalog';
@@ -252,7 +251,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     mode: deps.config.payments.mode,
   });
   // FC 044 F1: the owner's console of administrators.
-  registerAdminUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   // FC 072 F1: the staff, the roles and the matrix of permissions (sellers:manage, roles:manage).
   registerStaffUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerAdminRoleRoutes(app, { db: deps.db, now });

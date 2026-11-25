@@ -231,7 +231,8 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
     [[], [], false],
     [['orders:read'], [], true],
     [['catalog:write'], [], true],
-    [[], ['owner'], true],
+    [[], ['owner'], false],
+    [['sellers:manage'], ['admin'], true],
     [['orders:read', 'catalog:write'], [], true],
     [['orders:read'], ['owner'], true],
     [['catalog:write'], ['owner'], true],
@@ -263,7 +264,11 @@ describe('account menu of the header (FC 047 T1.1, T2.4)', () => {
           : ['Mis pedidos', 'Mi información', 'Métodos de pago']
       );
       // The consoles are no longer entries of the menu (FC 052 T1.1).
-      for (const gone of ['Panel: pedidos', 'Catálogo', 'Administradores']) {
+      for (const gone of [
+        'Panel: pedidos',
+        'Catálogo',
+        'Usuarios, roles y permisos',
+      ]) {
         expect(within(nav).queryByRole('link', { name: gone })).toBeNull();
       }
     }

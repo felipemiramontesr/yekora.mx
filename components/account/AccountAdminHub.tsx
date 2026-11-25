@@ -13,7 +13,7 @@ const ICONS: Record<AdminCard['key'], ComponentType<{ size: number }>> = {
   products: Package,
   catalog: Tags,
   shipping: Truck,
-  admins: ShieldCheck,
+  users: ShieldCheck,
 };
 
 /** The view a card opens. */
@@ -24,7 +24,7 @@ function viewOf(card: AdminCard): AccountView {
 /**
  * «Administración» (FC 052 T1.1, T2.4): one card for each console of the store the account may
  * open, and none for one it may not: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Administradores» for the owner. It is a convenience only; the API refuses what
+ * `catalog:write`, «Usuarios, roles y permisos» with `sellers:manage`. It is a convenience only; the API refuses what
  * the account cannot do. Each card is a link to the console's own address, which the area routes
  * without reloading.
  *

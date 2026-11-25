@@ -28,10 +28,11 @@ import {
 } from '@/lib/api/accountClient';
 import { listAddresses, updateProfile } from '@/lib/api/accountDataClient';
 import {
-  inviteAdminUser,
-  listAdminUsers,
-  updateAdminUser,
-} from '@/lib/api/adminUsersClient';
+  inviteStaffUser,
+  listStaffRoles,
+  listStaffUsers,
+  updateStaffUser,
+} from '@/lib/api/staffClient';
 import {
   deliverOrder,
   prepareOrder,
@@ -73,10 +74,11 @@ vi.mock('@/lib/api/paymentMethodsClient', () => ({
   detachPaymentMethod: vi.fn(),
 }));
 
-vi.mock('@/lib/api/adminUsersClient', () => ({
-  listAdminUsers: vi.fn(),
-  inviteAdminUser: vi.fn(),
-  updateAdminUser: vi.fn(),
+vi.mock('@/lib/api/staffClient', () => ({
+  listStaffUsers: vi.fn(),
+  listStaffRoles: vi.fn(),
+  inviteStaffUser: vi.fn(),
+  updateStaffUser: vi.fn(),
 }));
 
 vi.mock('@/lib/api/fulfillmentClient', () => ({
@@ -96,9 +98,10 @@ const data = {
   profile: vi.mocked(updateProfile),
 };
 const api = {
-  listAdminUsers: vi.mocked(listAdminUsers),
-  inviteAdminUser: vi.mocked(inviteAdminUser),
-  updateAdminUser: vi.mocked(updateAdminUser),
+  listStaffUsers: vi.mocked(listStaffUsers),
+  listStaffRoles: vi.mocked(listStaffRoles),
+  inviteStaffUser: vi.mocked(inviteStaffUser),
+  updateStaffUser: vi.mocked(updateStaffUser),
   register: vi.mocked(register),
   login: vi.mocked(login),
   verify: vi.mocked(verify),
@@ -1155,7 +1158,12 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
       ok({
         ...STAFF,
         roles: ['owner'],
-        permissions: ['account:self', 'orders:read', 'catalog:write'],
+        permissions: [
+          'account:self',
+          'orders:read',
+          'catalog:write',
+          'sellers:manage',
+        ],
       })
     );
     renderApp();
@@ -1169,7 +1177,7 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
       '/cuenta/panel/',
       '/cuenta/catalogo/productos/',
       '/cuenta/catalogo/marcas/',
-      '/cuenta/administradores/',
+      '/cuenta/usuarios/',
     ]);
     fireEvent.click(
       within(hub).getByRole('link', {
@@ -1204,7 +1212,7 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     ).toBeNull();
     expect(
       screen.queryAllByRole('link', {
-        name: /Pedidos|Productos|Catálogo|Administradores/,
+        name: /Pedidos|Productos|Catálogo|Usuarios/,
       })
     ).toHaveLength(0);
   });
@@ -1464,25 +1472,48 @@ describe('account area · passwords (FC 042 F2)', () => {
   );
 });
 
-describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', () => {
-  const t = account.admins;
+describe('panel of users and roles, the staff tab (FC 072 F2, T1.1, T2.1, T2.2)', () => {
+  const t = account.users;
   const OWNER = {
     ...BUYER,
     fullName: 'GrayMan',
     roles: ['owner'],
     permissions: [
       'account:self',
-      'audit:read',
-      'catalog:write',
       'orders:read',
-      'users:manage',
+      'sellers:manage',
+      'roles:manage',
     ],
   };
+  const ADMIN = {
+    ...BUYER,
+    fullName: 'Zoe Admin',
+    roles: ['admin'],
+    permissions: ['account:self', 'sellers:manage'],
+  };
+  const role = (id: string, name: string, over: object = {}) => ({
+    id,
+    name,
+    description: null,
+    isActive: true,
+    isSystem: false,
+    assignableByAdmin: true,
+    permissions: ['account:self'],
+    ...over,
+  });
+  const ROLES = [
+    role('owner', 'Dueño', { isSystem: true, assignableByAdmin: false }),
+    role('customer', 'Cliente', { isSystem: true, assignableByAdmin: false }),
+    role('admin', 'Administrador', { assignableByAdmin: false }),
+    role('staff_orders', 'Vendedor'),
+    role('staff_catalog', 'Staff · Catálogo'),
+    role('retired', 'Retirado', { isActive: false }),
+  ];
   const OWNER_ROW = {
     id: OWNER.id,
     email: 'owner@example.test',
     fullName: 'GrayMan',
-    roles: ['owner'],
+    roles: ['customer', 'owner'],
     isActive: true,
     totpEnabled: true,
     createdAt: '2026-11-11T18:00:00.000Z',
@@ -1499,123 +1530,216 @@ describe('administrators console of the owner (FC 044 F2, T1.4, T2.1, T2.5)', ()
     ...ZOE,
     id: 'a0000000-0000-4000-8000-000000000003',
     email: 'leo@example.test',
-    fullName: 'Leo Apagado',
+    fullName: 'Leo Vendedor',
+    roles: ['customer', 'staff_orders'],
     isActive: false,
   };
   const accounts = (...items: (typeof OWNER_ROW)[]) => ok({ items });
+  const rolesAnswer = () => ok({ items: ROLES, catalog: ['account:self'] });
 
-  /** Opens the console as the owner, with these accounts listed. */
-  async function openConsole(...items: (typeof OWNER_ROW)[]) {
-    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
-    api.me.mockResolvedValue(ok(OWNER));
-    api.listAdminUsers.mockResolvedValue(accounts(...items));
+  /** Opens the panel as `who`, with these accounts listed. */
+  async function openPanel(who: typeof OWNER, ...items: (typeof OWNER_ROW)[]) {
+    globalThis.history.replaceState(null, '', '/cuenta/usuarios/');
+    api.me.mockResolvedValue(ok(who));
+    api.listStaffUsers.mockResolvedValue(accounts(...items));
+    api.listStaffRoles.mockResolvedValue(rolesAnswer());
     renderApp();
     await screen.findByText(t.caption);
   }
 
-  it('ADMIN_LIST_GRANTED · shows the owner the console and the accounts, the owner row without controls', async () => {
-    await openConsole(OWNER_ROW, ZOE, LEO);
+  const inviteForm = () =>
+    screen.getByRole('heading', { name: t.new }).closest('form') as HTMLElement;
+
+  it('STAFF_LIST_GRANTED · shows the owner the panel, the roles by name and the owner row without controls', async () => {
+    await openPanel(OWNER, OWNER_ROW, ZOE, LEO);
     expect(
       screen
-        .getByText(account.dashboard.admins, { selector: 'li' })
+        .getByText(account.dashboard.users, { selector: 'li' })
         .getAttribute('aria-current')
     ).toBe('page');
     const rows = screen.getAllByRole('row').map((row) => row.textContent);
     expect(rows[1]).toBe(
-      `GrayManowner@example.test${t.roleOwner}${t.active}${t.twoStepOn}${t.protected}`
+      `GrayManowner@example.testDueño${t.active}${t.twoStepOn}${t.protected}`
     );
     expect(rows[2]).toContain(
-      `Zoe Adminzoe@example.test${t.roleAdmin}${t.active}${t.twoStepOff}`
+      `Zoe Adminzoe@example.testAdministrador${t.active}${t.twoStepOff}`
     );
-    expect(rows[3]).toContain(`${t.roleAdmin}${t.inactive}`);
-    // T2.1: nothing on the page can switch the owner off or withdraw its role.
+    expect(rows[3]).toContain(`Vendedor${t.inactive}`);
+    // T2.1: nothing on the page can switch the owner off or change its roles.
     expect(
       screen.queryByRole('button', { name: `${t.deactivate}: GrayMan` })
     ).toBeNull();
     expect(
-      screen.queryByRole('button', { name: `${t.revoke}: GrayMan` })
+      screen.queryByRole('button', { name: `${t.changeRoles}: GrayMan` })
     ).toBeNull();
     expect(
-      screen.getByRole('button', { name: `${t.activate}: Leo Apagado` })
+      screen.getByRole('button', { name: `${t.activate}: Leo Vendedor` })
     ).toBeTruthy();
   });
 
-  it('ADMIN_LIST_NOT_OWNER · offers an administrator no console, even at its path: it falls back to the orders', async () => {
-    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
-    api.me.mockResolvedValue(ok({ ...OWNER, roles: ['admin', 'customer'] }));
+  it('offers the owner every role it may give, and an administrator only those marked for it (T2.2)', async () => {
+    await openPanel(OWNER, OWNER_ROW);
+    const names = (form: HTMLElement) =>
+      within(form)
+        .getAllByRole('checkbox')
+        .map((box) => box.parentElement?.textContent);
+    expect(names(inviteForm())).toEqual([
+      'Administrador',
+      'Vendedor',
+      'Staff · Catálogo',
+    ]);
+    cleanup();
+    await openPanel(ADMIN, LEO);
+    expect(names(inviteForm())).toEqual(['Vendedor', 'Staff · Catálogo']);
+  });
+
+  it('STAFF_LIST_NO_PERMISSION · offers no panel to an account without sellers:manage, even at its path', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/usuarios/');
+    api.me.mockResolvedValue(
+      ok({ ...ADMIN, permissions: ['account:self', 'orders:read'] })
+    );
     renderApp();
     expect(
       (
         await screen.findByText(account.dashboard.orders, { selector: 'li' })
       ).getAttribute('aria-current')
     ).toBe('page');
-    expect(screen.queryByText(account.dashboard.admins)).toBeNull();
-    expect(api.listAdminUsers).not.toHaveBeenCalled();
+    expect(screen.queryByText(account.dashboard.users)).toBeNull();
+    expect(api.listStaffUsers).not.toHaveBeenCalled();
   });
 
-  it('invites an administrator by name and e-mail, with no password field, and says where the link went', async () => {
-    await openConsole(OWNER_ROW);
+  it('invites a person with a role, with no password field, and says where the link went', async () => {
+    await openPanel(OWNER, OWNER_ROW);
     expect(document.querySelector('input[type="password"]')).toBeNull();
-    type(t.name, '  Zoe Admin ');
-    type(t.email, ' zoe@example.test ');
-    api.inviteAdminUser.mockResolvedValue(ok(ZOE));
-    api.listAdminUsers.mockResolvedValue(accounts(OWNER_ROW, ZOE));
+    type(t.name, '  Leo Vendedor ');
+    type(t.email, ' leo@example.test ');
+    fireEvent.click(within(inviteForm()).getByLabelText('Vendedor'));
+    api.inviteStaffUser.mockResolvedValue(ok(LEO));
+    api.listStaffUsers.mockResolvedValue(accounts(OWNER_ROW, LEO));
     press(t.invite);
     expect(screen.getByRole('button', { name: t.inviting })).toBeTruthy();
-    await screen.findByText('Listo. Enviamos el enlace a zoe@example.test.');
-    expect(api.inviteAdminUser).toHaveBeenCalledWith({
-      email: 'zoe@example.test',
-      fullName: 'Zoe Admin',
+    await screen.findByText('Listo. Enviamos el enlace a leo@example.test.');
+    expect(api.inviteStaffUser).toHaveBeenCalledWith({
+      email: 'leo@example.test',
+      fullName: 'Leo Vendedor',
+      roles: ['staff_orders'],
     });
-    expect(await screen.findByText('zoe@example.test')).toBeTruthy();
+    expect(await screen.findByText('leo@example.test')).toBeTruthy();
     expect((screen.getByLabelText(t.email) as HTMLInputElement).value).toBe('');
   });
 
-  it('keeps what was typed and names the refusal when the invitation is refused', async () => {
-    await openConsole(OWNER_ROW, ZOE);
-    type(t.name, 'Zoe Admin');
-    type(t.email, 'zoe@example.test');
-    api.inviteAdminUser.mockResolvedValue(no('ADMIN_ALREADY_EXISTS'));
+  it('asks for at least one role and sends nothing without it', async () => {
+    await openPanel(OWNER, OWNER_ROW);
+    type(t.name, 'Leo Vendedor');
+    type(t.email, 'leo@example.test');
     press(t.invite);
-    await screen.findByText(t.errors.ADMIN_ALREADY_EXISTS);
-    expect((screen.getByLabelText(t.email) as HTMLInputElement).value).toBe(
-      'zoe@example.test'
-    );
-    expect(api.listAdminUsers).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(t.noRoles)).toBeTruthy();
+    expect(api.inviteStaffUser).not.toHaveBeenCalled();
   });
 
-  it('switches an administrator off and on and withdraws its role, reloading the list each time (T2.5)', async () => {
-    await openConsole(OWNER_ROW, ZOE, LEO);
-    api.updateAdminUser.mockResolvedValue(ok({ ...ZOE, isActive: false }));
+  it('keeps what was typed and names the refusal when the invitation is refused', async () => {
+    await openPanel(OWNER, OWNER_ROW, LEO);
+    type(t.name, 'Leo Vendedor');
+    type(t.email, 'leo@example.test');
+    fireEvent.click(within(inviteForm()).getByLabelText('Vendedor'));
+    api.inviteStaffUser.mockResolvedValue(no('STAFF_ALREADY_EXISTS'));
+    press(t.invite);
+    await screen.findByText(t.errors.STAFF_ALREADY_EXISTS);
+    expect((screen.getByLabelText(t.email) as HTMLInputElement).value).toBe(
+      'leo@example.test'
+    );
+    expect(api.listStaffUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches an account off and on, reloading the list each time (T2.3)', async () => {
+    await openPanel(OWNER, OWNER_ROW, ZOE, LEO);
+    api.updateStaffUser.mockResolvedValue(ok({ ...ZOE, isActive: false }));
     press(`${t.deactivate}: Zoe Admin`);
     await screen.findByText(t.saved);
-    expect(api.updateAdminUser).toHaveBeenLastCalledWith(ZOE.id, {
+    expect(api.updateStaffUser).toHaveBeenLastCalledWith(ZOE.id, {
       isActive: false,
     });
-    press(`${t.activate}: Leo Apagado`);
+    press(`${t.activate}: Leo Vendedor`);
     await waitFor(() =>
-      expect(api.updateAdminUser).toHaveBeenLastCalledWith(LEO.id, {
+      expect(api.updateStaffUser).toHaveBeenLastCalledWith(LEO.id, {
         isActive: true,
       })
     );
-    await waitFor(() => expect(api.listAdminUsers).toHaveBeenCalledTimes(3));
-    api.listAdminUsers.mockResolvedValue(accounts(OWNER_ROW, LEO));
-    press(`${t.revoke}: Zoe Admin`);
-    await waitFor(() => expect(screen.queryByText('Zoe Admin')).toBeNull());
-    expect(api.updateAdminUser).toHaveBeenLastCalledWith(ZOE.id, {
-      revokeAdmin: true,
+    await waitFor(() => expect(api.listStaffUsers).toHaveBeenCalledTimes(3));
+  });
+
+  it('changes the roles of an account: the form comes with what it holds, saves what is ticked and closes', async () => {
+    await openPanel(OWNER, OWNER_ROW, LEO);
+    press(`${t.changeRoles}: Leo Vendedor`);
+    const form = screen
+      .getByText(`Roles de Leo Vendedor`)
+      .closest('form') as HTMLElement;
+    expect(
+      (within(form).getByLabelText('Vendedor') as HTMLInputElement).checked
+    ).toBe(true);
+    expect(
+      (within(form).getByLabelText('Staff · Catálogo') as HTMLInputElement)
+        .checked
+    ).toBe(false);
+    fireEvent.click(within(form).getByLabelText('Staff · Catálogo'));
+    api.updateStaffUser.mockResolvedValue(ok(LEO));
+    fireEvent.click(within(form).getByRole('button', { name: t.saveRoles }));
+    await screen.findByText(t.saved);
+    expect(api.updateStaffUser).toHaveBeenCalledWith(LEO.id, {
+      roles: ['staff_orders', 'staff_catalog'],
     });
+    await waitFor(() =>
+      expect(screen.queryByText('Roles de Leo Vendedor')).toBeNull()
+    );
+  });
+
+  it('sends nothing when every role is unticked, and keeps the form open until it is cancelled', async () => {
+    await openPanel(OWNER, OWNER_ROW, LEO);
+    press(`${t.changeRoles}: Leo Vendedor`);
+    const form = screen
+      .getByText('Roles de Leo Vendedor')
+      .closest('form') as HTMLElement;
+    fireEvent.click(within(form).getByLabelText('Vendedor'));
+    fireEvent.click(within(form).getByRole('button', { name: t.saveRoles }));
+    expect(api.updateStaffUser).not.toHaveBeenCalled();
+    expect(screen.getByText('Roles de Leo Vendedor')).toBeTruthy();
+    fireEvent.click(within(form).getByRole('button', { name: t.cancel }));
+    expect(screen.queryByText('Roles de Leo Vendedor')).toBeNull();
+  });
+
+  it('names the refusal and keeps the form open when the roles are refused', async () => {
+    await openPanel(ADMIN, LEO);
+    press(`${t.changeRoles}: Leo Vendedor`);
+    const form = screen
+      .getByText('Roles de Leo Vendedor')
+      .closest('form') as HTMLElement;
+    api.updateStaffUser.mockResolvedValue(no('ADMIN_CANNOT_ELEVATE_ADMIN'));
+    fireEvent.click(within(form).getByRole('button', { name: t.saveRoles }));
+    await screen.findByText(t.errors.ADMIN_CANNOT_ELEVATE_ADMIN);
+    expect(screen.getByText('Roles de Leo Vendedor')).toBeTruthy();
+  });
+
+  it('shows the roles by their id and offers none to give when the roles cannot be read', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/usuarios/');
+    api.me.mockResolvedValue(ok(OWNER));
+    api.listStaffUsers.mockResolvedValue(accounts(OWNER_ROW, LEO));
+    api.listStaffRoles.mockResolvedValue(no('unknown'));
+    renderApp();
+    await screen.findByText(t.caption);
+    expect(screen.getAllByRole('row')[2].textContent).toContain('staff_orders');
+    expect(within(inviteForm()).queryAllByRole('checkbox')).toHaveLength(0);
   });
 
   it('says why the list could not be read, by its code or generically', async () => {
-    globalThis.history.replaceState(null, '', '/cuenta/administradores/');
+    globalThis.history.replaceState(null, '', '/cuenta/usuarios/');
     api.me.mockResolvedValue(ok(OWNER));
-    api.listAdminUsers.mockResolvedValue(no('OWNER_ROLE_REQUIRED'));
+    api.listStaffUsers.mockResolvedValue(no('ACTOR_UNAUTHORIZED'));
+    api.listStaffRoles.mockResolvedValue(rolesAnswer());
     renderApp();
-    await screen.findByText(t.errors.OWNER_ROLE_REQUIRED);
+    await screen.findByText(t.errors.ACTOR_UNAUTHORIZED);
     expect(screen.getByText(t.loading)).toBeTruthy();
     cleanup();
-    api.listAdminUsers.mockResolvedValue(no('invalid'));
+    api.listStaffUsers.mockResolvedValue(no('invalid'));
     renderApp();
     await screen.findByText(t.errors.unknown);
   });

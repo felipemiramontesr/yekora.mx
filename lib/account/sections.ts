@@ -5,7 +5,7 @@
  *
  * The menu offers four entries: «Mis pedidos», «Mi información», «Métodos de pago» (FC 054) and, to whoever may open at least
  * one console, «Administración», a page with a card for each console the account may open. The
- * consoles themselves (the panel's orders, the catalog, the administrators) are no longer entries
+ * consoles themselves (the panel's orders, the catalog, the shipping and the users) are no longer entries
  * of the menu, but the area still opens them by their own address.
  *
  * @module
@@ -20,7 +20,7 @@ type AccountSection =
   | 'admin'
   | 'panel'
   | 'catalog'
-  | 'admins'
+  | 'users'
   | 'shipping';
 
 /** The permission that opens the panel's orders. */
@@ -32,8 +32,11 @@ const CATALOG_PERMISSION = 'catalog:write';
 /** The permission that opens the shipping console (FC 061). */
 const SHIPPING_PERMISSION = 'shipping:manage';
 
-/** The role that opens the administrators console (FC 044 T1.4): no permission grants it. */
+/** The role of the owner (FC 044 T2.1): the panel of users shows it everything and protects it. */
 const OWNER_ROLE = 'owner';
+
+/** The permission that opens the panel of users and roles (FC 072): the owner and the administrator hold it. */
+const USERS_PERMISSION = 'sellers:manage';
 
 /** What the rule reads of an account. */
 type Who = Pick<MeResponse, 'roles' | 'permissions'>;
@@ -47,10 +50,10 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
     ACCESS.panel(user) ||
     ACCESS.catalog(user) ||
     ACCESS.shipping(user) ||
-    ACCESS.admins(user),
+    ACCESS.users(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
-  admins: (user) => user.roles.includes(OWNER_ROLE),
+  users: (user) => user.permissions.includes(USERS_PERMISSION),
   shipping: (user) => user.permissions.includes(SHIPPING_PERMISSION),
 };
 
@@ -87,9 +90,9 @@ export function canOpen(user: Who, section: AccountSection): boolean {
 /** A card of the administration hub. */
 export interface AdminCard {
   /** Which text it reads from `account.adminHub.cards`. */
-  key: 'orders' | 'products' | 'catalog' | 'shipping' | 'admins';
+  key: 'orders' | 'products' | 'catalog' | 'shipping' | 'users';
   /** The console it opens. */
-  tab: 'panel' | 'catalog' | 'shipping' | 'admins';
+  tab: 'panel' | 'catalog' | 'shipping' | 'users';
   /** The tab of the catalog console it opens, for the two that open it. */
   section: 'productos' | 'marcas' | null;
 }
@@ -105,13 +108,13 @@ const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
   },
   { key: 'catalog', tab: 'catalog', section: 'marcas', grantedBy: 'catalog' },
   { key: 'shipping', tab: 'shipping', section: null, grantedBy: 'shipping' },
-  { key: 'admins', tab: 'admins', section: null, grantedBy: 'admins' },
+  { key: 'users', tab: 'users', section: null, grantedBy: 'users' },
 ];
 
 /**
  * The cards of the administration hub an account is shown (FC 052 T2.4): each one if and only if
  * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Envíos» with `shipping:manage`, «Administradores» with the owner role.
+ * `catalog:write`, «Envíos» with `shipping:manage`, «Usuarios, roles y permisos» with `sellers:manage`.
  *
  * @param user - Its roles and permissions.
  * @returns The cards, in order.
