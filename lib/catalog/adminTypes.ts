@@ -178,6 +178,8 @@ const fields = {
   lengthMm: positive,
   widthMm: positive,
   heightMm: positive,
+  /** Whether the product may be returned (FC 073, K-80); a sold line keeps the value it sold with. */
+  allowsReturn: z.boolean(),
 };
 
 const altText = z.string().trim().max(255).nullable().default(null);
@@ -214,6 +216,7 @@ export const productCreate = z.strictObject({
   slug: productSlug(160),
   ...fields,
   brandId: fields.brandId.default(null),
+  allowsReturn: fields.allowsReturn.default(true),
   facetValueIds: facetIds.default([]),
   images: galleryImages,
 });
@@ -260,6 +263,7 @@ export const adminProductSchema = z.object({
   lengthMm: z.number().int().positive(),
   widthMm: z.number().int().positive(),
   heightMm: z.number().int().positive(),
+  allowsReturn: z.boolean(),
   isActive: z.boolean(),
   isTest: z.boolean(),
   facetValueIds: z.array(z.number().int().positive()),

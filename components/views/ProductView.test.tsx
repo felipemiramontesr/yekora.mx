@@ -34,6 +34,23 @@ describe('ProductView', () => {
     expect(html).toContain('data-discipline="escalada"');
   });
 
+  it('says whether the product accepts returns, in both languages (FC 073)', () => {
+    const show = (locale: 'en' | 'es-MX', allowsReturn: boolean) =>
+      renderToStaticMarkup(
+        <ProductView
+          locale={locale}
+          product={{ ...harness, allowsReturn }}
+          exchangeRate={snapshot.exchangeRate}
+        />
+      );
+    expect(show('en', true)).toContain(
+      'Accepts returns within 60 calendar days'
+    );
+    expect(show('en', false)).toContain('Final sale');
+    expect(show('es-MX', true)).toContain('Acepta devolución');
+    expect(show('es-MX', false)).toContain('Venta final');
+  });
+
   it('shows the gallery in order, the first photo eager and the rest lazy', () => {
     const html = renderToStaticMarkup(
       <ProductView

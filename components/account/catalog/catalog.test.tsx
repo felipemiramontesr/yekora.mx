@@ -711,6 +711,7 @@ const TRAIL: AdminProduct = {
   lengthMm: 300,
   widthMm: 200,
   heightMm: 120,
+  allowsReturn: true,
   isActive: true,
   isTest: false,
   facetValueIds: [10],
@@ -855,6 +856,7 @@ describe('products (FC 029 F3c)', () => {
       lengthMm: 300,
       widthMm: 200,
       heightMm: 120,
+      allowsReturn: true,
       facetValueIds: [10],
       images: [{ sha256: 'a'.repeat(64), altEs: null, altEn: null }],
     });
@@ -1026,6 +1028,50 @@ describe('products (FC 029 F3c)', () => {
         brandId: 2,
         facetValueIds: [],
       })
+    );
+  });
+
+  it('marks a new product as accepting returns, lets it be a final sale, and shows the current choice when editing (FC 073)', async () => {
+    api.createProduct.mockResolvedValue(ok(TRAIL));
+    await openProducts(TRAIL);
+    fireEvent.click(screen.getByRole('button', { name: p.new }));
+    await screen.findByRole('form', { name: p.titleNew });
+    const box = screen.getByLabelText(p.allowsReturn) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);
+    type(p.sku, 'TRAIL-1');
+    type(p.slug, 'tenis-trail');
+    type(p.nameEs, 'Tenis trail');
+    type(p.nameEn, 'Trail shoes');
+    type(p.priceMxn, '4850.10');
+    type(p.stockField, '10');
+    type(p.discipline, 'trail-running');
+    type(p.shippingClass, 'estandar');
+    type(p.weight, '800');
+    type(p.length, '300');
+    type(p.width, '200');
+    type(p.height, '120');
+    await addPhoto('a'.repeat(64));
+    fireEvent.submit(screen.getByRole('form', { name: p.titleNew }));
+    await screen.findByText(p.created);
+    expect(api.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsReturn: false })
+    );
+    cleanup();
+    api.updateProduct.mockResolvedValue(ok(TRAIL));
+    await openProducts({ ...TRAIL, allowsReturn: false });
+    fireEvent.click(
+      screen.getByRole('button', { name: `${p.edit}: Tenis trail` })
+    );
+    await screen.findByRole('form', { name: p.titleEdit });
+    const current = screen.getByLabelText(p.allowsReturn) as HTMLInputElement;
+    expect(current.checked).toBe(false);
+    fireEvent.click(current);
+    fireEvent.submit(screen.getByRole('form', { name: p.titleEdit }));
+    await screen.findByText(p.saved);
+    expect(api.updateProduct).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ allowsReturn: true })
     );
   });
 

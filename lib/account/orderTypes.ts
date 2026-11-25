@@ -37,6 +37,10 @@ const orderLineSchema = z.object({
   quantity: z.number().int().positive(),
   unitPriceMxnCents: z.number().int().positive(),
   lineTotalMxnCents: z.number().int().positive(),
+  /** Whether this line may be returned: the value it sold with (FC 073 T2.5), not the product's now. */
+  allowsReturn: z.boolean(),
+  /** Units already asked back, in every request (FC 073): what is left to return is `quantity` minus this. */
+  returnedQuantity: z.number().int().min(0),
 });
 
 /** One payment notification and what the reconciliation decided about it. */

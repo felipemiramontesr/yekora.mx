@@ -46,6 +46,7 @@ interface Row {
   fields: unknown[];
   stock: number;
   reserved_stock: number;
+  allows_return: number;
   is_active: number;
 }
 
@@ -88,6 +89,7 @@ const rowOut = (row: Row) => {
     length_mm: length,
     width_mm: width,
     height_mm: height,
+    allows_return: row.allows_return,
     is_active: row.is_active,
     is_test: 0,
   };
@@ -184,6 +186,7 @@ const HANDLERS: [string, Handler][] = [
         stock: p[9] as number,
         reserved_stock: 0,
         shipping_class_id: p[14] as number,
+        allows_return: p[15] as number,
         is_active: 1,
       });
       return [];
@@ -212,14 +215,15 @@ const HANDLERS: [string, Handler][] = [
   [
     'UPDATE products SET',
     (p) => {
-      const row = model.products.find((r) => r.id === p[14]) as Row;
+      const row = model.products.find((r) => r.id === p[15]) as Row;
       Object.assign(row, {
         category_id: p[0],
         brand_id: p[1],
         fields: [p[2], p[3], p[4], p[5], p[6], p[8], p[9], p[10], p[11]],
         stock: p[7],
         shipping_class_id: p[12],
-        is_active: p[13],
+        allows_return: p[13],
+        is_active: p[14],
       });
       return [];
     },
@@ -411,6 +415,31 @@ describe('products of the backoffice (FC 029 F2b2)', () => {
     expect(JSON.parse(entry?.[5] as string)).toMatchObject({
       nameEs: 'Mochila 30 L',
     });
+  });
+
+  it('accepts returns by default and keeps a final sale when told so, and edits it (FC 073 T0.1)', async () => {
+    const open = await create();
+    expect(open.json().allowsReturn).toBe(true);
+    const sale = await create({
+      sku: 'FINAL-1',
+      slug: 'final-1',
+      allowsReturn: false,
+    });
+    expect(sale.statusCode).toBe(201);
+    expect(sale.json().allowsReturn).toBe(false);
+    const edited = await write(
+      'PATCH',
+      `/v1/admin/catalog/products/${sale.json().id}`,
+      { allowsReturn: true }
+    );
+    expect(edited.statusCode).toBe(200);
+    expect(edited.json().allowsReturn).toBe(true);
+    const closed = await write(
+      'PATCH',
+      `/v1/admin/catalog/products/${sale.json().id}`,
+      { allowsReturn: false }
+    );
+    expect(closed.json().allowsReturn).toBe(false);
   });
 
   it('is born with its photos in order, the first primary, in one go (T1.1, T2.2)', async () => {

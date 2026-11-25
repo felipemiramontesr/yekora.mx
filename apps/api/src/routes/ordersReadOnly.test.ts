@@ -178,7 +178,7 @@ const HANDLERS: [string, Handler][] = [
     (p) => ORDERS.filter((row) => row.order_number === p[0]),
   ],
   [
-    'SELECT sku',
+    'SELECT i.sku',
     (p) =>
       p[0] === 1
         ? [
@@ -187,6 +187,8 @@ const HANDLERS: [string, Handler][] = [
               quantity: 1,
               unit_price_mxn_cents: '185000',
               line_total_mxn_cents: '185000',
+              allows_return: 1,
+              returned: '0',
             },
           ]
         : [],
@@ -331,6 +333,8 @@ describe('T2.6b a buyer reads only their own orders (T1.2 D)', () => {
           quantity: 1,
           unitPriceMxnCents: 185_000,
           lineTotalMxnCents: 185_000,
+          allowsReturn: true,
+          returnedQuantity: 0,
         },
       ],
       paymentEvents: [

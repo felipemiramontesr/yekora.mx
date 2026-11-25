@@ -529,6 +529,8 @@
       "inStock": "In stock",
       "outOfStock": "Out of stock",
       "addToCart": "Add to pack",
+      "returnable": "Accepts returns within 60 calendar days of delivery.",
+      "finalSale": "Final sale: it does not accept returns.",
       "sku": "SKU",
       "brand": "Brand"
     },
@@ -910,6 +912,7 @@
       "catalog": "Catalog",
       "users": "Users, roles and permissions",
       "shipping": "Shipping",
+      "returns": "Returns",
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
       "profile": "My information",
@@ -1158,6 +1161,7 @@
         "length": "Length (mm)",
         "width": "Width (mm)",
         "height": "Height (mm)",
+        "allowsReturn": "Accepts returns?",
         "facets": "Properties",
         "save": "Save",
         "saving": "Saving…",
@@ -1225,6 +1229,10 @@
           "height": {
             "description": "The height of the parcel, in millimetres.",
             "example": "120"
+          },
+          "allowsReturn": {
+            "description": "Tick it if the buyer may return it within 60 calendar days of delivery. Untick it for final-sale products. Changing it does not affect what was already sold.",
+            "example": "Ticked"
           }
         },
         "chooseDiscipline": "Choose a discipline",
@@ -1734,7 +1742,146 @@
         "users": {
           "name": "Users, roles and permissions",
           "description": "Invite the staff, give them roles and switch accounts on or off. The owner also edits the roles."
+        },
+        "returns": {
+          "name": "Returns",
+          "description": "The return requests: prepare the refund and have someone else confirm it."
         }
+      }
+    },
+    "returns": {
+      "title": "Return requests",
+      "loading": "Loading the returns…",
+      "intro": "Here you see the return requests of the people who bought. One person prepares the refund (the amount and whether the pieces go back to the inventory) and a different one confirms it, so two people review every refund.",
+      "filterLabel": "Show",
+      "filterAll": "Every stage",
+      "stages": {
+        "REQUESTED": "Requested",
+        "PREPARED": "Prepared",
+        "REFUNDING": "Refunding",
+        "REFUNDED": "Refunded"
+      },
+      "empty": "There are no requests with this filter.",
+      "total": "Requests in this view: {n}",
+      "order": "Order {number}",
+      "requestedAt": "Requested on {date}",
+      "reasonLabel": "Reason",
+      "reasons": {
+        "DEFECT": "The product arrived defective",
+        "NOT_AS_DESCRIBED": "It is not as described",
+        "CHANGED_MIND": "Changed their mind"
+      },
+      "commentLabel": "Comment from the buyer",
+      "linesLabel": "Lines",
+      "line": "{sku} × {quantity}",
+      "refundLine": "Refund prepared: {amount}",
+      "restockYes": "The pieces go back to the inventory.",
+      "restockNo": "The pieces do not go back to the inventory.",
+      "prepare": "Prepare refund",
+      "confirm": "Confirm refund",
+      "retry": "Retry refund",
+      "cancel": "Cancel",
+      "working": "Saving…",
+      "prepareTitle": "Prepare the refund of order {number}",
+      "confirmTitle": "Confirm the refund of order {number}",
+      "confirmSummary": "{amount} will be refunded. This moves money and cannot be undone.",
+      "retryNote": "Last time the processor did not confirm the refund. Retrying uses the same reference, so the money is not refunded twice.",
+      "amount": "Amount to refund (MXN)",
+      "restock": "Put the pieces back in the inventory",
+      "manualReference": "Reference of the refund made at Mercado Pago",
+      "manualNote": "If the order was paid with Mercado Pago, the refund is made by hand there and you write its reference here. With Stripe leave it empty.",
+      "fields": {
+        "filter": {
+          "description": "Choose a stage to see only those requests, or all of them.",
+          "example": "Prepared"
+        },
+        "amount": {
+          "description": "Pesos with up to two decimals. It cannot exceed what was paid minus what was already refunded.",
+          "example": "485.00"
+        },
+        "manualReference": {
+          "description": "The number Mercado Pago gave you when you returned the money. With Stripe leave it empty.",
+          "example": "MP-123456789"
+        }
+      },
+      "exampleLabel": "Example",
+      "invalidAmount": "Write an amount in pesos greater than 0, with up to two decimals.",
+      "preparedDone": "Done. The refund of order {number} is prepared; someone else must confirm it.",
+      "confirmedDone": "Done. Order {number} was refunded.",
+      "errors": {
+        "DUAL_CONTROL_VIOLATION_REJECT": "Someone else must confirm what you prepared.",
+        "UNAUTHORIZED_CONFIRMER_REJECT": "Your account cannot confirm refunds.",
+        "PERMISSION_DENIED": "Your account cannot do this action.",
+        "SECOND_FACTOR_REQUIRED": "Turn on two-step verification to manage returns.",
+        "RETURN_NOT_FOUND": "That request no longer exists. Reload the page.",
+        "RETURN_STATUS_CONFLICT": "The request is no longer at the stage that allows that action. Reload the page.",
+        "RETURN_NOT_PREPARED_REJECT": "The refund has to be prepared first. Reload the page.",
+        "RETURN_PAYLOAD_INVALID": "Check the data you wrote.",
+        "INVALID_REFUND_AMOUNT_REJECT": "The amount exceeds what was paid minus what was already refunded. Write a smaller one.",
+        "MANUAL_REFERENCE_REQUIRED": "This order was paid with Mercado Pago: write the reference of the refund you made there.",
+        "REFUND_PROCESSOR_UNAVAILABLE": "The payment processor is not available. Tell whoever runs the system.",
+        "REFUND_PROCESSOR_ERROR": "The payment processor did not answer or did not accept the refund. You can retry in a few minutes.",
+        "IDEMP_KEY_MISSING": "Something failed while sending the action. Try again.",
+        "IDEMP_KEY_INVALID": "Something failed while sending the action. Try again.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Try again.",
+        "invalid": "The server's answer could not be read. Try again.",
+        "unknown": "Something failed. Try again."
+      }
+    },
+    "returnRequest": {
+      "open": "Request a return",
+      "title": "Request a return",
+      "intro": "Choose the pieces you want to return, how many of each and why. We review your request and, if it applies, we refund your money.",
+      "window": "You have 60 calendar days from delivery to ask for it; for this order, until {date}.",
+      "unitsFor": "Pieces of {sku} you return (up to {max})",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "reasons": {
+        "DEFECT": "The product arrived defective",
+        "NOT_AS_DESCRIBED": "It is not as described",
+        "CHANGED_MIND": "I changed my mind"
+      },
+      "commentLabel": "Comment (optional)",
+      "fields": {
+        "units": {
+          "description": "Write how many pieces you return, from 0 to {max}. Leave 0 for what you keep.",
+          "example": "1"
+        },
+        "reason": {
+          "description": "Choose the main reason for the return.",
+          "example": "The product arrived defective"
+        },
+        "comment": {
+          "description": "Tell us what happened, in 500 characters at most.",
+          "example": "The zipper arrived broken."
+        }
+      },
+      "submit": "Send request",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "sent": "Done. We received your return request. We will write to you by e-mail when the refund is made.",
+      "chooseOne": "Choose at least one piece to return.",
+      "chooseReason": "Choose the reason for the return.",
+      "invalidQuantity": "Check the pieces: use whole numbers from 0 up to what you bought and have not returned yet.",
+      "errors": {
+        "ORDER_NOT_DELIVERED_REJECT": "This order has not been delivered yet, so it cannot be returned.",
+        "WINDOW_EXPIRED_REJECT": "The 60 calendar days to return this order are over.",
+        "PRODUCT_NON_RETURNABLE_REJECT": "One of these products is a final sale and does not accept returns.",
+        "INVALID_QUANTITY_REJECT": "You asked for more pieces than are left to return.",
+        "RETURN_PAYLOAD_INVALID": "Check the data of the request.",
+        "ORDER_NOT_FOUND": "We could not find this order.",
+        "DATA_DOMAIN_FORBIDDEN": "We could not find this order.",
+        "IDEMP_KEY_MISSING": "Something failed while sending the request. Try again.",
+        "IDEMP_KEY_INVALID": "Something failed while sending the request. Try again.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Try again.",
+        "invalid": "The answer of the server could not be read. Try again.",
+        "unknown": "Something failed. Try again."
       }
     },
     "sessionLoading": "Confirming your session…",

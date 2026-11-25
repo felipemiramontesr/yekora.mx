@@ -39,6 +39,7 @@ import {
   shipOrder,
 } from '@/lib/api/fulfillmentClient';
 import { listPaymentMethods } from '@/lib/api/paymentMethodsClient';
+import { listReturns, requestReturn } from '@/lib/api/returnsClient';
 import { readShippingAdmin } from '@/lib/api/shippingAdminClient';
 import { AccountView } from '../views/AccountView';
 import { AccountApp } from './AccountApp';
@@ -85,6 +86,13 @@ vi.mock('@/lib/api/fulfillmentClient', () => ({
   prepareOrder: vi.fn(),
   shipOrder: vi.fn(),
   deliverOrder: vi.fn(),
+}));
+
+vi.mock('@/lib/api/returnsClient', () => ({
+  listReturns: vi.fn(),
+  requestReturn: vi.fn(),
+  prepareReturn: vi.fn(),
+  confirmReturn: vi.fn(),
 }));
 
 vi.mock('@/lib/api/shippingAdminClient', () => ({
@@ -166,6 +174,8 @@ const DETAIL: OrderDetail = {
       quantity: 1,
       unitPriceMxnCents: 185000,
       lineTotalMxnCents: 185000,
+      allowsReturn: true,
+      returnedQuantity: 0,
     },
   ],
   paymentEvents: [
@@ -1877,5 +1887,102 @@ describe('shipping console of the area (FC 061 F1, T2.4)', () => {
     await screen.findByText(/Hola, /);
     expect(screen.queryByText(account.shipping.strategyTitle)).toBeNull();
     expect(readShippingAdmin).not.toHaveBeenCalled();
+  });
+});
+
+describe('returns in the area (FC 073)', () => {
+  const OPERATOR = {
+    ...BUYER,
+    fullName: 'Rita Operadora',
+    roles: ['staff_orders'],
+    permissions: ['account:self', 'returns:view', 'returns:prepare'],
+  };
+
+  it('opens /devoluciones/ under Administración for an account with returns:view', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/devoluciones/');
+    api.me.mockResolvedValue(ok(OPERATOR));
+    vi.mocked(listReturns).mockResolvedValue({
+      ok: true,
+      data: { items: [], total: 0 },
+    });
+    renderApp();
+    await screen.findByText(account.returns.empty);
+    expect(
+      screen
+        .getByText(account.adminHub.cards.returns.name, { selector: 'li' })
+        .getAttribute('aria-current')
+    ).toBe('page');
+    expect(listReturns).toHaveBeenCalledWith(undefined);
+  });
+
+  it('shows an account without the permission its orders instead', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/devoluciones/');
+    api.me.mockResolvedValue(ok(BUYER));
+    vi.mocked(listReturns).mockClear();
+    renderApp();
+    await screen.findByText(/Hola, /);
+    expect(screen.queryByText(account.returns.title)).toBeNull();
+    expect(listReturns).not.toHaveBeenCalled();
+  });
+
+  it('offers the buyer «Solicitar devolución» on a delivered order, and re-reads it once sent', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/${ORDER}/`);
+    api.me.mockResolvedValue(ok(BUYER));
+    const delivered: OrderDetail = {
+      ...DETAIL,
+      status: 'PAID',
+      fulfillment: 'DELIVERED',
+      deliveredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    api.readOrder.mockResolvedValue(ok(delivered));
+    vi.mocked(requestReturn).mockResolvedValue({
+      ok: true,
+      data: {
+        id: 1,
+        orderNumber: ORDER,
+        status: 'REQUESTED',
+        reason: 'DEFECT',
+        comment: null,
+        items: [{ sku: 'PACK', quantity: 1 }],
+        refundMxnCents: null,
+        restock: null,
+        createdAt: '2026-11-25T18:00:00.000Z',
+        preparedAt: null,
+        confirmedAt: null,
+      },
+    });
+    renderApp();
+    fireEvent.click(
+      await screen.findByRole('button', { name: account.returnRequest.open })
+    );
+    fireEvent.change(screen.getByLabelText(/Piezas de PACK/), {
+      target: { value: '1' },
+    });
+    fireEvent.change(screen.getByLabelText(account.returnRequest.reasonLabel), {
+      target: { value: 'DEFECT' },
+    });
+    fireEvent.submit(
+      screen.getByRole('form', { name: account.returnRequest.title })
+    );
+    await screen.findByText(account.returnRequest.sent);
+    await waitFor(() => expect(api.readOrder).toHaveBeenCalledTimes(2));
+  });
+
+  it('never offers the return in the panel, even for a delivered order', async () => {
+    globalThis.history.replaceState(null, '', `/cuenta/panel/${ORDER}/`);
+    api.me.mockResolvedValue(ok(STAFF));
+    api.readOrder.mockResolvedValue(
+      ok({
+        ...DETAIL,
+        status: 'PAID',
+        fulfillment: 'DELIVERED',
+        deliveredAt: new Date().toISOString(),
+      })
+    );
+    renderApp();
+    await screen.findByText(account.orders.lines);
+    expect(
+      screen.queryByRole('button', { name: account.returnRequest.open })
+    ).toBeNull();
   });
 });

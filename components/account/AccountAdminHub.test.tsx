@@ -35,6 +35,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'orders:read',
         'catalog:write',
         'shipping:manage',
+        'returns:view',
         'sellers:manage',
       ],
     });
@@ -44,7 +45,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       expect(screen.getByText(card.name)).toBeTruthy();
       expect(screen.getByText(card.description)).toBeTruthy();
     }
-    expect(screen.getAllByText(texts.open)).toHaveLength(5);
+    expect(screen.getAllByText(texts.open)).toHaveLength(6);
   });
 
   it.each([
@@ -59,6 +60,11 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       'shipping:manage',
       { ...none, permissions: ['shipping:manage'] },
       ['Envíos'],
+    ],
+    [
+      'returns:view',
+      { ...none, permissions: ['returns:view'] },
+      ['Devoluciones'],
     ],
     [
       'sellers:manage',
@@ -77,6 +83,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'Productos',
         'Catálogo',
         'Envíos',
+        'Devoluciones',
         'Usuarios, roles y permisos',
       ]) {
         if (!shown.includes(absent)) {
@@ -94,6 +101,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
           'orders:read',
           'catalog:write',
           'shipping:manage',
+          'returns:view',
           'sellers:manage',
         ],
       },
@@ -105,6 +113,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       '/en/account/catalogo/productos/',
       '/en/account/catalogo/marcas/',
       '/en/account/envios/',
+      '/en/account/devoluciones/',
       '/en/account/usuarios/',
     ]);
     // Each click is a navigation of the area, never a reload of the page.
@@ -121,6 +130,12 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       section: null,
     });
     fireEvent.click(links[4]);
+    expect(open).toHaveBeenLastCalledWith({
+      tab: 'returns',
+      orderNumber: null,
+      section: null,
+    });
+    fireEvent.click(links[5]);
     expect(open).toHaveBeenLastCalledWith({
       tab: 'users',
       orderNumber: null,

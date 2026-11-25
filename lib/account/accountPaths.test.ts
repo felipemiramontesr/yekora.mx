@@ -126,6 +126,23 @@ describe('administrators console path (FC 044 F2)', () => {
   });
 });
 
+describe('board of returns path (FC 073)', () => {
+  it('reads and writes /devoluciones/ the same in both languages, whatever follows it', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      expect(parseAccountPath(`${area}devoluciones/`, area)).toEqual({
+        tab: 'returns',
+        orderNumber: null,
+      });
+      expect(parseAccountPath(`${area}devoluciones/x/`, area).tab).toBe(
+        'returns'
+      );
+      expect(accountPath(area, { tab: 'returns', orderNumber: null })).toBe(
+        `${area}devoluciones/`
+      );
+    }
+  });
+});
+
 describe('shipping console path (FC 061)', () => {
   it('reads and writes /envios/ the same in both languages, whatever follows it', () => {
     for (const area of ['/cuenta/', '/en/account/']) {

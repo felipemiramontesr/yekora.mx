@@ -43,6 +43,7 @@ import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
 import type { UsersTexts } from './AccountUsersConsole';
+import type { ReturnsTexts } from './ReturnsConsole';
 import type { ShippingAdminTexts } from './ShippingAdminConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
 
@@ -75,6 +76,19 @@ const AccountUsersConsole = dynamic<{ texts: UsersTexts; owner: boolean }>(
     ),
   { ssr: false }
 );
+
+/**
+ * The board of returns, in its own chunk (FC 073): only an account with `returns:view` opens it,
+ * so nobody else downloads it with `/cuenta/`.
+ */
+const ReturnsConsole = dynamic<{
+  texts: ReturnsTexts;
+  locale: Locale;
+  canPrepare: boolean;
+  canConfirm: boolean;
+}>(() => import('./ReturnsConsole').then((module) => module.ReturnsConsole), {
+  ssr: false,
+});
 
 /**
  * The shipping console, in its own chunk (FC 061): only an account with `shipping:manage` opens
@@ -378,6 +392,7 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
   const cards = texts.adminHub.cards;
   if (view.tab === 'panel') return cards.orders.name;
   if (view.tab === 'users') return cards.users.name;
+  if (view.tab === 'returns') return cards.returns.name;
   if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
     return (view.section === 'productos' ? cards.products : cards.catalog).name;
@@ -416,6 +431,7 @@ function Dashboard({
     tab === 'panel' ||
     tab === 'catalog' ||
     tab === 'users' ||
+    tab === 'returns' ||
     tab === 'shipping';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
@@ -501,6 +517,14 @@ function Dashboard({
         <AccountUsersConsole
           texts={texts.account.users}
           owner={user.roles.includes('owner')}
+        />
+      )}
+      {tab === 'returns' && (
+        <ReturnsConsole
+          texts={texts.account.returns}
+          locale={locale}
+          canPrepare={user.permissions.includes('returns:prepare')}
+          canConfirm={user.permissions.includes('returns:confirm')}
         />
       )}
       {tab === 'shipping' && (

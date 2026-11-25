@@ -21,6 +21,7 @@ type AccountSection =
   | 'panel'
   | 'catalog'
   | 'users'
+  | 'returns'
   | 'shipping';
 
 /** The permission that opens the panel's orders. */
@@ -31,6 +32,9 @@ const CATALOG_PERMISSION = 'catalog:write';
 
 /** The permission that opens the shipping console (FC 061). */
 const SHIPPING_PERMISSION = 'shipping:manage';
+
+/** The permission that opens the board of returns (FC 073). */
+const RETURNS_PERMISSION = 'returns:view';
 
 /** The role of the owner (FC 044 T2.1): the panel of users shows it everything and protects it. */
 const OWNER_ROLE = 'owner';
@@ -50,10 +54,12 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
     ACCESS.panel(user) ||
     ACCESS.catalog(user) ||
     ACCESS.shipping(user) ||
-    ACCESS.users(user),
+    ACCESS.users(user) ||
+    ACCESS.returns(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
   users: (user) => user.permissions.includes(USERS_PERMISSION),
+  returns: (user) => user.permissions.includes(RETURNS_PERMISSION),
   shipping: (user) => user.permissions.includes(SHIPPING_PERMISSION),
 };
 
@@ -90,9 +96,9 @@ export function canOpen(user: Who, section: AccountSection): boolean {
 /** A card of the administration hub. */
 export interface AdminCard {
   /** Which text it reads from `account.adminHub.cards`. */
-  key: 'orders' | 'products' | 'catalog' | 'shipping' | 'users';
+  key: 'orders' | 'products' | 'catalog' | 'shipping' | 'users' | 'returns';
   /** The console it opens. */
-  tab: 'panel' | 'catalog' | 'shipping' | 'users';
+  tab: 'panel' | 'catalog' | 'shipping' | 'users' | 'returns';
   /** The tab of the catalog console it opens, for the two that open it. */
   section: 'productos' | 'marcas' | null;
 }
@@ -108,13 +114,14 @@ const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
   },
   { key: 'catalog', tab: 'catalog', section: 'marcas', grantedBy: 'catalog' },
   { key: 'shipping', tab: 'shipping', section: null, grantedBy: 'shipping' },
+  { key: 'returns', tab: 'returns', section: null, grantedBy: 'returns' },
   { key: 'users', tab: 'users', section: null, grantedBy: 'users' },
 ];
 
 /**
  * The cards of the administration hub an account is shown (FC 052 T2.4): each one if and only if
  * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Envíos» with `shipping:manage`, «Usuarios, roles y permisos» with `sellers:manage`.
+ * `catalog:write`, «Envíos» with `shipping:manage`, «Devoluciones» with `returns:view`, «Usuarios, roles y permisos» with `sellers:manage`.
  *
  * @param user - Its roles and permissions.
  * @returns The cards, in order.

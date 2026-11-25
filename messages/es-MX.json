@@ -529,6 +529,8 @@
       "inStock": "Disponible",
       "outOfStock": "Agotado",
       "addToCart": "Agregar a la mochila",
+      "returnable": "Acepta devolución dentro de 60 días naturales desde la entrega.",
+      "finalSale": "Venta final: no admite devolución.",
       "sku": "SKU",
       "brand": "Marca"
     },
@@ -910,6 +912,7 @@
       "catalog": "Catálogo",
       "users": "Usuarios, roles y permisos",
       "shipping": "Envíos",
+      "returns": "Devoluciones",
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
       "profile": "Mi información",
@@ -1158,6 +1161,7 @@
         "length": "Largo (mm)",
         "width": "Ancho (mm)",
         "height": "Alto (mm)",
+        "allowsReturn": "¿Acepta devolución?",
         "facets": "Propiedades",
         "save": "Guardar",
         "saving": "Guardando…",
@@ -1225,6 +1229,10 @@
           "height": {
             "description": "El alto del paquete, en milímetros.",
             "example": "120"
+          },
+          "allowsReturn": {
+            "description": "Márcala si quien compra puede devolverlo dentro de 60 días naturales desde la entrega. Quítala en productos de venta final. Cambiarla no afecta lo que ya se vendió.",
+            "example": "Marcada"
           }
         },
         "chooseDiscipline": "Elige una disciplina",
@@ -1734,7 +1742,146 @@
         "users": {
           "name": "Usuarios, roles y permisos",
           "description": "Invita al personal, asigna sus roles y activa o desactiva cuentas. El dueño también edita los roles."
+        },
+        "returns": {
+          "name": "Devoluciones",
+          "description": "Las solicitudes de devolución: prepara el reembolso y que otra persona lo confirme."
         }
+      }
+    },
+    "returns": {
+      "title": "Solicitudes de devolución",
+      "loading": "Cargando las devoluciones…",
+      "intro": "Aquí ves las solicitudes de devolución de quienes compraron. Una persona prepara el reembolso (el monto y si las piezas vuelven al inventario) y otra distinta lo confirma: así dos personas revisan cada reembolso.",
+      "filterLabel": "Mostrar",
+      "filterAll": "Todas las etapas",
+      "stages": {
+        "REQUESTED": "Solicitada",
+        "PREPARED": "Preparada",
+        "REFUNDING": "Reembolsando",
+        "REFUNDED": "Reembolsada"
+      },
+      "empty": "No hay solicitudes con este filtro.",
+      "total": "Solicitudes en esta vista: {n}",
+      "order": "Pedido {number}",
+      "requestedAt": "Solicitada el {date}",
+      "reasonLabel": "Motivo",
+      "reasons": {
+        "DEFECT": "El producto llegó defectuoso",
+        "NOT_AS_DESCRIBED": "No es como se describía",
+        "CHANGED_MIND": "Cambió de opinión"
+      },
+      "commentLabel": "Comentario de quien compró",
+      "linesLabel": "Partidas",
+      "line": "{sku} × {quantity}",
+      "refundLine": "Reembolso preparado: {amount}",
+      "restockYes": "Las piezas vuelven al inventario.",
+      "restockNo": "Las piezas no vuelven al inventario.",
+      "prepare": "Preparar reembolso",
+      "confirm": "Confirmar reembolso",
+      "retry": "Reintentar reembolso",
+      "cancel": "Cancelar",
+      "working": "Guardando…",
+      "prepareTitle": "Preparar el reembolso del pedido {number}",
+      "confirmTitle": "Confirmar el reembolso del pedido {number}",
+      "confirmSummary": "Se reembolsarán {amount}. Esta acción mueve dinero y no se puede deshacer.",
+      "retryNote": "La última vez el procesador no confirmó el reembolso. Al reintentar se usa la misma referencia, así que el dinero no se devuelve dos veces.",
+      "amount": "Monto a reembolsar (MXN)",
+      "restock": "Devolver las piezas al inventario",
+      "manualReference": "Referencia del reembolso hecho en Mercado Pago",
+      "manualNote": "Si el pedido se pagó con Mercado Pago, el reembolso se hace a mano allá y aquí escribes su referencia. Con Stripe déjala vacía.",
+      "fields": {
+        "filter": {
+          "description": "Elige una etapa para ver solo esas solicitudes, o todas.",
+          "example": "Preparada"
+        },
+        "amount": {
+          "description": "Pesos con hasta dos decimales. No puede pasar de lo pagado menos lo ya reembolsado.",
+          "example": "485.00"
+        },
+        "manualReference": {
+          "description": "El folio que te dio Mercado Pago al devolver el dinero. Con Stripe se deja vacío.",
+          "example": "MP-123456789"
+        }
+      },
+      "exampleLabel": "Ejemplo",
+      "invalidAmount": "Escribe un monto en pesos mayor que 0, con hasta dos decimales.",
+      "preparedDone": "Listo. El reembolso del pedido {number} quedó preparado; otra persona debe confirmarlo.",
+      "confirmedDone": "Listo. El pedido {number} quedó reembolsado.",
+      "errors": {
+        "DUAL_CONTROL_VIOLATION_REJECT": "Otra persona debe confirmar lo que tú preparaste.",
+        "UNAUTHORIZED_CONFIRMER_REJECT": "Tu cuenta no puede confirmar reembolsos.",
+        "PERMISSION_DENIED": "Tu cuenta no puede hacer esta acción.",
+        "SECOND_FACTOR_REQUIRED": "Activa la verificación en dos pasos para administrar las devoluciones.",
+        "RETURN_NOT_FOUND": "Esa solicitud ya no existe. Recarga la página.",
+        "RETURN_STATUS_CONFLICT": "La solicitud ya no está en la etapa que permite esa acción. Recarga la página.",
+        "RETURN_NOT_PREPARED_REJECT": "Primero hay que preparar el reembolso. Recarga la página.",
+        "RETURN_PAYLOAD_INVALID": "Revisa los datos que escribiste.",
+        "INVALID_REFUND_AMOUNT_REJECT": "El monto pasa de lo pagado menos lo ya reembolsado. Escribe uno menor.",
+        "MANUAL_REFERENCE_REQUIRED": "Este pedido se pagó con Mercado Pago: escribe la referencia del reembolso que hiciste allá.",
+        "REFUND_PROCESSOR_UNAVAILABLE": "El procesador de pagos no está disponible. Avisa a quien administra el sistema.",
+        "REFUND_PROCESSOR_ERROR": "El procesador de pagos no respondió o no aceptó el reembolso. Puedes reintentar en unos minutos.",
+        "IDEMP_KEY_MISSING": "Algo falló al enviar la acción. Inténtalo de nuevo.",
+        "IDEMP_KEY_INVALID": "Algo falló al enviar la acción. Inténtalo de nuevo.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
+        "invalid": "La respuesta del servidor no se pudo leer. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
+      }
+    },
+    "returnRequest": {
+      "open": "Solicitar devolución",
+      "title": "Solicitar una devolución",
+      "intro": "Elige las piezas que quieres devolver, cuántas de cada una y por qué. Revisamos tu solicitud y, si procede, te devolvemos el dinero.",
+      "window": "Tienes 60 días naturales desde la entrega para pedirla; en este pedido, hasta el {date}.",
+      "unitsFor": "Piezas de {sku} que devuelves (hasta {max})",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "Elige un motivo",
+      "reasons": {
+        "DEFECT": "El producto llegó defectuoso",
+        "NOT_AS_DESCRIBED": "No es como se describía",
+        "CHANGED_MIND": "Cambié de opinión"
+      },
+      "commentLabel": "Comentario (opcional)",
+      "fields": {
+        "units": {
+          "description": "Escribe cuántas piezas devuelves, de 0 a {max}. Deja 0 en lo que te quedas.",
+          "example": "1"
+        },
+        "reason": {
+          "description": "Elige la razón principal de la devolución.",
+          "example": "El producto llegó defectuoso"
+        },
+        "comment": {
+          "description": "Cuéntanos qué pasó, en máximo 500 caracteres.",
+          "example": "La cremallera llegó rota."
+        }
+      },
+      "submit": "Enviar solicitud",
+      "sending": "Enviando…",
+      "cancel": "Cancelar",
+      "sent": "Listo. Recibimos tu solicitud de devolución. Te escribiremos por correo cuando el reembolso esté hecho.",
+      "chooseOne": "Elige al menos una pieza para devolver.",
+      "chooseReason": "Elige el motivo de la devolución.",
+      "invalidQuantity": "Revisa las piezas: usa números enteros de 0 hasta lo que compraste y aún no has devuelto.",
+      "errors": {
+        "ORDER_NOT_DELIVERED_REJECT": "Este pedido todavía no está entregado, así que aún no se puede devolver.",
+        "WINDOW_EXPIRED_REJECT": "Ya pasaron los 60 días naturales para devolver este pedido.",
+        "PRODUCT_NON_RETURNABLE_REJECT": "Alguno de estos productos es de venta final y no admite devolución.",
+        "INVALID_QUANTITY_REJECT": "Pediste más piezas de las que quedan por devolver.",
+        "RETURN_PAYLOAD_INVALID": "Revisa los datos de la solicitud.",
+        "ORDER_NOT_FOUND": "No encontramos este pedido.",
+        "DATA_DOMAIN_FORBIDDEN": "No encontramos este pedido.",
+        "IDEMP_KEY_MISSING": "Algo falló al enviar la solicitud. Inténtalo de nuevo.",
+        "IDEMP_KEY_INVALID": "Algo falló al enviar la solicitud. Inténtalo de nuevo.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
+        "invalid": "La respuesta del servidor no se pudo leer. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
       }
     },
     "sessionLoading": "Confirmando tu sesión…",

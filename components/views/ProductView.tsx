@@ -92,6 +92,11 @@ export function ProductView({
               ? catalog.product.inStock
               : catalog.product.outOfStock}
           </p>
+          <p className="mt-2 text-sm text-petroleo/80">
+            {product.allowsReturn
+              ? catalog.product.returnable
+              : catalog.product.finalSale}
+          </p>
           <AddToCartButton
             sku={product.sku}
             inStock={product.inStock}

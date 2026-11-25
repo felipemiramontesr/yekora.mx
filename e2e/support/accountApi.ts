@@ -5,6 +5,7 @@ import {
   type PasswordContext,
   passwordViolation,
 } from '../../lib/account/passwordPolicy';
+import type { ReturnView } from '../../lib/account/returnTypes';
 
 /**
  * The account API as the E2E suites see it (FC 028 F2): `/v1/auth/*` and `/v1/account/*`,
@@ -95,6 +96,9 @@ const DETAIL = {
       quantity: 1,
       unitPriceMxnCents: 485000,
       lineTotalMxnCents: 485000,
+      // FC 073: the line sold with the right to return it, and no unit asked yet.
+      allowsReturn: true,
+      returnedQuantity: 0,
     },
   ],
   paymentEvents: [
@@ -145,6 +149,9 @@ const USERS: Record<Persona, object> = {
       'users:manage',
       'sellers:manage',
       'roles:manage',
+      'returns:view',
+      'returns:prepare',
+      'returns:confirm',
     ],
   },
 };
@@ -698,6 +705,10 @@ export async function mockAccountApi(
     latencyMs?: number;
     /** The account has not turned its authenticator on yet: signing in goes through enrolment (FC 056). */
     enrollment?: boolean;
+    /** The order is already delivered, two days ago, so the buyer may ask for a return (FC 073). */
+    delivered?: boolean;
+    /** The board of returns starts with a request to prepare and one prepared by someone else (FC 073). */
+    seedReturns?: boolean;
   } = {}
 ): Promise<void> {
   let user: Persona | null = options.signedIn ?? null;
@@ -713,7 +724,8 @@ export async function mockAccountApi(
   const persona = options.persona ?? options.signedIn ?? 'buyer';
   const staffRows = staffAccounts();
   const roleRows = staffRoles();
-  const fulfillment = newFulfillment();
+  const fulfillment = newFulfillment(options.delivered ? 'DELIVERED' : null);
+  const returns = newReturns(options.seedReturns === true);
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
     free: false,
@@ -767,7 +779,8 @@ export async function mockAccountApi(
         () => user,
         () => (user = null),
         () => (trusted = false),
-        data
+        data,
+        { fulfillment, returns }
       );
     })
   );
@@ -790,12 +803,17 @@ export async function mockAccountApi(
           ? answerShipping(route, shippingStates, shippingConfig)
           : problem(route, 403, 'PERMISSION_DENIED');
       }
+      if (path.startsWith('/v1/admin/returns')) {
+        return user === 'owner'
+          ? answerReturns(route, returns, user)
+          : problem(route, 403, 'PERMISSION_DENIED');
+      }
       // FC 068: staff who only read orders may not operate them.
       if (/\/(prepare|ship|deliver)$/.test(path) && user !== 'owner') {
         return problem(route, 403, 'PERMISSION_DENIED');
       }
       return user === 'staff' || user === 'owner'
-        ? answerOrders(route, fulfillment)
+        ? answerOrders(route, fulfillment, returns)
         : problem(route, 403, 'PERMISSION_DENIED');
     })
   );
@@ -807,7 +825,8 @@ function answerAccount(
   who: () => Persona | null,
   signOut: () => void,
   forget: () => void,
-  data: AccountData
+  data: AccountData,
+  world: { fulfillment: Fulfillment; returns: Returns }
 ) {
   const user = who();
   if (user === null) return problem(route, 401, 'SESSION_INVALID_OR_EXPIRED');
@@ -836,7 +855,10 @@ function answerAccount(
     forget();
     return json(route, 204);
   }
-  return answerOrders(route);
+  if (/^\/v1\/account\/orders\/[^/]+\/returns$/.test(path)) {
+    return answerReturnRequest(route, world.fulfillment, world.returns);
+  }
+  return answerOrders(route, world.fulfillment, world.returns);
 }
 
 /**
@@ -878,7 +900,11 @@ function answerCards(route: Route, data: AccountData) {
 }
 
 /** A list of one order, or that order. */
-function answerOrders(route: Route, parcel: Fulfillment = newFulfillment()) {
+function answerOrders(
+  route: Route,
+  parcel: Fulfillment = newFulfillment(),
+  returns?: Returns
+) {
   const request = route.request();
   const path = new URL(request.url()).pathname;
   if (path.endsWith('/orders')) {
@@ -891,7 +917,14 @@ function answerOrders(route: Route, parcel: Fulfillment = newFulfillment()) {
   }
   const step = /\/(prepare|ship|deliver)$/.exec(path)?.[1];
   if (step === undefined) {
-    return json(route, 200, { ...DETAIL, ...parcel.view() });
+    return json(route, 200, {
+      ...DETAIL,
+      lines: DETAIL.lines.map((line) => ({
+        ...line,
+        returnedQuantity: returns?.asked ?? 0,
+      })),
+      ...parcel.view(),
+    });
   }
   // FC 068: the three steps, in the order the API admits them.
   if (!request.headers()['idempotency-key']) {
@@ -935,9 +968,9 @@ interface Fulfillment {
 }
 
 /** A fresh fulfillment: nothing has happened to the order. */
-function newFulfillment(): Fulfillment {
+function newFulfillment(initial: Fulfillment['step'] = null): Fulfillment {
   const parcel: Fulfillment = {
-    step: null,
+    step: initial,
     carrier: null,
     trackingNumber: null,
     trackingUrl: null,
@@ -950,13 +983,156 @@ function newFulfillment(): Fulfillment {
         parcel.step === 'SHIPPED' || parcel.step === 'DELIVERED'
           ? '2026-11-02T09:00:00.000Z'
           : null,
+      // Two days ago, so the window of 60 days is open whenever the suite runs (FC 073).
       deliveredAt:
-        parcel.step === 'DELIVERED' ? '2026-11-04T16:00:00.000Z' : null,
+        parcel.step === 'DELIVERED'
+          ? new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          : null,
     }),
   };
   return parcel;
 }
 
+/** The returns of the interceptor, kept while a test runs (FC 073): the board's rows and the units the buyer asked. */
+interface Returns {
+  rows: ReturnView[];
+  /** Who prepared each request, by id: the board refuses the same person confirming it (T2.1). */
+  preparedBy: Map<number, Persona | 'other'>;
+  /** Units of the one line of the order already asked in any request. */
+  asked: number;
+}
+
+const RETURN_BASE: ReturnView = {
+  id: 1,
+  orderNumber: E2E_ORDER,
+  status: 'REQUESTED',
+  reason: 'DEFECT',
+  comment: null,
+  items: [{ sku: 'E2E-0001', quantity: 1 }],
+  refundMxnCents: null,
+  restock: null,
+  createdAt: '2026-11-20T16:00:00.000Z',
+  preparedAt: null,
+  confirmedAt: null,
+};
+
+/** Fresh returns: none, or a request to prepare and one prepared by someone else. */
+function newReturns(seed: boolean): Returns {
+  const returns: Returns = { rows: [], preparedBy: new Map(), asked: 0 };
+  if (seed) {
+    returns.rows.push(
+      { ...RETURN_BASE, id: 1, comment: 'Llegó roto' },
+      {
+        ...RETURN_BASE,
+        id: 2,
+        orderNumber: 'YEK-2026-E2E00002',
+        reason: 'CHANGED_MIND',
+        status: 'PREPARED',
+        refundMxnCents: 485000,
+        restock: true,
+        preparedAt: '2026-11-21T16:00:00.000Z',
+      }
+    );
+    returns.preparedBy.set(2, 'other');
+  }
+  return returns;
+}
+
+/**
+ * Answers the board `/v1/admin/returns` (FC 073): the list, the preparation and the confirmation
+ * in the stages the API admits them, and the refusal of the same person confirming what they
+ * prepared (T2.1).
+ */
+function answerReturns(route: Route, returns: Returns, who: Persona) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  if (request.method() === 'GET') {
+    const status = new URL(request.url()).searchParams.get('status');
+    const items = returns.rows.filter(
+      (row) => status === null || row.status === status
+    );
+    return json(route, 200, { items, total: items.length });
+  }
+  const step = /\/returns\/(\d+)\/(prepare|confirm)$/.exec(path);
+  const row = returns.rows.find((entry) => entry.id === Number(step?.[1]));
+  if (step === null || row === undefined) {
+    return problem(route, 404, 'RETURN_NOT_FOUND');
+  }
+  if (step[2] === 'prepare') {
+    if (!request.headers()['idempotency-key']) {
+      return problem(route, 400, 'IDEMP_KEY_MISSING');
+    }
+    if (row.status !== 'REQUESTED') {
+      return problem(route, 409, 'RETURN_STATUS_CONFLICT');
+    }
+    const body = request.postDataJSON() as {
+      refundMxnCents: number;
+      restock: boolean;
+    };
+    if (body.refundMxnCents > DETAIL.totalMxnCents) {
+      return problem(route, 409, 'INVALID_REFUND_AMOUNT_REJECT');
+    }
+    Object.assign(row, {
+      status: 'PREPARED',
+      refundMxnCents: body.refundMxnCents,
+      restock: body.restock,
+      preparedAt: new Date().toISOString(),
+    });
+    returns.preparedBy.set(row.id, who);
+    return json(route, 200, row);
+  }
+  if (row.status === 'REFUNDED') return json(route, 200, row);
+  if (row.status === 'REQUESTED') {
+    return problem(route, 409, 'RETURN_NOT_PREPARED_REJECT');
+  }
+  if (returns.preparedBy.get(row.id) === who) {
+    return problem(route, 403, 'DUAL_CONTROL_VIOLATION_REJECT');
+  }
+  Object.assign(row, {
+    status: 'REFUNDED',
+    confirmedAt: new Date().toISOString(),
+  });
+  return json(route, 200, row);
+}
+
+/**
+ * Answers the buyer's `POST /v1/account/orders/:order_number/returns` (FC 073): a key is
+ * required, the order must be delivered and the units cannot pass what is left to return.
+ */
+function answerReturnRequest(
+  route: Route,
+  parcel: Fulfillment,
+  returns: Returns
+) {
+  const request = route.request();
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  if (parcel.step !== 'DELIVERED') {
+    return problem(route, 409, 'ORDER_NOT_DELIVERED_REJECT');
+  }
+  const body = request.postDataJSON() as {
+    items: { sku: string; quantity: number }[];
+    reason: ReturnView['reason'];
+    comment?: string;
+  };
+  const units = body.items.reduce((sum, line) => sum + line.quantity, 0);
+  if (units + returns.asked > DETAIL.lines[0].quantity) {
+    return problem(route, 400, 'INVALID_QUANTITY_REJECT');
+  }
+  returns.asked += units;
+  const row: ReturnView = {
+    ...RETURN_BASE,
+    id: returns.rows.length + 1,
+    status: 'REQUESTED',
+    reason: body.reason,
+    comment: body.comment ?? null,
+    items: body.items,
+    createdAt: new Date().toISOString(),
+  };
+  returns.rows.push(row);
+  return json(route, 201, row);
+}
 /** An upload the page sent to the catalog backoffice, as the browser decoded it. */
 export interface Upload {
   /** The Content-Type of the request: what the Canvas encoded. */
@@ -985,6 +1161,7 @@ const CATALOG_PRODUCT = {
   lengthMm: 300,
   widthMm: 200,
   heightMm: 120,
+  allowsReturn: true,
   isActive: true,
   isTest: true,
   facetValueIds: [] as number[],

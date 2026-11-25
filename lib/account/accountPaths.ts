@@ -13,6 +13,8 @@
  * - `{area}catalogo/` the catalog console (FC 029 F3, `catalog:write`), and one tab of it:
  *   `{area}catalogo/{productos,marcas,propiedades,publicar}/`;
  * - `{area}usuarios/` the panel of users and roles (FC 072 F2, the owner and the administrators);
+ * - `{area}devoluciones/` the board of returns (FC 073, `returns:view`): the requests of the buyers and the
+ *   refunds an operator prepares and another confirms;
  * - `{area}envios/` the shipping console (FC 061, `shipping:manage`): strategy, free shipping and the
  *   rate of each state. The sub-path is the same in both languages.
  *
@@ -33,6 +35,7 @@ export interface AccountView {
     | 'panel'
     | 'catalog'
     | 'users'
+    | 'returns'
     | 'shipping';
   /** The open order, or null for the list. */
   orderNumber: string | null;
@@ -74,6 +77,7 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
     return { tab: 'catalog', orderNumber: null, section };
   }
   if (first === 'usuarios') return { tab: 'users', orderNumber: null };
+  if (first === 'devoluciones') return { tab: 'returns', orderNumber: null };
   if (first === 'envios') return { tab: 'shipping', orderNumber: null };
   if (first === 'panel') {
     return {
@@ -103,6 +107,7 @@ export function accountPath(area: string, view: AccountView): string {
     return `${area}catalogo/${section}`;
   }
   if (view.tab === 'users') return `${area}usuarios/`;
+  if (view.tab === 'returns') return `${area}devoluciones/`;
   if (view.tab === 'shipping') return `${area}envios/`;
   const tab = view.tab === 'panel' ? 'panel/' : '';
   const order = view.orderNumber ? `${view.orderNumber}/` : '';

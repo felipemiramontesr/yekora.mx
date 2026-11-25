@@ -128,8 +128,10 @@ export async function findOrder(
       quantity: number;
       unit_price_mxn_cents: number | string;
       line_total_mxn_cents: number | string;
+      allows_return: number;
+      returned: number | string;
     }>(
-      'SELECT sku, quantity, unit_price_mxn_cents, line_total_mxn_cents FROM order_items WHERE order_id = ? ORDER BY id',
+      'SELECT i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return ORDER BY i.id',
       [row.id]
     ),
     db.query<{
@@ -160,6 +162,8 @@ export async function findOrder(
         quantity: Number(line.quantity),
         unitPriceMxnCents: Number(line.unit_price_mxn_cents),
         lineTotalMxnCents: Number(line.line_total_mxn_cents),
+        allowsReturn: Number(line.allows_return) === 1,
+        returnedQuantity: Number(line.returned),
       })),
       paymentEvents: events.map((event) => ({
         processor: event.processor as Event['processor'],

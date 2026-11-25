@@ -1419,6 +1419,7 @@ describe('products of the backoffice on real SQL (FC 029 F2b2)', () => {
     lengthMm: 300,
     widthMm: 200,
     heightMm: 100,
+    allowsReturn: true,
   };
   it('creates a product with its property values, replaces them, and retires it (T2.6, T2.3c)', async () => {
     const material = await db.transaction((tx) =>
@@ -2624,6 +2625,68 @@ describe('returns and refunds on real SQL (migration 017, returnsService.ts, FC 
     );
     expect(lines.length).toBeGreaterThan(0);
     expect(lines.every((line) => Number(line.allows_return) === 1)).toBe(true);
+    await undo();
+  });
+
+  it('a line keeps the allows_return it sold with, whatever the product says later (FC 073 T2.5)', async () => {
+    const { order, item, undo } = await deliveredOrder();
+    const [{ product_id: productId }] = await db.query<{ product_id: number }>(
+      'SELECT product_id FROM order_items WHERE order_id = ? ORDER BY id LIMIT 1',
+      [order.id]
+    );
+    const linesOf = async () =>
+      (await findOrder(db, order.order_number))?.order.lines ?? [];
+    expect(await linesOf()).toMatchObject([
+      { sku: item.sku, allowsReturn: true, returnedQuantity: 0 },
+    ]);
+    // The product becomes a final sale: the line already sold still allows the return.
+    const closed = await db.transaction((tx) =>
+      updateProduct(tx, Number(productId), { allowsReturn: false })
+    );
+    if (typeof closed === 'string') throw new Error(closed);
+    expect(closed.after.allowsReturn).toBe(false);
+    expect((await linesOf())[0]).toMatchObject({ allowsReturn: true });
+    // And the other way round: a line sold as a final sale stays one when the product reopens.
+    await db.query(
+      'UPDATE order_items SET allows_return = 0 WHERE order_id = ?',
+      [order.id]
+    );
+    const reopened = await db.transaction((tx) =>
+      updateProduct(tx, Number(productId), { allowsReturn: true })
+    );
+    if (typeof reopened === 'string') throw new Error(reopened);
+    expect((await linesOf())[0]).toMatchObject({ allowsReturn: false });
+    await db.query(
+      'UPDATE order_items SET allows_return = 1 WHERE order_id = ?',
+      [order.id]
+    );
+    await undo();
+  });
+
+  it('the order read counts the units any request already asked for each line (FC 073 F0)', async () => {
+    const { buyer, order, item, undo } = await deliveredOrder();
+    const asked = await db.transaction((tx) =>
+      requestReturn(
+        tx,
+        {
+          orderNumber: order.order_number,
+          userId: buyer,
+          request: {
+            items: [{ sku: item.sku, quantity: 1 }],
+            reason: 'CHANGED_MIND',
+          },
+          now: new Date(),
+        },
+        { userId: buyer, ip: null }
+      )
+    );
+    if (typeof asked === 'string') throw new Error(asked);
+    const [line] = (await findOrder(db, order.order_number))?.order.lines ?? [];
+    expect(line).toMatchObject({
+      sku: item.sku,
+      quantity: Number(item.quantity),
+      returnedQuantity: 1,
+    });
     await undo();
   });
 

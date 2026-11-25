@@ -101,6 +101,7 @@ function fieldsOf(data: FormData) {
     lengthMm: Number(textOf(data, 'lengthMm')),
     widthMm: Number(textOf(data, 'widthMm')),
     heightMm: Number(textOf(data, 'heightMm')),
+    allowsReturn: data.has('allowsReturn'),
     facetValueIds: data.getAll('facetValueIds').map(Number),
   };
 }
@@ -370,6 +371,15 @@ export function ProductForm({
               />
             ))
           )}
+          {guided(texts, 'allowsReturn', t.allowsReturn, (control) => (
+            <input
+              {...control}
+              name="allowsReturn"
+              type="checkbox"
+              defaultChecked={product?.allowsReturn ?? true}
+              className="size-6 self-start"
+            />
+          ))}
           {options.groups
             .filter((group) => group.isActive)
             .map((group) => (

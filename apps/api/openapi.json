@@ -5945,13 +5945,23 @@
                             "type": "integer",
                             "exclusiveMinimum": 0,
                             "maximum": 9007199254740991
+                          },
+                          "allowsReturn": {
+                            "type": "boolean"
+                          },
+                          "returnedQuantity": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
                           }
                         },
                         "required": [
                           "sku",
                           "quantity",
                           "unitPriceMxnCents",
-                          "lineTotalMxnCents"
+                          "lineTotalMxnCents",
+                          "allowsReturn",
+                          "returnedQuantity"
                         ],
                         "additionalProperties": false
                       }
@@ -6957,13 +6967,23 @@
                             "type": "integer",
                             "exclusiveMinimum": 0,
                             "maximum": 9007199254740991
+                          },
+                          "allowsReturn": {
+                            "type": "boolean"
+                          },
+                          "returnedQuantity": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
                           }
                         },
                         "required": [
                           "sku",
                           "quantity",
                           "unitPriceMxnCents",
-                          "lineTotalMxnCents"
+                          "lineTotalMxnCents",
+                          "allowsReturn",
+                          "returnedQuantity"
                         ],
                         "additionalProperties": false
                       }
@@ -14107,6 +14127,9 @@
                             "exclusiveMinimum": 0,
                             "maximum": 9007199254740991
                           },
+                          "allowsReturn": {
+                            "type": "boolean"
+                          },
                           "isActive": {
                             "type": "boolean"
                           },
@@ -14174,6 +14197,7 @@
                           "lengthMm",
                           "widthMm",
                           "heightMm",
+                          "allowsReturn",
                           "isActive",
                           "isTest",
                           "facetValueIds",
@@ -14420,6 +14444,10 @@
                     "exclusiveMinimum": 0,
                     "maximum": 100000000
                   },
+                  "allowsReturn": {
+                    "default": true,
+                    "type": "boolean"
+                  },
                   "facetValueIds": {
                     "default": [],
                     "maxItems": 50,
@@ -14577,6 +14605,9 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "allowsReturn": {
+                      "type": "boolean"
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -14644,6 +14675,7 @@
                     "lengthMm",
                     "widthMm",
                     "heightMm",
+                    "allowsReturn",
                     "isActive",
                     "isTest",
                     "facetValueIds",
@@ -14953,6 +14985,9 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "allowsReturn": {
+                      "type": "boolean"
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -15020,6 +15055,7 @@
                     "lengthMm",
                     "widthMm",
                     "heightMm",
+                    "allowsReturn",
                     "isActive",
                     "isTest",
                     "facetValueIds",
@@ -15273,6 +15309,9 @@
                     "exclusiveMinimum": 0,
                     "maximum": 100000000
                   },
+                  "allowsReturn": {
+                    "type": "boolean"
+                  },
                   "isActive": {
                     "type": "boolean"
                   },
@@ -15375,6 +15414,9 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "allowsReturn": {
+                      "type": "boolean"
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -15442,6 +15484,7 @@
                     "lengthMm",
                     "widthMm",
                     "heightMm",
+                    "allowsReturn",
                     "isActive",
                     "isTest",
                     "facetValueIds",
@@ -15814,6 +15857,9 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "allowsReturn": {
+                      "type": "boolean"
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -15881,6 +15927,7 @@
                     "lengthMm",
                     "widthMm",
                     "heightMm",
+                    "allowsReturn",
                     "isActive",
                     "isTest",
                     "facetValueIds",

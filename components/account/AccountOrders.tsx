@@ -13,6 +13,7 @@ import { fill, formatMoney } from '@/lib/catalog/format';
 import { ORDER_STATUS_CODES } from '@/lib/checkout/checkoutTypes';
 import { FormAlert, failureText } from './AccountForms';
 import { OrderFulfillment } from './OrderFulfillment';
+import { OrderReturnRequest } from './OrderReturnRequest';
 
 /** The texts the order views read. */
 interface OrderTexts {
@@ -29,7 +30,7 @@ type Load<T> =
 const PAGE_SIZE = 20;
 
 /** A date and time in Mexico City, where the store and its buyers are. */
-function when(iso: string, locale: Locale): string {
+export function when(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -449,6 +450,15 @@ export function OrderDetailView({
       )}
       {load.kind === 'ready' && (
         <OrderFacts order={load.data} locale={locale} texts={texts} />
+      )}
+      {load.kind === 'ready' && scope === 'account' && (
+        <OrderReturnRequest
+          order={load.data}
+          texts={account.returnRequest}
+          locale={locale}
+          exampleLabel={account.exampleLabel}
+          onDone={() => setReload((count) => count + 1)}
+        />
       )}
       {load.kind === 'ready' && canManage && (
         <OrderFulfillment

@@ -64,6 +64,7 @@ interface AdminProduct {
   lengthMm: number;
   widthMm: number;
   heightMm: number;
+  allowsReturn: boolean;
   isActive: boolean;
   isTest: boolean;
   /** Values of the product's properties. */
@@ -86,6 +87,7 @@ interface ProductFields {
   lengthMm: number;
   widthMm: number;
   heightMm: number;
+  allowsReturn: boolean;
 }
 
 /** What creating a product takes. */
@@ -120,6 +122,7 @@ interface ProductRow {
   length_mm: number;
   width_mm: number;
   height_mm: number;
+  allows_return: number;
   is_active: number;
   is_test: number;
 }
@@ -146,6 +149,7 @@ const productOf = (
   lengthMm: Number(row.length_mm),
   widthMm: Number(row.width_mm),
   heightMm: Number(row.height_mm),
+  allowsReturn: Number(row.allows_return) === 1,
   isActive: Number(row.is_active) === 1,
   isTest: Number(row.is_test) === 1,
   facetValueIds,
@@ -167,7 +171,7 @@ export async function listAdminProducts(
     'SELECT COUNT(*) AS total FROM products'
   );
   const rows = await db.query<ProductRow>(
-    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
+    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?',
     [paging.pageSize, (paging.page - 1) * paging.pageSize]
   );
   // Each product comes with its properties and its stored gallery, so «Edit» and «Gallery»
@@ -182,7 +186,7 @@ async function productRow(
   id: number
 ): Promise<ProductRow | undefined> {
   const [row] = await tx.query<ProductRow>(
-    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?',
+    'SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?',
     [id]
   );
   return row;
@@ -331,7 +335,7 @@ export async function createProduct(
   if (refs === null || !(await checkedBlobs(tx, input.images)))
     return 'CAT_REFERENCE_INVALID';
   await tx.query(
-    'INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO products (sku, slug, category_id, brand_id, name_es, name_en, description_es, description_en, price_mxn_cents, stock, weight_grams, length_mm, width_mm, height_mm, shipping_class_id, allows_return) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       input.sku,
       input.slug,
@@ -348,6 +352,7 @@ export async function createProduct(
       input.widthMm,
       input.heightMm,
       refs.shipping,
+      input.allowsReturn ? 1 : 0,
     ]
   );
   const [{ id }] = await tx.query<{ id: number }>(
@@ -391,7 +396,7 @@ export async function updateProduct(
   const refs = await references(tx, next);
   if (refs === null) return 'CAT_REFERENCE_INVALID';
   await tx.query(
-    'UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, is_active = ? WHERE id = ?',
+    'UPDATE products SET category_id = ?, brand_id = ?, name_es = ?, name_en = ?, description_es = ?, description_en = ?, price_mxn_cents = ?, stock = ?, weight_grams = ?, length_mm = ?, width_mm = ?, height_mm = ?, shipping_class_id = ?, allows_return = ?, is_active = ? WHERE id = ?',
     [
       refs.category,
       next.brandId,
@@ -406,6 +411,7 @@ export async function updateProduct(
       next.widthMm,
       next.heightMm,
       refs.shipping,
+      next.allowsReturn ? 1 : 0,
       next.isActive ? 1 : 0,
       id,
     ]
