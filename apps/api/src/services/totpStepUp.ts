@@ -22,7 +22,7 @@ export async function verifyStepUpTotp(
   check: { userId: string; code: string; totpKey: Buffer; now: Date }
 ): Promise<StepUpCode> {
   const stored = await totpOf(db, check.userId);
-  if (stored === null || !stored.enabled) {
+  if (!stored?.enabled) {
     return decideStepUp({ active: true, enrolled: false, valid: false });
   }
   const secret = decryptTotpSecret(
