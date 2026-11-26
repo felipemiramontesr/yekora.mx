@@ -17,6 +17,7 @@ import { remoteFontViolations } from './lib/hermeticBuild';
 import { outboxViolations } from './lib/outboxValidation';
 import { ownerEmailViolations } from './lib/ownerHygiene';
 import {
+  accountWhitelistViolations,
   SPA_AREAS,
   spaFallbackViolations,
   staticExportViolations,
@@ -57,6 +58,10 @@ const failures = [
   ...spaFallbackViolations(readFileSync('public/.htaccess', 'utf8'), areas).map(
     (v) => `b) ${v}`
   ),
+  ...accountWhitelistViolations(
+    readFileSync('public/.htaccess', 'utf8'),
+    areas.filter((area) => area === 'cuenta' || area === 'en/account')
+  ).map((v) => `b2) ${v}`),
   ...outboxViolations(sources('apps/api/src')).map((v) => `c) ${v}`),
   ...remoteFontViolations(
     new Map(

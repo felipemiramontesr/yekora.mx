@@ -28,10 +28,15 @@ const PUBLIC_DIR = 'public';
 const SERVER_FILES = new Set(['.htaccess']);
 
 /**
- * Scripts the operator runs against production that are the only way into a product service:
- * the owner account is provisioned out of band, never through a route (FC 044 T2.1).
+ * Scripts that count as consumers although they are not the product: the one the operator runs
+ * against production as the only way into a service (the owner account is provisioned out of
+ * band, never through a route, FC 044 T2.1), and the platform guard that reads the address table
+ * of the account area to keep public/.htaccess in step with it (FC 074 T2.4).
  */
-const OPERATOR_SCRIPTS = ['scripts/provisionOwner.ts'];
+const OPERATOR_SCRIPTS = [
+  'scripts/provisionOwner.ts',
+  'scripts/lib/spaExportValidation.ts',
+];
 
 const MODIFIERS = new Set(['declare', 'async']);
 const DECLARATION_KEYWORDS = new Set([

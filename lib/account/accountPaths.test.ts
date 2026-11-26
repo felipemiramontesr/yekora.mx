@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { accountPath, parseAccountPath } from './accountPaths';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  ACCOUNT_SEGMENTS,
+  accountPath,
+  CATALOG_SECTIONS,
+  parseAccountPath,
+} from './accountPaths';
 
 const ORDER = 'YEK-2026-AB12CD34';
 
@@ -154,6 +161,53 @@ describe('shipping console path (FC 061)', () => {
       expect(accountPath(area, { tab: 'shipping', orderNumber: null })).toBe(
         `${area}envios/`
       );
+    }
+  });
+});
+
+describe('the address table of the area (FC 074 K-77, T2.4, T2.5)', () => {
+  it('names one fixed segment for each tab but the orders, and the four tabs of the catalog', () => {
+    expect(ACCOUNT_SEGMENTS).toEqual({
+      profile: 'datos',
+      'payment-methods': 'metodos-pago',
+      admin: 'administracion',
+      panel: 'panel',
+      catalog: 'catalogo',
+      users: 'usuarios',
+      returns: 'devoluciones',
+      shipping: 'envios',
+    });
+    expect(CATALOG_SECTIONS).toEqual([
+      'productos',
+      'marcas',
+      'propiedades',
+      'publicar',
+    ]);
+  });
+
+  it('writes every tab at its segment and reads it back, in both languages', () => {
+    for (const area of ['/cuenta/', '/en/account/']) {
+      for (const [tab, segment] of Object.entries(ACCOUNT_SEGMENTS)) {
+        const view = { tab, orderNumber: null } as Parameters<
+          typeof accountPath
+        >[1];
+        expect(accountPath(area, view)).toBe(`${area}${segment}/`);
+        expect(parseAccountPath(`${area}${segment}/`, area).tab).toBe(tab);
+      }
+    }
+  });
+
+  it('keeps no address of the retired «administradores» console in the code of the account area', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        return statSync(path).isDirectory() ? files(path) : [path];
+      });
+    const here = 'accountPaths.test.ts';
+    for (const dir of ['lib/account', 'components/account']) {
+      for (const file of files(dir).filter((path) => !path.endsWith(here))) {
+        expect(readFileSync(file, 'utf8')).not.toMatch(/administradores\//);
+      }
     }
   });
 });

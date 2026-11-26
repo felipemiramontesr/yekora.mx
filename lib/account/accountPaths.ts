@@ -43,8 +43,25 @@ export interface AccountView {
   section?: CatalogSection | null;
 }
 
+/**
+ * The URL segment of each tab that has a fixed address of its own (the buyer's orders have none:
+ * they are the root of the area). The one table the client and the platform guard both read
+ * (FC 074 K-77): `scripts/lib/spaExportValidation.ts` checks that `public/.htaccess` admits each
+ * of these and nothing else, so an address the page does not know answers a real 404.
+ */
+export const ACCOUNT_SEGMENTS = {
+  profile: 'datos',
+  'payment-methods': 'metodos-pago',
+  admin: 'administracion',
+  panel: 'panel',
+  catalog: 'catalogo',
+  users: 'usuarios',
+  returns: 'devoluciones',
+  shipping: 'envios',
+} as const satisfies Partial<Record<AccountView['tab'], string>>;
+
 /** The tabs of the catalog console that have an address of their own (FC 052 T1.1). */
-const CATALOG_SECTIONS = [
+export const CATALOG_SECTIONS = [
   'productos',
   'marcas',
   'propiedades',
@@ -53,6 +70,13 @@ const CATALOG_SECTIONS = [
 
 /** One of {@link CATALOG_SECTIONS}. */
 export type CatalogSection = (typeof CATALOG_SECTIONS)[number];
+
+/** The tab a fixed segment opens, by its segment. */
+const TAB_OF_SEGMENT = new Map<string, keyof typeof ACCOUNT_SEGMENTS>(
+  (Object.keys(ACCOUNT_SEGMENTS) as (keyof typeof ACCOUNT_SEGMENTS)[]).map(
+    (tab) => [ACCOUNT_SEGMENTS[tab], tab]
+  )
+);
 
 /** Shape of a public order number. */
 const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
@@ -67,24 +91,18 @@ const ORDER_NUMBER = /^YEK-\d{4}-[0-9A-Z]{8}$/;
 export function parseAccountPath(pathname: string, area: string): AccountView {
   const rest = pathname.startsWith(area) ? pathname.slice(area.length) : '';
   const [first = '', second = ''] = rest.split('/');
-  if (first === 'datos') return { tab: 'profile', orderNumber: null };
-  if (first === 'metodos-pago') {
-    return { tab: 'payment-methods', orderNumber: null };
-  }
-  if (first === 'administracion') return { tab: 'admin', orderNumber: null };
-  if (first === 'catalogo') {
+  const tab = TAB_OF_SEGMENT.get(first);
+  if (tab === 'catalog') {
     const section = CATALOG_SECTIONS.find((name) => name === second) ?? null;
-    return { tab: 'catalog', orderNumber: null, section };
+    return { tab, orderNumber: null, section };
   }
-  if (first === 'usuarios') return { tab: 'users', orderNumber: null };
-  if (first === 'devoluciones') return { tab: 'returns', orderNumber: null };
-  if (first === 'envios') return { tab: 'shipping', orderNumber: null };
-  if (first === 'panel') {
+  if (tab === 'panel') {
     return {
-      tab: 'panel',
+      tab,
       orderNumber: ORDER_NUMBER.test(second) ? second : null,
     };
   }
+  if (tab !== undefined) return { tab, orderNumber: null };
   return {
     tab: 'orders',
     orderNumber: ORDER_NUMBER.test(first) ? first : null,
@@ -99,17 +117,14 @@ export function parseAccountPath(pathname: string, area: string): AccountView {
  * @returns e.g. `/cuenta/panel/YEK-2026-AB12CD34/`.
  */
 export function accountPath(area: string, view: AccountView): string {
-  if (view.tab === 'profile') return `${area}datos/`;
-  if (view.tab === 'payment-methods') return `${area}metodos-pago/`;
-  if (view.tab === 'admin') return `${area}administracion/`;
-  if (view.tab === 'catalog') {
-    const section = view.section ? `${view.section}/` : '';
-    return `${area}catalogo/${section}`;
+  if (view.tab === 'orders') {
+    return view.orderNumber ? `${area}${view.orderNumber}/` : area;
   }
-  if (view.tab === 'users') return `${area}usuarios/`;
-  if (view.tab === 'returns') return `${area}devoluciones/`;
-  if (view.tab === 'shipping') return `${area}envios/`;
-  const tab = view.tab === 'panel' ? 'panel/' : '';
-  const order = view.orderNumber ? `${view.orderNumber}/` : '';
-  return `${area}${tab}${order}`;
+  const segment = `${area}${ACCOUNT_SEGMENTS[view.tab]}/`;
+  if (view.tab === 'catalog') {
+    return view.section ? `${segment}${view.section}/` : segment;
+  }
+  return view.tab === 'panel' && view.orderNumber
+    ? `${segment}${view.orderNumber}/`
+    : segment;
 }

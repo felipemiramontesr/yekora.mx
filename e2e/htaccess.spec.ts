@@ -93,12 +93,69 @@ test('every sub-path of the account area answers its own page', async ({
   request,
 }) => {
   for (const [path, title] of [
+    ['/cuenta/', 'Mi cuenta'],
+    ['/en/account/', 'My account'],
     ['/cuenta/YEK-2026-AB12CD34/', 'Mi cuenta'],
+    ['/cuenta/datos/', 'Mi cuenta'],
+    ['/cuenta/metodos-pago/', 'Mi cuenta'],
+    ['/cuenta/administracion/', 'Mi cuenta'],
+    ['/cuenta/usuarios/', 'Mi cuenta'],
+    ['/cuenta/devoluciones/', 'Mi cuenta'],
+    ['/cuenta/envios/', 'Mi cuenta'],
+    ['/cuenta/catalogo/', 'Mi cuenta'],
+    ['/cuenta/catalogo/publicar/', 'Mi cuenta'],
     ['/cuenta/panel/', 'Mi cuenta'],
+    ['/en/account/devoluciones', 'My account'],
     ['/en/account/panel/YEK-2026-AB12CD34/', 'My account'],
   ]) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect(response.status()).toBe(200);
     expect(await response.text()).toContain(title);
+  }
+});
+
+// FC 074 (K-77, OWASP A01/A05): an address of the account area the page does not open is a real
+// 404 with the exported 404 page, never the page of the area with 200 and never a redirect. The
+// retired «administradores» console is one of them, in both languages, and an extra segment after
+// a known one is another.
+test('an unknown or retired address of the account area is a real 404 with no redirect (T2.1, T2.2)', async ({
+  request,
+}) => {
+  for (const path of [
+    '/cuenta/administradores/',
+    '/en/account/administradores/',
+    '/cuenta/no-existe/',
+    '/en/account/no-existe/',
+    '/cuenta/datos/x/',
+    '/cuenta/panel/no-es-un-folio/',
+    '/cuenta/catalogo/otra/',
+    '/cuenta/yek-2026-ab12cd34/',
+  ]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status(), path).toBe(404);
+    expect(response.headers().location, path).toBeUndefined();
+    const body = await response.text();
+    expect(body, path).toContain('Ruta no encontrada');
+    expect(body, path).not.toMatch(/administrador/i);
+  }
+});
+
+// FC 074 T2.3: the 404 of the account area carries the same hardening as a page that answers 200.
+test('the 404 of the account area carries the same security headers as a page (T2.3)', async ({
+  request,
+}) => {
+  const page = (await request.get('/cuenta/', { maxRedirects: 0 })).headers();
+  const missing = (
+    await request.get('/cuenta/administradores/', { maxRedirects: 0 })
+  ).headers();
+  for (const name of [
+    'content-security-policy',
+    'strict-transport-security',
+    'x-content-type-options',
+    'referrer-policy',
+    'permissions-policy',
+  ]) {
+    expect(missing[name], name).toBeDefined();
+    expect(missing[name], name).toBe(page[name]);
   }
 });
