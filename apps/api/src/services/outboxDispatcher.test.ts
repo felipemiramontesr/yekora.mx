@@ -1038,3 +1038,43 @@ describe('the language of an order mail (FC 067 T1.1, T2.1)', () => {
     expect(message.html).toContain('<html lang="es-MX">');
   });
 });
+
+describe('the alerts of the payments (FC 075 T2.4)', () => {
+  const alert = (id: number, type: string, extra: object, locale: string) =>
+    row(id, {
+      event_type: type,
+      payload: JSON.stringify({ userId: USER, locale, ...extra }),
+    });
+
+  it.each(['es-MX', 'en'])(
+    'writes the three notices in %s, with the mode or the processor and no secret',
+    async (locale) => {
+      const { db } = outboxDb([
+        [
+          alert(1, 'PAYMENTS_MODE_APPROVED', { targetMode: 'live' }, locale),
+          alert(2, 'PAYMENTS_PROBE_FAILED', { processor: 'STRIPE' }, locale),
+          alert(
+            3,
+            'WEBHOOK_SIGNATURE_ANOMALY',
+            { processor: 'MERCADO_PAGO' },
+            locale
+          ),
+        ],
+      ]);
+      const { outbox, send } = dispatcher(db);
+      outbox.kick();
+      await outbox.drain();
+      const [mode, probe, anomaly] = send.mock.calls.map(([m]) => m);
+      expect(mode.text).toContain('live');
+      expect(probe.text).toContain('STRIPE');
+      expect(anomaly.text).toContain('MERCADO_PAGO');
+      for (const message of [mode, probe, anomaly]) {
+        expect(message.subject.length).toBeGreaterThan(0);
+        expect(message.html).toContain(
+          `<html lang="${locale === 'en' ? 'en' : 'es-MX'}">`
+        );
+        expect(message.text).not.toMatch(/sk_|whsec_/);
+      }
+    }
+  );
+});

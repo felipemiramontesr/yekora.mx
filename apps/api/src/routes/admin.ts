@@ -22,6 +22,7 @@ import { problem, PROBLEM_TYPE } from '../lib/problem';
 import { type CheckoutDeps, expireOverdueOrders } from '../services/checkout';
 import type { Db, Transactional } from '../services/db';
 import { listOrders } from '../services/orderReads';
+import { noteProbeFailure } from '../services/paymentAlerts';
 import { readPaymentsHealth } from '../services/paymentsHealth';
 import { lookUpOrder } from './orders';
 
@@ -67,11 +68,31 @@ export function registerAdminRoutes(
 
   // FC 070 T2.2: reachability of the processors, behind the session, the authenticator and
   // orders:read of the guard. The public GET /health is another route and stays as it is.
-  app.get('/v1/admin/payments/health', async () =>
-    paymentsHealthSchema.parse(
+  app.get('/v1/admin/payments/health', async (request) => {
+    const health = paymentsHealthSchema.parse(
       await readPaymentsHealth(deps.mode, deps.processors)
-    )
-  );
+    );
+    // FC 075 T2.4: a processor that did not answer is told to the owner, at most once an hour.
+    const failed = (
+      [
+        ['STRIPE', health.processors.stripe],
+        ['MERCADO_PAGO', health.processors.mercadoPago],
+      ] as const
+    ).filter(([, state]) => state === 'unreachable');
+    // Telling it must never break the probe: a failure is only logged.
+    const alerted = await Promise.all(
+      failed.map(([processor]) =>
+        noteProbeFailure(deps.db, processor, deps.now()).catch(
+          (error: unknown) => {
+            request.log.error({ error }, 'probe failure not recorded');
+            return false;
+          }
+        )
+      )
+    );
+    if (alerted.includes(true)) request.outboxQueued = true;
+    return health;
+  });
 
   app.get('/v1/admin/orders/:order_number', async (request, reply) => {
     const { order_number: orderNumber } = request.params as {

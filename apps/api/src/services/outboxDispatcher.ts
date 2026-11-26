@@ -185,6 +185,75 @@ const COPY = {
       },
     }),
   },
+  PAYMENTS_MODE_APPROVED: {
+    'es-MX': (mode: string): Copy => ({
+      subject: 'Aprobaste un cambio de modo de pagos en YĒKORA',
+      content: {
+        heading: 'Cambio de modo de pagos aprobado',
+        paragraphs: [
+          `Se aprobó cambiar los pagos a modo «${mode}». El cambio no ocurre solo: hay que actualizar el modo y las llaves en el servidor y volver a desplegar, dentro de las próximas 24 horas.`,
+        ],
+        notice: `Si nadie de tu equipo lo pidió, revisa la bitácora y cambia las llaves de pago.`,
+      },
+    }),
+    en: (mode: string): Copy => ({
+      subject: 'A payments mode change was approved on YĒKORA',
+      content: {
+        heading: 'Payments mode change approved',
+        paragraphs: [
+          `A change of the payments to «${mode}» mode was approved. It does not happen by itself: the mode and the keys must be updated on the server and the API redeployed, within the next 24 hours.`,
+        ],
+        notice: `If nobody on your team asked for it, check the audit log and rotate the payment keys.`,
+      },
+    }),
+  },
+  PAYMENTS_PROBE_FAILED: {
+    'es-MX': (processor: string): Copy => ({
+      subject: 'Un procesador de pagos no respondió',
+      content: {
+        heading: 'Un procesador de pagos no respondió',
+        paragraphs: [
+          `La revisión de salud no pudo conectar con ${processor}. Revisa su panel y las llaves configuradas.`,
+        ],
+        notice:
+          'Este aviso se envía como máximo una vez por hora y por procesador.',
+      },
+    }),
+    en: (processor: string): Copy => ({
+      subject: 'A payment processor did not answer',
+      content: {
+        heading: 'A payment processor did not answer',
+        paragraphs: [
+          `The health check could not reach ${processor}. Check its dashboard and the configured keys.`,
+        ],
+        notice: 'This notice is sent at most once an hour for each processor.',
+      },
+    }),
+  },
+  WEBHOOK_SIGNATURE_ANOMALY: {
+    'es-MX': (processor: string): Copy => ({
+      subject: 'Avisos de pago con firma inválida',
+      content: {
+        heading: 'Avisos de pago con firma inválida',
+        paragraphs: [
+          `En los últimos 10 minutos llegaron 10 o más avisos de ${processor} con una firma que no es válida. Puede ser un secreto de webhook desactualizado o un intento de suplantación.`,
+        ],
+        notice:
+          'Revisa el secreto del webhook en el panel del procesador y en el servidor.',
+      },
+    }),
+    en: (processor: string): Copy => ({
+      subject: 'Payment notices with a bad signature',
+      content: {
+        heading: 'Payment notices with a bad signature',
+        paragraphs: [
+          `In the last 10 minutes, 10 or more notices from ${processor} arrived with a signature that is not valid. It may be an outdated webhook secret or an attempt to impersonate the processor.`,
+        ],
+        notice:
+          'Check the webhook secret in the dashboard of the processor and on the server.',
+      },
+    }),
+  },
   TOTP_ENABLED: {
     'es-MX': (): Copy => ({
       subject: 'Activaste la verificación en dos pasos en YĒKORA',
@@ -241,6 +310,12 @@ function copyOf(
       return COPY.PASSWORD_CHANGED[locale]();
     case 'TOTP_ENABLED':
       return COPY.TOTP_ENABLED[locale]();
+    case 'PAYMENTS_MODE_APPROVED':
+      return COPY.PAYMENTS_MODE_APPROVED[locale](event.targetMode);
+    case 'PAYMENTS_PROBE_FAILED':
+      return COPY.PAYMENTS_PROBE_FAILED[locale](event.processor);
+    case 'WEBHOOK_SIGNATURE_ANOMALY':
+      return COPY.WEBHOOK_SIGNATURE_ANOMALY[locale](event.processor);
   }
 }
 

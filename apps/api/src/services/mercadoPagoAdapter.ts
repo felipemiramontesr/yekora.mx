@@ -25,6 +25,7 @@
  * @module
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { signedByAny } from './webhookSecrets';
 import {
   type CreatedSession,
   type PaymentMethodCode,
@@ -227,16 +228,18 @@ export function createMercadoPagoAdapter(
       const requestId = header(headers, 'x-request-id');
       const dataId = (query['data.id'] ?? '').toLowerCase();
       if (ts === '' || requestId === '' || dataId === '') return null;
-      const expected = createHmac('sha256', secrets.webhookSecret)
-        .update(`id:${dataId};request-id:${requestId};ts:${ts};`)
-        .digest();
       const received = Buffer.from(given, 'hex');
-      if (
-        received.length !== expected.length ||
-        !timingSafeEqual(received, expected)
-      ) {
-        return null;
-      }
+      // FC 075 T1.2: during a rotation the variable holds both secrets.
+      const signed = signedByAny(secrets.webhookSecret, (secret) => {
+        const expected = createHmac('sha256', secret)
+          .update(`id:${dataId};request-id:${requestId};ts:${ts};`)
+          .digest();
+        return (
+          received.length === expected.length &&
+          timingSafeEqual(received, expected)
+        );
+      });
+      if (!signed) return null;
       let event: { id?: unknown; type?: unknown; action?: unknown };
       try {
         event = JSON.parse(rawBody.toString('utf8')) as typeof event;

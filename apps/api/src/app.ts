@@ -22,6 +22,7 @@ import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAdminRoutes } from './routes/admin';
+import { registerAdminPaymentRoutes } from './routes/adminPayments';
 import { registerAdminOrderRoutes } from './routes/adminOrders';
 import { registerAdminRoleRoutes } from './routes/adminRoles';
 import { registerReturnRoutes } from './routes/returns';
@@ -248,6 +249,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     db: deps.db,
     now,
     processors,
+    mode: deps.config.payments.mode,
+  });
+  // FC 075 F2: the payments mode switch, an approval the start of the API demands.
+  registerAdminPaymentRoutes(app, {
+    db: deps.db,
+    now,
+    auth: deps.config.auth,
     mode: deps.config.payments.mode,
   });
   // FC 044 F1: the owner's console of administrators.

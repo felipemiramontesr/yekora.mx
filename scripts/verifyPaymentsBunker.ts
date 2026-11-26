@@ -4,7 +4,9 @@
  * whether its webhook is set up, and scans the files of the working tree for credentials in clear
  * text. It prints findings and never a value of a secret.
  *
- * CLI: `bun scripts/verifyPaymentsBunker.ts` with the production environment loaded
+ * With `--check-rotation` it also checks the keys and webhook secrets of a rotation (FC 075).
+ *
+ * CLI: `bun scripts/verifyPaymentsBunker.ts [--check-rotation]` with the production environment loaded
  * (CHECKOUT_PII_KEY, CUSTOMER_EMAIL_HMAC_PEPPER, ORDER_TOKEN_PEPPER, STRIPE_SECRET_KEY and
  * API_PUBLIC_URL; the key of Stripe needs `Webhooks: read`).
  * exit 0 = every check passed · exit 1 = at least one failed.
@@ -13,6 +15,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   checkCheckoutSecrets,
+  checkRotation,
   checkStripeWebhook,
   type Finding,
   formatReport,
@@ -61,6 +64,9 @@ findings.push(
       },
   scanForSecrets(treeFiles())
 );
+if (process.argv.includes('--check-rotation')) {
+  findings.push(...checkRotation(process.env));
+}
 
 const report = formatReport(findings);
 console.log(report.text);

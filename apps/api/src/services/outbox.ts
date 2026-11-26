@@ -44,6 +44,24 @@ export type MailEvent = (
       userId: string;
     }
   | {
+      /** The owner approved a change of the payments mode (FC 075, K-75). */
+      type: 'PAYMENTS_MODE_APPROVED';
+      userId: string;
+      targetMode: 'sandbox' | 'live';
+    }
+  | {
+      /** A processor did not answer the health probe (FC 075). */
+      type: 'PAYMENTS_PROBE_FAILED';
+      userId: string;
+      processor: string;
+    }
+  | {
+      /** Ten or more webhooks with a bad signature arrived in ten minutes (FC 075). */
+      type: 'WEBHOOK_SIGNATURE_ANOMALY';
+      userId: string;
+      processor: string;
+    }
+  | {
       /** The payment of an order was confirmed (FC 066, K-88). */
       type: 'ORDER_CONFIRMED';
       /** `orders.id`: the buyer's data is read and decrypted only when the mail is sent. */

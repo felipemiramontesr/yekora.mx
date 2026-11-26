@@ -80,6 +80,7 @@ import {
   useBackupCode,
 } from './services/identity';
 import { findOrder, listOrders } from './services/orderReads';
+import { assertPaymentsModeApproved } from './services/paymentsModeGate';
 import { provisionOwner, recoverOwner } from './services/ownerProvision';
 import { enqueueMail } from './services/outbox';
 import { createOutboxDispatcher } from './services/outboxDispatcher';
@@ -2998,5 +2999,54 @@ describe('the staff, the roles and the matrix on real SQL (migration 018, staffU
       catalog
     );
     await cleanUp();
+  });
+});
+
+describe('the tickets of the payments mode switch on real SQL (migration 019, FC 075 F0 F2)', () => {
+  it('refuses a consumed row without its confirmation, and a value outside its list', async () => {
+    const [user] = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 1'
+    );
+    const insert = (target: string, status: string) =>
+      db.query(
+        'INSERT INTO payments_mode_tickets (challenge_id, target_mode, requested_by, reason, expires_at, status) VALUES (?, ?, ?, ?, NOW(), ?)',
+        [`itest-${target}-${status}`, target, user.id, 'itest', status]
+      );
+    await expect(insert('live', 'CONSUMED')).rejects.toThrow(
+      'ck_payments_mode_tickets_consumed'
+    );
+    await expect(insert('prod', 'PENDING')).rejects.toThrow(
+      'ck_payments_mode_tickets_target'
+    );
+    await expect(insert('live', 'DONE')).rejects.toThrow(
+      'ck_payments_mode_tickets_status'
+    );
+  });
+
+  it('lets live start only while the latest consumed approval is live, and activates it once', async () => {
+    const [user] = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 1'
+    );
+    const consumed = (challenge: string, target: string, minutesAgo: number) =>
+      db.query(
+        "INSERT INTO payments_mode_tickets (challenge_id, target_mode, requested_by, reason, expires_at, status, consumed_at, confirmed_by, approval_expires_at) VALUES (?, ?, ?, 'itest', NOW(), 'CONSUMED', DATE_SUB(NOW(), INTERVAL ? MINUTE), ?, DATE_ADD(NOW(), INTERVAL 1 DAY))",
+        [challenge, target, user.id, minutesAgo, user.id]
+      );
+    await expect(
+      assertPaymentsModeApproved(db, 'live', new Date())
+    ).rejects.toThrow('is not live');
+    await consumed('itest-live', 'live', 10);
+    await assertPaymentsModeApproved(db, 'live', new Date());
+    const [row] = await db.query<{ activated_at: Date | null }>(
+      "SELECT activated_at FROM payments_mode_tickets WHERE challenge_id = 'itest-live'"
+    );
+    expect(row.activated_at).not.toBeNull();
+    await consumed('itest-sandbox', 'sandbox', 1);
+    await expect(
+      assertPaymentsModeApproved(db, 'live', new Date())
+    ).rejects.toThrow('is not live');
+    await db.query(
+      "DELETE FROM payments_mode_tickets WHERE challenge_id LIKE 'itest%'"
+    );
   });
 });

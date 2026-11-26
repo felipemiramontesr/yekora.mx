@@ -172,7 +172,7 @@ describe('loadConfig · payments (FC 012, 092_AN §2)', () => {
   it.each([
     [
       'a live Stripe key in sandbox',
-      { STRIPE_SECRET_KEY: 'sk_live_1', STRIPE_WEBHOOK_SECRET: 'w' },
+      { STRIPE_SECRET_KEY: 'sk_live_1', STRIPE_WEBHOOK_SECRET: 'whsec_w' },
       'STRIPE_SECRET_KEY does not match PAYMENTS_MODE',
     ],
     [
@@ -320,7 +320,10 @@ describe('loadConfig · mail (FC 028 F1, ADR 0013)', () => {
 });
 
 describe('FC 070 T1.1 · PaymentGatewayConfigurationGate(K, P, M) at start-up', () => {
-  const STRIPE = { STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'w' };
+  const STRIPE = {
+    STRIPE_SECRET_KEY: 'sk_test_1',
+    STRIPE_WEBHOOK_SECRET: 'whsec_w',
+  };
   const MERCADO_PAGO = { MP_ACCESS_TOKEN: 'TEST-1', MP_WEBHOOK_SECRET: 'm' };
 
   it('K ⊤ P ⊤ M ⊤: GATEWAY_CONFIGURED_200, with a secret or a restricted test key in sandbox', () => {
@@ -328,10 +331,42 @@ describe('FC 070 T1.1 · PaymentGatewayConfigurationGate(K, P, M) at start-up', 
       const { payments } = loadConfig({
         ...base,
         STRIPE_SECRET_KEY: key,
-        STRIPE_WEBHOOK_SECRET: 'w',
+        STRIPE_WEBHOOK_SECRET: 'whsec_w',
       });
       expect(payments.stripe?.apiKey).toBe(key);
     }
+  });
+
+  it('FC 075 T1.2: takes the new and the old webhook secret separated by a comma', () => {
+    const { payments } = loadConfig({
+      ...base,
+      STRIPE_SECRET_KEY: 'sk_test_1',
+      STRIPE_WEBHOOK_SECRET: 'whsec_new,whsec_old',
+    });
+    expect(payments.stripe?.webhookSecret).toBe('whsec_new,whsec_old');
+  });
+
+  it.each([
+    ['a secret without the whsec_ prefix', 'whsec_new,old'],
+    ['no secret at all', ' , '],
+  ])('FC 075 T1.2: refuses %s at start-up', (_name, secret) => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        STRIPE_SECRET_KEY: 'sk_test_1',
+        STRIPE_WEBHOOK_SECRET: secret,
+      })
+    ).toThrow('STRIPE_WEBHOOK_SECRET must be one or more whsec_ secrets');
+  });
+
+  it('FC 075 T1.2: refuses a Mercado Pago secret variable with no secret in it', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        MP_ACCESS_TOKEN: 'TEST-1',
+        MP_WEBHOOK_SECRET: ' , ',
+      })
+    ).toThrow('MP_WEBHOOK_SECRET holds no secret');
   });
 
   it.each([
@@ -345,14 +380,14 @@ describe('FC 070 T1.1 · PaymentGatewayConfigurationGate(K, P, M) at start-up', 
         ...base,
         PAYMENTS_MODE: mode,
         STRIPE_SECRET_KEY: key,
-        STRIPE_WEBHOOK_SECRET: 'w',
+        STRIPE_WEBHOOK_SECRET: 'whsec_w',
       })
     ).toThrow('STRIPE_SECRET_KEY does not match PAYMENTS_MODE');
   });
 
   it.each([
     ['a key without its webhook secret', { STRIPE_SECRET_KEY: 'sk_test_1' }],
-    ['a webhook secret without its key', { STRIPE_WEBHOOK_SECRET: 'w' }],
+    ['a webhook secret without its key', { STRIPE_WEBHOOK_SECRET: 'whsec_w' }],
     ['a token without its webhook secret', { MP_ACCESS_TOKEN: 'TEST-1' }],
     ['a webhook secret without its token', { MP_WEBHOOK_SECRET: 'm' }],
   ])('K ⊤ P ⊥: %s is GATEWAY_INCOMPLETE_ABORT', (_name, env) => {

@@ -42,6 +42,11 @@ const PERMISSIONS: Record<string, string[]> = {
 };
 
 type Handler = (params: readonly unknown[]) => unknown[];
+
+/** Whether the alert log answers; without it the alert fails and only the log says so. */
+let alertLog = false;
+/** Statements that queued mail, to see the alert. */
+const queued: unknown[] = [];
 const HANDLERS: [string, Handler][] = [
   [
     'SELECT s.id, s.user_id',
@@ -66,6 +71,15 @@ const HANDLERS: [string, Handler][] = [
         role_id: ROLE_OF[p[0] as string],
         permission_id: permission,
       })),
+  ],
+  ['SELECT COUNT(*) AS n FROM audit_log', () => (alertLog ? [{ n: 0 }] : [])],
+  ['SELECT DISTINCT u.id', () => [{ id: 'owner-1' }]],
+  [
+    'INSERT INTO outbox_events',
+    (p) => {
+      queued.push(p[0]);
+      return [];
+    },
   ],
   [
     'SELECT is_totp_enabled',
@@ -137,6 +151,14 @@ describe('GET /v1/admin/payments/health (FC 070 T2.2)', () => {
       processors: { stripe: 'ok', mercadoPago: 'unreachable' },
     });
     expect(stripe.ping).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the owner about a processor that did not answer, without changing the report (FC 075 T2.4)', async () => {
+    alertLog = true;
+    const answer = await probe(session('r'));
+    alertLog = false;
+    expect(answer.statusCode).toBe(200);
+    expect(queued).toEqual(['PAYMENTS_PROBE_FAILED']);
   });
 
   it('carries no secret and no detail of the processors', async () => {

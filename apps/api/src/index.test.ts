@@ -27,6 +27,25 @@ const idleDb = (): Db & Transactional => ({
   close: async () => undefined,
 });
 
+/** A database whose latest consumed approval is the given one (FC 075), none if omitted. */
+const approvalDb =
+  (latest?: Record<string, unknown>, closed: string[] = []) =>
+  (): Db & Transactional => ({
+    ...idleDb(),
+    query: (async (sql: string) =>
+      sql.includes('payments_mode_tickets') && latest ? [latest] : []) as never,
+    close: async () => {
+      closed.push('closed');
+    },
+  });
+
+const activatedLive = {
+  id: 1,
+  target_mode: 'live',
+  approval_expires_at: new Date('2026-01-01T00:00:00Z'),
+  activated_at: new Date('2026-01-01T01:00:00Z'),
+};
+
 // Same cold-start budget as app.test.ts; the warm-up never touches the mocked pool.
 beforeAll(async () => {
   const { address, stop } = await start(env, idleDb);
@@ -102,7 +121,11 @@ describe('start · Mercado Pago account check (FC 019)', () => {
     'starts with %s, after asking Mercado Pago once',
     async (_case, keys, list) => {
       const fetchMock = tags(list);
-      const { stop } = await start({ ...env, ...keys }, idleDb, fetchMock);
+      const { stop } = await start(
+        { ...env, ...keys },
+        approvalDb(activatedLive),
+        fetchMock
+      );
       await stop();
       expect(fetchMock).toHaveBeenCalledOnce();
     }
@@ -131,4 +154,25 @@ describe('start · Mercado Pago account check (FC 019)', () => {
       expect(makeDb).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('start · the approval of live (FC 075 T2.1)', () => {
+  it('refuses to start in live without an approval, closing the pool', async () => {
+    const closed: string[] = [];
+    await expect(
+      start(
+        {
+          ...env,
+          MP_ACCESS_TOKEN: 'APP_USR-1',
+          MP_WEBHOOK_SECRET: 'mp_1',
+          PAYMENTS_MODE: 'live',
+        },
+        approvalDb(undefined, closed),
+        vi.fn<typeof fetch>(
+          async () => new Response(JSON.stringify({ tags: ['normal'] }))
+        )
+      )
+    ).rejects.toThrow('PAYMENTS_MODE=live has no approval of the owner');
+    expect(closed).toEqual(['closed']);
+  });
 });

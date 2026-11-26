@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
+  checkRotation,
   checkCheckoutSecrets,
   checkStripeWebhook,
   formatReport,
@@ -205,5 +206,67 @@ describe('formatReport', () => {
     expect(report.text).toBe('[OK] A: fine\n[FAIL] B: broken');
     expect(report.ok).toBe(false);
     expect(formatReport([{ check: 'A', ok: true, detail: 'x' }]).ok).toBe(true);
+  });
+});
+
+describe('checkRotation (FC 075 F4)', () => {
+  const sandbox = {
+    PAYMENTS_MODE: 'sandbox',
+    STRIPE_SECRET_KEY: 'sk_test_1',
+    STRIPE_WEBHOOK_SECRET: 'whsec_a',
+  };
+  const failing = (env: Record<string, string | undefined>) =>
+    checkRotation(env)
+      .filter((f) => !f.ok)
+      .map((f) => f.check);
+
+  it('passes one secret, and two distinct ones while a rotation is in progress', () => {
+    expect(failing(sandbox)).toEqual([]);
+    const rotating = checkRotation({
+      ...sandbox,
+      STRIPE_WEBHOOK_SECRET: 'whsec_a, whsec_b',
+    });
+    expect(rotating.every((f) => f.ok)).toBe(true);
+    expect(rotating[2].detail).toContain('rotation is in progress');
+  });
+
+  it.each([
+    ['none', ''],
+    ['three', 'whsec_a,whsec_b,whsec_c'],
+    ['a repeated one', 'whsec_a,whsec_a'],
+    ['one without the prefix', 'whsec_a,secret'],
+  ])('refuses %s', (_case, value) => {
+    expect(failing({ ...sandbox, STRIPE_WEBHOOK_SECRET: value })).toEqual([
+      'STRIPE_WEBHOOK_SECRET_LIST',
+    ]);
+  });
+
+  it('wants a restricted key of the declared mode in live', () => {
+    const live = { ...sandbox, PAYMENTS_MODE: 'live' };
+    expect(failing({ ...live, STRIPE_SECRET_KEY: 'rk_live_1' })).toEqual([]);
+    expect(failing({ ...live, STRIPE_SECRET_KEY: 'sk_live_1' })).toEqual([
+      'STRIPE_KEY_SCOPE',
+    ]);
+    expect(failing(live)).toEqual(['STRIPE_KEY_MODE', 'STRIPE_KEY_SCOPE']);
+    expect(
+      failing({ PAYMENTS_MODE: 'sandbox', STRIPE_WEBHOOK_SECRET: 'whsec_a' })
+    ).toEqual(['STRIPE_KEY_MODE']);
+  });
+
+  it('checks the Mercado Pago list only when Mercado Pago is used', () => {
+    expect(checkRotation(sandbox).map((f) => f.check)).not.toContain(
+      'MP_WEBHOOK_SECRET_LIST'
+    );
+    const mp = { ...sandbox, MP_ACCESS_TOKEN: 'TEST-1' };
+    expect(failing({ ...mp, MP_WEBHOOK_SECRET: 'm1,m2' })).toEqual([]);
+    expect(failing(mp)).toEqual(['MP_WEBHOOK_SECRET_LIST']);
+  });
+
+  it('never repeats a secret in what it prints', () => {
+    const text = JSON.stringify(
+      checkRotation({ ...sandbox, STRIPE_WEBHOOK_SECRET: 'whsec_topsecret,x' })
+    );
+    expect(text).not.toContain('topsecret');
+    expect(text).not.toContain('sk_test_1');
   });
 });

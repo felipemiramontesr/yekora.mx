@@ -186,3 +186,74 @@ export function formatReport(findings: readonly Finding[]): {
     .join('\n');
   return { text, ok: findings.every((finding) => finding.ok) };
 }
+
+/** The secrets a webhook variable holds: its comma-separated elements, without the empty ones. */
+function secretsOf(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((secret) => secret.trim())
+    .filter((secret) => secret !== '');
+}
+
+/** One webhook variable: one secret, or two distinct ones while it is rotated (FC 075 T1.2). */
+function checkSecretList(name: string, value: string | undefined): Finding {
+  const secrets = secretsOf(value);
+  const prefixed =
+    name !== 'STRIPE_WEBHOOK_SECRET' ||
+    secrets.every((secret) => secret.startsWith('whsec_'));
+  const ok =
+    secrets.length >= 1 &&
+    secrets.length <= 2 &&
+    new Set(secrets).size === secrets.length &&
+    prefixed;
+  let detail = `${secrets.length} secret(s)`;
+  if (ok && secrets.length === 2) {
+    detail =
+      '2 secrets: a rotation is in progress; remove the old one once the processor switched';
+  }
+  if (!ok) {
+    const prefix =
+      name === 'STRIPE_WEBHOOK_SECRET' ? ' starting with whsec_' : '';
+    detail = `needs 1 or 2 distinct secrets${prefix}, has ${secrets.length}`;
+  }
+  return { check: `${name}_LIST`, ok, detail };
+}
+
+/**
+ * The checks of a key rotation (FC 075 F4, `--check-rotation`): each webhook variable holds one or
+ * two distinct secrets, the Stripe key belongs to the declared mode and, in live, is a restricted
+ * key and not a full-access one.
+ *
+ * @param env - The environment of the API, usually `process.env`.
+ * @returns One finding per check, with no secret in any of them.
+ */
+export function checkRotation(
+  env: Record<string, string | undefined>
+): Finding[] {
+  const live = env.PAYMENTS_MODE === 'live';
+  const key = env.STRIPE_SECRET_KEY ?? '';
+  const keyKind = live ? 'live' : 'test';
+  const modeOk = [`sk_${keyKind}_`, `rk_${keyKind}_`].some((prefix) =>
+    key.startsWith(prefix)
+  );
+  const scopeOk = !live || key.startsWith('rk_live_');
+  const findings: Finding[] = [
+    {
+      check: 'STRIPE_KEY_MODE',
+      ok: modeOk,
+      detail: modeOk ? 'matches PAYMENTS_MODE' : 'does not match PAYMENTS_MODE',
+    },
+    {
+      check: 'STRIPE_KEY_SCOPE',
+      ok: scopeOk,
+      detail: scopeOk
+        ? 'no full-access key in live'
+        : 'use a restricted key (rk_live_) in live, not a full-access one',
+    },
+    checkSecretList('STRIPE_WEBHOOK_SECRET', env.STRIPE_WEBHOOK_SECRET),
+  ];
+  if (env.MP_ACCESS_TOKEN) {
+    findings.push(checkSecretList('MP_WEBHOOK_SECRET', env.MP_WEBHOOK_SECRET));
+  }
+  return findings;
+}

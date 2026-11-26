@@ -39,6 +39,12 @@ import {
   exchangeRateSchema,
   productSchema,
 } from '../../../lib/api/catalogClient';
+import {
+  paymentModeApprovalSchema,
+  paymentModeConfirmSchema,
+  paymentModePrepareSchema,
+  paymentModeTicketSchema,
+} from '../../../lib/account/paymentsBunkerTypes';
 import { paymentsHealthSchema } from '../../../lib/account/paymentsHealthTypes';
 import { cartQuoteSchema } from '../../../lib/cart/cartTypes';
 import {
@@ -639,6 +645,34 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     request: {},
     responses: {
       200: paymentsHealthSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/payments/mode/prepare',
+    summary:
+      'The owner or an administrator asks to change the payments mode: a ticket of ten minutes (audited)',
+    permission: 'users:manage',
+    request: { body: paymentModePrepareSchema },
+    responses: {
+      201: paymentModeTicketSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/payments/mode/confirm',
+    summary:
+      'The owner confirms the ticket with the phrase and the second factor: an approval the start of the API demands (audited)',
+    permission: 'users:manage',
+    request: { body: paymentModeConfirmSchema },
+    responses: {
+      200: paymentModeApprovalSchema,
+      400: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

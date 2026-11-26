@@ -30,6 +30,7 @@ import { parseAuthKey } from './services/authCrypto';
 import { parsePiiKey } from './services/checkoutCrypto';
 import type { MercadoPagoSecrets } from './services/mercadoPagoAdapter';
 import type { StripeSecrets } from './services/stripeAdapter';
+import { webhookSecretsOf } from './services/webhookSecrets';
 
 /** The public site: the only origin a production deployment answers to. */
 const SITE_ORIGIN = 'https://yekora.mx';
@@ -218,13 +219,28 @@ function loadPayments(parsed: z.infer<typeof schema>): PaymentsConfig {
     parsed.STRIPE_SECRET_KEY,
     parsed.STRIPE_WEBHOOK_SECRET
   );
-  if (stripe) checkMode('STRIPE_SECRET_KEY', stripe[0], prefixes.stripe);
+  if (stripe) {
+    checkMode('STRIPE_SECRET_KEY', stripe[0], prefixes.stripe);
+    // FC 075 T1.2: one secret, or the new and the old one while Stripe's is rotated.
+    const secrets = webhookSecretsOf(stripe[1]);
+    if (
+      secrets.length === 0 ||
+      !secrets.every((secret) => secret.startsWith('whsec_'))
+    ) {
+      throw new Error(
+        'STRIPE_WEBHOOK_SECRET must be one or more whsec_ secrets'
+      );
+    }
+  }
   const mercadoPago = pair(
     'Mercado Pago',
     parsed.MP_ACCESS_TOKEN,
     parsed.MP_WEBHOOK_SECRET
   );
   if (mercadoPago) {
+    if (webhookSecretsOf(mercadoPago[1]).length === 0) {
+      throw new Error('MP_WEBHOOK_SECRET holds no secret');
+    }
     checkMode('MP_ACCESS_TOKEN', mercadoPago[0], prefixes.mercadoPago);
     // A live-looking token in sandbox needs the operator's word first (FC 019 T1.1 C); the
     // account itself is checked against Mercado Pago when the API starts (T1.1 V).

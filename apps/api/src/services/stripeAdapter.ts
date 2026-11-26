@@ -18,6 +18,7 @@
  * @module
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { signedByAny } from './webhookSecrets';
 import {
   type CreatedSession,
   type PaymentProcessorPort,
@@ -244,12 +245,15 @@ export function createStripeAdapter(
       ) {
         return null;
       }
-      const expected = createHmac('sha256', secrets.webhookSecret)
-        .update(`${timestamp}.`)
-        .update(rawBody)
-        .digest('hex');
-      if (!candidates.some((candidate) => sameHex(expected, candidate)))
-        return null;
+      // FC 075 T1.2: during a rotation the variable holds both secrets.
+      const signed = signedByAny(secrets.webhookSecret, (secret) => {
+        const expected = createHmac('sha256', secret)
+          .update(`${timestamp}.`)
+          .update(rawBody)
+          .digest('hex');
+        return candidates.some((candidate) => sameHex(expected, candidate));
+      });
+      if (!signed) return null;
       let event: {
         id?: unknown;
         type?: unknown;

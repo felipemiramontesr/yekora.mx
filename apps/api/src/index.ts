@@ -2,7 +2,7 @@
  * Startup of the YĒKORA API (FC 008). `server.ts` calls {@link start} on Hostinger (apiv1.yekora.mx).
  *
  * Validates the environment (fails closed), checks the Mercado Pago account against its mode
- * (FC 019), opens the MariaDB pool, builds the app and listens on Hostinger's PORT.
+ * (FC 019), refuses to run live without the owner's approval (FC 075), opens the MariaDB pool, builds the app and listens on Hostinger's PORT.
  * SIGTERM/SIGINT close the server and the pool cleanly.
  *
  * @module
@@ -15,6 +15,7 @@ import {
   verifyMercadoPagoLiveAccount,
   verifyMercadoPagoTestAccount,
 } from './services/mercadoPagoAdapter';
+import { assertPaymentsModeApproved } from './services/paymentsModeGate';
 
 /**
  * Checks that the Mercado Pago account matches the declared mode (FC 019 T1.0 to T1.2): none
@@ -52,6 +53,13 @@ export async function start(
   // Before the pool opens, so a refused account leaves nothing to close.
   await checkMercadoPagoAccount(config.payments, fetchImpl);
   const db = makeDb(config.db);
+  // FC 075 T2.1: live needs the owner's approval; refuse before listening, and close the pool.
+  try {
+    await assertPaymentsModeApproved(db, config.payments.mode, new Date());
+  } catch (error) {
+    await db.close();
+    throw error;
+  }
   const app = await buildApp({
     config,
     db,

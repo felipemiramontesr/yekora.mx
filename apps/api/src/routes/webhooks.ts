@@ -13,6 +13,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { problem, PROBLEM_TYPE } from '../lib/problem';
+import { noteRejectedSignature } from '../services/paymentAlerts';
 import { receiveWebhook, type WebhookDeps } from '../services/webhooks';
 
 const ROUTES = [
@@ -56,6 +57,19 @@ export async function registerWebhookRoutes(
           // FC 066: a settled payment queued its confirmation; wake the dispatcher after the answer.
           request.outboxQueued = true;
           return { code: outcome.code };
+        }
+        // FC 075 T2.4: a bad signature is recorded, and a burst of them is told to the owner.
+        // Recording it must never change the answer: a failure is only logged.
+        if (outcome.code === 'INVALID_SIGNATURE') {
+          const alerted = await noteRejectedSignature(
+            deps.db,
+            { processor: code, ip: request.ip },
+            deps.now()
+          ).catch((error: unknown) => {
+            request.log.error({ error }, 'rejected signature not recorded');
+            return false;
+          });
+          if (alerted) request.outboxQueued = true;
         }
         return reply
           .code(outcome.status)

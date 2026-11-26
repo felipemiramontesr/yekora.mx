@@ -211,6 +211,26 @@ describe('verifyWebhook (manifest id;request-id;ts, constant time)', () => {
     'x-request-id': 'req-1',
   };
 
+  it('accepts the new and the old secret while one is rotated, and refuses any other (FC 075 T1.2)', () => {
+    const rotating = createMercadoPagoAdapter(
+      { ...SECRETS, webhookSecret: 'mp-new,mp-secret' },
+      answering({})
+    );
+    const accepts = (secret: string) =>
+      rotating.verifyWebhook({
+        rawBody: body,
+        headers: {
+          'x-signature': `ts=1700,v1=${sign('987', 'req-1', '1700', secret)}`,
+          'x-request-id': 'req-1',
+        },
+        query: { 'data.id': '987' },
+        now: NOW,
+      }) !== null;
+    expect(accepts('mp-new')).toBe(true);
+    expect(accepts('mp-secret')).toBe(true);
+    expect(accepts('mp-other')).toBe(false);
+  });
+
   it('accepts a valid signature: the event id and the payment to reconcile', () => {
     expect(verify(body, ok)).toEqual({
       eventId: '12345',

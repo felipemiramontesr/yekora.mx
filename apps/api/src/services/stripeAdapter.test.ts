@@ -255,6 +255,23 @@ describe('verifyWebhook (raw bytes, constant time, 300 s)', () => {
       now,
     });
 
+  it('accepts the new and the old secret while one is rotated, and refuses any other (FC 075 T1.2)', () => {
+    const rotating = createStripeAdapter(
+      { ...SECRETS, webhookSecret: 'whsec_new,whsec_test' },
+      answering({})
+    );
+    const accepts = (secret: string) =>
+      rotating.verifyWebhook({
+        rawBody: body,
+        headers: { 'stripe-signature': `t=${t},v1=${sign(body, secret)}` },
+        query: {},
+        now: NOW,
+      }) !== null;
+    expect(accepts('whsec_new')).toBe(true);
+    expect(accepts('whsec_test')).toBe(true);
+    expect(accepts('whsec_other')).toBe(false);
+  });
+
   it('accepts a valid signature and returns the event and its session', () => {
     expect(verify(body, `t=${t},v1=${sign(body)}`)).toEqual({
       eventId: 'evt_1',

@@ -62,6 +62,9 @@ const INVENTORY = [
   '│       └── /deliver (POST)',
   // FC 070: the payments probe (orders:read, second factor); the public /health is untouched.
   '├── /v1/admin/payments/health (GET, HEAD)',
+  // FC 075: the payments mode switch (users:manage: the owner and the administrators).
+  '├── /v1/admin/payments/mode/prepare (POST)',
+  '├── /v1/admin/payments/mode/confirm (POST)',
   // FC 072: the staff and the roles of the panel «Usuarios, roles y permisos».
   '├── /v1/admin/users (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
@@ -261,6 +264,9 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
     expect(panel).toEqual([
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
       '├── /v1/admin/payments/health (GET, HEAD)',
+      // FC 075: the payments mode switch (users:manage: the owner and the administrators).
+      '├── /v1/admin/payments/mode/prepare (POST)',
+      '├── /v1/admin/payments/mode/confirm (POST)',
       '├── /v1/admin/users (GET, HEAD, POST)',
       '├── /v1/admin/roles (GET, HEAD, POST)',
       '├── /v1/admin/returns (GET, HEAD)',

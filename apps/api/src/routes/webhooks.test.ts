@@ -15,10 +15,27 @@ const config = loadConfig({
   DB_NAME: 'yekora_dev',
 });
 
+/** How many bad signatures the audit log holds; -1 means the log cannot be read. */
+let rejections = -1;
+/** The mail queued by an alert. */
+const queued: unknown[] = [];
+
 /** Nothing recorded yet; every write succeeds. */
 const db: Db & Transactional = {
-  query: async <Row>(sql: string) =>
-    (sql.startsWith('INSERT') ? { affectedRows: 1 } : []) as unknown as Row[],
+  query: async <Row>(sql: string, params: readonly unknown[] = []) => {
+    if (sql.startsWith('SELECT COUNT(*) AS n FROM audit_log')) {
+      const hour = String(params[0]) === 'WEBHOOK_SIGNATURE_ANOMALY';
+      if (rejections < 0) return [] as Row[];
+      return [{ n: hour ? 0 : rejections }] as unknown as Row[];
+    }
+    if (sql.startsWith('SELECT DISTINCT u.id')) {
+      return [{ id: 'owner-1' }] as unknown as Row[];
+    }
+    if (sql.startsWith('INSERT INTO outbox_events')) queued.push(params[0]);
+    return (sql.startsWith('INSERT')
+      ? { affectedRows: 1 }
+      : []) as unknown as Row[];
+  },
   ping: async () => undefined,
   transaction(work) {
     return work(this);
@@ -105,6 +122,20 @@ describe('POST /v1/webhooks/stripe and /v1/webhooks/mercadopago', () => {
       status: 401,
       detail: 'INVALID_SIGNATURE',
     });
+  });
+
+  it('tells the owner about the tenth bad signature, still answering 401 (FC 075 T2.4)', async () => {
+    rejections = 9;
+    await makeApp(processor(BODY).port);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/webhooks/stripe',
+      headers: { 'content-type': 'application/json' },
+      payload: `${BODY} `,
+    });
+    rejections = -1;
+    expect(res.statusCode).toBe(401);
+    expect(queued).toEqual(['WEBHOOK_SIGNATURE_ANOMALY']);
   });
 
   it('takes a delivery with no body or content type as empty bytes', async () => {

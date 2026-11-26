@@ -93,6 +93,8 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (route.path.startsWith('/v1/admin/roles') && route.method !== 'GET')
     return 'roles:manage';
   if (/^\/v1\/admin\/(users|roles)/.test(route.path)) return 'sellers:manage';
+  // FC 075: the payments mode switch (owner and administrators; the owner alone confirms).
+  if (route.path.startsWith('/v1/admin/payments/mode')) return 'users:manage';
   // FC 071: the board lists, one operator prepares and another confirms.
   if (route.path === '/v1/admin/returns') return 'returns:view';
   if (route.path === '/v1/admin/returns/:id/prepare') return 'returns:prepare';

@@ -15,7 +15,7 @@
 import { randomUUID } from 'node:crypto';
 import { isPrivileged } from '../lib/permissions';
 import { codeHash, newToken, tokenHash } from './authCrypto';
-import type { Db, Transactional } from './db';
+import type { TxQuery, Db, Transactional } from './db';
 
 /** Lifetime of a sign-in challenge. */
 const CHALLENGE_MS = 5 * 60_000;
@@ -336,7 +336,7 @@ export async function failChallenge(db: Db, id: string): Promise<void> {
  * @returns The encrypted secret and whether it is enabled, or null when none was enrolled.
  */
 export async function totpOf(
-  db: Db,
+  db: TxQuery,
   userId: string
 ): Promise<{ encrypted: string; enabled: boolean } | null> {
   const [row] = await db.query<{
