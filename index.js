@@ -1740,7 +1740,7 @@ var require_helmet = __commonJS({
 var require_helmet2 = __commonJS({
   "../../node_modules/@fastify/helmet/index.js"(exports2, module2) {
     "use strict";
-    var { randomBytes: randomBytes6 } = require("node:crypto");
+    var { randomBytes: randomBytes7 } = require("node:crypto");
     var fp = require_fastify_plugin();
     var helmet2 = require_helmet();
     async function fastifyHelmet(fastify, options) {
@@ -1794,8 +1794,8 @@ var require_helmet2 = __commonJS({
     async function replyDecorators(request, reply, configuration, enableCSP) {
       if (enableCSP) {
         reply.cspNonce = {
-          script: randomBytes6(16).toString("hex"),
-          style: randomBytes6(16).toString("hex")
+          script: randomBytes7(16).toString("hex"),
+          style: randomBytes7(16).toString("hex")
         };
       }
       reply.helmet = function(opts) {
@@ -11294,11 +11294,11 @@ var require_sonic_boom = __commonJS({
         }
       }
       const flags = sonic.append ? "a" : "w";
-      const mode = sonic.mode;
+      const mode2 = sonic.mode;
       if (sonic.sync) {
         try {
           if (sonic.mkdir) fs4.mkdirSync(path3.dirname(file2), { recursive: true });
-          const fd = fs4.openSync(file2, flags, mode);
+          const fd = fs4.openSync(file2, flags, mode2);
           fileOpened(null, fd);
         } catch (err) {
           fileOpened(err);
@@ -11307,17 +11307,17 @@ var require_sonic_boom = __commonJS({
       } else if (sonic.mkdir) {
         fs4.mkdir(path3.dirname(file2), { recursive: true }, (err) => {
           if (err) return fileOpened(err);
-          fs4.open(file2, flags, mode, fileOpened);
+          fs4.open(file2, flags, mode2, fileOpened);
         });
       } else {
-        fs4.open(file2, flags, mode, fileOpened);
+        fs4.open(file2, flags, mode2, fileOpened);
       }
     }
     function SonicBoom(opts) {
       if (!(this instanceof SonicBoom)) {
         return new SonicBoom(opts);
       }
-      let { fd, dest, minLength, maxLength, maxWrite, periodicFlush, sync, append = true, mkdir, retryEAGAIN, fsync, contentMode, mode } = opts || {};
+      let { fd, dest, minLength, maxLength, maxWrite, periodicFlush, sync, append = true, mkdir, retryEAGAIN, fsync, contentMode, mode: mode2 } = opts || {};
       fd = fd || dest;
       this._len = 0;
       this.fd = -1;
@@ -11340,7 +11340,7 @@ var require_sonic_boom = __commonJS({
       this.writable = true;
       this._fsync = fsync || false;
       this.append = append || false;
-      this.mode = mode;
+      this.mode = mode2;
       this.retryEAGAIN = retryEAGAIN || (() => true);
       this.mkdir = mkdir || false;
       let fsWriteSync;
@@ -17201,9 +17201,9 @@ var require_proxy_addr = __commonJS({
       const len = rangeSubnets.length;
       return len === 0 ? trustNone : len === 1 ? trustSingle(rangeSubnets[0]) : trustMulti(rangeSubnets);
     }
-    function parseipNotation(note) {
-      const pos = note.lastIndexOf("/");
-      const str = pos !== -1 ? note.substring(0, pos) : note;
+    function parseipNotation(note2) {
+      const pos = note2.lastIndexOf("/");
+      const str = pos !== -1 ? note2.substring(0, pos) : note2;
       if (!isip(str)) {
         throw new TypeError("invalid IP address: " + str);
       }
@@ -17212,7 +17212,7 @@ var require_proxy_addr = __commonJS({
         ip = ip.toIPv4Address();
       }
       const max = ip.kind() === "ipv6" ? 128 : 32;
-      let range = pos !== -1 ? note.substring(pos + 1, note.length) : null;
+      let range = pos !== -1 ? note2.substring(pos + 1, note2.length) : null;
       if (range === null) {
         range = max;
       } else if (DIGIT_REGEXP.test(range)) {
@@ -17223,7 +17223,7 @@ var require_proxy_addr = __commonJS({
         range = null;
       }
       if (range <= 0 || range > max) {
-        throw new TypeError("invalid range on address: " + note);
+        throw new TypeError("invalid range on address: " + note2);
       }
       return [ip, range];
     }
@@ -19382,11 +19382,11 @@ var require_util = __commonJS({
       return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
     }
     exports2.getErrorPath = getErrorPath;
-    function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
-      if (!mode)
+    function checkStrictMode(it, msg, mode2 = it.opts.strictSchema) {
+      if (!mode2)
         return;
       msg = `strict mode: ${msg}`;
-      if (mode === true)
+      if (mode2 === true)
         throw new Error(msg);
       it.self.logger.warn(msg);
     }
@@ -29712,11 +29712,11 @@ var require_util2 = __commonJS({
       return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
     }
     exports2.getErrorPath = getErrorPath;
-    function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
-      if (!mode)
+    function checkStrictMode(it, msg, mode2 = it.opts.strictSchema) {
+      if (!mode2)
         return;
       msg = `strict mode: ${msg}`;
-      if (mode === true)
+      if (mode2 === true)
         throw new Error(msg);
       it.self.logger.warn(msg);
     }
@@ -35502,8 +35502,8 @@ var require_dist2 = __commonJS({
         (0, limit_1.default)(ajv);
       return ajv;
     };
-    formatsPlugin.get = (name2, mode = "full") => {
-      const formats = mode === "fast" ? formats_1.fastFormats : formats_1.fullFormats;
+    formatsPlugin.get = (name2, mode2 = "full") => {
+      const formats = mode2 === "fast" ? formats_1.fastFormats : formats_1.fullFormats;
       const f = formats[name2];
       if (!f)
         throw new Error(`Unknown format "${name2}"`);
@@ -37264,11 +37264,11 @@ var require_util3 = __commonJS({
       return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
     }
     exports2.getErrorPath = getErrorPath;
-    function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
-      if (!mode)
+    function checkStrictMode(it, msg, mode2 = it.opts.strictSchema) {
+      if (!mode2)
         return;
       msg = `strict mode: ${msg}`;
-      if (mode === true)
+      if (mode2 === true)
         throw new Error(msg);
       it.self.logger.warn(msg);
     }
@@ -99483,6 +99483,29 @@ var pageSchema = external_exports.object({
   exchangeRate: exchangeRateSchema.nullable()
 });
 
+// ../../lib/account/paymentsBunkerTypes.ts
+var mode = external_exports.enum(["sandbox", "live"]);
+var paymentModePrepareSchema = external_exports.strictObject({
+  targetMode: mode,
+  reason: external_exports.string().trim().min(1).max(255)
+});
+var paymentModeTicketSchema = external_exports.strictObject({
+  challengeId: external_exports.string(),
+  targetMode: mode,
+  expiresAt: external_exports.string()
+});
+var paymentModeConfirmSchema = external_exports.strictObject({
+  challengeId: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  confirmationPhrase: external_exports.string().max(64),
+  totpCode: external_exports.string().regex(/^\d{6}$/)
+});
+var paymentModeApprovalSchema = external_exports.strictObject({
+  code: external_exports.literal("SWITCH_PERMITTED"),
+  targetMode: mode,
+  /** The moment by which the approved mode must be started to stay approved, ISO 8601. */
+  approvalExpiresAt: external_exports.string()
+});
+
 // ../../lib/account/paymentsHealthTypes.ts
 var processorHealthSchema = external_exports.enum(["ok", "unreachable", "unconfigured"]);
 var paymentsHealthSchema = external_exports.strictObject({
@@ -102030,6 +102053,32 @@ var ROUTE_CONTRACTS = [
     }
   },
   {
+    method: "POST",
+    path: "/v1/admin/payments/mode/prepare",
+    summary: "The owner or an administrator asks to change the payments mode: a ticket of ten minutes (audited)",
+    permission: "users:manage",
+    request: { body: paymentModePrepareSchema },
+    responses: {
+      201: paymentModeTicketSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/payments/mode/confirm",
+    summary: "The owner confirms the ticket with the phrase and the second factor: an approval the start of the API demands (audited)",
+    permission: "users:manage",
+    request: { body: paymentModeConfirmSchema },
+    responses: {
+      200: paymentModeApprovalSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
     method: "GET",
     path: "/v1/admin/orders/:order_number",
     summary: "One order, with its lines and payment events",
@@ -103262,13 +103311,87 @@ function registerAccountRoutes(app, deps) {
   });
 }
 
+// src/services/paymentAlerts.ts
+var SIGNATURE_ALERT_THRESHOLD = 10;
+var SIGNATURE_LOG_CEILING = 100;
+var SIGNATURE_WINDOW_MS = 10 * 60 * 1e3;
+var HOUR_MS = 60 * 60 * 1e3;
+async function privilegedUsers(db) {
+  const rows = await db.query(
+    "SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id WHERE u.is_active = 1 AND ur.role_id IN ('owner', 'admin')"
+  );
+  return rows.map((row3) => row3.id);
+}
+async function alertModeApproved(tx, targetMode) {
+  await Promise.all(
+    (await privilegedUsers(tx)).map(
+      (userId) => enqueueMail(tx, { type: "PAYMENTS_MODE_APPROVED", userId, targetMode })
+    )
+  );
+}
+async function countSince(db, action, entityId, since) {
+  const [row3] = await db.query(
+    "SELECT COUNT(*) AS n FROM audit_log WHERE entity_type = 'payments' AND action = ? AND entity_id = ? AND created_at >= ?",
+    [action, entityId, since]
+  );
+  return Number(row3.n);
+}
+function note(db, action, entityId, ip) {
+  return recordAudit(db, {
+    userId: null,
+    action,
+    entityType: "payments",
+    entityId,
+    before: null,
+    after: null,
+    ip
+  });
+}
+async function noteProbeFailure(db, processor, now) {
+  const since = new Date(now.getTime() - HOUR_MS);
+  if (await countSince(db, "PAYMENTS_PROBE_FAILED", processor, since) > 0) {
+    return false;
+  }
+  await note(db, "PAYMENTS_PROBE_FAILED", processor, null);
+  await Promise.all(
+    (await privilegedUsers(db)).map(
+      (userId) => enqueueMail(db, { type: "PAYMENTS_PROBE_FAILED", userId, processor })
+    )
+  );
+  return true;
+}
+async function noteRejectedSignature(db, rejected, now) {
+  const { processor, ip } = rejected;
+  const since = new Date(now.getTime() - SIGNATURE_WINDOW_MS);
+  const before = await countSince(
+    db,
+    "WEBHOOK_SIGNATURE_REJECTED",
+    processor,
+    since
+  );
+  if (before >= SIGNATURE_LOG_CEILING) return false;
+  await note(db, "WEBHOOK_SIGNATURE_REJECTED", processor, ip);
+  if (before + 1 < SIGNATURE_ALERT_THRESHOLD) return false;
+  const hour = new Date(now.getTime() - HOUR_MS);
+  if (await countSince(db, "WEBHOOK_SIGNATURE_ANOMALY", processor, hour) > 0) {
+    return false;
+  }
+  await note(db, "WEBHOOK_SIGNATURE_ANOMALY", processor, ip);
+  await Promise.all(
+    (await privilegedUsers(db)).map(
+      (userId) => enqueueMail(db, { type: "WEBHOOK_SIGNATURE_ANOMALY", userId, processor })
+    )
+  );
+  return true;
+}
+
 // src/services/paymentsHealth.ts
 async function probe(port) {
   if (port === void 0) return "unconfigured";
   const answered = await port.ping().catch(() => false);
   return answered ? "ok" : "unreachable";
 }
-async function readPaymentsHealth(mode, processors) {
+async function readPaymentsHealth(mode2, processors) {
   const [stripe, mercadoPago] = await Promise.all([
     probe(processors.STRIPE),
     probe(processors.MERCADO_PAGO)
@@ -103277,7 +103400,7 @@ async function readPaymentsHealth(mode, processors) {
   const healthy = states.has("ok") && !states.has("unreachable");
   return {
     status: healthy ? "ok" : "degraded",
-    mode,
+    mode: mode2,
     processors: { stripe, mercadoPago }
   };
 }
@@ -103298,12 +103421,27 @@ function registerAdminRoutes(app, deps) {
     );
     return orderPageSchema.parse({ items, total, ...paging2 });
   });
-  app.get(
-    "/v1/admin/payments/health",
-    async () => paymentsHealthSchema.parse(
+  app.get("/v1/admin/payments/health", async (request) => {
+    const health = paymentsHealthSchema.parse(
       await readPaymentsHealth(deps.mode, deps.processors)
-    )
-  );
+    );
+    const failed = [
+      ["STRIPE", health.processors.stripe],
+      ["MERCADO_PAGO", health.processors.mercadoPago]
+    ].filter(([, state]) => state === "unreachable");
+    const alerted = await Promise.all(
+      failed.map(
+        ([processor]) => noteProbeFailure(deps.db, processor, deps.now()).catch(
+          (error63) => {
+            request.log.error({ error: error63 }, "probe failure not recorded");
+            return false;
+          }
+        )
+      )
+    );
+    if (alerted.includes(true)) request.outboxQueued = true;
+    return health;
+  });
   app.get("/v1/admin/orders/:order_number", async (request, reply) => {
     const { order_number: orderNumber } = request.params;
     const found = await lookUpOrder(deps, orderNumber);
@@ -103311,6 +103449,214 @@ function registerAdminRoutes(app, deps) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
     }
     return orderDetailSchema.parse(found.order);
+  });
+}
+
+// src/services/paymentsModeSwitch.ts
+var import_node_crypto9 = require("node:crypto");
+
+// src/services/paymentGates.ts
+function decideModeSwitch(inputs) {
+  if (!inputs.challenge) return "SWITCH_CHALLENGE_INVALID";
+  if (!inputs.phrase) return "SWITCH_PHRASE_MISMATCH";
+  if (!inputs.totp) return "SWITCH_TOTP_FAILED";
+  return inputs.owner ? "SWITCH_PERMITTED" : "SWITCH_OWNER_REQUIRED";
+}
+function decideStepUp(inputs) {
+  if (!inputs.active) return "STEP_UP_UNAUTHORIZED_401";
+  if (!inputs.enrolled) return "STEP_UP_NOT_ENROLLED_403";
+  return inputs.valid ? "STEP_UP_GRANTED_200" : "STEP_UP_CODE_INVALID_403";
+}
+
+// src/services/totpStepUp.ts
+async function verifyStepUpTotp(db, check2) {
+  const stored = await totpOf(db, check2.userId);
+  if (!stored?.enabled) {
+    return decideStepUp({ active: true, enrolled: false, valid: false });
+  }
+  const secret = decryptTotpSecret(
+    check2.totpKey,
+    check2.userId,
+    stored.encrypted
+  );
+  return decideStepUp({
+    active: true,
+    enrolled: true,
+    valid: verifyTotp(secret, check2.code, check2.now)
+  });
+}
+
+// src/services/paymentsModeSwitch.ts
+var TICKET_MS = 10 * 60 * 1e3;
+var MAX_ATTEMPTS2 = 3;
+var APPROVAL_MS = 24 * 60 * 60 * 1e3;
+var PHRASES = {
+  live: "CONFIRMAR_CAMBIO_A_LIVE",
+  sandbox: "CONFIRMAR_CAMBIO_A_SANDBOX"
+};
+async function prepareModeSwitch(tx, request, actor, now) {
+  if (request.targetMode === request.currentMode) {
+    return "SWITCH_TARGET_UNCHANGED";
+  }
+  const challengeId = (0, import_node_crypto9.randomBytes)(32).toString("hex");
+  const expiresAt = new Date(now.getTime() + TICKET_MS);
+  await tx.query(
+    "INSERT INTO payments_mode_tickets (challenge_id, target_mode, requested_by, reason, expires_at) VALUES (?, ?, ?, ?, ?)",
+    [challengeId, request.targetMode, actor.userId, request.reason, expiresAt]
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "PAYMENTS_MODE_PREPARED",
+    entityType: "payments",
+    entityId: request.targetMode,
+    before: { mode: request.currentMode },
+    after: { mode: request.targetMode },
+    ip: actor.ip
+  });
+  return {
+    challengeId,
+    targetMode: request.targetMode,
+    expiresAt: expiresAt.toISOString()
+  };
+}
+async function failedAttempt(tx, ticket) {
+  const attempts = Number(ticket.attempts) + 1;
+  await tx.query(
+    "UPDATE payments_mode_tickets SET attempts = ?, status = ? WHERE id = ?",
+    [attempts, attempts >= MAX_ATTEMPTS2 ? "FAILED" : "PENDING", ticket.id]
+  );
+}
+async function openTicket(tx, challengeId, now) {
+  const [ticket] = await tx.query(
+    "SELECT id, target_mode, status, attempts, expires_at FROM payments_mode_tickets WHERE challenge_id = ? FOR UPDATE",
+    [challengeId]
+  );
+  if (ticket?.status !== "PENDING") return null;
+  if (new Date(ticket.expires_at).getTime() > now.getTime()) return ticket;
+  await tx.query(
+    "UPDATE payments_mode_tickets SET status = 'EXPIRED' WHERE id = ?",
+    [ticket.id]
+  );
+  return null;
+}
+async function refused(tx, ticket, decision, actor) {
+  if (decision !== "SWITCH_OWNER_REQUIRED") await failedAttempt(tx, ticket);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "PAYMENTS_STEP_UP_FAILED",
+    entityType: "payments",
+    entityId: ticket.target_mode,
+    before: null,
+    after: { reason: decision },
+    ip: actor.ip
+  });
+  return decision;
+}
+async function confirmModeSwitch(tx, input2, actor, now) {
+  const ticket = await openTicket(tx, input2.challengeId, now);
+  if (ticket === null) return "SWITCH_CHALLENGE_INVALID";
+  const phrase = input2.confirmationPhrase === PHRASES[ticket.target_mode];
+  const stepUp = phrase ? await verifyStepUpTotp(tx, {
+    userId: actor.userId,
+    code: input2.totpCode,
+    totpKey: input2.totpKey,
+    now
+  }) : null;
+  const decision = decideModeSwitch({
+    challenge: true,
+    phrase,
+    totp: stepUp === "STEP_UP_GRANTED_200",
+    owner: input2.owner
+  });
+  if (decision !== "SWITCH_PERMITTED") {
+    return refused(tx, ticket, decision, actor);
+  }
+  const approvalExpiresAt = new Date(now.getTime() + APPROVAL_MS);
+  await tx.query(
+    "UPDATE payments_mode_tickets SET status = 'CONSUMED', consumed_at = ?, confirmed_by = ?, approval_expires_at = ? WHERE id = ?",
+    [now, actor.userId, approvalExpiresAt, ticket.id]
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "PAYMENTS_MODE_APPROVED",
+    entityType: "payments",
+    entityId: ticket.target_mode,
+    before: null,
+    after: { mode: ticket.target_mode },
+    ip: actor.ip
+  });
+  await alertModeApproved(tx, ticket.target_mode);
+  return {
+    code: "SWITCH_PERMITTED",
+    targetMode: ticket.target_mode,
+    approvalExpiresAt: approvalExpiresAt.toISOString()
+  };
+}
+
+// src/routes/adminPayments.ts
+var REFUSALS2 = {
+  SWITCH_CHALLENGE_INVALID: [400, "Invalid or expired ticket"],
+  SWITCH_PHRASE_MISMATCH: [400, "The confirmation phrase does not match"],
+  SWITCH_TOTP_FAILED: [403, "The second factor failed"],
+  SWITCH_OWNER_REQUIRED: [403, "Only the owner confirms"]
+};
+function refusalOf2(code2) {
+  const [status, title] = REFUSALS2[code2];
+  return { status, body: problem(status, title, code2) };
+}
+function registerAdminPaymentRoutes(app, deps) {
+  app.post("/v1/admin/payments/mode/prepare", async (request, reply) => {
+    const body = paymentModePrepareSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    const { userId } = request.user;
+    const outcome = await deps.db.transaction(
+      (tx) => prepareModeSwitch(
+        tx,
+        { ...body.data, currentMode: deps.mode },
+        { userId, ip: request.ip },
+        deps.now()
+      )
+    );
+    if (outcome === "SWITCH_TARGET_UNCHANGED") {
+      return reply.code(409).type(PROBLEM_TYPE).send(
+        problem(
+          409,
+          "The API already runs that mode",
+          "SWITCH_TARGET_UNCHANGED"
+        )
+      );
+    }
+    return reply.code(201).send(outcome);
+  });
+  app.post("/v1/admin/payments/mode/confirm", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = paymentModeConfirmSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    if (!deps.auth) {
+      return refuse(reply, 503, "Identity unavailable", "SERVICE_UNAVAILABLE");
+    }
+    const { totpKey } = deps.auth;
+    const { roles } = request.user;
+    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      const outcome = await confirmModeSwitch(
+        tx,
+        { ...body.data, owner: roles.includes("owner"), totpKey },
+        { userId, ip: request.ip },
+        deps.now()
+      );
+      if (typeof outcome === "string") {
+        return refusalOf2(outcome);
+      }
+      request.outboxQueued = true;
+      return { status: 200, body: outcome };
+    });
   });
 }
 
@@ -103389,7 +103735,7 @@ async function transitionOrder(tx, step, orderNumber, parcel, actor, now) {
 }
 
 // src/routes/adminOrders.ts
-var REFUSALS2 = {
+var REFUSALS3 = {
   ORDER_NOT_FOUND: [404, "Not found"],
   ORDER_STATUS_CONFLICT: [409, "The order is not in a status that allows it"]
 };
@@ -103432,7 +103778,7 @@ function registerAdminOrderRoutes(app, deps) {
           if (typeof outcome !== "string") {
             return { status: 200, body: outcome };
           }
-          const [status, title] = REFUSALS2[outcome];
+          const [status, title] = REFUSALS3[outcome];
           return {
             status,
             body: problem(status, title, outcome)
@@ -103456,7 +103802,7 @@ function decideRoleMutation(inputs) {
 }
 
 // src/services/adminRoles.ts
-function refusalOf2(code2) {
+function refusalOf3(code2) {
   if (code2 === "OWNER_ONLY_FORBIDDEN_403") return "OWNER_ONLY_FORBIDDEN";
   return code2 === "SYSTEM_ROLE_PROTECTED_403" ? "SYSTEM_ROLE_PROTECTED" : "TWO_FACTOR_REQUIRED";
 }
@@ -103507,7 +103853,7 @@ async function setPermissions(tx, roleId2, permissions) {
 }
 async function createRole(tx, input2, actor) {
   const verdict = gate(actor, true);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf2(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf3(verdict);
   if (RESERVED_ROLE_IDS.has(input2.id)) return "ROLE_ID_RESERVED";
   if (breaksMatrix(input2.id, input2.permissions))
     return "MATRIX_INVARIANT_VIOLATED";
@@ -103543,14 +103889,14 @@ async function createRole(tx, input2, actor) {
 }
 async function patchRole(tx, id, input2, actor) {
   const closed = gate(actor, true);
-  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf2(closed);
+  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf3(closed);
   const [target] = await tx.query(
     "SELECT is_system FROM roles WHERE id = ? FOR UPDATE",
     [id]
   );
   if (target === void 0) return "ROLE_NOT_FOUND";
   const verdict = gate(actor, Number(target.is_system) === 0);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf2(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf3(verdict);
   if (id === "admin" && (input2.assignableByAdmin === true || input2.isActive === false)) {
     return "ROLE_INVARIANT_VIOLATED";
   }
@@ -103591,7 +103937,7 @@ async function patchRole(tx, id, input2, actor) {
 }
 
 // src/routes/adminRoles.ts
-var REFUSALS3 = {
+var REFUSALS4 = {
   OWNER_ONLY_FORBIDDEN: [403, "Only the owner edits the roles"],
   SYSTEM_ROLE_PROTECTED: [403, "A role of the system cannot be edited"],
   TWO_FACTOR_REQUIRED: [403, "The second factor is required"],
@@ -103621,7 +103967,7 @@ function answerOf(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS3[outcome];
+  const [status, title] = REFUSALS4[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminRoleRoutes(app, deps) {
@@ -104056,7 +104402,7 @@ async function isReturnRefund(db, orderId, refundIds) {
 }
 
 // src/routes/returns.ts
-function refusalOf3(code2) {
+function refusalOf4(code2) {
   const [status, title] = RETURN_REFUSALS[code2];
   return { status, body: problem(status, title, code2) };
 }
@@ -104079,7 +104425,7 @@ function registerReturnRoutes(app, deps) {
           { orderNumber, userId, request: body.data, now: deps.now() },
           { userId, ip: request.ip }
         );
-        return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf4(outcome) : { status: 201, body: outcome };
       });
     }
   );
@@ -104116,7 +104462,7 @@ function registerReturnRoutes(app, deps) {
         { userId, ip: request.ip },
         deps.now()
       );
-      return typeof outcome === "string" ? refusalOf3(outcome) : { status: 200, body: outcome };
+      return typeof outcome === "string" ? refusalOf4(outcome) : { status: 200, body: outcome };
     });
   });
   app.post("/v1/admin/returns/:id/confirm", async (request, reply) => {
@@ -104142,13 +104488,13 @@ function registerReturnRoutes(app, deps) {
 }
 
 // src/services/staffUsers.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 
 // src/services/passwordResets.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto10.randomBytes)(32).toString("hex");
   await tx.query(
     "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
@@ -104164,7 +104510,7 @@ async function mailResetLink(tx, userId, totpKey, now) {
   });
 }
 function decoyReset(totpKey) {
-  const token = (0, import_node_crypto9.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto10.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
     totpKey,
     tokenHash2(token),
@@ -104219,7 +104565,7 @@ function completeReset(db, reset, passwordHash, now, ip) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -104231,7 +104577,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto10.randomBytes)(16),
+    salt: (0, import_node_crypto11.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -104243,11 +104589,11 @@ async function verifyPassword(hash2, password) {
   }
 }
 function unmatchableHash() {
-  return hashPassword((0, import_node_crypto10.randomBytes)(64).toString("hex"));
+  return hashPassword((0, import_node_crypto11.randomBytes)(64).toString("hex"));
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto10.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto11.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
@@ -104295,7 +104641,7 @@ async function checkRoles(tx, requested, asOwner) {
     permitted: asOwner ? wanted.every((id) => !OUT_OF_BAND.has(id)) : active.every((row3) => Number(row3.assignable_by_admin) === 1)
   };
 }
-function refusalOf4(code2, asOwner) {
+function refusalOf5(code2, asOwner) {
   if (code2 === "ACTOR_UNAUTHORIZED_403") return "ACTOR_UNAUTHORIZED";
   if (code2 === "VALIDATION_OR_2FA_FAILED_400")
     return "VALIDATION_OR_2FA_FAILED";
@@ -104312,12 +104658,12 @@ async function createStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf4(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf5(verdict, asOwner);
   const [existing] = await tx.query(
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto11.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto12.randomUUID)();
   if (existing) {
     const held = await lockedRoles(tx, id);
     if (held.includes("owner")) return "OWNER_IMMUTABLE";
@@ -104357,7 +104703,7 @@ async function updateStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf4(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf5(verdict, asOwner);
   if (held.includes("owner")) return "OWNER_IMMUTABLE";
   if (!isStaff(held)) return "USER_NOT_FOUND";
   if (!asOwner) {
@@ -104402,7 +104748,7 @@ async function updateStaff(tx, input2, actor) {
 }
 
 // src/routes/staffUsers.ts
-var REFUSALS4 = {
+var REFUSALS5 = {
   ACTOR_UNAUTHORIZED: [
     403,
     "Only the owner and the administrators manage the staff"
@@ -104434,7 +104780,7 @@ function answerOf2(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS4[outcome];
+  const [status, title] = REFUSALS5[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerStaffUserRoutes(app, deps) {
@@ -104635,13 +104981,13 @@ async function updateShippingRules(tx, body, actor) {
 }
 
 // src/routes/adminShipping.ts
-var REFUSALS5 = {
+var REFUSALS6 = {
   SHIPPING_STRATEGY_UNAVAILABLE: [409, "The strategy has no active rates"],
   SHIPPING_ZONE_UNKNOWN: [400, "Unknown state"]
 };
 function answerOf3(outcome) {
   if (typeof outcome !== "string") return { status: 200, body: outcome };
-  const [status, title] = REFUSALS5[outcome];
+  const [status, title] = REFUSALS6[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminShippingRoutes(app, deps) {
@@ -104801,7 +105147,7 @@ var PASSWORD_PROBLEMS = {
 };
 
 // src/services/botChallenge.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -104812,16 +105158,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto12.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto13.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto12.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto13.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto12.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto12.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto13.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto13.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto12.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto12.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto13.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto13.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -106231,6 +106577,17 @@ async function registerWebhookRoutes(app, deps) {
           request.outboxQueued = true;
           return { code: outcome.code };
         }
+        if (outcome.code === "INVALID_SIGNATURE") {
+          const alerted = await noteRejectedSignature(
+            deps.db,
+            { processor: code2, ip: request.ip },
+            deps.now()
+          ).catch((error63) => {
+            request.log.error({ error: error63 }, "rejected signature not recorded");
+            return false;
+          });
+          if (alerted) request.outboxQueued = true;
+        }
         return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
       });
     }
@@ -106239,7 +106596,17 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
+
+// src/services/webhookSecrets.ts
+function webhookSecretsOf(value) {
+  return value.split(",").map((secret) => secret.trim()).filter((secret) => secret !== "");
+}
+function signedByAny(value, matches) {
+  return webhookSecretsOf(value).map(matches).includes(true);
+}
+
+// src/services/mercadoPagoAdapter.ts
 var MP_API = "https://api.mercadopago.com";
 var TIMEOUT_MS2 = 1e4;
 var PAYMENT_TYPES = [
@@ -106367,11 +106734,12 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       const requestId = header(headers, "x-request-id");
       const dataId = (query["data.id"] ?? "").toLowerCase();
       if (ts === "" || requestId === "" || dataId === "") return null;
-      const expected = (0, import_node_crypto13.createHmac)("sha256", secrets.webhookSecret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
       const received = Buffer.from(given, "hex");
-      if (received.length !== expected.length || !(0, import_node_crypto13.timingSafeEqual)(received, expected)) {
-        return null;
-      }
+      const signed = signedByAny(secrets.webhookSecret, (secret) => {
+        const expected = (0, import_node_crypto14.createHmac)("sha256", secret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+        return received.length === expected.length && (0, import_node_crypto14.timingSafeEqual)(received, expected);
+      });
+      if (!signed) return null;
       let event;
       try {
         event = JSON.parse(rawBody.toString("utf8"));
@@ -110040,7 +110408,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto14 = __toESM(require("node:crypto"), 1);
+var import_node_crypto15 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 
@@ -111893,7 +112261,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto14.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto15.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -113070,8 +113438,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto14.default.randomBytes(len).toString("hex"),
-      import_node_crypto14.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto15.default.randomBytes(len).toString("hex"),
+      import_node_crypto15.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -113759,7 +114127,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -113770,7 +114138,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto15.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto16.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -113880,7 +114248,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -113895,7 +114263,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto16.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto17.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -113962,7 +114330,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -113975,7 +114343,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto17.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto18.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -114585,7 +114953,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 function isAbortSignal(value) {
   return typeof value === "object" && value !== null && "aborted" in value && typeof value.addEventListener === "function" && typeof value.removeEventListener === "function";
@@ -114945,7 +115313,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto18.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto19.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -114980,7 +115348,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto19 = __toESM(require("node:crypto"), 1);
+var import_node_crypto20 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -115145,7 +115513,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto19.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto20.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -116501,7 +116869,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto19.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto20.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -116835,7 +117203,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto20 = __toESM(require("node:crypto"), 1);
+var import_node_crypto21 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -117158,7 +117526,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto20.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto21.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -119959,6 +120327,72 @@ var COPY = {
       }
     })
   },
+  PAYMENTS_MODE_APPROVED: {
+    "es-MX": (mode2) => ({
+      subject: "Aprobaste un cambio de modo de pagos en Y\u0112KORA",
+      content: {
+        heading: "Cambio de modo de pagos aprobado",
+        paragraphs: [
+          `Se aprob\xF3 cambiar los pagos a modo \xAB${mode2}\xBB. El cambio no ocurre solo: hay que actualizar el modo y las llaves en el servidor y volver a desplegar, dentro de las pr\xF3ximas 24 horas.`
+        ],
+        notice: `Si nadie de tu equipo lo pidi\xF3, revisa la bit\xE1cora y cambia las llaves de pago.`
+      }
+    }),
+    en: (mode2) => ({
+      subject: "A payments mode change was approved on Y\u0112KORA",
+      content: {
+        heading: "Payments mode change approved",
+        paragraphs: [
+          `A change of the payments to \xAB${mode2}\xBB mode was approved. It does not happen by itself: the mode and the keys must be updated on the server and the API redeployed, within the next 24 hours.`
+        ],
+        notice: `If nobody on your team asked for it, check the audit log and rotate the payment keys.`
+      }
+    })
+  },
+  PAYMENTS_PROBE_FAILED: {
+    "es-MX": (processor) => ({
+      subject: "Un procesador de pagos no respondi\xF3",
+      content: {
+        heading: "Un procesador de pagos no respondi\xF3",
+        paragraphs: [
+          `La revisi\xF3n de salud no pudo conectar con ${processor}. Revisa su panel y las llaves configuradas.`
+        ],
+        notice: "Este aviso se env\xEDa como m\xE1ximo una vez por hora y por procesador."
+      }
+    }),
+    en: (processor) => ({
+      subject: "A payment processor did not answer",
+      content: {
+        heading: "A payment processor did not answer",
+        paragraphs: [
+          `The health check could not reach ${processor}. Check its dashboard and the configured keys.`
+        ],
+        notice: "This notice is sent at most once an hour for each processor."
+      }
+    })
+  },
+  WEBHOOK_SIGNATURE_ANOMALY: {
+    "es-MX": (processor) => ({
+      subject: "Avisos de pago con firma inv\xE1lida",
+      content: {
+        heading: "Avisos de pago con firma inv\xE1lida",
+        paragraphs: [
+          `En los \xFAltimos 10 minutos llegaron 10 o m\xE1s avisos de ${processor} con una firma que no es v\xE1lida. Puede ser un secreto de webhook desactualizado o un intento de suplantaci\xF3n.`
+        ],
+        notice: "Revisa el secreto del webhook en el panel del procesador y en el servidor."
+      }
+    }),
+    en: (processor) => ({
+      subject: "Payment notices with a bad signature",
+      content: {
+        heading: "Payment notices with a bad signature",
+        paragraphs: [
+          `In the last 10 minutes, 10 or more notices from ${processor} arrived with a signature that is not valid. It may be an outdated webhook secret or an attempt to impersonate the processor.`
+        ],
+        notice: "Check the webhook secret in the dashboard of the processor and on the server."
+      }
+    })
+  },
   TOTP_ENABLED: {
     "es-MX": () => ({
       subject: "Activaste la verificaci\xF3n en dos pasos en Y\u0112KORA",
@@ -120006,6 +120440,12 @@ function copyOf(keys, event, locale) {
       return COPY.PASSWORD_CHANGED[locale]();
     case "TOTP_ENABLED":
       return COPY.TOTP_ENABLED[locale]();
+    case "PAYMENTS_MODE_APPROVED":
+      return COPY.PAYMENTS_MODE_APPROVED[locale](event.targetMode);
+    case "PAYMENTS_PROBE_FAILED":
+      return COPY.PAYMENTS_PROBE_FAILED[locale](event.processor);
+    case "WEBHOOK_SIGNATURE_ANOMALY":
+      return COPY.WEBHOOK_SIGNATURE_ANOMALY[locale](event.processor);
   }
 }
 var ORDER_COPY = {
@@ -120599,7 +121039,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto21 = require("node:crypto");
+var import_node_crypto22 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -120668,7 +121108,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto21.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto22.timingSafeEqual)(a, b);
 }
 async function refusalReason(answer) {
   const body = await answer.json().catch(() => null);
@@ -120731,9 +121171,11 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       if (!/^\d+$/.test(timestamp) || Math.abs(now.getTime() / 1e3 - seconds) > SIGNATURE_TOLERANCE_S) {
         return null;
       }
-      const expected = (0, import_node_crypto21.createHmac)("sha256", secrets.webhookSecret).update(`${timestamp}.`).update(rawBody).digest("hex");
-      if (!candidates.some((candidate) => sameHex2(expected, candidate)))
-        return null;
+      const signed = signedByAny(secrets.webhookSecret, (secret) => {
+        const expected = (0, import_node_crypto22.createHmac)("sha256", secret).update(`${timestamp}.`).update(rawBody).digest("hex");
+        return candidates.some((candidate) => sameHex2(expected, candidate));
+      });
+      if (!signed) return null;
       let event;
       try {
         event = JSON.parse(rawBody.toString("utf8"));
@@ -121059,6 +121501,12 @@ async function buildApp(deps) {
     processors,
     mode: deps.config.payments.mode
   });
+  registerAdminPaymentRoutes(app, {
+    db: deps.db,
+    now,
+    auth: deps.config.auth,
+    mode: deps.config.payments.mode
+  });
   registerStaffUserRoutes(app, { db: deps.db, auth: deps.config.auth, now });
   registerAdminRoleRoutes(app, { db: deps.db, now });
   registerAdminOrderRoutes(app, { db: deps.db, now });
@@ -121143,22 +121591,33 @@ function checkMode(name2, key, prefixes) {
   }
 }
 function loadPayments(parsed) {
-  const mode = parsed.PAYMENTS_MODE;
-  const prefixes = KEY_PREFIXES[mode];
+  const mode2 = parsed.PAYMENTS_MODE;
+  const prefixes = KEY_PREFIXES[mode2];
   const stripe = pair(
     "Stripe",
     parsed.STRIPE_SECRET_KEY,
     parsed.STRIPE_WEBHOOK_SECRET
   );
-  if (stripe) checkMode("STRIPE_SECRET_KEY", stripe[0], prefixes.stripe);
+  if (stripe) {
+    checkMode("STRIPE_SECRET_KEY", stripe[0], prefixes.stripe);
+    const secrets = webhookSecretsOf(stripe[1]);
+    if (secrets.length === 0 || !secrets.every((secret) => secret.startsWith("whsec_"))) {
+      throw new Error(
+        "STRIPE_WEBHOOK_SECRET must be one or more whsec_ secrets"
+      );
+    }
+  }
   const mercadoPago = pair(
     "Mercado Pago",
     parsed.MP_ACCESS_TOKEN,
     parsed.MP_WEBHOOK_SECRET
   );
   if (mercadoPago) {
+    if (webhookSecretsOf(mercadoPago[1]).length === 0) {
+      throw new Error("MP_WEBHOOK_SECRET holds no secret");
+    }
     checkMode("MP_ACCESS_TOKEN", mercadoPago[0], prefixes.mercadoPago);
-    if (mode === "sandbox" && mercadoPago[0].startsWith("APP_USR-") && parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== "true") {
+    if (mode2 === "sandbox" && mercadoPago[0].startsWith("APP_USR-") && parsed.MP_SANDBOX_IS_TEST_ACCOUNT !== "true") {
       throw new Error(
         "MISSING_APP_USR_CONFIRMATION: MP_ACCESS_TOKEN with APP_USR- in sandbox requires explicit MP_SANDBOX_IS_TEST_ACCOUNT=true"
       );
@@ -121177,7 +121636,7 @@ function loadPayments(parsed) {
     throw new Error("Checkout peppers must be at least 32 characters");
   }
   return {
-    mode,
+    mode: mode2,
     siteUrl: parsed.SITE_URL.replace(/\/$/, ""),
     apiUrl: parsed.API_PUBLIC_URL.replace(/\/$/, ""),
     stripe: stripe && { apiKey: stripe[0], webhookSecret: stripe[1] },
@@ -121352,6 +121811,29 @@ async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix
   } : null;
 }
 
+// src/services/paymentsModeGate.ts
+async function assertPaymentsModeApproved(db, mode2, now) {
+  if (mode2 !== "live") return;
+  const [latest] = await db.query(
+    "SELECT id, target_mode, approval_expires_at, activated_at FROM payments_mode_tickets WHERE status = 'CONSUMED' ORDER BY consumed_at DESC, id DESC LIMIT 1"
+  );
+  if (latest?.target_mode !== "live") {
+    throw new Error(
+      "PAYMENTS_MODE=live has no approval of the owner: the latest consumed approval is not live"
+    );
+  }
+  if (latest.activated_at !== null) return;
+  if (new Date(latest.approval_expires_at).getTime() < now.getTime()) {
+    throw new Error(
+      "PAYMENTS_MODE=live: the approval of the owner expired before it was activated"
+    );
+  }
+  await db.query(
+    "UPDATE payments_mode_tickets SET activated_at = ? WHERE id = ? AND activated_at IS NULL",
+    [now, latest.id]
+  );
+}
+
 // src/index.ts
 async function checkMercadoPagoAccount(payments, fetchImpl) {
   const token = payments.mercadoPago?.accessToken;
@@ -121366,6 +121848,12 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
   const config2 = loadConfig(env2);
   await checkMercadoPagoAccount(config2.payments, fetchImpl);
   const db = makeDb(config2.db);
+  try {
+    await assertPaymentsModeApproved(db, config2.payments.mode, /* @__PURE__ */ new Date());
+  } catch (error63) {
+    await db.close();
+    throw error63;
+  }
   const app = await buildApp({
     config: config2,
     db,
@@ -121383,7 +121871,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "3dfd576c7fce7b9e25fd5d1edd694650563267ca" : void 0;
+var sha = true ? "262b3d332f0ce1b413cd7c2b3756ba925e719e5f" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
