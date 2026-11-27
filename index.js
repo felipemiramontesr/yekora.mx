@@ -1740,7 +1740,7 @@ var require_helmet = __commonJS({
 var require_helmet2 = __commonJS({
   "../../node_modules/@fastify/helmet/index.js"(exports2, module2) {
     "use strict";
-    var { randomBytes: randomBytes7 } = require("node:crypto");
+    var { randomBytes: randomBytes8 } = require("node:crypto");
     var fp = require_fastify_plugin();
     var helmet2 = require_helmet();
     async function fastifyHelmet(fastify, options) {
@@ -1794,8 +1794,8 @@ var require_helmet2 = __commonJS({
     async function replyDecorators(request, reply, configuration, enableCSP) {
       if (enableCSP) {
         reply.cspNonce = {
-          script: randomBytes7(16).toString("hex"),
-          style: randomBytes7(16).toString("hex")
+          script: randomBytes8(16).toString("hex"),
+          style: randomBytes8(16).toString("hex")
         };
       }
       reply.helmet = function(opts) {
@@ -11355,7 +11355,7 @@ var require_sonic_boom = __commonJS({
         fsWrite = () => fs4.write(this.fd, this._writingBuf, this.release);
       } else if (contentMode === void 0 || contentMode === kContentModeUtf8) {
         this._writingBuf = "";
-        this.write = write;
+        this.write = write2;
         this.flush = flush;
         this.flushSync = flushSync;
         this._actualWrite = actualWrite;
@@ -11488,7 +11488,7 @@ var require_sonic_boom = __commonJS({
       }
       return Buffer.concat(bufs, len);
     }
-    function write(data) {
+    function write2(data) {
       if (this.destroyed) {
         throw new Error("SonicBoom destroyed");
       }
@@ -12149,7 +12149,7 @@ var require_thread_stream = __commonJS({
             }
             return;
           }
-          write(stream, leftover, noop);
+          write2(stream, leftover, noop);
           continue;
         }
         if (leftover === 0) {
@@ -12453,7 +12453,7 @@ var require_thread_stream = __commonJS({
         });
       }
     }
-    function write(stream, maxBytes, cb) {
+    function write2(stream, maxBytes, cb) {
       const current = Atomics.load(stream[kImpl].state, WRITE_INDEX);
       let offset = current;
       let remaining = maxBytes;
@@ -12538,7 +12538,7 @@ var require_thread_stream = __commonJS({
         } else if (leftover < 0) {
           throw new Error("overwritten");
         }
-        write(stream, leftover, cb);
+        write2(stream, leftover, cb);
       }
     }
     function flushSync(stream) {
@@ -13430,7 +13430,7 @@ var require_proto = __commonJS({
         return "Pino";
       },
       [lsCacheSym]: initialLsCache,
-      [writeSym]: write,
+      [writeSym]: write2,
       [asJsonSym]: asJson,
       [getLevelSym]: getLevel,
       [setLevelSym]: setLevel
@@ -13533,7 +13533,7 @@ var require_proto = __commonJS({
     function defaultMixinMergeStrategy(mergeObject, mixinObject) {
       return Object.assign(mixinObject, mergeObject);
     }
-    function write(_obj, msg, num) {
+    function write2(_obj, msg, num) {
       const t = this[timeSym]();
       const mixin = this[mixinSym];
       const errorKey = this[errorKeySym];
@@ -14194,7 +14194,7 @@ var require_multistream = __commonJS({
         });
       }
       const res = {
-        write,
+        write: write2,
         add,
         remove,
         emit,
@@ -14214,7 +14214,7 @@ var require_multistream = __commonJS({
       }
       streamsArray = null;
       return res;
-      function write(data) {
+      function write2(data) {
         let dest;
         const level = typeof this.lastLevel === "string" ? (this.streamLevels || streamLevels)[this.lastLevel] : this.lastLevel;
         const { streams } = this;
@@ -14316,7 +14316,7 @@ var require_multistream = __commonJS({
           };
         }
         return {
-          write,
+          write: write2,
           add,
           remove,
           emit,
@@ -75530,17 +75530,17 @@ var require_query2 = __commonJS({
           }
           return this.done();
         }
-        let row3;
+        let row4;
         try {
-          row3 = this._rowParser.next(packet, this._currentFields, this.options);
+          row4 = this._rowParser.next(packet, this._currentFields, this.options);
         } catch (err) {
           this._localStreamError = err;
           return this.doneInsert(null);
         }
         if (this.onResult) {
-          this._currentRows.push(row3);
+          this._currentRows.push(row4);
         } else {
-          this.emit("result", row3, this._resultIndex);
+          this.emit("result", row4, this._resultIndex);
         }
         return _Query.prototype.row;
       }
@@ -75564,12 +75564,12 @@ var require_query2 = __commonJS({
             stream.emit("end");
           }
         });
-        const onResult = (row3, index) => {
+        const onResult = (row4, index) => {
           if (stream.destroyed) return;
-          if (!stream.push(row3)) {
+          if (!stream.push(row4)) {
             this._connection && this._connection.pause();
           }
-          stream.emit("result", row3, index);
+          stream.emit("result", row4, index);
         };
         const onFields = (fields2) => {
           if (stream.destroyed) return;
@@ -77945,10 +77945,10 @@ var require_connection = __commonJS({
       }
       writeTextResult(rows, columns, binary = false) {
         this.writeColumns(columns);
-        rows.forEach((row3) => {
+        rows.forEach((row4) => {
           const arrayRow = new Array(columns.length);
           columns.forEach((column) => {
-            arrayRow.push(row3[column.name]);
+            arrayRow.push(row4[column.name]);
           });
           if (binary) {
             this.writeBinaryRow(arrayRow);
@@ -99506,6 +99506,96 @@ var paymentModeApprovalSchema = external_exports.strictObject({
   approvalExpiresAt: external_exports.string()
 });
 
+// ../../lib/account/posTypes.ts
+var CENTS_MAX = 1e8;
+var cents = external_exports.number().int().min(0).max(CENTS_MAX);
+var openShiftSchema = external_exports.strictObject({
+  openingCashMxnCents: cents
+});
+var posShiftSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  cashierUserId: external_exports.string(),
+  openedAt: external_exports.string(),
+  openingCashMxnCents: external_exports.number().int().min(0)
+});
+var currentShiftSchema = external_exports.strictObject({
+  shift: posShiftSchema.nullable()
+});
+var cashMovementSchema = external_exports.strictObject({
+  shiftId: external_exports.number().int().positive(),
+  type: external_exports.enum(["IN", "OUT"]),
+  amountMxnCents: external_exports.number().int().min(1).max(CENTS_MAX),
+  reason: external_exports.string().trim().min(1).max(255)
+});
+var cashMovementResultSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  shiftId: external_exports.number().int().positive(),
+  type: external_exports.enum(["IN", "OUT"]),
+  amountMxnCents: external_exports.number().int().positive()
+});
+var closeShiftSchema = external_exports.strictObject({
+  countedCashMxnCents: cents,
+  notes: external_exports.string().trim().max(255).optional()
+});
+var shiftParams = external_exports.strictObject({
+  id: external_exports.coerce.number().int().positive()
+});
+var closedShiftSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  expectedCashMxnCents: external_exports.number().int().min(0),
+  countedCashMxnCents: external_exports.number().int().min(0),
+  differenceMxnCents: external_exports.number().int()
+});
+var posProductsQuery = external_exports.strictObject({
+  q: external_exports.string().trim().min(1).max(64).optional()
+});
+var posProductsSchema = external_exports.strictObject({
+  items: external_exports.array(
+    external_exports.strictObject({
+      sku: external_exports.string(),
+      nameEs: external_exports.string(),
+      nameEn: external_exports.string(),
+      priceMxnCents: external_exports.number().int().positive(),
+      available: external_exports.number().int()
+    })
+  )
+});
+var saleLine = external_exports.strictObject({
+  sku: external_exports.string().min(1).max(64),
+  quantity: external_exports.number().int().min(1).max(99)
+});
+var posSaleSchema = external_exports.strictObject({
+  items: external_exports.array(saleLine).min(1).max(50).refine(
+    (items) => new Set(items.map((item) => item.sku)).size === items.length,
+    "A product appears twice"
+  ),
+  payment: external_exports.strictObject({
+    method: external_exports.string().max(32),
+    tenderedMxnCents: cents.optional(),
+    confirmedAmountMxnCents: cents.optional(),
+    terminalAuthCode: external_exports.string().max(64).optional(),
+    cardLastFour: external_exports.string().max(16).optional(),
+    cardBrand: external_exports.string().max(16).optional(),
+    voucherFolio: external_exports.string().max(64).optional()
+  }),
+  /** Where to send the receipt, only if the buyer wants it. */
+  customerEmail: external_exports.email().max(254).optional()
+});
+var posSaleResultSchema = external_exports.strictObject({
+  orderNumber: external_exports.string(),
+  method: external_exports.enum(["POS_CASH", "POS_CARD_MANUAL"]),
+  totalMxnCents: external_exports.number().int().positive(),
+  changeMxnCents: external_exports.number().int().min(0)
+});
+var receiptQuery = external_exports.strictObject({
+  width: external_exports.enum(["80", "58"]).default("80")
+});
+var receiptSchema = external_exports.strictObject({
+  orderNumber: external_exports.string(),
+  widthMm: external_exports.union([external_exports.literal(80), external_exports.literal(58)]),
+  lines: external_exports.array(external_exports.string())
+});
+
 // ../../lib/account/paymentsHealthTypes.ts
 var processorHealthSchema = external_exports.enum(["ok", "unreachable", "unconfigured"]);
 var paymentsHealthSchema = external_exports.strictObject({
@@ -99532,44 +99622,44 @@ var destinationSchema = external_exports.strictObject({
   stateCode: external_exports.string().regex(/^[A-Z]{3}$/, "State code must be 3 capital letters"),
   postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits").optional()
 });
-var cents = external_exports.number().int();
+var cents2 = external_exports.number().int();
 var cartQuoteSchema = external_exports.object({
   items: external_exports.array(
     external_exports.object({
       sku: external_exports.string(),
       slug: external_exports.string().nullable(),
       name: external_exports.string().nullable(),
-      quantity: cents.min(1),
-      unitPriceMxnCents: cents.positive().nullable(),
-      lineTotalMxnCents: cents.nonnegative().nullable(),
-      lineBaseMxnCents: cents.nonnegative().nullable(),
-      lineTaxMxnCents: cents.nonnegative().nullable(),
+      quantity: cents2.min(1),
+      unitPriceMxnCents: cents2.positive().nullable(),
+      lineTotalMxnCents: cents2.nonnegative().nullable(),
+      lineBaseMxnCents: cents2.nonnegative().nullable(),
+      lineTaxMxnCents: cents2.nonnegative().nullable(),
       stockStatus: external_exports.enum([
         "available",
         "low_stock",
         "out_of_stock",
         "unavailable"
       ]),
-      availableQuantity: cents.min(0).max(MAX_QUANTITY),
+      availableQuantity: cents2.min(0).max(MAX_QUANTITY),
       purchasable: external_exports.boolean()
     })
   ),
   summary: external_exports.object({
-    itemsBaseMxnCents: cents.nonnegative(),
-    itemsTaxMxnCents: cents.nonnegative(),
-    itemsTotalMxnCents: cents.nonnegative(),
+    itemsBaseMxnCents: cents2.nonnegative(),
+    itemsTaxMxnCents: cents2.nonnegative(),
+    itemsTotalMxnCents: cents2.nonnegative(),
     // FC 011: null without a destination; a zero charge when no rule covers it.
     shippingCode: external_exports.enum(["STANDARD_RATE", "FREE_SHIPPING", "UNSERVICEABLE_DESTINATION"]).nullable(),
-    shippingBaseMxnCents: cents.nonnegative().nullable(),
-    shippingTaxMxnCents: cents.nonnegative().nullable(),
-    shippingTotalMxnCents: cents.nonnegative().nullable(),
+    shippingBaseMxnCents: cents2.nonnegative().nullable(),
+    shippingTaxMxnCents: cents2.nonnegative().nullable(),
+    shippingTotalMxnCents: cents2.nonnegative().nullable(),
     serviceable: external_exports.boolean(),
-    freeShippingRemainingMxnCents: cents.nonnegative().nullable(),
-    subtotalMxnCents: cents.nonnegative(),
-    taxMxnCents: cents.nonnegative(),
-    totalMxnCents: cents.nonnegative(),
-    totalItems: cents.nonnegative(),
-    referenceUsdCents: cents.nonnegative().nullable(),
+    freeShippingRemainingMxnCents: cents2.nonnegative().nullable(),
+    subtotalMxnCents: cents2.nonnegative(),
+    taxMxnCents: cents2.nonnegative(),
+    totalMxnCents: cents2.nonnegative(),
+    totalItems: cents2.nonnegative(),
+    referenceUsdCents: cents2.nonnegative().nullable(),
     exchangeRate: external_exports.object({ series: external_exports.string(), date: external_exports.string(), rate: external_exports.string() }).nullable()
   }).refine(
     (s) => s.itemsBaseMxnCents + s.itemsTaxMxnCents === s.itemsTotalMxnCents && (s.shippingBaseMxnCents ?? 0) + (s.shippingTaxMxnCents ?? 0) === (s.shippingTotalMxnCents ?? 0) && s.subtotalMxnCents === s.itemsBaseMxnCents + (s.shippingBaseMxnCents ?? 0) && s.taxMxnCents === s.itemsTaxMxnCents + (s.shippingTaxMxnCents ?? 0) && s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents
@@ -99624,6 +99714,11 @@ var PAYMENT_METHOD_CODES = [
   "OXXO",
   "SPEI",
   "MERCADO_PAGO_BALANCE"
+];
+var ORDER_METHOD_CODES = [
+  ...PAYMENT_METHOD_CODES,
+  "POS_CASH",
+  "POS_CARD_MANUAL"
 ];
 var STATE_CODES = new Set(MEXICAN_STATES.map((state) => state.code));
 var text2 = (max) => external_exports.string().trim().min(1).max(max);
@@ -99688,7 +99783,7 @@ function splitStatus(code2) {
 var orderViewSchema = external_exports.object({
   orderNumber: external_exports.string(),
   status: external_exports.enum(ORDER_STATUS_CODES),
-  method: external_exports.enum(PAYMENT_METHOD_CODES),
+  method: external_exports.enum(ORDER_METHOD_CODES),
   itemsTotalMxnCents: external_exports.number().int().nonnegative(),
   shippingTotalMxnCents: external_exports.number().int().nonnegative(),
   totalMxnCents: external_exports.number().int().positive(),
@@ -100139,27 +100234,32 @@ var returnPrepareRequestSchema = external_exports.strictObject({
   restock: external_exports.boolean()
 });
 var returnConfirmRequestSchema = external_exports.strictObject({
-  manualReference: external_exports.string().trim().min(1).max(128).optional()
+  manualReference: external_exports.string().trim().min(1).max(128).optional(),
+  /** How a counter sale is paid back (FC 076): cash from the drawer or the terminal. */
+  refundMethod: external_exports.enum(["CASH", "TERMINAL"]).optional()
 });
 var returnParams = external_exports.strictObject({
   id: external_exports.coerce.number().int().positive()
+});
+var posReturnRequestSchema = returnRequestSchema.extend({
+  orderNumber: external_exports.string().regex(/^YEK-\d{4}-[0-9A-Z]{8}$/)
 });
 
 // ../../lib/account/shippingAdminTypes.ts
 var ZONE_RATE_STRATEGY_ID = 2;
 var STATE_COUNT = 32;
 var MAX_CENTS = 1e7;
-var cents2 = external_exports.number().int().min(0).max(MAX_CENTS);
+var cents3 = external_exports.number().int().min(0).max(MAX_CENTS);
 var shippingConfigRequestSchema = external_exports.strictObject({
   strategyId: external_exports.number().int().min(1).max(5),
   isFreeShippingActive: external_exports.boolean(),
-  freeShippingThresholdMxnCents: cents2.nullable()
+  freeShippingThresholdMxnCents: cents3.nullable()
 }).refine(
   (body) => body.isFreeShippingActive ? body.freeShippingThresholdMxnCents !== null && body.freeShippingThresholdMxnCents > 0 : body.freeShippingThresholdMxnCents === null
 );
 var ruleSchema = external_exports.strictObject({
   zoneId: external_exports.number().int().min(1).max(STATE_COUNT),
-  rateMxnCents: cents2
+  rateMxnCents: cents3
 });
 var shippingRulesRequestSchema = external_exports.strictObject({
   rules: external_exports.array(ruleSchema).length(STATE_COUNT).refine(
@@ -100235,8 +100335,8 @@ function stockStatus(stock) {
   if (stock <= 0) return "out_of_stock";
   return stock < LOW_STOCK ? "low_stock" : "available";
 }
-function quoteLine(line, row3, lang) {
-  if (!row3) {
+function quoteLine(line, row4, lang) {
+  if (!row4) {
     return {
       quoted: {
         sku: line.sku,
@@ -100254,8 +100354,8 @@ function quoteLine(line, row3, lang) {
       warning: "unavailable"
     };
   }
-  const unit = Number(row3.price_mxn_cents);
-  const stock = Number(row3.stock);
+  const unit = Number(row4.price_mxn_cents);
+  const stock = Number(row4.stock);
   const total = unit * line.quantity;
   const { base: base2, tax } = splitVat(total);
   const status = stockStatus(stock);
@@ -100265,9 +100365,9 @@ function quoteLine(line, row3, lang) {
   else if (!purchasable) warning = "insufficient_stock";
   return {
     quoted: {
-      sku: row3.sku,
-      slug: row3.slug,
-      name: lang === "en" ? row3.name_en : row3.name_es,
+      sku: row4.sku,
+      slug: row4.slug,
+      name: lang === "en" ? row4.name_en : row4.name_es,
       quantity: line.quantity,
       unitPriceMxnCents: unit,
       lineTotalMxnCents: total,
@@ -100282,7 +100382,7 @@ function quoteLine(line, row3, lang) {
   };
 }
 function buildQuote(lines, rows, rate, lang, shipping = null) {
-  const bySku = new Map(rows.map((row3) => [row3.sku, row3]));
+  const bySku = new Map(rows.map((row4) => [row4.sku, row4]));
   const items = [];
   const warnings = [];
   const summary2 = {
@@ -100347,19 +100447,19 @@ async function quoteCartToDestination(db, lines, rate, lang, destination, provid
   if (lines.length === 0 || products.items.some((item) => !item.purchasable)) {
     return { ok: false, code: "EMPTY_OR_UNAVAILABLE_CART" };
   }
-  const bySku = new Map(rows.map((row3) => [row3.sku, row3]));
+  const bySku = new Map(rows.map((row4) => [row4.sku, row4]));
   const shipment = await provider.quote({
     stateCode: destination.stateCode,
     itemsTotalMxnCents: products.summary.itemsTotalMxnCents,
     lines: lines.map((line) => {
-      const row3 = bySku.get(line.sku);
+      const row4 = bySku.get(line.sku);
       return {
         quantity: line.quantity,
-        weightGrams: Number(row3.weight_grams),
-        lengthMm: Number(row3.length_mm),
-        widthMm: Number(row3.width_mm),
-        heightMm: Number(row3.height_mm),
-        classId: Number(row3.shipping_class_id)
+        weightGrams: Number(row4.weight_grams),
+        lengthMm: Number(row4.length_mm),
+        widthMm: Number(row4.width_mm),
+        heightMm: Number(row4.height_mm),
+        classId: Number(row4.shipping_class_id)
       };
     })
   });
@@ -100488,30 +100588,30 @@ var catalogListQuery = external_exports.object({
 var catalogItemParams = external_exports.object({ slug: slug2 });
 function presentProperties(rows, language) {
   const english = language === "en";
-  return rows.map((row3) => ({
-    groupCode: row3.group_code,
-    groupName: english ? row3.group_name_en : row3.group_name_es,
-    valueCode: row3.value_code,
-    valueName: english ? row3.value_en : row3.value_es,
-    isFilterable: Number(row3.is_filterable) === 1
+  return rows.map((row4) => ({
+    groupCode: row4.group_code,
+    groupName: english ? row4.group_name_en : row4.group_name_es,
+    valueCode: row4.value_code,
+    valueName: english ? row4.value_en : row4.value_es,
+    isFilterable: Number(row4.is_filterable) === 1
   }));
 }
-function present(row3, language, fix, properties) {
+function present(row4, language, fix, properties) {
   const english = language === "en";
   return {
-    sku: row3.sku,
-    slug: row3.slug,
-    name: english ? row3.name_en : row3.name_es,
-    description: english ? row3.description_en : row3.description_es,
-    discipline: row3.discipline,
-    disciplineName: english ? row3.discipline_name_en : row3.discipline_name_es,
-    brand: row3.brand,
-    brandName: row3.brand_name,
+    sku: row4.sku,
+    slug: row4.slug,
+    name: english ? row4.name_en : row4.name_es,
+    description: english ? row4.description_en : row4.description_es,
+    discipline: row4.discipline,
+    disciplineName: english ? row4.discipline_name_en : row4.discipline_name_es,
+    brand: row4.brand,
+    brandName: row4.brand_name,
     properties: presentProperties(properties, language),
-    priceMxnCents: Number(row3.price_mxn_cents),
-    priceUsdCents: usdCents(Number(row3.price_mxn_cents), fix),
-    inStock: Number(row3.stock) > 0,
-    allowsReturn: Number(row3.allows_return) === 1
+    priceMxnCents: Number(row4.price_mxn_cents),
+    priceUsdCents: usdCents(Number(row4.price_mxn_cents), fix),
+    inStock: Number(row4.stock) > 0,
+    allowsReturn: Number(row4.allows_return) === 1
   };
 }
 function registerCatalogRoutes(app, deps) {
@@ -100530,11 +100630,11 @@ function registerCatalogRoutes(app, deps) {
     ]);
     const fix = rate ? Number(rate.rate) : null;
     const properties = await Promise.all(
-      items.map((row3) => findProductProperties(deps.db, row3.slug))
+      items.map((row4) => findProductProperties(deps.db, row4.slug))
     );
     return {
       items: items.map(
-        (row3, index) => present(row3, query.lang, fix, properties[index])
+        (row4, index) => present(row4, query.lang, fix, properties[index])
       ),
       page: query.page,
       pageSize: query.pageSize,
@@ -100659,22 +100759,22 @@ ${key}`).digest("hex");
 function runIdempotent(db, request, work) {
   const hash2 = keyHash(request.userId, request.key);
   return db.transaction(async (tx) => {
-    const [row3] = await tx.query(
+    const [row4] = await tx.query(
       "SELECT route, request_hash, response_status, response_body, expires_at FROM idempotency_keys WHERE key_hash = ? FOR UPDATE",
       [hash2]
     );
-    if (row3 && new Date(row3.expires_at) > request.now) {
-      if (row3.route !== request.route || row3.request_hash !== request.requestHash)
+    if (row4 && new Date(row4.expires_at) > request.now) {
+      if (row4.route !== request.route || row4.request_hash !== request.requestHash)
         return { code: "IDEMP_PAYLOAD_MISMATCH" };
       return {
         code: "IDEMP_REPLAY_SUCCESS",
         answer: {
-          status: Number(row3.response_status),
-          body: JSON.parse(row3.response_body)
+          status: Number(row4.response_status),
+          body: JSON.parse(row4.response_body)
         }
       };
     }
-    if (row3) {
+    if (row4) {
       await tx.query("DELETE FROM idempotency_keys WHERE key_hash = ?", [hash2]);
     }
     const answer = await work(tx);
@@ -100897,11 +100997,11 @@ async function storeMedia(tx, bytes, verdict) {
   return true;
 }
 async function readMedia(db, sha2562) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT mime_type, media_data FROM media_blobs WHERE sha256 = ?",
     [sha2562]
   );
-  return row3 ? { mimeType: row3.mime_type, data: row3.media_data } : null;
+  return row4 ? { mimeType: row4.mime_type, data: row4.media_data } : null;
 }
 function matchesDigest(data, sha2562) {
   return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") === sha2562;
@@ -101008,25 +101108,25 @@ function sealed(key, userId, addressId, content) {
     JSON.stringify(content)
   );
 }
-function opened(key, userId, row3) {
+function opened(key, userId, row4) {
   return addressContentSchema.parse(
     JSON.parse(
       decryptPii(
         key,
-        subjectOf(userId, row3.id),
+        subjectOf(userId, row4.id),
         "user_address",
-        row3.address_enc
+        row4.address_enc
       )
     )
   );
 }
-function viewOf(key, userId, row3, defaultId) {
-  const content = opened(key, userId, row3);
+function viewOf(key, userId, row4, defaultId) {
+  const content = opened(key, userId, row4);
   return {
-    id: row3.id,
-    isDefault: row3.id === defaultId,
-    isComplete: Number(row3.is_complete) === 1,
-    stateCode: row3.state_code,
+    id: row4.id,
+    isDefault: row4.id === defaultId,
+    isComplete: Number(row4.is_complete) === 1,
+    stateCode: row4.state_code,
     postalCode: content.postalCode,
     label: content.label ?? null,
     name: content.name ?? null,
@@ -101049,28 +101149,28 @@ async function listAddresses(db, key, userId) {
     [userId]
   );
   return rows.map(
-    (row3) => viewOf(key, userId, row3, owner?.default_address_id ?? null)
+    (row4) => viewOf(key, userId, row4, owner?.default_address_id ?? null)
   );
 }
 async function accountDelivery(db, key, userId) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT u.phone_enc, u.preferred_locale, a.id AS address_id, a.state_code, a.address_enc FROM users u LEFT JOIN user_addresses a ON a.id = u.default_address_id AND a.user_id = u.id WHERE u.id = ?",
     [userId]
   );
-  const preferredLocale = row3.preferred_locale;
+  const preferredLocale = row4.preferred_locale;
   if (key === null) {
     return { phone: null, postalCode: null, stateCode: null, preferredLocale };
   }
-  const address = row3.address_enc ? opened(key, userId, {
-    id: row3.address_id,
-    state_code: row3.state_code,
+  const address = row4.address_enc ? opened(key, userId, {
+    id: row4.address_id,
+    state_code: row4.state_code,
     is_complete: 0,
-    address_enc: row3.address_enc
+    address_enc: row4.address_enc
   }) : null;
   return {
-    phone: row3.phone_enc ? decryptPii(key, userId, "user_phone", row3.phone_enc) : null,
+    phone: row4.phone_enc ? decryptPii(key, userId, "user_phone", row4.phone_enc) : null,
     postalCode: address?.postalCode ?? null,
-    stateCode: address ? row3.state_code : null,
+    stateCode: address ? row4.state_code : null,
     preferredLocale
   };
 }
@@ -101134,11 +101234,11 @@ async function updateAddress(tx, key, userId, addressId, change) {
       ]
     );
   } else {
-    const [row3] = await tx.query(
+    const [row4] = await tx.query(
       "SELECT is_complete FROM user_addresses WHERE id = ? AND user_id = ?",
       [addressId, userId]
     );
-    isComplete = Number(row3.is_complete) === 1;
+    isComplete = Number(row4.is_complete) === 1;
   }
   if (isDefault) {
     await tx.query("UPDATE users SET default_address_id = ? WHERE id = ?", [
@@ -101192,11 +101292,11 @@ async function enqueueMail(tx, event) {
 
 // src/services/stripeCustomer.ts
 async function linkedCustomer(db, userId) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT stripe_customer_id FROM user_stripe_customers WHERE user_id = ?",
     [userId]
   );
-  return row3?.stripe_customer_id ?? null;
+  return row4?.stripe_customer_id ?? null;
 }
 async function ensureCustomer(db, cards, userId) {
   const existing = await linkedCustomer(db, userId);
@@ -101233,7 +101333,7 @@ async function expireOverdueOrders(db, now) {
       [now]
     );
     if (overdue.length === 0) return 0;
-    const ids = overdue.map((row3) => row3.id);
+    const ids = overdue.map((row4) => row4.id);
     await tx.query(
       "UPDATE products p JOIN (SELECT product_id, SUM(quantity) AS units FROM order_items WHERE order_id IN (?) GROUP BY product_id) r ON r.product_id = p.id SET p.reserved_stock = p.reserved_stock - r.units",
       [ids]
@@ -101258,11 +101358,11 @@ async function reserveLines(tx, lines) {
         [line.quantity, line.sku, line.quantity]
       );
       if (affected(result) !== 1) return null;
-      const [row3] = await tx.query(
+      const [row4] = await tx.query(
         "SELECT id FROM products WHERE sku = ?",
         [line.sku]
       );
-      return [line.sku, row3.id];
+      return [line.sku, row4.id];
     })
   );
   if (reserved.includes(null)) throw new InsufficientStock();
@@ -101487,18 +101587,18 @@ async function createCheckout(deps, body, lang, userId = null) {
 
 // src/services/orderReads.ts
 var iso = (date5) => new Date(date5).toISOString();
-function summary(row3) {
+function summary(row4) {
   return {
-    orderNumber: row3.order_number,
-    ...splitStatus(row3.status),
-    method: row3.method,
-    itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
-    shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
-    totalMxnCents: Number(row3.total_mxn_cents),
-    createdAt: iso(row3.created_at),
-    expiresAt: iso(row3.expires_at),
-    paidAt: row3.paid_at === null ? null : iso(row3.paid_at),
-    isTest: Number(row3.is_test) === 1
+    orderNumber: row4.order_number,
+    ...splitStatus(row4.status),
+    method: row4.method,
+    itemsTotalMxnCents: Number(row4.items_total_mxn_cents),
+    shippingTotalMxnCents: Number(row4.shipping_total_mxn_cents),
+    totalMxnCents: Number(row4.total_mxn_cents),
+    createdAt: iso(row4.created_at),
+    expiresAt: iso(row4.expires_at),
+    paidAt: row4.paid_at === null ? null : iso(row4.paid_at),
+    isTest: Number(row4.is_test) === 1
   };
 }
 async function listOrders(db, scope, paging2) {
@@ -101526,30 +101626,30 @@ async function listOrders(db, scope, paging2) {
   return { items: rows.map(summary), total: Number(count.n) };
 }
 async function findOrder(db, orderNumber) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT o.id, o.user_id, o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.created_at, o.expires_at, o.paid_at, o.is_test, o.carrier, o.tracking_number, o.tracking_url, o.shipped_at, o.delivered_at FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
     [orderNumber]
   );
-  if (row3 === void 0) return null;
+  if (row4 === void 0) return null;
   const [lines, events] = await Promise.all([
     db.query(
       "SELECT i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.unit_price_mxn_cents, i.line_total_mxn_cents, i.allows_return ORDER BY i.id",
-      [row3.id]
+      [row4.id]
     ),
     db.query(
       "SELECT p.code AS processor, e.event_type, e.processor_status, e.amount_mxn_cents, r.code AS resulting_status, e.is_alert, e.received_at FROM payment_events e JOIN payment_processors p ON p.id = e.processor_id LEFT JOIN order_statuses r ON r.id = e.resulting_status_id WHERE e.order_id = ? ORDER BY e.received_at, e.id",
-      [row3.id]
+      [row4.id]
     )
   ]);
   return {
-    ownerId: row3.user_id,
+    ownerId: row4.user_id,
     order: {
-      ...summary(row3),
-      carrier: row3.carrier,
-      trackingNumber: row3.tracking_number,
-      trackingUrl: row3.tracking_url,
-      shippedAt: row3.shipped_at === null ? null : iso(row3.shipped_at),
-      deliveredAt: row3.delivered_at === null ? null : iso(row3.delivered_at),
+      ...summary(row4),
+      carrier: row4.carrier,
+      trackingNumber: row4.tracking_number,
+      trackingUrl: row4.tracking_url,
+      shippedAt: row4.shipped_at === null ? null : iso(row4.shipped_at),
+      deliveredAt: row4.delivered_at === null ? null : iso(row4.delivered_at),
       lines: lines.map((line) => ({
         sku: line.sku,
         quantity: Number(line.quantity),
@@ -101611,27 +101711,27 @@ function registerOrderRoutes(app, deps) {
       if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
         return notFound();
       await expireOverdueOrders(deps.db, deps.now());
-      const [row3] = await deps.db.query(
+      const [row4] = await deps.db.query(
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
         [orderNumber]
       );
-      if (row3 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
-        Buffer.from(row3.access_token_hash),
+      if (row4 === void 0 || !(0, import_node_crypto5.timingSafeEqual)(
+        Buffer.from(row4.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
         return notFound();
       }
-      const { status, fulfillment } = splitStatus(row3.status);
+      const { status, fulfillment } = splitStatus(row4.status);
       return orderViewSchema.parse({
-        orderNumber: row3.order_number,
+        orderNumber: row4.order_number,
         status,
         fulfillment,
-        method: row3.method,
-        itemsTotalMxnCents: Number(row3.items_total_mxn_cents),
-        shippingTotalMxnCents: Number(row3.shipping_total_mxn_cents),
-        totalMxnCents: Number(row3.total_mxn_cents),
-        expiresAt: new Date(row3.expires_at).toISOString(),
-        paidAt: row3.paid_at === null ? null : new Date(row3.paid_at).toISOString()
+        method: row4.method,
+        itemsTotalMxnCents: Number(row4.items_total_mxn_cents),
+        shippingTotalMxnCents: Number(row4.shipping_total_mxn_cents),
+        totalMxnCents: Number(row4.total_mxn_cents),
+        expiresAt: new Date(row4.expires_at).toISOString(),
+        paidAt: row4.paid_at === null ? null : new Date(row4.paid_at).toISOString()
       });
     }
   );
@@ -102053,6 +102153,97 @@ var ROUTE_CONTRACTS = [
     }
   },
   {
+    method: "GET",
+    path: "/v1/admin/pos/shifts/current",
+    summary: "The open till shift, without its expected cash (blind count)",
+    permission: "pos:shift",
+    request: {},
+    responses: {
+      200: currentShiftSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/pos/shifts/open",
+    summary: "Opens the till shift; one at a time (Idempotency-Key, audited)",
+    permission: "pos:shift",
+    request: { body: openShiftSchema },
+    responses: {
+      201: posShiftSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/pos/shifts/movements",
+    summary: "Cash put in or taken out of the drawer (T1.4, Idempotency-Key, audited)",
+    permission: "pos:shift",
+    request: { body: cashMovementSchema },
+    responses: {
+      201: cashMovementResultSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/pos/shifts/:id/close",
+    summary: "Closes the shift with a blind count (T1.2, Idempotency-Key, audited)",
+    permission: "pos:shift",
+    request: { params: shiftParams, body: closeShiftSchema },
+    responses: {
+      200: closedShiftSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/pos/products",
+    summary: "The products of the counter, with what is left after online reservations",
+    permission: "pos:sell",
+    request: { query: posProductsQuery },
+    responses: {
+      200: posProductsSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/pos/checkout",
+    summary: "Sells at the counter from the shared stock (T1.1, T1.3, Idempotency-Key, audited)",
+    permission: "pos:sell",
+    request: { body: posSaleSchema },
+    responses: {
+      201: posSaleResultSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/pos/orders/:order_number/receipt",
+    summary: "The thermal receipt of a counter sale, 80 or 58 mm",
+    permission: "pos:sell",
+    request: {
+      params: external_exports.object({ order_number: external_exports.string() }),
+      query: receiptQuery
+    },
+    responses: {
+      200: receiptSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
     method: "POST",
     path: "/v1/admin/payments/mode/prepare",
     summary: "The owner or an administrator asks to change the payments mode: a ticket of ten minutes (audited)",
@@ -102222,6 +102413,20 @@ var ROUTE_CONTRACTS = [
     responses: {
       200: returnListSchema,
       400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/returns/pos",
+    summary: "The staff asks for the return of a counter sale (Idempotency-Key, audited)",
+    permission: "returns:prepare",
+    request: { body: posReturnRequestSchema },
+    responses: {
+      201: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS
     }
   },
@@ -102565,18 +102770,18 @@ function clientFacts(ip, userAgent) {
   return { ip: ip || null, userAgent: userAgent?.slice(0, 500) ?? null };
 }
 async function findUserByEmail(db, email3) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT id, email, password_hash, full_name, is_active FROM users WHERE email = ? AND is_active = 1",
     [email3]
   );
-  return row3 ?? null;
+  return row4 ?? null;
 }
 async function emailOf(db, userId) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT email FROM users WHERE id = ?",
     [userId]
   );
-  return row3.email;
+  return row4.email;
 }
 function createCustomer(db, user) {
   return db.transaction(async (tx) => {
@@ -102619,10 +102824,10 @@ async function capabilitiesOf(db, userId) {
     [userId]
   );
   return {
-    roles: [...new Set(rows.map((row3) => row3.role_id))].sort(byName),
+    roles: [...new Set(rows.map((row4) => row4.role_id))].sort(byName),
     permissions: [
       ...new Set(
-        rows.flatMap((row3) => row3.permission_id ? [row3.permission_id] : [])
+        rows.flatMap((row4) => row4.permission_id ? [row4.permission_id] : [])
       )
     ].sort(byName),
     totpEnabled: Number(totp?.is_totp_enabled ?? 0) === 1
@@ -102655,16 +102860,16 @@ async function markEmailVerified(db, userId, now) {
   );
 }
 async function liveChallenge(db, id, now) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT id, user_id, challenge_type, code_hash, attempts FROM two_factor_challenges WHERE id = ? AND expires_at > ? AND attempts < ?",
     [id, now, MAX_ATTEMPTS]
   );
-  return row3 ? {
-    id: row3.id,
-    userId: row3.user_id,
-    type: row3.challenge_type,
-    codeHash: row3.code_hash,
-    attempts: Number(row3.attempts)
+  return row4 ? {
+    id: row4.id,
+    userId: row4.user_id,
+    type: row4.challenge_type,
+    codeHash: row4.code_hash,
+    attempts: Number(row4.attempts)
   } : null;
 }
 async function failChallenge(db, id) {
@@ -102674,14 +102879,14 @@ async function failChallenge(db, id) {
   );
 }
 async function totpOf(db, userId) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT totp_secret_encrypted, is_totp_enabled FROM two_factor_auth WHERE user_id = ?",
     [userId]
   );
-  if (!row3?.totp_secret_encrypted) return null;
+  if (!row4?.totp_secret_encrypted) return null;
   return {
-    encrypted: row3.totp_secret_encrypted,
-    enabled: Number(row3.is_totp_enabled) === 1
+    encrypted: row4.totp_secret_encrypted,
+    enabled: Number(row4.is_totp_enabled) === 1
   };
 }
 async function savePendingTotp(db, userId, encrypted) {
@@ -102737,17 +102942,17 @@ async function openSession(tx, input2) {
   return { token, maxAgeSeconds: lifetime / 1e3 };
 }
 async function sessionUser(db, token, now) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT s.id, s.user_id, u.email, u.full_name FROM user_sessions s JOIN users u ON u.id = s.user_id AND u.is_active = 1 WHERE s.id = ? AND s.expires_at > ?",
     [tokenHash2(token), now]
   );
-  if (!row3) return null;
-  const capabilities = await capabilitiesOf(db, row3.user_id);
+  if (!row4) return null;
+  const capabilities = await capabilitiesOf(db, row4.user_id);
   return {
-    sessionId: row3.id,
-    userId: row3.user_id,
-    email: row3.email,
-    fullName: row3.full_name,
+    sessionId: row4.id,
+    userId: row4.user_id,
+    email: row4.email,
+    fullName: row4.full_name,
     ...capabilities
   };
 }
@@ -102775,11 +102980,11 @@ async function rememberDevice(db, device) {
   return token;
 }
 async function isTrustedDevice(db, token, userId, now) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT id FROM user_trusted_devices WHERE device_token_hash = ? AND user_id = ? AND expires_at > ?",
     [tokenHash2(token), userId, now]
   );
-  return row3 !== void 0;
+  return row4 !== void 0;
 }
 async function forgetDevice(db, token, userId) {
   await db.query(
@@ -103323,7 +103528,7 @@ async function privilegedUsers(db) {
   const rows = await db.query(
     "SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id WHERE u.is_active = 1 AND ur.role_id IN ('owner', 'admin')"
   );
-  return rows.map((row3) => row3.id);
+  return rows.map((row4) => row4.id);
 }
 async function alertModeApproved(tx, targetMode) {
   await Promise.all(
@@ -103333,11 +103538,11 @@ async function alertModeApproved(tx, targetMode) {
   );
 }
 async function countSince(db, action, entityId, since) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT COUNT(*) AS n FROM audit_log WHERE entity_type = 'payments' AND action = ? AND entity_id = ? AND created_at >= ?",
     [action, entityId, since]
   );
-  return Number(row3.n);
+  return Number(row4.n);
 }
 function note(db, action, entityId, ip) {
   return recordAudit(db, {
@@ -103663,6 +103868,565 @@ function registerAdminPaymentRoutes(app, deps) {
   });
 }
 
+// src/services/posCheckout.ts
+var import_node_crypto10 = require("node:crypto");
+
+// src/services/posGates.ts
+var SUPERVISOR_DIFF_CENTS = 1e4;
+var SUPERVISOR_WITHDRAWAL_CENTS = 2e5;
+var MIN_NOTES = 10;
+function decideSaleStock(inputs) {
+  if (!inputs.stock) return "INSUFFICIENT_STOCK_REJECT";
+  if (!inputs.unreserved) return "STOCK_RESERVED_ONLINE_REJECT";
+  return inputs.shiftOpen ? "SALE_PERMITTED" : "POS_SHIFT_CLOSED_REJECT";
+}
+function decideShiftClose(inputs) {
+  if (!inputs.allowed) return "PERMISSION_DENIED";
+  if (!inputs.open) return "SHIFT_NOT_OPEN_REJECT";
+  if (inputs.matches) return "SHIFT_CLOSED_SUCCESS";
+  if (!inputs.notes) return "MISSING_DIFF_JUSTIFICATION_REJECT";
+  return inputs.withinLimit ? "SHIFT_CLOSED_SUCCESS" : "SUPERVISOR_REQUIRED_FOR_LARGE_DIFF";
+}
+function decideWithdrawal(inputs) {
+  if (!inputs.allowed) return "PERMISSION_DENIED";
+  if (!inputs.open) return "SHIFT_NOT_OPEN_REJECT";
+  if (!inputs.funds) return "INSUFFICIENT_DRAWER_CASH_REJECT";
+  return inputs.withinLimit ? "WITHDRAWAL_PERMITTED" : "SUPERVISOR_PERMISSION_REQUIRED";
+}
+function decidePayment(inputs) {
+  if (!inputs.method) return "INVALID_POS_METHOD_REJECT";
+  if (!inputs.tendered) return "INSUFFICIENT_TENDERED_REJECT";
+  if (!inputs.amount) return "TERMINAL_AMOUNT_MISMATCH_REJECT";
+  return inputs.voucher ? "PAYMENT_VALID_ACCEPTED" : "INVALID_VOUCHER_DATA_REJECT";
+}
+
+// src/services/posCheckout.ts
+var METHOD_IDS = { POS_CASH: 5, POS_CARD_MANUAL: 6 };
+var COUNTER_ZONE = 1;
+var HOLD_MS = 60 * 60 * 1e3;
+var COUNTER_EMAIL = "pos@mostrador.local";
+var CARD_NUMBER = /\d(?:[ -]?\d){12,18}/;
+var AUTH_CODE = /^[A-Za-z0-9]{1,32}$/;
+var LAST_FOUR = /^\d{4}$/;
+async function posProducts(db, search) {
+  const escaped = (search ?? "").replaceAll(/[\\%_]/g, String.raw`\$&`);
+  const like = `%${escaped}%`;
+  const rows = await db.query(
+    "SELECT sku, name_es, name_en, price_mxn_cents, stock - reserved_stock AS available FROM products WHERE is_active = 1 AND (sku LIKE ? OR name_es LIKE ? OR name_en LIKE ?) ORDER BY sku LIMIT 100",
+    [like, like, like]
+  );
+  return {
+    items: rows.map((row4) => ({
+      sku: row4.sku,
+      nameEs: row4.name_es,
+      nameEn: row4.name_en,
+      priceMxnCents: Number(row4.price_mxn_cents),
+      available: Number(row4.available)
+    }))
+  };
+}
+async function priced(tx, sale, shiftOpen) {
+  const skus = sale.items.map((item) => item.sku);
+  const rows = await tx.query(
+    "SELECT id, sku, price_mxn_cents, stock, reserved_stock, allows_return FROM products WHERE sku IN (?) AND is_active = 1 ORDER BY id FOR UPDATE",
+    [skus]
+  );
+  const found = new Map(rows.map((row4) => [row4.sku, row4]));
+  const lines = [];
+  for (const item of sale.items) {
+    const row4 = found.get(item.sku);
+    if (row4 === void 0) return "POS_PRODUCT_UNKNOWN";
+    const stock = Number(row4.stock);
+    const decision = decideSaleStock({
+      stock: stock >= item.quantity,
+      unreserved: stock - Number(row4.reserved_stock) >= item.quantity,
+      shiftOpen
+    });
+    if (decision !== "SALE_PERMITTED") return decision;
+    const unit = Number(row4.price_mxn_cents);
+    const total = unit * item.quantity;
+    lines.push({
+      productId: Number(row4.id),
+      sku: row4.sku,
+      quantity: item.quantity,
+      unit,
+      total,
+      ...splitVat(total),
+      allowsReturn: Number(row4.allows_return)
+    });
+  }
+  return lines;
+}
+function checkPayment(payment2, total) {
+  const cash = payment2.method === "POS_CASH";
+  const card = payment2.method === "POS_CARD_MANUAL";
+  const [auth2 = "", lastFour = "", brand = "", folio = ""] = [
+    payment2.terminalAuthCode,
+    payment2.cardLastFour,
+    payment2.cardBrand,
+    payment2.voucherFolio
+  ];
+  const voucher = AUTH_CODE.test(auth2) && LAST_FOUR.test(lastFour) && folio !== "" && brand !== "" && ![auth2, brand, folio].some((text3) => CARD_NUMBER.test(text3));
+  return decidePayment({
+    method: cash || card,
+    tendered: !cash || (payment2.tenderedMxnCents ?? -1) >= total,
+    amount: !card || payment2.confirmedAmountMxnCents === total,
+    voucher: !card || voucher
+  });
+}
+async function insertOrder(tx, input2) {
+  const { sale, lines, secrets, now } = input2;
+  const orderNumber = newOrderNumber(now);
+  const sum = (pick2) => lines.reduce((total2, line) => total2 + pick2(line), 0);
+  const total = sum((line) => line.total);
+  const cash = sale.payment.method === "POS_CASH";
+  const change = cash ? sale.payment.tenderedMxnCents - total : 0;
+  const email3 = sale.customerEmail ?? COUNTER_EMAIL;
+  const seal = (field, value) => encryptPii(secrets.piiKey, orderNumber, field, value);
+  const inserted = await tx.query(
+    "INSERT INTO orders (order_number, status_id, payment_method_id, payment_resource_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, paid_at, shipped_at, delivered_at, is_test, locale, channel, pos_shift_id, pos_cashier_id, pos_tendered_mxn_cents, pos_change_mxn_cents, pos_terminal_auth_code, pos_terminal_last_four, pos_terminal_brand, pos_terminal_voucher_folio) VALUES (?, 9, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'es-MX', 'pos', ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      orderNumber,
+      METHOD_IDS[sale.payment.method],
+      `pos:${orderNumber}`,
+      COUNTER_ZONE,
+      sum((line) => line.base),
+      sum((line) => line.tax),
+      total,
+      total,
+      seal("customer_name", "Cliente Mostrador"),
+      seal("customer_email", email3),
+      seal("customer_phone", "0000000000"),
+      seal("shipping_address", JSON.stringify({ counter: "Mostrador Yekora" })),
+      emailHmac(secrets.emailPepper, email3),
+      tokenHash(secrets.tokenPepper, (0, import_node_crypto10.randomBytes)(32).toString("base64url")),
+      now,
+      new Date(now.getTime() + HOLD_MS),
+      now,
+      now,
+      now,
+      input2.shiftId,
+      input2.cashier,
+      cash ? sale.payment.tenderedMxnCents : null,
+      cash ? change : null,
+      cash ? null : sale.payment.terminalAuthCode,
+      cash ? null : sale.payment.cardLastFour,
+      cash ? null : sale.payment.cardBrand,
+      cash ? null : sale.payment.voucherFolio
+    ]
+  );
+  const id = inserted.insertId;
+  return { id, orderNumber, total, change };
+}
+async function sellAtCounter(tx, sale, context) {
+  const { actor, secrets, now } = context;
+  const [shift] = await tx.query(
+    "SELECT id FROM pos_shifts WHERE status = 'OPEN' FOR UPDATE"
+  );
+  const lines = await priced(tx, sale, shift !== void 0);
+  if (typeof lines === "string") return lines;
+  const total = lines.reduce((n, line) => n + line.total, 0);
+  const payment2 = checkPayment(sale.payment, total);
+  if (payment2 !== "PAYMENT_VALID_ACCEPTED") return payment2;
+  const order2 = await insertOrder(tx, {
+    sale,
+    lines,
+    shiftId: Number(shift.id),
+    cashier: actor.userId,
+    secrets,
+    now
+  });
+  await tx.query(
+    "INSERT INTO order_items (order_id, product_id, sku, quantity, unit_price_mxn_cents, line_base_mxn_cents, line_tax_mxn_cents, line_total_mxn_cents, allows_return) VALUES ?",
+    [
+      lines.map((line) => [
+        order2.id,
+        line.productId,
+        line.sku,
+        line.quantity,
+        line.unit,
+        line.base,
+        line.tax,
+        line.total,
+        line.allowsReturn
+      ])
+    ]
+  );
+  await Promise.all(
+    lines.map(
+      (line) => tx.query("UPDATE products SET stock = stock - ? WHERE id = ?", [
+        line.quantity,
+        line.productId
+      ])
+    )
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "POS_SALE",
+    entityType: "orders",
+    entityId: order2.orderNumber,
+    before: null,
+    after: { method: sale.payment.method, totalMxnCents: order2.total },
+    ip: actor.ip
+  });
+  if (sale.customerEmail !== void 0) {
+    await enqueueMail(tx, { type: "POS_RECEIPT_EMAIL", orderId: order2.id });
+  }
+  return {
+    orderNumber: order2.orderNumber,
+    method: sale.payment.method,
+    totalMxnCents: order2.total,
+    changeMxnCents: order2.change
+  };
+}
+
+// src/services/posReceipt.ts
+var COLUMNS = { 80: 42, 58: 32 };
+var money = (cents4) => `$${(Number(cents4) / 100).toFixed(2)}`;
+function row(left, right, width) {
+  const room = Math.max(1, width - right.length - 1);
+  return `${left.slice(0, room).padEnd(room)} ${right}`;
+}
+var centered = (text3, width) => `${" ".repeat(Math.max(0, Math.floor((width - text3.length) / 2)))}${text3}`;
+function payment(order2, width) {
+  if (order2.pos_terminal_last_four === null) {
+    return [
+      row("Efectivo recibido", money(order2.pos_tendered_mxn_cents), width),
+      row("Cambio", money(order2.pos_change_mxn_cents), width)
+    ];
+  }
+  return [
+    `Terminal Banorte \xB7 ${order2.pos_terminal_brand}`,
+    `Tarjeta **** ${order2.pos_terminal_last_four}`,
+    `Autorizacion ${order2.pos_terminal_auth_code}`,
+    `Folio ${order2.pos_terminal_voucher_folio}`
+  ];
+}
+async function posReceipt(db, orderNumber, widthMm) {
+  const [order2] = await db.query(
+    "SELECT id, paid_at, items_base_mxn_cents, items_tax_mxn_cents, total_mxn_cents, pos_tendered_mxn_cents, pos_change_mxn_cents, pos_terminal_auth_code, pos_terminal_last_four, pos_terminal_brand, pos_terminal_voucher_folio FROM orders WHERE order_number = ? AND channel = 'pos'",
+    [orderNumber]
+  );
+  if (order2 === void 0) return null;
+  const items = await db.query(
+    "SELECT i.sku, p.name_es, i.quantity, i.line_total_mxn_cents FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = ? ORDER BY i.id",
+    [order2.id]
+  );
+  const width = COLUMNS[widthMm];
+  const rule = "-".repeat(width);
+  const date5 = new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Mexico_City"
+  }).format(new Date(order2.paid_at));
+  return {
+    orderNumber,
+    widthMm,
+    lines: [
+      centered("YEKORA", width),
+      centered("Comprobante de venta", width),
+      rule,
+      `Folio ${orderNumber}`,
+      date5,
+      rule,
+      ...items.flatMap((item) => [
+        item.name_es.slice(0, width),
+        row(
+          `${item.quantity} x ${item.sku}`,
+          money(item.line_total_mxn_cents),
+          width
+        )
+      ]),
+      rule,
+      row("Subtotal", money(order2.items_base_mxn_cents), width),
+      row("IVA 16%", money(order2.items_tax_mxn_cents), width),
+      row("TOTAL", money(order2.total_mxn_cents), width),
+      rule,
+      ...payment(order2, width),
+      rule,
+      centered("No es comprobante fiscal", width),
+      centered("Devoluciones: 60 dias naturales", width)
+    ]
+  };
+}
+
+// src/services/posShifts.ts
+var CASH_METHOD_ID = 5;
+async function currentShift(db) {
+  const [row4] = await db.query(
+    "SELECT id, cashier_user_id, opened_at, opening_cash_mxn_cents FROM pos_shifts WHERE status = 'OPEN'"
+  );
+  return row4 ? {
+    id: Number(row4.id),
+    cashierUserId: row4.cashier_user_id,
+    openedAt: new Date(row4.opened_at).toISOString(),
+    openingCashMxnCents: Number(row4.opening_cash_mxn_cents)
+  } : null;
+}
+async function openShift(tx, openingCashMxnCents, actor) {
+  try {
+    await tx.query(
+      "INSERT INTO pos_shifts (cashier_user_id, opening_cash_mxn_cents) VALUES (?, ?)",
+      [actor.userId, openingCashMxnCents]
+    );
+  } catch (error63) {
+    if (error63.code !== "ER_DUP_ENTRY") throw error63;
+    return "POS_SHIFT_ALREADY_OPEN";
+  }
+  const shift = await currentShift(tx);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "POS_SHIFT_OPENED",
+    entityType: "pos_shifts",
+    entityId: String(shift.id),
+    before: null,
+    after: { openingCashMxnCents },
+    ip: actor.ip
+  });
+  return shift;
+}
+async function lockShift(tx, id) {
+  const [row4] = await tx.query(
+    "SELECT id, cashier_user_id, status, opening_cash_mxn_cents FROM pos_shifts WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  return row4;
+}
+async function drawerCash(tx, shift) {
+  const [sales] = await tx.query(
+    "SELECT COALESCE(SUM(total_mxn_cents), 0) AS cents FROM orders WHERE pos_shift_id = ? AND payment_method_id = ?",
+    [shift.id, CASH_METHOD_ID]
+  );
+  const [moves] = await tx.query(
+    "SELECT COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_mxn_cents ELSE -CAST(amount_mxn_cents AS SIGNED) END), 0) AS cents FROM pos_cash_movements WHERE shift_id = ?",
+    [shift.id]
+  );
+  return Number(shift.opening_cash_mxn_cents) + Number(sales.cents) + Number(moves.cents);
+}
+async function writeMovement(tx, movement, userId) {
+  const result = await tx.query(
+    "INSERT INTO pos_cash_movements (shift_id, type, amount_mxn_cents, reason, authorized_by_user_id, return_id) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      movement.shiftId,
+      movement.type,
+      movement.amountMxnCents,
+      movement.reason,
+      userId,
+      movement.returnId ?? null
+    ]
+  );
+  return result.insertId;
+}
+async function moveCash(tx, input2, actor) {
+  const shift = await lockShift(tx, input2.shiftId);
+  const open2 = shift?.status === "OPEN";
+  const isOut = input2.type === "OUT";
+  const funds = !isOut || !open2 || input2.amountMxnCents <= await drawerCash(tx, shift);
+  const decision = decideWithdrawal({
+    allowed: true,
+    open: open2,
+    funds,
+    withinLimit: !isOut || actor.supervisor || input2.amountMxnCents <= SUPERVISOR_WITHDRAWAL_CENTS
+  });
+  if (decision !== "WITHDRAWAL_PERMITTED") return decision;
+  const id = await writeMovement(tx, input2, actor.userId);
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "POS_CASH_MOVED",
+    entityType: "pos_shifts",
+    entityId: String(input2.shiftId),
+    before: null,
+    after: { type: input2.type, amountMxnCents: input2.amountMxnCents },
+    ip: actor.ip
+  });
+  return {
+    id,
+    shiftId: input2.shiftId,
+    type: input2.type,
+    amountMxnCents: input2.amountMxnCents
+  };
+}
+async function closeShift(tx, id, input2, actor, now) {
+  const shift = await lockShift(tx, id);
+  if (shift === void 0) return "SHIFT_NOT_OPEN_REJECT";
+  const expected = await drawerCash(tx, shift);
+  const difference = input2.countedCashMxnCents - expected;
+  const notes = input2.notes ?? "";
+  const decision = decideShiftClose({
+    allowed: actor.supervisor || shift.cashier_user_id === actor.userId,
+    open: shift.status === "OPEN",
+    matches: difference === 0,
+    notes: notes.length >= MIN_NOTES,
+    withinLimit: actor.supervisor || Math.abs(difference) <= SUPERVISOR_DIFF_CENTS
+  });
+  if (decision !== "SHIFT_CLOSED_SUCCESS") return decision;
+  await tx.query(
+    "UPDATE pos_shifts SET status = 'CLOSED', closed_at = ?, expected_cash_mxn_cents = ?, counted_cash_mxn_cents = ?, cash_difference_mxn_cents = ?, closed_by_user_id = ?, notes = ? WHERE id = ?",
+    [
+      now,
+      expected,
+      input2.countedCashMxnCents,
+      difference,
+      actor.userId,
+      notes === "" ? null : notes,
+      id
+    ]
+  );
+  await recordAudit(tx, {
+    userId: actor.userId,
+    action: "POS_SHIFT_CLOSED",
+    entityType: "pos_shifts",
+    entityId: String(id),
+    before: null,
+    after: { differenceMxnCents: difference },
+    ip: actor.ip
+  });
+  return {
+    id,
+    expectedCashMxnCents: expected,
+    countedCashMxnCents: input2.countedCashMxnCents,
+    differenceMxnCents: difference
+  };
+}
+
+// src/routes/adminPos.ts
+var REFUSALS3 = {
+  POS_SHIFT_ALREADY_OPEN: [409, "A shift is already open"],
+  PERMISSION_DENIED: [403, "Permission denied"],
+  SHIFT_NOT_OPEN_REJECT: [409, "The shift is not open"],
+  MISSING_DIFF_JUSTIFICATION_REJECT: [400, "A difference needs a note"],
+  SUPERVISOR_REQUIRED_FOR_LARGE_DIFF: [403, "A supervisor must close it"],
+  INSUFFICIENT_DRAWER_CASH_REJECT: [400, "The drawer does not hold it"],
+  SUPERVISOR_PERMISSION_REQUIRED: [403, "A supervisor must take it out"],
+  POS_PRODUCT_UNKNOWN: [400, "A product does not exist or is retired"],
+  INSUFFICIENT_STOCK_REJECT: [409, "There is not enough stock"],
+  STOCK_RESERVED_ONLINE_REJECT: [409, "The units are reserved online"],
+  POS_SHIFT_CLOSED_REJECT: [409, "Open a shift before selling"],
+  INVALID_POS_METHOD_REJECT: [400, "Not a method of the counter"],
+  INSUFFICIENT_TENDERED_REJECT: [400, "The cash does not cover the total"],
+  TERMINAL_AMOUNT_MISMATCH_REJECT: [400, "The terminal charged another amount"],
+  INVALID_VOUCHER_DATA_REJECT: [400, "The voucher data is incomplete"]
+};
+function refusalOf3(code2) {
+  const [status, title] = REFUSALS3[code2];
+  return { status, body: problem(status, title, code2) };
+}
+function actorOf(request) {
+  const user = request.user;
+  return {
+    userId: user.userId,
+    supervisor: user.permissions.includes("pos:supervisor"),
+    ip: request.ip
+  };
+}
+function write(deps, request, reply, body, run) {
+  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    return refuse(reply, 400, "Idempotency-Key required", key.code);
+  }
+  if (body === void 0) {
+    return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+  }
+  const actor = actorOf(request);
+  return runOnce(deps, request, reply, key.key, (tx) => run(tx, body, actor));
+}
+function registerPosRoutes(app, deps) {
+  app.get("/v1/admin/pos/shifts/current", async () => ({
+    shift: await currentShift(deps.db)
+  }));
+  app.post(
+    "/v1/admin/pos/shifts/open",
+    async (request, reply) => write(
+      deps,
+      request,
+      reply,
+      openShiftSchema.safeParse(request.body).data,
+      async (tx, body, actor) => {
+        const outcome = await openShift(tx, body.openingCashMxnCents, actor);
+        return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
+      }
+    )
+  );
+  app.post(
+    "/v1/admin/pos/shifts/movements",
+    async (request, reply) => write(
+      deps,
+      request,
+      reply,
+      cashMovementSchema.safeParse(request.body).data,
+      async (tx, body, actor) => {
+        const outcome = await moveCash(tx, body, actor);
+        return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
+      }
+    )
+  );
+  app.post("/v1/admin/pos/shifts/:id/close", async (request, reply) => {
+    const params = shiftParams.safeParse(request.params);
+    const body = closeShiftSchema.safeParse(request.body).data;
+    return write(
+      deps,
+      request,
+      reply,
+      params.success && body ? { id: params.data.id, ...body } : void 0,
+      async (tx, input2, actor) => {
+        const outcome = await closeShift(
+          tx,
+          input2.id,
+          input2,
+          actor,
+          deps.now()
+        );
+        return typeof outcome === "string" ? refusalOf3(outcome) : { status: 200, body: outcome };
+      }
+    );
+  });
+  app.get("/v1/admin/pos/products", async (request, reply) => {
+    const query = posProductsQuery.safeParse(request.query);
+    if (!query.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    return posProducts(deps.db, query.data.q);
+  });
+  app.post("/v1/admin/pos/checkout", async (request, reply) => {
+    const { checkout: secrets } = deps;
+    if (secrets === null) {
+      return refuse(reply, 503, "Checkout unavailable", "SERVICE_UNAVAILABLE");
+    }
+    return write(
+      deps,
+      request,
+      reply,
+      posSaleSchema.safeParse(request.body).data,
+      async (tx, body, actor) => {
+        const outcome = await sellAtCounter(tx, body, {
+          actor,
+          secrets,
+          now: deps.now()
+        });
+        if (typeof outcome === "string") return refusalOf3(outcome);
+        if (body.customerEmail !== void 0) request.outboxQueued = true;
+        return { status: 201, body: outcome };
+      }
+    );
+  });
+  app.get(
+    "/v1/admin/pos/orders/:order_number/receipt",
+    async (request, reply) => {
+      const query = receiptQuery.safeParse(request.query);
+      if (!query.success) {
+        return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+      }
+      const { order_number: orderNumber } = request.params;
+      const receipt = await posReceipt(
+        deps.db,
+        orderNumber,
+        query.data.width === "58" ? 58 : 80
+      );
+      return receipt ?? refuse(reply, 404, "Not found", "ORDER_NOT_FOUND");
+    }
+  );
+}
+
 // src/services/ordersFsm.ts
 var PAID = 2;
 var PREPARING = 7;
@@ -103738,7 +104502,7 @@ async function transitionOrder(tx, step, orderNumber, parcel, actor, now) {
 }
 
 // src/routes/adminOrders.ts
-var REFUSALS3 = {
+var REFUSALS4 = {
   ORDER_NOT_FOUND: [404, "Not found"],
   ORDER_STATUS_CONFLICT: [409, "The order is not in a status that allows it"]
 };
@@ -103781,7 +104545,7 @@ function registerAdminOrderRoutes(app, deps) {
           if (typeof outcome !== "string") {
             return { status: 200, body: outcome };
           }
-          const [status, title] = REFUSALS3[outcome];
+          const [status, title] = REFUSALS4[outcome];
           return {
             status,
             body: problem(status, title, outcome)
@@ -103805,7 +104569,7 @@ function decideRoleMutation(inputs) {
 }
 
 // src/services/adminRoles.ts
-function refusalOf3(code2) {
+function refusalOf4(code2) {
   if (code2 === "OWNER_ONLY_FORBIDDEN_403") return "OWNER_ONLY_FORBIDDEN";
   return code2 === "SYSTEM_ROLE_PROTECTED_403" ? "SYSTEM_ROLE_PROTECTED" : "TWO_FACTOR_REQUIRED";
 }
@@ -103817,14 +104581,14 @@ var flag = (value) => value === void 0 ? null : Number(value);
 function breaksMatrix(roleId2, permissions) {
   return !permissions.includes("account:self") || permissions.includes("roles:manage") || permissions.includes("users:manage") && roleId2 !== "admin" || permissions.some((permission) => !CATALOG_SET.has(permission));
 }
-var toRoleView = (row3) => ({
-  id: row3.id,
-  name: row3.name,
-  description: row3.description,
-  isActive: Number(row3.is_active) === 1,
-  isSystem: Number(row3.is_system) === 1,
-  assignableByAdmin: Number(row3.assignable_by_admin) === 1,
-  permissions: row3.permissions === null ? [] : row3.permissions.split(",")
+var toRoleView = (row4) => ({
+  id: row4.id,
+  name: row4.name,
+  description: row4.description,
+  isActive: Number(row4.is_active) === 1,
+  isSystem: Number(row4.is_system) === 1,
+  assignableByAdmin: Number(row4.assignable_by_admin) === 1,
+  permissions: row4.permissions === null ? [] : row4.permissions.split(",")
 });
 async function listRoles(db) {
   const rows = await db.query(
@@ -103833,11 +104597,11 @@ async function listRoles(db) {
   return { items: rows.map(toRoleView), catalog: [...CATALOG] };
 }
 async function roleOf(tx, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin, GROUP_CONCAT(rp.permission_id ORDER BY rp.permission_id) AS permissions FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id WHERE r.id = ? GROUP BY r.id, r.name, r.description, r.is_active, r.is_system, r.assignable_by_admin",
     [id]
   );
-  return toRoleView(row3);
+  return toRoleView(row4);
 }
 function gate(actor, notSystem) {
   return decideRoleMutation({
@@ -103856,7 +104620,7 @@ async function setPermissions(tx, roleId2, permissions) {
 }
 async function createRole(tx, input2, actor) {
   const verdict = gate(actor, true);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf3(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf4(verdict);
   if (RESERVED_ROLE_IDS.has(input2.id)) return "ROLE_ID_RESERVED";
   if (breaksMatrix(input2.id, input2.permissions))
     return "MATRIX_INVARIANT_VIOLATED";
@@ -103892,14 +104656,14 @@ async function createRole(tx, input2, actor) {
 }
 async function patchRole(tx, id, input2, actor) {
   const closed = gate(actor, true);
-  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf3(closed);
+  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf4(closed);
   const [target] = await tx.query(
     "SELECT is_system FROM roles WHERE id = ? FOR UPDATE",
     [id]
   );
   if (target === void 0) return "ROLE_NOT_FOUND";
   const verdict = gate(actor, Number(target.is_system) === 0);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf3(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf4(verdict);
   if (id === "admin" && (input2.assignableByAdmin === true || input2.isActive === false)) {
     return "ROLE_INVARIANT_VIOLATED";
   }
@@ -103940,7 +104704,7 @@ async function patchRole(tx, id, input2, actor) {
 }
 
 // src/routes/adminRoles.ts
-var REFUSALS4 = {
+var REFUSALS5 = {
   OWNER_ONLY_FORBIDDEN: [403, "Only the owner edits the roles"],
   SYSTEM_ROLE_PROTECTED: [403, "A role of the system cannot be edited"],
   TWO_FACTOR_REQUIRED: [403, "The second factor is required"],
@@ -103956,7 +104720,7 @@ var REFUSALS4 = {
     "The administrator role cannot be changed that way"
   ]
 };
-function actorOf(request) {
+function actorOf2(request) {
   const user = request.user;
   return {
     userId: user.userId,
@@ -103970,7 +104734,7 @@ function answerOf(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS4[outcome];
+  const [status, title] = REFUSALS5[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminRoleRoutes(app, deps) {
@@ -103992,7 +104756,7 @@ function registerAdminRoleRoutes(app, deps) {
       request,
       reply,
       key.key,
-      async (tx) => answerOf(await createRole(tx, body.data, actorOf(request)), true)
+      async (tx) => answerOf(await createRole(tx, body.data, actorOf2(request)), true)
     );
   });
   app.patch("/v1/admin/roles/:id", async (request, reply) => {
@@ -104011,7 +104775,7 @@ function registerAdminRoleRoutes(app, deps) {
       reply,
       key.key,
       async (tx) => answerOf(
-        await patchRole(tx, params.data.id, body.data, actorOf(request)),
+        await patchRole(tx, params.data.id, body.data, actorOf2(request)),
         false
       )
     );
@@ -104062,6 +104826,12 @@ var RETURN_REFUSALS = {
     "Another person has to confirm what you prepared"
   ],
   INVALID_REFUND_AMOUNT_REJECT: [409, "The amount exceeds what the order paid"],
+  REFUND_METHOD_REQUIRED: [
+    400,
+    "A counter refund is paid back in cash or on the terminal"
+  ],
+  POS_SHIFT_CLOSED_REJECT: [409, "Open a shift before giving cash back"],
+  INSUFFICIENT_DRAWER_CASH_REJECT: [400, "The drawer does not hold it"],
   MANUAL_REFERENCE_REQUIRED: [
     400,
     "The reference of the refund made by hand is required"
@@ -104076,20 +104846,20 @@ async function withLines(db, rows) {
   if (rows.length === 0) return [];
   const lines = await db.query(
     "SELECT ri.return_id, i.sku, ri.quantity FROM order_return_items ri JOIN order_items i ON i.id = ri.order_item_id WHERE ri.return_id IN (?) ORDER BY ri.id",
-    [rows.map((row3) => row3.id)]
+    [rows.map((row4) => row4.id)]
   );
-  return rows.map((row3) => ({
-    id: row3.id,
-    orderNumber: row3.order_number,
-    status: row3.status,
-    reason: row3.reason,
-    comment: row3.comment,
-    items: lines.filter((line) => line.return_id === row3.id).map((line) => ({ sku: line.sku, quantity: Number(line.quantity) })),
-    refundMxnCents: row3.refund_mxn_cents === null ? null : Number(row3.refund_mxn_cents),
-    restock: row3.restock === null ? null : Number(row3.restock) === 1,
-    createdAt: iso3(row3.created_at),
-    preparedAt: iso3(row3.prepared_at),
-    confirmedAt: iso3(row3.confirmed_at)
+  return rows.map((row4) => ({
+    id: row4.id,
+    orderNumber: row4.order_number,
+    status: row4.status,
+    reason: row4.reason,
+    comment: row4.comment,
+    items: lines.filter((line) => line.return_id === row4.id).map((line) => ({ sku: line.sku, quantity: Number(line.quantity) })),
+    refundMxnCents: row4.refund_mxn_cents === null ? null : Number(row4.refund_mxn_cents),
+    restock: row4.restock === null ? null : Number(row4.restock) === 1,
+    createdAt: iso3(row4.created_at),
+    preparedAt: iso3(row4.prepared_at),
+    confirmedAt: iso3(row4.confirmed_at)
   }));
 }
 async function viewOf2(db, id) {
@@ -104101,17 +104871,19 @@ async function viewOf2(db, id) {
 }
 async function requestReturn(tx, input2, actor) {
   const [order2] = await tx.query(
-    "SELECT id, user_id, status_id, delivered_at FROM orders WHERE order_number = ? FOR UPDATE",
+    "SELECT id, user_id, status_id, delivered_at, channel FROM orders WHERE order_number = ? FOR UPDATE",
     [input2.orderNumber]
   );
   if (order2 === void 0) return "ORDER_NOT_FOUND";
+  if (input2.counter === true && order2.channel !== "pos")
+    return "ORDER_NOT_FOUND";
   const skus = input2.request.items.map((line) => line.sku);
   if (new Set(skus).size !== skus.length) return "RETURN_PAYLOAD_INVALID";
   const lines = await tx.query(
     "SELECT i.id, i.sku, i.quantity, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.allows_return",
     [order2.id]
   );
-  const owner = order2.user_id === input2.userId;
+  const owner = input2.counter === true || order2.user_id === input2.userId;
   const delivered = Number(order2.status_id) === 9;
   const withinWindow = withinReturnWindow(order2.delivered_at, input2.now);
   const chosen = [];
@@ -104170,48 +104942,48 @@ async function listReturns(db, status) {
   return { items: await withLines(db, rows), total: Number(count.n) };
 }
 async function committedCents(tx, orderId, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND id <> ? AND status IN ('REFUNDING', 'REFUNDED')",
     [orderId, id]
   );
-  return Number(row3.n);
+  return Number(row4.n);
 }
 async function outsideRefundedCents(tx, orderId, processorRefundedCents) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND status = 'REFUNDED'",
     [orderId]
   );
-  return Math.max(0, processorRefundedCents - Number(row3.n));
+  return Math.max(0, processorRefundedCents - Number(row4.n));
 }
 async function readProcessorRefunded(deps, id) {
-  const [row3] = await deps.db.query(
+  const [row4] = await deps.db.query(
     "SELECT p.code AS processor_code, o.payment_resource_id FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ?",
     [id]
   );
-  const processor = row3?.processor_code === "STRIPE" ? deps.processors.STRIPE : void 0;
-  if (processor?.fetchRefundedTotal === void 0 || row3.payment_resource_id === null) {
+  const processor = row4?.processor_code === "STRIPE" ? deps.processors.STRIPE : void 0;
+  if (processor?.fetchRefundedTotal === void 0 || row4.payment_resource_id === null) {
     return 0;
   }
   try {
-    return await processor.fetchRefundedTotal(row3.payment_resource_id);
+    return await processor.fetchRefundedTotal(row4.payment_resource_id);
   } catch (error63) {
     if (!(error63 instanceof PaymentProcessorError)) throw error63;
     return "REFUND_PROCESSOR_ERROR";
   }
 }
 async function prepareReturn(tx, id, input2, actor, now) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT r.order_id, r.status, o.total_mxn_cents FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ? FOR UPDATE",
     [id]
   );
-  if (row3 === void 0) return "RETURN_NOT_FOUND";
-  if (row3.status !== "REQUESTED") return "RETURN_STATUS_CONFLICT";
-  const committed = await committedCents(tx, row3.order_id, id) + await outsideRefundedCents(
+  if (row4 === void 0) return "RETURN_NOT_FOUND";
+  if (row4.status !== "REQUESTED") return "RETURN_STATUS_CONFLICT";
+  const committed = await committedCents(tx, row4.order_id, id) + await outsideRefundedCents(
     tx,
-    row3.order_id,
+    row4.order_id,
     input2.processorRefundedCents
   );
-  if (committed + input2.refundMxnCents > Number(row3.total_mxn_cents)) {
+  if (committed + input2.refundMxnCents > Number(row4.total_mxn_cents)) {
     return "INVALID_REFUND_AMOUNT_REJECT";
   }
   await tx.query(
@@ -104234,26 +105006,34 @@ async function prepareReturn(tx, id, input2, actor, now) {
   return viewOf2(tx, id);
 }
 async function beginRefund(tx, id, confirmer, now, ip, processorRefundedCents) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT r.order_id, o.order_number, r.status, r.prepared_by, r.refund_mxn_cents, o.total_mxn_cents, o.payment_resource_id, p.code AS processor_code FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ? FOR UPDATE",
     [id]
   );
-  if (row3 === void 0) return { kind: "refusal", code: "RETURN_NOT_FOUND" };
-  if (row3.status === "REFUNDED") return { kind: "done" };
-  const refundCents = Number(row3.refund_mxn_cents ?? 0);
-  const outside = row3.status === "PREPARED" ? await outsideRefundedCents(tx, row3.order_id, processorRefundedCents) : 0;
-  const committed = await committedCents(tx, row3.order_id, id) + outside;
+  if (row4 === void 0) return { kind: "refusal", code: "RETURN_NOT_FOUND" };
+  if (row4.status === "REFUNDED") return { kind: "done" };
+  const refundCents = Number(row4.refund_mxn_cents ?? 0);
+  const outside = row4.status === "PREPARED" ? await outsideRefundedCents(tx, row4.order_id, processorRefundedCents) : 0;
+  const committed = await committedCents(tx, row4.order_id, id) + outside;
   const verdict = decideConfirmation({
-    prepared: row3.status === "PREPARED" || row3.status === "REFUNDING",
+    prepared: row4.status === "PREPARED" || row4.status === "REFUNDING",
     authorized: confirmer.canConfirm,
-    samePerson: row3.prepared_by === confirmer.userId,
-    amountOk: refundCents > 0 && committed + refundCents <= Number(row3.total_mxn_cents)
+    samePerson: row4.prepared_by === confirmer.userId,
+    amountOk: refundCents > 0 && committed + refundCents <= Number(row4.total_mxn_cents)
   });
   if (verdict !== "REFUND_CONFIRMED_EXECUTE") {
     return { kind: "refusal", code: verdict };
   }
-  if (row3.processor_code === "MERCADO_PAGO" && !confirmer.hasManualReference) {
+  if (row4.processor_code === "MERCADO_PAGO" && !confirmer.hasManualReference) {
     return { kind: "refusal", code: "MANUAL_REFERENCE_REQUIRED" };
+  }
+  if (row4.processor_code === "LOCAL") {
+    if (confirmer.refundMethod === null) {
+      return { kind: "refusal", code: "REFUND_METHOD_REQUIRED" };
+    }
+    if (confirmer.refundMethod === "TERMINAL" && !confirmer.hasManualReference) {
+      return { kind: "refusal", code: "MANUAL_REFERENCE_REQUIRED" };
+    }
   }
   await tx.query(
     "UPDATE order_returns SET status = 'REFUNDING', confirmed_by = ?, confirmed_at = ? WHERE id = ?",
@@ -104264,7 +105044,7 @@ async function beginRefund(tx, id, confirmer, now, ip, processorRefundedCents) {
     action: "RETURN_REFUND_INTENT",
     entityType: "order_returns",
     entityId: String(id),
-    before: { status: row3.status },
+    before: { status: row4.status },
     after: { status: "REFUNDING", refundCents },
     ip
   });
@@ -104272,25 +105052,56 @@ async function beginRefund(tx, id, confirmer, now, ip, processorRefundedCents) {
     kind: "go",
     intent: {
       returnId: id,
-      orderId: row3.order_id,
-      orderNumber: row3.order_number,
-      processor: row3.processor_code,
-      paymentResourceId: row3.payment_resource_id,
+      orderId: row4.order_id,
+      orderNumber: row4.order_number,
+      processor: row4.processor_code,
+      paymentResourceId: row4.payment_resource_id,
       refundMxnCents: refundCents
     }
   };
 }
+async function payFromDrawer(tx, intent, userId) {
+  const [open2] = await tx.query(
+    "SELECT id, opening_cash_mxn_cents FROM pos_shifts WHERE status = 'OPEN' FOR UPDATE"
+  );
+  if (open2 === void 0) return "POS_SHIFT_CLOSED_REJECT";
+  if (intent.refundMxnCents > await drawerCash(tx, open2)) {
+    return "INSUFFICIENT_DRAWER_CASH_REJECT";
+  }
+  await writeMovement(
+    tx,
+    {
+      shiftId: Number(open2.id),
+      type: "OUT",
+      amountMxnCents: intent.refundMxnCents,
+      reason: `Devoluci\xF3n mostrador #${intent.returnId}`,
+      returnId: intent.returnId
+    },
+    userId
+  );
+  return null;
+}
 async function finishRefund(tx, intent, reference, confirmer, processorRefundedCents) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT status, restock FROM order_returns WHERE id = ? FOR UPDATE",
     [intent.returnId]
   );
-  if (row3.status !== "REFUNDING") return viewOf2(tx, intent.returnId);
+  if (row4.status !== "REFUNDING") return viewOf2(tx, intent.returnId);
+  const counter = intent.processor === "LOCAL";
+  if (counter && reference.refundMethod === "CASH") {
+    const refused2 = await payFromDrawer(tx, intent, confirmer.userId);
+    if (refused2 !== null) return refused2;
+  }
   await tx.query(
-    "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ? WHERE id = ?",
-    [reference.refundId, reference.manualReference, intent.returnId]
+    "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ?, refund_method = ? WHERE id = ?",
+    [
+      reference.refundId,
+      reference.manualReference,
+      counter ? reference.refundMethod : null,
+      intent.returnId
+    ]
   );
-  if (Number(row3.restock) === 1) {
+  if (Number(row4.restock) === 1) {
     await tx.query(
       "UPDATE products p JOIN order_items i ON i.product_id = p.id JOIN order_return_items ri ON ri.order_item_id = i.id SET p.stock = p.stock + ri.quantity WHERE ri.return_id = ?",
       [intent.returnId]
@@ -104311,11 +105122,13 @@ async function finishRefund(tx, intent, reference, confirmer, processorRefundedC
       intent.orderId
     ]);
   }
-  await enqueueMail(tx, {
-    type: "RETURN_REFUNDED",
-    orderId: intent.orderId,
-    refundMxnCents: intent.refundMxnCents
-  });
+  if (!counter) {
+    await enqueueMail(tx, {
+      type: "RETURN_REFUNDED",
+      orderId: intent.orderId,
+      refundMxnCents: intent.refundMxnCents
+    });
+  }
   await recordAudit(tx, {
     userId: confirmer.userId,
     action: "RETURN_REFUNDED",
@@ -104325,7 +105138,7 @@ async function finishRefund(tx, intent, reference, confirmer, processorRefundedC
     after: {
       status: "REFUNDED",
       refundCents: intent.refundMxnCents,
-      restocked: Number(row3.restock) === 1,
+      restocked: Number(row4.restock) === 1,
       orderRefunded: settles
     },
     ip: confirmer.ip
@@ -104348,7 +105161,8 @@ async function confirmReturn(deps, id, confirmer, ip) {
       {
         userId: confirmer.userId,
         canConfirm: confirmer.canConfirm,
-        hasManualReference: confirmer.manualReference !== null
+        hasManualReference: confirmer.manualReference !== null,
+        refundMethod: confirmer.refundMethod ?? null
       },
       deps.now(),
       ip,
@@ -104382,12 +105196,16 @@ async function confirmReturn(deps, id, confirmer, ip) {
     (tx) => finishRefund(
       tx,
       intent,
-      { refundId, manualReference: confirmer.manualReference },
+      {
+        refundId,
+        manualReference: confirmer.manualReference,
+        refundMethod: confirmer.refundMethod ?? null
+      },
       { userId: confirmer.userId, ip },
       typeof settled === "number" ? settled : 0
     )
   );
-  return { status: 200, body: view };
+  return typeof view === "string" ? refusalAnswer(view) : { status: 200, body: view };
 }
 async function isReturnRefund(db, orderId, refundIds) {
   if (refundIds.length === 0) return false;
@@ -104405,7 +105223,7 @@ async function isReturnRefund(db, orderId, refundIds) {
 }
 
 // src/routes/returns.ts
-function refusalOf4(code2) {
+function refusalOf5(code2) {
   const [status, title] = RETURN_REFUSALS[code2];
   return { status, body: problem(status, title, code2) };
 }
@@ -104428,10 +105246,35 @@ function registerReturnRoutes(app, deps) {
           { orderNumber, userId, request: body.data, now: deps.now() },
           { userId, ip: request.ip }
         );
-        return typeof outcome === "string" ? refusalOf4(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
       });
     }
   );
+  app.post("/v1/admin/returns/pos", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const body = posReturnRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
+    }
+    const { orderNumber, ...asked } = body.data;
+    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      const outcome = await requestReturn(
+        tx,
+        {
+          orderNumber,
+          userId,
+          request: asked,
+          now: deps.now(),
+          counter: true
+        },
+        { userId, ip: request.ip }
+      );
+      return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
+    });
+  });
   app.get("/v1/admin/returns", async (request, reply) => {
     const query = returnListQuery.safeParse(request.query);
     if (!query.success) {
@@ -104465,7 +105308,7 @@ function registerReturnRoutes(app, deps) {
         { userId, ip: request.ip },
         deps.now()
       );
-      return typeof outcome === "string" ? refusalOf4(outcome) : { status: 200, body: outcome };
+      return typeof outcome === "string" ? refusalOf5(outcome) : { status: 200, body: outcome };
     });
   });
   app.post("/v1/admin/returns/:id/confirm", async (request, reply) => {
@@ -104481,7 +105324,8 @@ function registerReturnRoutes(app, deps) {
       {
         userId: user.userId,
         canConfirm: user.permissions.includes("returns:confirm"),
-        manualReference: body.data.manualReference ?? null
+        manualReference: body.data.manualReference ?? null,
+        refundMethod: body.data.refundMethod ?? null
       },
       request.ip
     );
@@ -104491,13 +105335,13 @@ function registerReturnRoutes(app, deps) {
 }
 
 // src/services/staffUsers.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 
 // src/services/passwordResets.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto10.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto11.randomBytes)(32).toString("hex");
   await tx.query(
     "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
@@ -104513,7 +105357,7 @@ async function mailResetLink(tx, userId, totpKey, now) {
   });
 }
 function decoyReset(totpKey) {
-  const token = (0, import_node_crypto10.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto11.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
     totpKey,
     tokenHash2(token),
@@ -104521,15 +105365,15 @@ function decoyReset(totpKey) {
   );
 }
 async function liveReset(db, token, now) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT t.id, t.user_id, u.email, u.full_name FROM password_reset_tokens t JOIN users u ON u.id = t.user_id AND u.is_active = 1 WHERE t.token_hash = ? AND t.consumed_at IS NULL AND t.expires_at > ?",
     [tokenHash2(token), now]
   );
-  return row3 ? {
-    id: Number(row3.id),
-    userId: row3.user_id,
-    email: row3.email,
-    fullName: row3.full_name
+  return row4 ? {
+    id: Number(row4.id),
+    userId: row4.user_id,
+    email: row4.email,
+    fullName: row4.full_name
   } : null;
 }
 function completeReset(db, reset, passwordHash, now, ip) {
@@ -104568,7 +105412,7 @@ function completeReset(db, reset, passwordHash, now, ip) {
 }
 
 // src/services/passwords.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 var import_hash_wasm = __toESM(require_index_umd(), 1);
 var PARAMETERS = {
   memorySize: 19456,
@@ -104580,7 +105424,7 @@ function hashPassword(password) {
   return (0, import_hash_wasm.argon2id)({
     ...PARAMETERS,
     password,
-    salt: (0, import_node_crypto11.randomBytes)(16),
+    salt: (0, import_node_crypto12.randomBytes)(16),
     outputType: "encoded"
   });
 }
@@ -104592,23 +105436,23 @@ async function verifyPassword(hash2, password) {
   }
 }
 function unmatchableHash() {
-  return hashPassword((0, import_node_crypto11.randomBytes)(64).toString("hex"));
+  return hashPassword((0, import_node_crypto12.randomBytes)(64).toString("hex"));
 }
 var decoy;
 function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto11.randomBytes)(32).toString("base64url"));
+  decoy ??= hashPassword((0, import_node_crypto12.randomBytes)(32).toString("base64url"));
   return decoy;
 }
 
 // src/services/staffUsers.ts
-var toStaffUser = (row3) => ({
-  id: row3.id,
-  email: row3.email,
-  fullName: row3.full_name,
-  roles: row3.roles.split(","),
-  isActive: Number(row3.is_active) === 1,
-  totpEnabled: Number(row3.totp_enabled) === 1,
-  createdAt: row3.created_at.toISOString()
+var toStaffUser = (row4) => ({
+  id: row4.id,
+  email: row4.email,
+  fullName: row4.full_name,
+  roles: row4.roles.split(","),
+  isActive: Number(row4.is_active) === 1,
+  totpEnabled: Number(row4.totp_enabled) === 1,
+  createdAt: row4.created_at.toISOString()
 });
 async function listStaff(db, asOwner) {
   const rows = asOwner ? await db.query(
@@ -104619,18 +105463,18 @@ async function listStaff(db, asOwner) {
   return rows.map(toStaffUser);
 }
 async function accountOf(tx, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, GROUP_CONCAT(ur.role_id ORDER BY ur.role_id) AS roles, COALESCE(MAX(t.is_totp_enabled), 0) AS totp_enabled FROM users u JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN two_factor_auth t ON t.user_id = u.id WHERE u.id = ? GROUP BY u.id, u.email, u.full_name, u.is_active, u.created_at",
     [id]
   );
-  return toStaffUser(row3);
+  return toStaffUser(row4);
 }
 async function lockedRoles(tx, userId) {
   const rows = await tx.query(
     "SELECT role_id FROM user_roles WHERE user_id = ? FOR UPDATE",
     [userId]
   );
-  return rows.map((row3) => row3.role_id);
+  return rows.map((row4) => row4.role_id);
 }
 var OUT_OF_BAND = /* @__PURE__ */ new Set(["owner", "customer"]);
 async function checkRoles(tx, requested, asOwner) {
@@ -104638,13 +105482,13 @@ async function checkRoles(tx, requested, asOwner) {
   const rows = await tx.query("SELECT id, is_active, assignable_by_admin FROM roles WHERE id IN (?)", [
     wanted
   ]);
-  const active = rows.filter((row3) => Number(row3.is_active) === 1);
+  const active = rows.filter((row4) => Number(row4.is_active) === 1);
   return {
     found: active.length === wanted.length,
-    permitted: asOwner ? wanted.every((id) => !OUT_OF_BAND.has(id)) : active.every((row3) => Number(row3.assignable_by_admin) === 1)
+    permitted: asOwner ? wanted.every((id) => !OUT_OF_BAND.has(id)) : active.every((row4) => Number(row4.assignable_by_admin) === 1)
   };
 }
-function refusalOf5(code2, asOwner) {
+function refusalOf6(code2, asOwner) {
   if (code2 === "ACTOR_UNAUTHORIZED_403") return "ACTOR_UNAUTHORIZED";
   if (code2 === "VALIDATION_OR_2FA_FAILED_400")
     return "VALIDATION_OR_2FA_FAILED";
@@ -104661,12 +105505,12 @@ async function createStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf5(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf6(verdict, asOwner);
   const [existing] = await tx.query(
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto12.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto13.randomUUID)();
   if (existing) {
     const held = await lockedRoles(tx, id);
     if (held.includes("owner")) return "OWNER_IMMUTABLE";
@@ -104706,7 +105550,7 @@ async function updateStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf5(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf6(verdict, asOwner);
   if (held.includes("owner")) return "OWNER_IMMUTABLE";
   if (!isStaff(held)) return "USER_NOT_FOUND";
   if (!asOwner) {
@@ -104751,7 +105595,7 @@ async function updateStaff(tx, input2, actor) {
 }
 
 // src/routes/staffUsers.ts
-var REFUSALS5 = {
+var REFUSALS6 = {
   ACTOR_UNAUTHORIZED: [
     403,
     "Only the owner and the administrators manage the staff"
@@ -104770,7 +105614,7 @@ var REFUSALS5 = {
   ROLE_NOT_FOUND: [422, "Unknown or retired role"],
   STAFF_ALREADY_EXISTS: [409, "Already part of the staff"]
 };
-function actorOf2(request) {
+function actorOf3(request) {
   const user = request.user;
   return {
     userId: user.userId,
@@ -104783,7 +105627,7 @@ function answerOf2(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS5[outcome];
+  const [status, title] = REFUSALS6[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerStaffUserRoutes(app, deps) {
@@ -104821,7 +105665,7 @@ function registerStaffUserRoutes(app, deps) {
             totpKey,
             now: deps.now()
           },
-          actorOf2(request)
+          actorOf3(request)
         ),
         true
       )
@@ -104848,7 +105692,7 @@ function registerStaffUserRoutes(app, deps) {
         await updateStaff(
           tx,
           { id: params.data.id, ...body.data },
-          actorOf2(request)
+          actorOf3(request)
         ),
         false
       )
@@ -104858,13 +105702,13 @@ function registerStaffUserRoutes(app, deps) {
 
 // src/services/shippingAdmin.ts
 async function readConfig(db) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT active_strategy_id, is_free_shipping_active, free_shipping_threshold_mxn_cents FROM shipping_configs WHERE id = 1"
   );
   return {
-    strategyId: row3?.active_strategy_id ?? ZONE_RATE_STRATEGY_ID,
-    isFreeShippingActive: Number(row3?.is_free_shipping_active ?? 0) === 1,
-    freeShippingThresholdMxnCents: row3?.free_shipping_threshold_mxn_cents ?? null
+    strategyId: row4?.active_strategy_id ?? ZONE_RATE_STRATEGY_ID,
+    isFreeShippingActive: Number(row4?.is_free_shipping_active ?? 0) === 1,
+    freeShippingThresholdMxnCents: row4?.free_shipping_threshold_mxn_cents ?? null
   };
 }
 async function readRules(db) {
@@ -104874,9 +105718,9 @@ async function readRules(db) {
      GROUP BY zone_id ORDER BY zone_id`,
     [ZONE_RATE_STRATEGY_ID]
   );
-  return rows.map((row3) => ({
-    zoneId: row3.zone_id,
-    rateMxnCents: Number(row3.rate_mxn_cents)
+  return rows.map((row4) => ({
+    zoneId: row4.zone_id,
+    rateMxnCents: Number(row4.rate_mxn_cents)
   }));
 }
 async function readShippingAdmin(db) {
@@ -104895,24 +105739,24 @@ async function readShippingAdmin(db) {
   ]);
   return {
     config: config2,
-    strategies: strategies.map((row3) => ({
-      id: row3.id,
-      code: row3.code,
-      nameEs: row3.name_es,
-      nameEn: row3.name_en,
-      administrable: row3.id === ZONE_RATE_STRATEGY_ID
+    strategies: strategies.map((row4) => ({
+      id: row4.id,
+      code: row4.code,
+      nameEs: row4.name_es,
+      nameEn: row4.name_en,
+      administrable: row4.id === ZONE_RATE_STRATEGY_ID
     })),
-    classes: classes.map((row3) => ({
-      id: row3.id,
-      slug: row3.slug,
-      nameEs: row3.name_es,
-      nameEn: row3.name_en
+    classes: classes.map((row4) => ({
+      id: row4.id,
+      slug: row4.slug,
+      nameEs: row4.name_es,
+      nameEn: row4.name_en
     })),
-    zones: zones.map((row3) => ({
-      id: row3.id,
-      code: row3.code,
-      nameEs: row3.name_es,
-      nameEn: row3.name_en
+    zones: zones.map((row4) => ({
+      id: row4.id,
+      code: row4.code,
+      nameEs: row4.name_es,
+      nameEn: row4.name_en
     })),
     rules
   };
@@ -104984,13 +105828,13 @@ async function updateShippingRules(tx, body, actor) {
 }
 
 // src/routes/adminShipping.ts
-var REFUSALS6 = {
+var REFUSALS7 = {
   SHIPPING_STRATEGY_UNAVAILABLE: [409, "The strategy has no active rates"],
   SHIPPING_ZONE_UNKNOWN: [400, "Unknown state"]
 };
 function answerOf3(outcome) {
   if (typeof outcome !== "string") return { status: 200, body: outcome };
-  const [status, title] = REFUSALS6[outcome];
+  const [status, title] = REFUSALS7[outcome];
   return { status, body: problem(status, title, outcome) };
 }
 function registerAdminShippingRoutes(app, deps) {
@@ -105150,7 +105994,7 @@ var PASSWORD_PROBLEMS = {
 };
 
 // src/services/botChallenge.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -105161,16 +106005,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha256 = (value) => (0, import_node_crypto13.createHash)("sha256").update(value).digest("hex");
+var sha256 = (value) => (0, import_node_crypto14.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto13.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto14.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto13.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto13.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto14.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto14.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto13.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha256(`${salt}${(0, import_node_crypto13.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto14.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha256(`${salt}${(0, import_node_crypto14.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -105580,12 +106424,12 @@ function registerAuthRoutes(app, deps) {
 }
 
 // src/services/catalogAdmin.ts
-var brandOf = (row3) => ({
-  id: Number(row3.id),
-  slug: row3.slug,
-  name: row3.name,
-  website: row3.website,
-  isActive: Number(row3.is_active) === 1
+var brandOf = (row4) => ({
+  id: Number(row4.id),
+  slug: row4.slug,
+  name: row4.name,
+  website: row4.website,
+  isActive: Number(row4.is_active) === 1
 });
 async function listBrands(db) {
   const rows = await db.query(
@@ -105594,11 +106438,11 @@ async function listBrands(db) {
   return rows.map(brandOf);
 }
 async function lockBrand(tx, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, slug, name, website, is_active FROM brands WHERE id = ? FOR UPDATE",
     [id]
   );
-  return row3 ? brandOf(row3) : null;
+  return row4 ? brandOf(row4) : null;
 }
 async function createBrand(tx, input2) {
   await tx.query("INSERT INTO brands (slug, name, website) VALUES (?, ?, ?)", [
@@ -105606,11 +106450,11 @@ async function createBrand(tx, input2) {
     input2.name,
     input2.website
   ]);
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, slug, name, website, is_active FROM brands WHERE slug = ?",
     [input2.slug]
   );
-  return { before: null, after: brandOf(row3) };
+  return { before: null, after: brandOf(row4) };
 }
 async function updateBrand(tx, id, patch) {
   const before = await lockBrand(tx, id);
@@ -105623,25 +106467,25 @@ async function updateBrand(tx, id, patch) {
   return { before, after };
 }
 var flag2 = (value) => Number(value) === 1;
-var groupOf = (row3, values = []) => ({
-  id: Number(row3.id),
-  code: row3.code,
-  nameEs: row3.name_es,
-  nameEn: row3.name_en,
-  isRequired: flag2(row3.is_required),
-  isOrdered: flag2(row3.is_ordered),
-  isFilterable: flag2(row3.is_filterable),
-  showOnLanding: flag2(row3.show_on_landing),
-  isActive: flag2(row3.is_active),
-  sortOrder: Number(row3.sort_order),
+var groupOf = (row4, values = []) => ({
+  id: Number(row4.id),
+  code: row4.code,
+  nameEs: row4.name_es,
+  nameEn: row4.name_en,
+  isRequired: flag2(row4.is_required),
+  isOrdered: flag2(row4.is_ordered),
+  isFilterable: flag2(row4.is_filterable),
+  showOnLanding: flag2(row4.show_on_landing),
+  isActive: flag2(row4.is_active),
+  sortOrder: Number(row4.sort_order),
   values
 });
-var valueOf = (row3) => ({
-  id: Number(row3.id),
-  code: row3.code,
-  valueEs: row3.value_es,
-  valueEn: row3.value_en,
-  sortOrder: Number(row3.sort_order)
+var valueOf = (row4) => ({
+  id: Number(row4.id),
+  code: row4.code,
+  valueEs: row4.value_es,
+  valueEn: row4.value_en,
+  sortOrder: Number(row4.sort_order)
 });
 async function listFacets(db) {
   const groups = await db.query(
@@ -105658,11 +106502,11 @@ async function listFacets(db) {
   );
 }
 async function lockGroup(tx, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE id = ? FOR UPDATE",
     [id]
   );
-  return row3 ? groupOf(row3) : null;
+  return row4 ? groupOf(row4) : null;
 }
 async function createFacetGroup(tx, input2) {
   await tx.query(
@@ -105678,11 +106522,11 @@ async function createFacetGroup(tx, input2) {
       input2.sortOrder
     ]
   );
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, code, name_es, name_en, is_required, is_ordered, is_filterable, show_on_landing, is_active, sort_order FROM product_facet_groups WHERE code = ?",
     [input2.code]
   );
-  return { before: null, after: groupOf(row3) };
+  return { before: null, after: groupOf(row4) };
 }
 async function updateFacetGroup(tx, id, patch) {
   const before = await lockGroup(tx, id);
@@ -105711,19 +106555,19 @@ async function createFacetValue(tx, groupId, input2) {
     "INSERT INTO product_facet_values (group_id, code, value_es, value_en, sort_order) VALUES (?, ?, ?, ?, ?)",
     [groupId, input2.code, input2.valueEs, input2.valueEn, input2.sortOrder]
   );
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE group_id = ? AND code = ?",
     [groupId, input2.code]
   );
-  return { before: null, after: valueOf(row3) };
+  return { before: null, after: valueOf(row4) };
 }
 async function updateFacetValue(tx, id, patch) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT id, group_id, code, value_es, value_en, sort_order FROM product_facet_values WHERE id = ? FOR UPDATE",
     [id]
   );
-  if (!row3) return "CAT_NOT_FOUND";
-  const before = valueOf(row3);
+  if (!row4) return "CAT_NOT_FOUND";
+  const before = valueOf(row4);
   const after = { ...before, ...patch };
   await tx.query(
     "UPDATE product_facet_values SET value_es = ?, value_en = ?, sort_order = ? WHERE id = ?",
@@ -105785,27 +106629,27 @@ function registerCatalogEntityRoutes(app, deps) {
 }
 
 // src/services/catalogProducts.ts
-var productOf = (row3, facetValueIds = [], gallery = []) => ({
-  id: Number(row3.id),
-  sku: row3.sku,
-  slug: row3.slug,
-  nameEs: row3.name_es,
-  nameEn: row3.name_en,
-  descriptionEs: row3.description_es,
-  descriptionEn: row3.description_en,
-  priceMxnCents: Number(row3.price_mxn_cents),
-  stock: Number(row3.stock),
-  reservedStock: Number(row3.reserved_stock),
-  discipline: row3.discipline,
-  brandId: row3.brand_id === null ? null : Number(row3.brand_id),
-  shippingClass: row3.shipping_class,
-  weightGrams: Number(row3.weight_grams),
-  lengthMm: Number(row3.length_mm),
-  widthMm: Number(row3.width_mm),
-  heightMm: Number(row3.height_mm),
-  allowsReturn: Number(row3.allows_return) === 1,
-  isActive: Number(row3.is_active) === 1,
-  isTest: Number(row3.is_test) === 1,
+var productOf = (row4, facetValueIds = [], gallery = []) => ({
+  id: Number(row4.id),
+  sku: row4.sku,
+  slug: row4.slug,
+  nameEs: row4.name_es,
+  nameEn: row4.name_en,
+  descriptionEs: row4.description_es,
+  descriptionEn: row4.description_en,
+  priceMxnCents: Number(row4.price_mxn_cents),
+  stock: Number(row4.stock),
+  reservedStock: Number(row4.reserved_stock),
+  discipline: row4.discipline,
+  brandId: row4.brand_id === null ? null : Number(row4.brand_id),
+  shippingClass: row4.shipping_class,
+  weightGrams: Number(row4.weight_grams),
+  lengthMm: Number(row4.length_mm),
+  widthMm: Number(row4.width_mm),
+  heightMm: Number(row4.height_mm),
+  allowsReturn: Number(row4.allows_return) === 1,
+  isActive: Number(row4.is_active) === 1,
+  isTest: Number(row4.is_test) === 1,
   facetValueIds,
   gallery
 });
@@ -105817,15 +106661,15 @@ async function listAdminProducts(db, paging2) {
     "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id ORDER BY p.name_es ASC, p.id ASC LIMIT ? OFFSET ?",
     [paging2.pageSize, (paging2.page - 1) * paging2.pageSize]
   );
-  const items = await Promise.all(rows.map((row3) => fullProduct(db, row3)));
+  const items = await Promise.all(rows.map((row4) => fullProduct(db, row4)));
   return { items, total: Number(total) };
 }
 async function productRow(tx, id) {
-  const [row3] = await tx.query(
+  const [row4] = await tx.query(
     "SELECT p.id, p.sku, p.slug, p.name_es, p.name_en, p.description_es, p.description_en, p.price_mxn_cents, p.stock, p.reserved_stock, c.slug AS discipline, p.brand_id, s.slug AS shipping_class, p.weight_grams, p.length_mm, p.width_mm, p.height_mm, p.allows_return, p.is_active, p.is_test FROM products p JOIN categories c ON c.id = p.category_id JOIN shipping_classes s ON s.id = p.shipping_class_id WHERE p.id = ?",
     [id]
   );
-  return row3;
+  return row4;
 }
 async function lockedProduct(tx, id) {
   const [found] = await tx.query(
@@ -105834,17 +106678,17 @@ async function lockedProduct(tx, id) {
   );
   return found ? productRow(tx, id) : void 0;
 }
-async function fullProduct(tx, row3) {
+async function fullProduct(tx, row4) {
   const values = await tx.query(
     "SELECT value_id FROM product_facet_links WHERE product_id = ? ORDER BY value_id ASC",
-    [row3.id]
+    [row4.id]
   );
   const images = await tx.query(
     "SELECT media_sha256, alt_text_es, alt_text_en, sort_order, is_primary FROM product_media WHERE product_id = ? AND is_active = 1 ORDER BY is_primary DESC, sort_order ASC, id ASC",
-    [row3.id]
+    [row4.id]
   );
   return productOf(
-    row3,
+    row4,
     values.map((value) => Number(value.value_id)),
     images.map((image) => ({
       sha256: image.media_sha256,
@@ -105856,8 +106700,8 @@ async function fullProduct(tx, row3) {
   );
 }
 async function readAdminProduct(db, id) {
-  const row3 = await productRow(db, id);
-  return row3 ? fullProduct(db, row3) : null;
+  const row4 = await productRow(db, id);
+  return row4 ? fullProduct(db, row4) : null;
 }
 async function references(tx, fields2) {
   const [category] = await tx.query(
@@ -105938,13 +106782,13 @@ async function createProduct(tx, input2) {
   await Promise.all(
     input2.images.map((image, index) => placeImage(tx, id, image, index))
   );
-  const row3 = await productRow(tx, id);
-  return { before: null, after: await fullProduct(tx, row3) };
+  const row4 = await productRow(tx, id);
+  return { before: null, after: await fullProduct(tx, row4) };
 }
 async function updateProduct(tx, id, patch) {
-  const row3 = await lockedProduct(tx, id);
-  if (!row3) return "CAT_NOT_FOUND";
-  const before = await fullProduct(tx, row3);
+  const row4 = await lockedProduct(tx, id);
+  if (!row4) return "CAT_NOT_FOUND";
+  const before = await fullProduct(tx, row4);
   const facets = await checkedFacets(tx, patch.facetValueIds ?? []);
   if (facets === "CAT_REFERENCE_INVALID") return facets;
   const { facetValueIds, isActive, ...fields2 } = patch;
@@ -106011,10 +106855,10 @@ async function placeImage(tx, productId, image, index) {
   }
 }
 async function replaceGallery(tx, id, images) {
-  const row3 = await lockedProduct(tx, id);
-  if (!row3) return "CAT_NOT_FOUND";
+  const row4 = await lockedProduct(tx, id);
+  if (!row4) return "CAT_NOT_FOUND";
   if (!await checkedBlobs(tx, images)) return "CAT_REFERENCE_INVALID";
-  const before = await fullProduct(tx, row3);
+  const before = await fullProduct(tx, row4);
   await tx.query(
     "UPDATE product_media SET is_active = 0, is_primary = 0 WHERE product_id = ?",
     [id]
@@ -106022,7 +106866,7 @@ async function replaceGallery(tx, id, images) {
   await Promise.all(
     images.map((image, index) => placeImage(tx, id, image, index))
   );
-  return { before, after: await fullProduct(tx, row3) };
+  return { before, after: await fullProduct(tx, row4) };
 }
 
 // src/routes/catalogProducts.ts
@@ -106298,19 +107142,19 @@ async function applyRefund(tx, orderId, orderNumber, outcome) {
 }
 
 // src/services/settlement.ts
-var row = (code2, nextStatusId, alert, sellsStock = false) => ({
+var row2 = (code2, nextStatusId, alert, sellsStock = false) => ({
   code: code2,
   httpStatus: code2 === "STATE_CONFLICT_ANOMALY" ? 500 : 200,
   nextStatusId,
   alert,
   sellsStock
 });
-var CONFLICT = row("STATE_CONFLICT_ANOMALY", null, true);
+var CONFLICT = row2("STATE_CONFLICT_ANOMALY", null, true);
 var T1_4 = {
-  "100": row("ORDER_PAID", 2, false, true),
-  "010": row("ALREADY_PAID", null, false),
-  "001": row("LATE_PAYMENT_NEEDS_REVIEW", 6, true),
-  "000": row("PAYMENT_NEEDS_REVIEW_ALERT", null, true),
+  "100": row2("ORDER_PAID", 2, false, true),
+  "010": row2("ALREADY_PAID", null, false),
+  "001": row2("LATE_PAYMENT_NEEDS_REVIEW", 6, true),
+  "000": row2("PAYMENT_NEEDS_REVIEW_ALERT", null, true),
   "110": CONFLICT,
   "101": CONFLICT,
   "011": CONFLICT,
@@ -106338,7 +107182,7 @@ var REFUND_TYPES = {
 };
 var STATUS = { PENDING: 1, PAID: 2, EXPIRED: 3, CANCELLED: 4 };
 async function recordEvent(tx, record2) {
-  const { payment, order: order2 } = record2.reconciliation;
+  const { payment: payment2, order: order2 } = record2.reconciliation;
   try {
     await tx.query(
       "INSERT INTO payment_events (processor_id, event_id, event_type, order_id, processor_status, amount_mxn_cents, currency, resulting_status_id, is_alert, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -106347,9 +107191,9 @@ async function recordEvent(tx, record2) {
         record2.event.eventId,
         record2.event.type,
         order2?.id ?? null,
-        payment?.processorStatus ?? null,
-        payment?.amountMxnCents ?? null,
-        payment?.currency ?? null,
+        payment2?.processorStatus ?? null,
+        payment2?.amountMxnCents ?? null,
+        payment2?.currency ?? null,
         record2.resultingStatusId,
         record2.alert ? 1 : 0,
         record2.isTest ? 1 : 0
@@ -106365,13 +107209,13 @@ async function reconcile(deps, code2, processor, event) {
   if (event.resourceId === null || !SETTLING_TYPES[code2].includes(event.type)) {
     return { payment: null, order: null, confirmed: false };
   }
-  const payment = await processor.fetchPayment(event.resourceId);
+  const payment2 = await processor.fetchPayment(event.resourceId);
   const [order2] = await deps.db.query(
     "SELECT o.id, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ?",
-    [payment.orderNumber, PROCESSOR_ID[code2]]
+    [payment2.orderNumber, PROCESSOR_ID[code2]]
   );
-  const confirmed = payment.paid && order2 !== void 0 && payment.currency === "MXN" && payment.amountMxnCents === Number(order2.total_mxn_cents);
-  return { payment, order: order2 ?? null, confirmed };
+  const confirmed = payment2.paid && order2 !== void 0 && payment2.currency === "MXN" && payment2.amountMxnCents === Number(order2.total_mxn_cents);
+  return { payment: payment2, order: order2 ?? null, confirmed };
 }
 function recordRefundEvent(deps, base2, code2, alert) {
   return deps.db.transaction(async (tx) => {
@@ -106435,7 +107279,7 @@ async function receiveRefund(deps, code2, processor, event, isTest) {
     "SELECT o.id, o.order_number, o.total_mxn_cents FROM orders o JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ? AND m.processor_id = ? AND o.payment_resource_id = ?",
     [refund.orderNumber, processorId, refund.sessionId]
   );
-  const payment = {
+  const payment2 = {
     paid: false,
     amountMxnCents: refund.refundedMxnCents,
     currency: refund.currency,
@@ -106443,12 +107287,12 @@ async function receiveRefund(deps, code2, processor, event, isTest) {
     processorStatus: "refunded"
   };
   if (order2 === void 0 || refund.currency !== "MXN" || refund.amountMxnCents !== Number(order2.total_mxn_cents)) {
-    return unreconciled({ payment, order: null, confirmed: false });
+    return unreconciled({ payment: payment2, order: null, confirmed: false });
   }
   const base2 = {
     processorId,
     event,
-    reconciliation: { payment, order: order2, confirmed: true },
+    reconciliation: { payment: payment2, order: order2, confirmed: true },
     isTest
   };
   if (await isReturnRefund(deps.db, order2.id, refund.refundIds)) {
@@ -106464,33 +107308,33 @@ function settleOrder(deps, base2, order2) {
       [order2.id]
     );
     const status = Number(current.status_id);
-    const row3 = settle2(
+    const row4 = settle2(
       status === STATUS.PENDING,
       status === STATUS.PAID && current.payment_resource_id === resourceId,
       status === STATUS.EXPIRED || status === STATUS.CANCELLED
     );
     const recorded = await recordEvent(tx, {
       ...base2,
-      resultingStatusId: row3.nextStatusId ?? status,
-      alert: row3.alert
+      resultingStatusId: row4.nextStatusId ?? status,
+      alert: row4.alert
     });
     if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
-    if (row3.nextStatusId !== null) {
+    if (row4.nextStatusId !== null) {
       await tx.query(
         "UPDATE orders SET status_id = ?, paid_at = ?, payment_resource_id = ? WHERE id = ?",
-        [row3.nextStatusId, deps.now(), resourceId, order2.id]
+        [row4.nextStatusId, deps.now(), resourceId, order2.id]
       );
     }
-    if (row3.sellsStock) {
+    if (row4.sellsStock) {
       await tx.query(
         "UPDATE products p JOIN order_items i ON i.product_id = p.id SET p.stock = p.stock - i.quantity, p.reserved_stock = p.reserved_stock - i.quantity WHERE i.order_id = ?",
         [order2.id]
       );
     }
-    if (status === STATUS.PENDING && row3.nextStatusId === STATUS.PAID) {
+    if (status === STATUS.PENDING && row4.nextStatusId === STATUS.PAID) {
       await enqueueMail(tx, { type: "ORDER_CONFIRMED", orderId: order2.id });
     }
-    return { status: row3.httpStatus, code: row3.code };
+    return { status: row4.httpStatus, code: row4.code };
   });
 }
 async function keepOneCard(deps, orderId) {
@@ -106599,7 +107443,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 
 // src/services/webhookSecrets.ts
 function webhookSecretsOf(value) {
@@ -106739,8 +107583,8 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       if (ts === "" || requestId === "" || dataId === "") return null;
       const received = Buffer.from(given, "hex");
       const signed = signedByAny(secrets.webhookSecret, (secret) => {
-        const expected = (0, import_node_crypto14.createHmac)("sha256", secret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
-        return received.length === expected.length && (0, import_node_crypto14.timingSafeEqual)(received, expected);
+        const expected = (0, import_node_crypto15.createHmac)("sha256", secret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+        return received.length === expected.length && (0, import_node_crypto15.timingSafeEqual)(received, expected);
       });
       if (!signed) return null;
       let event;
@@ -106764,19 +107608,19 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       }
     },
     async fetchPayment(paymentId) {
-      const payment = await call(
+      const payment2 = await call(
         `/v1/payments/${encodeURIComponent(paymentId)}`,
         {
           method: "GET"
         }
       );
-      const status = typeof payment.status === "string" ? payment.status : "unknown";
-      const amount = typeof payment.transaction_amount === "number" && Number.isFinite(payment.transaction_amount) ? Math.round(payment.transaction_amount * 100) : null;
+      const status = typeof payment2.status === "string" ? payment2.status : "unknown";
+      const amount = typeof payment2.transaction_amount === "number" && Number.isFinite(payment2.transaction_amount) ? Math.round(payment2.transaction_amount * 100) : null;
       return {
         paid: status === "approved",
         amountMxnCents: amount,
-        currency: typeof payment.currency_id === "string" ? payment.currency_id.toUpperCase() : null,
-        orderNumber: typeof payment.external_reference === "string" ? payment.external_reference : null,
+        currency: typeof payment2.currency_id === "string" ? payment2.currency_id.toUpperCase() : null,
+        orderNumber: typeof payment2.external_reference === "string" ? payment2.external_reference : null,
         processorStatus: status
       };
     }
@@ -110411,7 +111255,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto15 = __toESM(require("node:crypto"), 1);
+var import_node_crypto16 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 
@@ -112264,7 +113108,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto15.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto16.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -113441,8 +114285,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto15.default.randomBytes(len).toString("hex"),
-      import_node_crypto15.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto16.default.randomBytes(len).toString("hex"),
+      import_node_crypto16.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -114130,7 +114974,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto16 = __toESM(require("node:crypto"), 1);
+var import_node_crypto17 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -114141,7 +114985,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto16.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto17.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -114251,7 +115095,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -114266,7 +115110,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto17.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto18.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -114333,7 +115177,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -114346,7 +115190,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto18.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto19.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -114956,7 +115800,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto19 = __toESM(require("node:crypto"), 1);
+var import_node_crypto20 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 function isAbortSignal(value) {
   return typeof value === "object" && value !== null && "aborted" in value && typeof value.addEventListener === "function" && typeof value.removeEventListener === "function";
@@ -115316,7 +116160,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto19.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto20.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -115351,7 +116195,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto20 = __toESM(require("node:crypto"), 1);
+var import_node_crypto21 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -115516,7 +116360,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto20.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto21.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -116872,7 +117716,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto20.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto21.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -117206,7 +118050,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto21 = __toESM(require("node:crypto"), 1);
+var import_node_crypto22 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -117529,7 +118373,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto21.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto22.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -120156,7 +121000,7 @@ function button(label2, url2) {
 function fallbackLink(intro, url2) {
   return `<p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${escapeHtml(intro)}<br><a href="${escapeHtml(url2)}" style="color:${PETROLEO};word-break:break-all;">${escapeHtml(url2)}</a></p>`;
 }
-function row2(cells, opts = {}) {
+function row3(cells, opts = {}) {
   const weight = opts.head || opts.strong ? "bold" : "normal";
   const tag = opts.head ? "th" : "td";
   return `<tr>${cells.map(
@@ -120174,7 +121018,7 @@ function orderHtml(order2, words) {
     ]
   ];
   const lines = order2.lines.map(
-    (line) => row2([
+    (line) => row3([
       `${line.name} (${line.sku})`,
       String(line.quantity),
       line.unitPrice,
@@ -120185,8 +121029,8 @@ function orderHtml(order2, words) {
     [words.items, order2.itemsTotal],
     [words.shipping, order2.shipping],
     [words.tax, order2.tax]
-  ].map(([label2, value]) => row2([label2, "", "", value]));
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${summary2.map(([label2, value]) => row2([label2, value])).join("")}</table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${row2([words.product, words.quantity, words.unit, words.amount], { head: true })}${lines.join("")}${totals.join("")}${row2([words.total, "", "", order2.total], { strong: true })}</table><p style="margin:0 0 4px 0;font-family:${SANS};font-size:14px;line-height:20px;font-weight:bold;color:${PETROLEO};">${escapeHtml(words.address)}</p><p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${order2.address.map(escapeHtml).join("<br>")}</p>`;
+  ].map(([label2, value]) => row3([label2, "", "", value]));
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${summary2.map(([label2, value]) => row3([label2, value])).join("")}</table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${row3([words.product, words.quantity, words.unit, words.amount], { head: true })}${lines.join("")}${totals.join("")}${row3([words.total, "", "", order2.total], { strong: true })}</table><p style="margin:0 0 4px 0;font-family:${SANS};font-size:14px;line-height:20px;font-weight:bold;color:${PETROLEO};">${escapeHtml(words.address)}</p><p style="margin:0 0 24px 0;font-family:${SANS};font-size:14px;line-height:20px;color:${PETROLEO};">${order2.address.map(escapeHtml).join("<br>")}</p>`;
 }
 function orderText(order2, words) {
   return [
@@ -120452,6 +121296,28 @@ function copyOf(keys, event, locale) {
   }
 }
 var ORDER_COPY = {
+  POS_RECEIPT_EMAIL: {
+    "es-MX": ({ number: number4, site }) => ({
+      subject: `Tu comprobante de compra ${number4}`,
+      content: {
+        heading: "Gracias por tu compra en la tienda",
+        paragraphs: [
+          `Este es el comprobante de tu compra ${number4}. Cons\xE9rvalo para cualquier devoluci\xF3n dentro de los 60 d\xEDas naturales.`
+        ],
+        button: { label: "Ir a Y\u0112KORA", url: `${site}/` }
+      }
+    }),
+    en: ({ number: number4, site }) => ({
+      subject: `Your receipt ${number4}`,
+      content: {
+        heading: "Thank you for shopping at the store",
+        paragraphs: [
+          `This is the receipt of your purchase ${number4}. Keep it for any return within 60 calendar days.`
+        ],
+        button: { label: "Go to Y\u0112KORA", url: `${site}/en/` }
+      }
+    })
+  },
   ORDER_CONFIRMED: {
     "es-MX": ({ name: name2, number: number4, site }) => ({
       subject: `Confirmamos tu pedido ${number4} en Y\u0112KORA`,
@@ -120653,15 +121519,16 @@ var ORDER_COPY = {
     })
   }
 };
-function money(cents3, locale) {
+function money2(cents4, locale) {
   const amount = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "MXN",
     currencyDisplay: "narrowSymbol"
-  }).format(cents3 / 100);
+  }).format(cents4 / 100);
   return `${amount} MXN`;
 }
 function addressLines(address, state) {
+  if (address.counter !== void 0) return [address.counter];
   const number4 = [address.exteriorNumber, address.interiorNumber].filter((part) => part !== void 0 && part !== "").join(" int. ");
   return [
     `${address.street} ${number4}`,
@@ -120727,7 +121594,7 @@ async function renderOrder(db, keys, event) {
     carrier: order2.carrier,
     trackingNumber: order2.tracking_number,
     trackingUrl,
-    refund: event.type === "RETURN_REFUNDED" ? money(event.refundMxnCents, locale) : null
+    refund: event.type === "RETURN_REFUNDED" ? money2(event.refundMxnCents, locale) : null
   });
   const block = {
     number: number4,
@@ -120737,16 +121604,16 @@ async function renderOrder(db, keys, event) {
       name: english ? item.name_en : item.name_es,
       sku: item.sku,
       quantity: item.quantity,
-      unitPrice: money(item.unit_price_mxn_cents, locale),
-      lineTotal: money(item.line_total_mxn_cents, locale)
+      unitPrice: money2(item.unit_price_mxn_cents, locale),
+      lineTotal: money2(item.line_total_mxn_cents, locale)
     })),
-    itemsTotal: money(order2.items_total_mxn_cents, locale),
-    shipping: money(order2.shipping_total_mxn_cents, locale),
-    tax: money(
+    itemsTotal: money2(order2.items_total_mxn_cents, locale),
+    shipping: money2(order2.shipping_total_mxn_cents, locale),
+    tax: money2(
       Number(order2.items_tax_mxn_cents) + Number(order2.shipping_tax_mxn_cents),
       locale
     ),
-    total: money(order2.total_mxn_cents, locale),
+    total: money2(order2.total_mxn_cents, locale),
     address: addressLines(address, english ? zone.name_en : zone.name_es),
     ...order2.carrier && order2.tracking_number ? {
       parcel: {
@@ -120762,10 +121629,10 @@ async function renderOrder(db, keys, event) {
   assertMultipart(html, text3);
   return { to, subject, text: text3, html };
 }
-async function render(db, keys, row3) {
+async function render(db, keys, row4) {
   const event = {
-    type: row3.event_type,
-    ...JSON.parse(row3.payload)
+    type: row4.event_type,
+    ...JSON.parse(row4.payload)
   };
   if ("orderId" in event) return renderOrder(db, keys, event);
   const to = await emailOf(db, event.userId);
@@ -120785,33 +121652,33 @@ function createOutboxDispatcher(deps) {
   let running = null;
   let again = false;
   let timer;
-  async function deliver(row3) {
+  async function deliver(row4) {
     const now = deps.now();
     const claim2 = await db.query(
       "UPDATE outbox_events SET status = 'PROCESSING', next_retry_at = ? WHERE id = ? AND status = 'PENDING'",
-      [new Date(now.getTime() + LEASE_MS), row3.id]
+      [new Date(now.getTime() + LEASE_MS), row4.id]
     );
     if (claim2.affectedRows !== 1) return;
     try {
-      await deps.send(await render(db, deps, row3));
+      await deps.send(await render(db, deps, row4));
       await db.query(
         "UPDATE outbox_events SET status = 'SENT', sent_at = ?, error_message = NULL WHERE id = ?",
-        [now, row3.id]
+        [now, row4.id]
       );
     } catch (error63) {
-      const attempts = Number(row3.retry_count) + 1;
+      const attempts = Number(row4.retry_count) + 1;
       const reason = error63 instanceof Error ? error63.message : String(error63);
       await db.query(
         "UPDATE outbox_events SET status = ?, retry_count = ?, next_retry_at = ?, error_message = ? WHERE id = ?",
         [
-          attempts >= Number(row3.max_retries) ? "FAILED" : "PENDING",
+          attempts >= Number(row4.max_retries) ? "FAILED" : "PENDING",
           attempts,
           new Date(now.getTime() + retryDelaySeconds(attempts) * 1e3),
           reason.slice(0, 500),
-          row3.id
+          row4.id
         ]
       );
-      deps.log.error({ outboxId: row3.id, attempts }, "outbox send failed");
+      deps.log.error({ outboxId: row4.id, attempts }, "outbox send failed");
     }
   }
   async function runOnce2() {
@@ -120828,7 +121695,7 @@ function createOutboxDispatcher(deps) {
       [now, BATCH]
     );
     await due.reduce(
-      (previous, row3, index) => previous.then(() => index === 0 ? void 0 : wait(GAP_MS)).then(() => deliver(row3)),
+      (previous, row4, index) => previous.then(() => index === 0 ? void 0 : wait(GAP_MS)).then(() => deliver(row4)),
       Promise.resolve()
     );
     return due.length;
@@ -120981,16 +121848,16 @@ function evaluateShipping(config2, rules, facts) {
 }
 
 // src/services/shippingRates.ts
-function toRule(row3) {
+function toRule(row4) {
   return {
-    id: row3.id,
-    zoneId: row3.zone_id,
-    classId: row3.shipping_class_id,
-    minWeightGrams: row3.min_weight_grams,
-    maxWeightGrams: row3.max_weight_grams,
-    minItemsTotalMxnCents: row3.min_items_total_mxn_cents,
-    maxItemsTotalMxnCents: row3.max_items_total_mxn_cents,
-    rateMxnCents: row3.rate_mxn_cents
+    id: row4.id,
+    zoneId: row4.zone_id,
+    classId: row4.shipping_class_id,
+    minWeightGrams: row4.min_weight_grams,
+    maxWeightGrams: row4.max_weight_grams,
+    minItemsTotalMxnCents: row4.min_items_total_mxn_cents,
+    maxItemsTotalMxnCents: row4.max_items_total_mxn_cents,
+    rateMxnCents: row4.rate_mxn_cents
   };
 }
 function createTableRateProvider(db) {
@@ -121002,20 +121869,20 @@ function createTableRateProvider(db) {
       );
       if (zone === void 0)
         return { serviceable: false, code: "INVALID_DESTINATION" };
-      const [row3] = await db.query(
+      const [row4] = await db.query(
         `SELECT s.id AS strategy_id, s.code AS strategy, c.is_free_shipping_active,
            c.free_shipping_threshold_mxn_cents
          FROM shipping_configs c
          JOIN shipping_strategies s ON s.id = c.active_strategy_id
          WHERE c.id = 1 AND s.is_active = 1`
       );
-      if (row3 === void 0) {
+      if (row4 === void 0) {
         return { serviceable: false, code: "UNSERVICEABLE_DESTINATION" };
       }
       const config2 = {
-        strategy: row3.strategy,
-        freeShippingActive: row3.is_free_shipping_active === 1,
-        freeShippingThresholdMxnCents: row3.free_shipping_threshold_mxn_cents
+        strategy: row4.strategy,
+        freeShippingActive: row4.is_free_shipping_active === 1,
+        freeShippingThresholdMxnCents: row4.free_shipping_threshold_mxn_cents
       };
       const [classes, rules] = await Promise.all([
         db.query(
@@ -121025,7 +121892,7 @@ function createTableRateProvider(db) {
           `SELECT id, zone_id, shipping_class_id, min_weight_grams, max_weight_grams,
              min_items_total_mxn_cents, max_items_total_mxn_cents, rate_mxn_cents
            FROM shipping_rules WHERE strategy_id = ? AND is_active = 1`,
-          [row3.strategy_id]
+          [row4.strategy_id]
         )
       ]);
       return evaluateShipping(config2, rules.map(toRule), {
@@ -121042,7 +121909,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto22 = require("node:crypto");
+var import_node_crypto23 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -121111,7 +121978,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto22.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto23.timingSafeEqual)(a, b);
 }
 async function refusalReason(answer) {
   const body = await answer.json().catch(() => null);
@@ -121175,7 +122042,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         return null;
       }
       const signed = signedByAny(secrets.webhookSecret, (secret) => {
-        const expected = (0, import_node_crypto22.createHmac)("sha256", secret).update(`${timestamp}.`).update(rawBody).digest("hex");
+        const expected = (0, import_node_crypto23.createHmac)("sha256", secret).update(`${timestamp}.`).update(rawBody).digest("hex");
         return candidates.some((candidate) => sameHex2(expected, candidate));
       });
       if (!signed) return null;
@@ -121307,8 +122174,8 @@ function createStripeCards(secrets, fetchImpl = fetch) {
         { method: "GET" }
       );
       const rows = Array.isArray(body.data) ? body.data : [];
-      return rows.flatMap((row3) => {
-        const method = row3;
+      return rows.flatMap((row4) => {
+        const method = row4;
         const id = textOrNull(method.id);
         const brand = textOrNull(method.card?.brand);
         const last4 = textOrNull(method.card?.last4);
@@ -121503,6 +122370,11 @@ async function buildApp(deps) {
     now,
     processors,
     mode: deps.config.payments.mode
+  });
+  registerPosRoutes(app, {
+    db: deps.db,
+    now,
+    checkout: deps.config.payments.checkout
   });
   registerAdminPaymentRoutes(app, {
     db: deps.db,
@@ -121787,15 +122659,15 @@ async function fetchLatestFix(token, fetchImpl = fetch, timeoutMs = 3e3) {
 // src/services/exchangeRate.ts
 var REFRESH_MS = 60 * 60 * 1e3;
 async function latestStored(db) {
-  const [row3] = await db.query(
+  const [row4] = await db.query(
     "SELECT DATE_FORMAT(determination_date, '%Y-%m-%d') AS determination_date, rate_decimal, fetched_at FROM exchange_rates WHERE series_id = ? ORDER BY determination_date DESC LIMIT 1",
     [FIX_SERIES]
   );
-  return row3;
+  return row4;
 }
 async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix = fetchLatestFix) {
-  let row3 = await latestStored(db);
-  const stale = !row3 || now.getTime() - new Date(row3.fetched_at).getTime() > REFRESH_MS;
+  let row4 = await latestStored(db);
+  const stale = !row4 || now.getTime() - new Date(row4.fetched_at).getTime() > REFRESH_MS;
   if (token && stale) {
     try {
       const fix = await fetchFix(token);
@@ -121803,14 +122675,14 @@ async function currentRate(db, token, now = /* @__PURE__ */ new Date(), fetchFix
         "INSERT INTO exchange_rates (series_id, determination_date, rate_decimal, fetched_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE rate_decimal = VALUES(rate_decimal), fetched_at = VALUES(fetched_at)",
         [FIX_SERIES, fix.date, fix.rate, now]
       );
-      row3 = await latestStored(db);
+      row4 = await latestStored(db);
     } catch {
     }
   }
-  return row3 ? {
+  return row4 ? {
     series: FIX_SERIES,
-    date: row3.determination_date,
-    rate: String(row3.rate_decimal)
+    date: row4.determination_date,
+    rate: String(row4.rate_decimal)
   } : null;
 }
 
@@ -121874,7 +122746,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "3f9d309ac6cbfb20b8d6a36f9dac38b08a4903ee" : void 0;
+var sha = true ? "c1e2384219fe539c748dbc06f9c2655093048e74" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
