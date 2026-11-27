@@ -99483,6 +99483,112 @@ var pageSchema = external_exports.object({
   exchangeRate: exchangeRateSchema.nullable()
 });
 
+// ../../lib/account/fiscalTypes.ts
+var TAX_SYSTEMS = [
+  "601",
+  "603",
+  "605",
+  "606",
+  "607",
+  "608",
+  "610",
+  "611",
+  "612",
+  "614",
+  "615",
+  "616",
+  "620",
+  "621",
+  "622",
+  "623",
+  "624",
+  "625",
+  "626"
+];
+var CFDI_USES = [
+  "G01",
+  "G02",
+  "G03",
+  "I01",
+  "I02",
+  "I03",
+  "I04",
+  "I05",
+  "I06",
+  "I07",
+  "I08",
+  "D01",
+  "D02",
+  "D03",
+  "D04",
+  "D05",
+  "D06",
+  "D07",
+  "D08",
+  "D09",
+  "D10",
+  "S01",
+  "CP01",
+  "CN01"
+];
+var TAX_SYSTEM_SET = new Set(TAX_SYSTEMS);
+var CFDI_USE_SET = new Set(CFDI_USES);
+var CAPITAL_REGIMES = [
+  "SA",
+  "SA DE CV",
+  "SAB",
+  "SAB DE CV",
+  "SAPI",
+  "SAPI DE CV",
+  "SAPIB",
+  "SAPIB DE CV",
+  "SAS",
+  "SAS DE CV",
+  "S DE RL",
+  "S DE RL DE CV",
+  "SPR DE RL",
+  "SPR DE RL DE CV",
+  "S EN C",
+  "S EN C POR A",
+  "S EN NC",
+  "SC",
+  "SCP",
+  "AC"
+];
+var RFC = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+var LEGAL_NAME = /^[A-ZÑ&0-9.,'/\s]{1,254}$/;
+var POSTAL_CODE = /^\d{5}$/;
+var LEGAL_NAME_BYTES = 483;
+function carriesCapitalRegime(name2) {
+  const plain = name2.replaceAll(".", "").replaceAll(/[,\s-]+/g, " ").trim();
+  return CAPITAL_REGIMES.some((regime) => plain.endsWith(` ${regime}`));
+}
+var capitals = external_exports.string().max(300).trim().toUpperCase();
+var fiscalProfileRequestSchema = external_exports.strictObject({
+  rfc: capitals,
+  legalName: capitals,
+  taxSystem: capitals,
+  postalCode: capitals,
+  defaultCfdiUse: capitals
+});
+var isLegalName = (name2) => LEGAL_NAME.test(name2) && new TextEncoder().encode(name2).length <= LEGAL_NAME_BYTES && !carriesCapitalRegime(name2);
+function fiscalDataVerdict(data) {
+  if (!RFC.test(data.rfc)) return "INVALID_RFC_REJECT";
+  if (!isLegalName(data.legalName)) return "INVALID_LEGAL_NAME_REJECT";
+  if (!TAX_SYSTEM_SET.has(data.taxSystem)) return "INVALID_TAX_SYSTEM_REJECT";
+  if (!POSTAL_CODE.test(data.postalCode)) return "INVALID_POSTAL_CODE_REJECT";
+  if (!CFDI_USE_SET.has(data.cfdiUse)) return "INVALID_CFDI_USE_REJECT";
+  return "FISCAL_DATA_ACCEPTED";
+}
+var fiscalProfileSchema = external_exports.object({
+  rfc: external_exports.string(),
+  legalName: external_exports.string(),
+  taxSystem: external_exports.string(),
+  postalCode: external_exports.string(),
+  defaultCfdiUse: external_exports.string()
+});
+var fiscalProfileSavedSchema = external_exports.object({ saved: external_exports.literal(true) });
+
 // ../../lib/account/paymentsBunkerTypes.ts
 var mode = external_exports.enum(["sandbox", "live"]);
 var paymentModePrepareSchema = external_exports.strictObject({
@@ -99837,9 +99943,9 @@ var RANGES = [
   [97, 97, "YUC"],
   [98, 99, "ZAC"]
 ];
-var POSTAL_CODE = /^\d{5}$/;
+var POSTAL_CODE2 = /^\d{5}$/;
 function stateOfPostalCode(postalCode) {
-  if (!POSTAL_CODE.test(postalCode)) return null;
+  if (!POSTAL_CODE2.test(postalCode)) return null;
   const prefix = Number(postalCode.slice(0, 2));
   const hit = RANGES.find(([from, to]) => prefix >= from && prefix <= to);
   return hit ? hit[2] : null;
@@ -101990,6 +102096,31 @@ var ROUTE_CONTRACTS = [
   },
   {
     method: "GET",
+    path: "/v1/account/fiscal-profile",
+    summary: "The fiscal data the account saved to be invoiced (FC 077)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: fiscalProfileSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "PUT",
+    path: "/v1/account/fiscal-profile",
+    summary: "Saves the fiscal data of the account, judged value by value; the answer repeats none of it (FC 077)",
+    permission: "account:self",
+    request: { headers: mutationHeaders, body: fiscalProfileRequestSchema },
+    responses: {
+      200: fiscalProfileSavedSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
     path: "/v1/account/addresses",
     summary: "The account\u2019s book of delivery addresses, oldest first (FC 051)",
     permission: "account:self",
@@ -103521,6 +103652,109 @@ function registerAccountRoutes(app, deps) {
       return reply.code(403).type(PROBLEM_TYPE).send(problem(403, "Not your order", "DATA_DOMAIN_FORBIDDEN"));
     }
     return orderDetailSchema.parse(found.order);
+  });
+}
+
+// src/services/fiscalProfiles.ts
+async function readFiscalProfile(db, key, userId) {
+  const [row4] = await db.query(
+    "SELECT rfc, legal_name_enc, tax_system, postal_code_enc, default_cfdi_use FROM customer_fiscal_profiles WHERE user_id = ?",
+    [userId]
+  );
+  if (row4 === void 0) return null;
+  return {
+    rfc: row4.rfc,
+    legalName: decryptPii(key, userId, "fiscal_legal_name", row4.legal_name_enc),
+    taxSystem: row4.tax_system,
+    postalCode: decryptPii(
+      key,
+      userId,
+      "fiscal_postal_code",
+      row4.postal_code_enc
+    ),
+    defaultCfdiUse: row4.default_cfdi_use
+  };
+}
+async function saveFiscalProfile(tx, key, userId, profile) {
+  await tx.query(
+    "INSERT INTO customer_fiscal_profiles (user_id, rfc, legal_name_enc, tax_system, postal_code_enc, default_cfdi_use) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE rfc = VALUES(rfc), legal_name_enc = VALUES(legal_name_enc), tax_system = VALUES(tax_system), postal_code_enc = VALUES(postal_code_enc), default_cfdi_use = VALUES(default_cfdi_use)",
+    [
+      userId,
+      profile.rfc,
+      encryptPii(key, userId, "fiscal_legal_name", profile.legalName),
+      profile.taxSystem,
+      encryptPii(key, userId, "fiscal_postal_code", profile.postalCode),
+      profile.defaultCfdiUse
+    ]
+  );
+}
+
+// src/routes/accountFiscal.ts
+var TITLES2 = {
+  INVALID_RFC_REJECT: "The RFC is not valid",
+  INVALID_LEGAL_NAME_REJECT: "The legal name is not valid, or carries its capital regime",
+  INVALID_TAX_SYSTEM_REJECT: "The tax regime is not in the SAT catalog",
+  INVALID_POSTAL_CODE_REJECT: "The postal code is not valid",
+  INVALID_CFDI_USE_REJECT: "The CFDI use is not in the SAT catalog"
+};
+var unavailable = (reply) => refuse(
+  reply,
+  503,
+  "Personal data cannot be read or saved right now",
+  "SERVICE_UNAVAILABLE"
+);
+function registerAccountFiscalRoutes(app, deps) {
+  app.get("/v1/account/fiscal-profile", async (request, reply) => {
+    if (deps.piiKey === null) return unavailable(reply);
+    const profile = await readFiscalProfile(
+      deps.db,
+      deps.piiKey,
+      request.user.userId
+    );
+    if (profile === null) {
+      return refuse(
+        reply,
+        404,
+        "No fiscal profile saved",
+        "FISCAL_PROFILE_NOT_FOUND"
+      );
+    }
+    return fiscalProfileSchema.parse(profile);
+  });
+  app.put("/v1/account/fiscal-profile", async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    if (key.code !== "IDEMP_KEY_ACCEPTED") {
+      return refuse(reply, 400, "Idempotency-Key required", key.code);
+    }
+    const { piiKey } = deps;
+    if (piiKey === null) return unavailable(reply);
+    const body = fiscalProfileRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+    }
+    const verdict = fiscalDataVerdict({
+      ...body.data,
+      cfdiUse: body.data.defaultCfdiUse
+    });
+    if (verdict !== "FISCAL_DATA_ACCEPTED") {
+      return refuse(reply, 400, TITLES2[verdict], verdict);
+    }
+    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      await saveFiscalProfile(tx, piiKey, userId, body.data);
+      await recordAudit(tx, {
+        userId,
+        action: "FISCAL_PROFILE_SAVED",
+        entityType: "customer_fiscal_profiles",
+        entityId: userId,
+        before: null,
+        after: null,
+        ip: request.ip
+      });
+      return {
+        status: 200,
+        body: fiscalProfileSavedSchema.parse({ saved: true })
+      };
+    });
   });
 }
 
@@ -106066,7 +106300,7 @@ var RESET_REQUEST_ANSWER = {
   ok: true,
   message: "Si el correo est\xE1 registrado, enviamos instrucciones para restablecer tu contrase\xF1a."
 };
-var TITLES2 = {
+var TITLES3 = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
   MAIL_UNAVAILABLE: "Sign-in by e-mail unavailable",
   INVALID_REQUEST: "Invalid request",
@@ -106090,7 +106324,7 @@ var TITLES2 = {
   PASSWORD_BREACHED: "The password appears in a known data breach"
 };
 function refuse3(reply, status, code2) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES2[code2], code2));
+  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES3[code2], code2));
 }
 async function strongEnough(password, context, reply, breach) {
   const broken = passwordViolation(password, context);
@@ -107059,7 +107293,7 @@ function registerCatalogAdminRoutes(app, deps) {
 }
 
 // src/routes/checkout.ts
-var TITLES3 = {
+var TITLES4 = {
   INVALID_REQUEST: "Invalid checkout request",
   SERVICE_UNAVAILABLE: "Payments unavailable",
   INVALID_SHIPPING_ADDRESS: "Invalid shipping address",
@@ -107089,7 +107323,7 @@ function registerCheckoutRoutes(app, deps) {
         buyer?.userId ?? null
       ) : { ok: false, status: 400, code: "INVALID_REQUEST" };
       if (!outcome.ok) {
-        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES3[outcome.code], outcome.code));
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
       }
       return reply.code(201).send(checkoutSessionSchema.parse(outcome.session));
     }
@@ -107405,7 +107639,7 @@ var ROUTES = [
   ["stripe", "STRIPE"],
   ["mercadopago", "MERCADO_PAGO"]
 ];
-var TITLES4 = {
+var TITLES5 = {
   INVALID_SIGNATURE: "Invalid signature",
   SERVICE_UNAVAILABLE: "Payments unavailable",
   STATE_CONFLICT_ANOMALY: "Order state conflict",
@@ -107441,7 +107675,7 @@ async function registerWebhookRoutes(app, deps) {
           });
           if (alerted) request.outboxQueued = true;
         }
-        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES5[outcome.code], outcome.code));
       });
     }
     done();
@@ -122371,6 +122605,11 @@ async function buildApp(deps) {
     cards,
     siteUrl: deps.config.payments.siteUrl
   });
+  registerAccountFiscalRoutes(app, {
+    db: deps.db,
+    now,
+    piiKey: deps.config.payments.checkout?.piiKey ?? null
+  });
   registerAdminRoutes(app, {
     db: deps.db,
     now,
@@ -122752,7 +122991,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "30a98940f73262b290eff8f7c161e91684d68eec" : void 0;
+var sha = true ? "e31940c598bae4d6dcd4b441eb93b190102cf8bf" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
