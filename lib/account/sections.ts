@@ -23,6 +23,8 @@ type AccountSection =
   | 'users'
   | 'returns'
   | 'pos'
+  | 'fiscal'
+  | 'invoicing'
   | 'shipping';
 
 /** The permission that opens the panel's orders. */
@@ -40,6 +42,9 @@ const RETURNS_PERMISSION = 'returns:view';
 /** The permissions that open the point of sale (FC 076): selling or running the till. */
 const POS_PERMISSIONS = new Set(['pos:sell', 'pos:shift']);
 
+/** The permission that opens the queue of invoice requests (FC 077). */
+const INVOICING_PERMISSION = 'invoices:read';
+
 /** The role of the owner (FC 044 T2.1): the panel of users shows it everything and protects it. */
 const OWNER_ROLE = 'owner';
 
@@ -54,24 +59,33 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
   orders: () => true,
   profile: () => true,
   'payment-methods': () => true,
+  fiscal: () => true,
   admin: (user) =>
     ACCESS.panel(user) ||
     ACCESS.catalog(user) ||
     ACCESS.shipping(user) ||
     ACCESS.users(user) ||
     ACCESS.returns(user) ||
+    ACCESS.invoicing(user) ||
     ACCESS.pos(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
   users: (user) => user.permissions.includes(USERS_PERMISSION),
   returns: (user) => user.permissions.includes(RETURNS_PERMISSION),
+  invoicing: (user) => user.permissions.includes(INVOICING_PERMISSION),
   pos: (user) =>
     user.permissions.some((permission) => POS_PERMISSIONS.has(permission)),
   shipping: (user) => user.permissions.includes(SHIPPING_PERMISSION),
 };
 
+/** An entry of the account menu. */
+type MenuSection = Extract<
+  AccountSection,
+  'orders' | 'profile' | 'payment-methods' | 'admin'
+>;
+
 /** The entries of the account menu, in order. */
-const MENU: readonly AccountSection[] = [
+const MENU: readonly MenuSection[] = [
   'orders',
   'profile',
   'payment-methods',
@@ -85,7 +99,7 @@ const MENU: readonly AccountSection[] = [
  * @returns «Mis pedidos», «Mi información» and «Métodos de pago» always, and «Administración» when the account may open
  *   at least one console (FC 052 T1.1: `orders:read` ∨ `catalog:write` ∨ the owner role).
  */
-export function sectionsOf(user: Who): AccountSection[] {
+export function sectionsOf(user: Who): MenuSection[] {
   return MENU.filter((section) => ACCESS[section](user));
 }
 
@@ -110,9 +124,17 @@ export interface AdminCard {
     | 'shipping'
     | 'users'
     | 'returns'
-    | 'pos';
+    | 'pos'
+    | 'invoices';
   /** The console it opens. */
-  tab: 'panel' | 'catalog' | 'shipping' | 'users' | 'returns' | 'pos';
+  tab:
+    | 'panel'
+    | 'catalog'
+    | 'shipping'
+    | 'users'
+    | 'returns'
+    | 'invoicing'
+    | 'pos';
   /** The tab of the catalog console it opens, for the two that open it. */
   section: 'productos' | 'marcas' | null;
 }
@@ -130,13 +152,19 @@ const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
   { key: 'catalog', tab: 'catalog', section: 'marcas', grantedBy: 'catalog' },
   { key: 'shipping', tab: 'shipping', section: null, grantedBy: 'shipping' },
   { key: 'returns', tab: 'returns', section: null, grantedBy: 'returns' },
+  {
+    key: 'invoices',
+    tab: 'invoicing',
+    section: null,
+    grantedBy: 'invoicing',
+  },
   { key: 'users', tab: 'users', section: null, grantedBy: 'users' },
 ];
 
 /**
  * The cards of the administration hub an account is shown (FC 052 T2.4): each one if and only if
  * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Envíos» with `shipping:manage`, «Devoluciones» with `returns:view`, «Usuarios, roles y permisos» with `sellers:manage`.
+ * `catalog:write`, «Envíos» with `shipping:manage`, «Devoluciones» with `returns:view`, «Facturación» with `invoices:read`, «Usuarios, roles y permisos» with `sellers:manage`.
  *
  * @param user - Its roles and permissions.
  * @returns The cards, in order.

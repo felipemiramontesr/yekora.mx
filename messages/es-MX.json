@@ -1767,6 +1767,10 @@
         "pos": {
           "name": "Punto de venta",
           "description": "Abre la caja, cobra en el mostrador y ciérrala."
+        },
+        "invoices": {
+          "name": "Facturación",
+          "description": "Solicitudes de factura: subir PDF y XML, rechazar o anular."
         }
       }
     },
@@ -2126,6 +2130,220 @@
         "title": "Stripe Link y carteras digitales",
         "text": "Stripe Link y las carteras digitales (Apple Pay y Google Pay) son servicios independientes de Stripe, Inc. y de los fabricantes de tu dispositivo. Eliminar o reemplazar tu tarjeta en YĒKORA no borra las tarjetas que hayas guardado en Link o en tu dispositivo: adminístralas desde Link («Edit wallet») o desde los ajustes de tu dispositivo."
       }
+    },
+    "fiscal": {
+      "title": "Datos para factura",
+      "intro": "Guarda tus datos fiscales y al pedir una factura ya vendrán escritos. Cópialos como aparecen en tu Constancia de Situación Fiscal.",
+      "loading": "Cargando…",
+      "save": "Guardar datos fiscales",
+      "saved": "Tus datos fiscales quedaron guardados.",
+      "orderTitle": "Factura",
+      "ask": "Pedir factura",
+      "askIntro": "Tienes 30 días desde el pago. La emitimos y te la enviamos al correo que indiques.",
+      "send": "Enviar solicitud",
+      "requested": "La solicitud de factura quedó registrada.",
+      "invalidEmail": "Escribe un correo válido.",
+      "reasonLine": "Motivo: {reason}",
+      "downloadPdf": "Descargar PDF",
+      "downloadXml": "Descargar XML",
+      "states": {
+        "PENDING": "Tu factura está en preparación. Te llegará por correo.",
+        "COMPLETED": "Tu factura está lista.",
+        "REJECTED": "No pudimos emitir la factura. Corrige los datos y pídela de nuevo en los siguientes 7 días.",
+        "CANCELLED": "La factura anterior se canceló. Puedes pedirla de nuevo en los siguientes 7 días."
+      },
+      "fields": {
+        "rfc": {
+          "label": "RFC",
+          "description": "Con homoclave, sin guiones ni espacios.",
+          "example": "XAXX010101000"
+        },
+        "legalName": {
+          "label": "Nombre o razón social",
+          "description": "Sin el régimen de capital (sin S.A. de C.V.).",
+          "example": "LA ROSA"
+        },
+        "taxSystem": {
+          "label": "Régimen fiscal",
+          "description": "El que dice tu constancia.",
+          "example": "612"
+        },
+        "postalCode": {
+          "label": "Código postal fiscal",
+          "description": "Los 5 dígitos de tu domicilio fiscal.",
+          "example": "98612"
+        },
+        "cfdiUse": {
+          "label": "Uso de la factura (CFDI)",
+          "description": "Para qué la usarás.",
+          "example": "G03"
+        },
+        "email": {
+          "label": "Correo para la factura",
+          "description": "Ahí llegan el PDF y el XML.",
+          "example": "nombre@correo.mx"
+        }
+      },
+      "taxSystems": {
+        "601": "General de Ley Personas Morales",
+        "603": "Personas Morales con Fines no Lucrativos",
+        "605": "Sueldos y Salarios",
+        "606": "Arrendamiento",
+        "607": "Enajenación o Adquisición de Bienes",
+        "608": "Demás ingresos",
+        "610": "Residentes en el Extranjero",
+        "611": "Ingresos por Dividendos",
+        "612": "Personas Físicas con Actividades Empresariales y Profesionales",
+        "614": "Ingresos por intereses",
+        "615": "Ingresos por obtención de premios",
+        "616": "Sin obligaciones fiscales",
+        "620": "Sociedades Cooperativas de Producción",
+        "621": "Incorporación Fiscal",
+        "622": "Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+        "623": "Grupos de Sociedades (opcional)",
+        "624": "Coordinados",
+        "625": "Plataformas Tecnológicas",
+        "626": "Régimen Simplificado de Confianza"
+      },
+      "cfdiUses": {
+        "G01": "Adquisición de mercancías",
+        "G02": "Devoluciones, descuentos o bonificaciones",
+        "G03": "Gastos en general",
+        "I01": "Construcciones",
+        "I02": "Mobiliario y equipo de oficina",
+        "I03": "Equipo de transporte",
+        "I04": "Equipo de cómputo",
+        "I05": "Dados, troqueles, moldes y herramental",
+        "I06": "Comunicaciones telefónicas",
+        "I07": "Comunicaciones satelitales",
+        "I08": "Otra maquinaria y equipo",
+        "D01": "Honorarios médicos y gastos hospitalarios",
+        "D02": "Gastos médicos por incapacidad",
+        "D03": "Gastos funerales",
+        "D04": "Donativos",
+        "D05": "Intereses de créditos hipotecarios",
+        "D06": "Aportaciones voluntarias al SAR",
+        "D07": "Primas de seguros de gastos médicos",
+        "D08": "Transportación escolar",
+        "D09": "Depósitos para el ahorro y pensiones",
+        "D10": "Colegiaturas",
+        "S01": "Sin efectos fiscales",
+        "CP01": "Pagos",
+        "CN01": "Nómina"
+      },
+      "errors": {
+        "INVALID_RFC_REJECT": "El RFC no es válido.",
+        "INVALID_LEGAL_NAME_REJECT": "Revisa el nombre o razón social: sin comillas ni régimen de capital.",
+        "INVALID_TAX_SYSTEM_REJECT": "Elige el régimen fiscal.",
+        "INVALID_POSTAL_CODE_REJECT": "El código postal son 5 dígitos.",
+        "INVALID_CFDI_USE_REJECT": "Elige el uso de la factura.",
+        "FISCAL_PROFILE_NOT_FOUND": "Aún no hay datos fiscales guardados.",
+        "ORDER_NOT_FOUND": "No encontramos ese pedido.",
+        "ORDER_BELONGS_TO_ACCOUNT_REJECT": "Ese pedido tiene cuenta: la persona pide su factura desde ella.",
+        "ORDER_NOT_ELIGIBLE_REJECT": "Ese pedido no se puede facturar: no está pagado o ya fue reembolsado.",
+        "FISCAL_DEADLINE_EXPIRED_REJECT": "Ya pasó el plazo para pedir la factura.",
+        "INVOICE_ALREADY_EXISTS_REJECT": "Ese pedido ya tiene una solicitud o una factura.",
+        "INVOICE_REQUEST_NOT_FOUND": "No encontramos la solicitud.",
+        "INVOICE_REQUEST_NOT_PENDING": "La solicitud ya no está pendiente. Actualiza la lista.",
+        "INVOICE_REQUEST_NOT_COMPLETED": "La solicitud no tiene una factura que cancelar.",
+        "INVALID_PDF_FILE_REJECT": "El PDF no es válido o pesa más de 2 MB.",
+        "INVALID_XML_FILE_REJECT": "El XML no es un CFDI 4.0 válido.",
+        "FISCAL_CONFIGURATION_ERROR": "Falta configurar el RFC de la tienda. Avisa a quien administra el sistema.",
+        "INVALID_ISSUER_RFC_REJECT": "Esa factura no la emitió la tienda: revisa el archivo.",
+        "METADATA_MISMATCH_REJECT": "El RFC del receptor o el total del XML no coincide con la solicitud.",
+        "INVALID_OR_DUPLICATE_UUID_REJECT": "El folio fiscal falta o ya está registrado.",
+        "INVALID_REQUEST": "Revisa los datos.",
+        "SERVICE_UNAVAILABLE": "El servicio no está disponible. Intenta más tarde.",
+        "PERMISSION_DENIED": "Tu cuenta no puede hacer esta acción.",
+        "SECOND_FACTOR_REQUIRED": "Activa la verificación en dos pasos.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Entra de nuevo.",
+        "rate_limited": "Demasiados intentos. Espera un momento.",
+        "offline": "No hay conexión.",
+        "timeout": "La tienda tardó demasiado. Revisa antes de repetir.",
+        "server": "Algo falló en la tienda.",
+        "invalid": "La respuesta no se entendió.",
+        "unknown": "No se pudo completar."
+      }
+    },
+    "invoicing": {
+      "title": "Facturación",
+      "intro": "Las facturas se timbran en el sistema externo. Aquí se sube su PDF y XML y la tienda los entrega.",
+      "askForBuyer": "Pedir factura por quien compró sin cuenta",
+      "askForBuyerIntro": "Para compras como invitado o de mostrador.",
+      "searchTitle": "Buscar solicitudes",
+      "search": "Buscar",
+      "allStatuses": "Todas",
+      "empty": "No hay solicitudes con ese filtro.",
+      "statuses": {
+        "PENDING": "En espera",
+        "COMPLETED": "Entregada",
+        "REJECTED": "Rechazada",
+        "CANCELLED": "Cancelada"
+      },
+      "facts": {
+        "rfc": "RFC",
+        "legalName": "Razón social",
+        "taxSystem": "Régimen",
+        "postalCode": "Código postal",
+        "cfdiUse": "Uso CFDI",
+        "email": "Correo",
+        "total": "Total del pedido",
+        "invoicable": "Total a facturar",
+        "requestedAt": "Solicitada"
+      },
+      "upload": "Subir factura",
+      "uploadFor": "Subir factura del pedido {number}",
+      "uploaded": "Factura registrada y enviada. Folio {uuid}.",
+      "chooseBoth": "Elige el PDF y el XML.",
+      "tooLarge": "El PDF puede pesar hasta 2 MB y el XML hasta 512 KB.",
+      "shortReason": "Escribe un motivo de al menos 10 letras.",
+      "close": {
+        "reject": {
+          "button": "Rechazar solicitud",
+          "formFor": "Rechazar la solicitud del pedido {number}",
+          "done": "Solicitud rechazada."
+        },
+        "cancel": {
+          "button": "Anular factura",
+          "formFor": "Anular la factura del pedido {number}",
+          "done": "Factura anulada. Puede pedirse de nuevo."
+        }
+      },
+      "fields": {
+        "status": {
+          "label": "Estado",
+          "description": "Qué solicitudes ver.",
+          "example": "En espera"
+        },
+        "search": {
+          "label": "Pedido o RFC",
+          "description": "El número completo o el RFC completo.",
+          "example": "YEK-2026-AB12CD34"
+        },
+        "orderNumber": {
+          "label": "Número de pedido",
+          "description": "Como viene en el comprobante.",
+          "example": "YEK-2026-AB12CD34"
+        },
+        "pdf": {
+          "label": "PDF de la factura",
+          "description": "Hasta 2 MB.",
+          "example": "factura.pdf"
+        },
+        "xml": {
+          "label": "XML de la factura",
+          "description": "El CFDI 4.0 timbrado, hasta 512 KB.",
+          "example": "factura.xml"
+        },
+        "reason": {
+          "label": "Motivo",
+          "description": "La persona lo leerá. Al menos 10 letras.",
+          "example": "El RFC no corresponde"
+        }
+      },
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "page": "Página {page} de {pages}"
     }
   }
 }

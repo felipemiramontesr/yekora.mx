@@ -118,9 +118,14 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
       'the sections of the account area are paths it routes itself (no page per path in the export); inside the area a click changes the view without a reload',
   },
   'components/account/AccountApp.tsx': {
-    count: 2,
+    count: 3,
     reason:
-      'the breadcrumb of the account area, and its «Administración» step: its own paths (Apache fallback, no export), changed without a reload',
+      'the breadcrumb of the account area, its «Administración» step and the link to «Datos para factura» (FC 077): its own paths (Apache fallback, no export), changed without a reload',
+  },
+  'components/account/invoiceShared.tsx': {
+    count: 1,
+    reason:
+      'the download of an invoice file from the API (FC 077): another origin, not a page',
   },
   'components/account/AccountAdminHub.tsx': {
     count: 1,

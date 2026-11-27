@@ -89,6 +89,17 @@ vi.mock('@/lib/api/fulfillmentClient', () => ({
   deliverOrder: vi.fn(),
 }));
 
+vi.mock('@/lib/api/invoiceClient', async (original) => ({
+  ...(await original<typeof import('@/lib/api/invoiceClient')>()),
+  readFiscalProfile: vi.fn(async () => ({
+    ok: false,
+    reason: 'FISCAL_PROFILE_NOT_FOUND',
+  })),
+  listInvoiceQueue: vi.fn(async () => ({
+    ok: true,
+    data: { items: [], total: 0, page: 1, pageSize: 50 },
+  })),
+}));
 vi.mock('@/lib/api/posClient', () => ({
   readShift: vi.fn(),
   openTill: vi.fn(),
@@ -2023,5 +2034,44 @@ describe('point of sale in the area (FC 076 F4)', () => {
     renderApp();
     await screen.findByText(/Hola, /);
     expect(readShift).not.toHaveBeenCalled();
+  });
+});
+
+describe('invoicing in the area (FC 077 F4)', () => {
+  it('goes from the data of the account to «Datos para factura» without reloading', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/datos/');
+    api.me.mockResolvedValue(ok(BUYER));
+    renderApp();
+    fireEvent.click(
+      await screen.findByRole('link', { name: account.fiscal.title })
+    );
+    expect(globalThis.location.pathname).toBe('/cuenta/datos-fiscales/');
+    await screen.findByRole('form', { name: account.fiscal.title });
+  });
+
+  it('opens /facturacion/ under Administración for whoever may read the requests', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/facturacion/');
+    api.me.mockResolvedValue(
+      ok({
+        ...BUYER,
+        roles: ['owner'],
+        permissions: [
+          'account:self',
+          'invoices:read',
+          'invoices:upload',
+          'invoices:request',
+        ],
+      })
+    );
+    renderApp();
+    await screen.findByText(account.invoicing.empty);
+    expect(
+      screen
+        .getByText(account.adminHub.cards.invoices.name, { selector: 'li' })
+        .getAttribute('aria-current')
+    ).toBe('page');
+    expect(
+      screen.getByRole('button', { name: account.invoicing.askForBuyer })
+    ).toBeTruthy();
   });
 });

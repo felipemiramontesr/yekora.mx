@@ -155,6 +155,9 @@ const USERS: Record<Persona, object> = {
       'pos:sell',
       'pos:shift',
       'pos:supervisor',
+      'invoices:read',
+      'invoices:upload',
+      'invoices:request',
     ],
   },
 };
@@ -730,6 +733,7 @@ export async function mockAccountApi(
   const fulfillment = newFulfillment(options.delivered ? 'DELIVERED' : null);
   const returns = newReturns(options.seedReturns === true);
   const till: Till = { opening: null, cash: 0 };
+  const invoicing: Invoicing = { profile: null, request: null, status: null };
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
     free: false,
@@ -784,7 +788,7 @@ export async function mockAccountApi(
         () => (user = null),
         () => (trusted = false),
         data,
-        { fulfillment, returns }
+        { fulfillment, returns, invoicing }
       );
     })
   );
@@ -801,6 +805,7 @@ export async function mockAccountApi(
           () => answerShipping(route, shippingStates, shippingConfig),
         ],
         ['/v1/admin/pos/', () => answerPos(route, till)],
+        ['/v1/admin/invoices/', () => answerInvoicing(route, invoicing)],
         ['/v1/admin/returns', () => answerReturns(route, returns, 'owner')],
       ];
       const found = consoles.find(([start]) => path.startsWith(start));
@@ -820,6 +825,80 @@ export async function mockAccountApi(
   );
 }
 
+/** The invoicing of the interceptor (FC 077): the saved fiscal data and the one request. */
+interface Invoicing {
+  profile: Record<string, unknown> | null;
+  request: Record<string, unknown> | null;
+  status: 'PENDING' | 'COMPLETED' | null;
+}
+
+/**
+ * Answers the fiscal profile, the invoice request of an order and the queue of the staff, as the
+ * API does for the screens.
+ */
+function answerInvoicing(route: Route, invoicing: Invoicing) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  const method = request.method();
+  if (method !== 'GET' && !request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  if (path === '/v1/account/fiscal-profile') {
+    if (method === 'PUT') {
+      invoicing.profile = request.postDataJSON() as Record<string, unknown>;
+      return json(route, 200, { saved: true });
+    }
+    return invoicing.profile === null
+      ? problem(route, 404, 'FISCAL_PROFILE_NOT_FOUND')
+      : json(route, 200, invoicing.profile);
+  }
+  if (path.endsWith('/invoice-request')) {
+    if (method === 'GET') {
+      return json(route, 200, { status: invoicing.status, reason: null });
+    }
+    invoicing.request = request.postDataJSON() as Record<string, unknown>;
+    invoicing.status = 'PENDING';
+    return json(route, 201, { id: 1, status: 'PENDING' });
+  }
+  if (path.endsWith('/upload')) {
+    invoicing.status = 'COMPLETED';
+    return json(route, 200, {
+      id: 1,
+      status: 'COMPLETED',
+      uuid: '6F1C2A3B-4D5E-4F60-8A9B-0C1D2E3F4A5B',
+    });
+  }
+  const asked = invoicing.request;
+  const { emailForInvoice, ...data } = asked ?? {};
+  const items =
+    asked === null
+      ? []
+      : [
+          {
+            ...data,
+            id: 1,
+            orderNumber: E2E_ORDER,
+            channel: 'online',
+            totalMxnCents: 500000,
+            invoicableMxnCents: 500000,
+            status: invoicing.status,
+            email: emailForInvoice,
+            reason: null,
+            requestedAt: '2026-11-27T18:00:00.000Z',
+          },
+        ];
+  const wanted = new URL(request.url()).searchParams.get('status');
+  const shown = items.filter(
+    (item) => wanted === null || item.status === wanted
+  );
+  return json(route, 200, {
+    items: shown,
+    total: shown.length,
+    page: 1,
+    pageSize: 50,
+  });
+}
+
 /** The signed-in routes of the buyer. */
 function answerAccount(
   route: Route,
@@ -827,7 +906,11 @@ function answerAccount(
   signOut: () => void,
   forget: () => void,
   data: AccountData,
-  world: { fulfillment: Fulfillment; returns: Returns }
+  world: {
+    fulfillment: Fulfillment;
+    returns: Returns;
+    invoicing: Invoicing;
+  }
 ) {
   const user = who();
   if (user === null) return problem(route, 401, 'SESSION_INVALID_OR_EXPIRED');
@@ -855,6 +938,12 @@ function answerAccount(
   if (path === '/v1/account/forget-device') {
     forget();
     return json(route, 204);
+  }
+  if (
+    path === '/v1/account/fiscal-profile' ||
+    path.endsWith('/invoice-request')
+  ) {
+    return answerInvoicing(route, world.invoicing);
   }
   if (/^\/v1\/account\/orders\/[^/]+\/returns$/.test(path)) {
     return answerReturnRequest(route, world.fulfillment, world.returns);

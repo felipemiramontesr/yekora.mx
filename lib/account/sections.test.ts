@@ -117,3 +117,15 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
     ]);
   });
 });
+
+describe('the sections of invoicing (FC 077)', () => {
+  const buyer = { roles: ['customer'], permissions: ['account:self'] };
+
+  it('opens «Datos para factura» to everyone and the queue only with invoices:read', () => {
+    expect(canOpen(buyer, 'fiscal')).toBe(true);
+    expect(canOpen(buyer, 'invoicing')).toBe(false);
+    const staff = { roles: ['staff_orders'], permissions: ['invoices:read'] };
+    expect(canOpen(staff, 'invoicing')).toBe(true);
+    expect(canOpen(staff, 'admin')).toBe(true);
+  });
+});

@@ -42,6 +42,9 @@ import { AccountAdminHub } from './AccountAdminHub';
 import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
+import { AccountFiscalProfile } from './AccountFiscalProfile';
+import type { InvoicingTexts } from './AccountInvoicesConsole';
+import type { FiscalTexts } from './invoiceShared';
 import type { UsersTexts } from './AccountUsersConsole';
 import type { PosTexts } from './AccountPosConsole';
 import type { ReturnsTexts } from './ReturnsConsole';
@@ -74,6 +77,25 @@ const AccountUsersConsole = dynamic<{ texts: UsersTexts; owner: boolean }>(
   () =>
     import('./AccountUsersConsole').then(
       (module) => module.AccountUsersConsole
+    ),
+  { ssr: false }
+);
+
+/**
+ * The queue of invoice requests, in its own chunk (FC 077): only an account with `invoices:read`
+ * opens it.
+ */
+const AccountInvoicesConsole = dynamic<{
+  texts: InvoicingTexts;
+  fiscal: FiscalTexts;
+  exampleLabel: string;
+  locale: Locale;
+  canUpload: boolean;
+  canRequest: boolean;
+}>(
+  () =>
+    import('./AccountInvoicesConsole').then(
+      (module) => module.AccountInvoicesConsole
     ),
   { ssr: false }
 );
@@ -402,6 +424,8 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
   if (view.tab === 'users') return cards.users.name;
   if (view.tab === 'returns') return cards.returns.name;
   if (view.tab === 'pos') return cards.pos.name;
+  if (view.tab === 'invoicing') return cards.invoices.name;
+  if (view.tab === 'fiscal') return texts.fiscal.title;
   if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
     return (view.section === 'productos' ? cards.products : cards.catalog).name;
@@ -442,6 +466,7 @@ function Dashboard({
     tab === 'users' ||
     tab === 'returns' ||
     tab === 'pos' ||
+    tab === 'invoicing' ||
     tab === 'shipping';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
@@ -495,6 +520,34 @@ function Dashboard({
         </p>
       </div>
       {tab === 'profile' && (
+        <a
+          href={accountPath(area, { tab: 'fiscal', orderNumber: null })}
+          onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+            event.preventDefault();
+            onNavigate({ tab: 'fiscal', orderNumber: null });
+          }}
+          className="tap-target self-start underline underline-offset-4"
+        >
+          {texts.account.fiscal.title}
+        </a>
+      )}
+      {tab === 'fiscal' && (
+        <AccountFiscalProfile
+          texts={texts.account.fiscal}
+          exampleLabel={texts.account.exampleLabel}
+        />
+      )}
+      {tab === 'invoicing' && (
+        <AccountInvoicesConsole
+          texts={texts.account.invoicing}
+          fiscal={texts.account.fiscal}
+          exampleLabel={texts.account.exampleLabel}
+          locale={locale}
+          canUpload={user.permissions.includes('invoices:upload')}
+          canRequest={user.permissions.includes('invoices:request')}
+        />
+      )}
+      {tab === 'profile' && (
         <AccountProfileAddresses
           user={user}
           messages={texts.account}
@@ -547,6 +600,7 @@ function Dashboard({
         <OrderDetailView
           scope={scope}
           orderNumber={view.orderNumber}
+          email={user.email}
           locale={locale}
           texts={texts}
           backHref={accountPath(area, { tab, orderNumber: null })}

@@ -11,7 +11,7 @@
 import { z } from 'zod';
 
 /** The tax regimes of the SAT catalog `c_RegimenFiscal`, as CFDI 4.0 names them. */
-const TAX_SYSTEMS = [
+export const TAX_SYSTEMS = [
   '601',
   '603',
   '605',
@@ -34,7 +34,7 @@ const TAX_SYSTEMS = [
 ] as const;
 
 /** The uses of the SAT catalog `c_UsoCFDI`. */
-const CFDI_USES = [
+export const CFDI_USES = [
   'G01',
   'G02',
   'G03',

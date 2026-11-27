@@ -13,6 +13,7 @@ import { fill, formatMoney } from '@/lib/catalog/format';
 import { ORDER_STATUS_CODES } from '@/lib/checkout/checkoutTypes';
 import { FormAlert, failureText } from './AccountForms';
 import { OrderFulfillment } from './OrderFulfillment';
+import { OrderInvoiceRequest } from './OrderInvoiceRequest';
 import { OrderReturnRequest } from './OrderReturnRequest';
 
 /** The texts the order views read. */
@@ -392,6 +393,7 @@ export function OrderDetailView({
   backHref,
   onBack,
   canManage = false,
+  email = '',
 }: Readonly<{
   scope: OrderScope;
   orderNumber: string;
@@ -401,6 +403,8 @@ export function OrderDetailView({
   onBack: () => void;
   /** Whether the account holds `orders:manage`: the panel then shows the fulfillment (FC 068). */
   canManage?: boolean;
+  /** The account's e-mail, offered for its invoices (FC 077). */
+  email?: string;
 }>) {
   const { account } = texts;
   const [load, setLoad] = useState<Load<OrderDetail>>({ kind: 'loading' });
@@ -458,6 +462,14 @@ export function OrderDetailView({
           locale={locale}
           exampleLabel={account.exampleLabel}
           onDone={() => setReload((count) => count + 1)}
+        />
+      )}
+      {load.kind === 'ready' && scope === 'account' && (
+        <OrderInvoiceRequest
+          order={load.data}
+          texts={account.fiscal}
+          exampleLabel={account.exampleLabel}
+          email={email}
         />
       )}
       {load.kind === 'ready' && canManage && (

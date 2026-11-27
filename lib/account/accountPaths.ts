@@ -14,6 +14,8 @@
  *   `{area}catalogo/{productos,marcas,propiedades,publicar}/`;
  * - `{area}usuarios/` the panel of users and roles (FC 072 F2, the owner and the administrators);
  * - `{area}pos/` the point of sale (FC 076, `pos:sell` or `pos:shift`);
+ * - `{area}datos-fiscales/` the fiscal data of the account, to be invoiced (FC 077);
+ * - `{area}facturacion/` the queue of invoice requests (FC 077, `invoices:read`);
  * - `{area}devoluciones/` the board of returns (FC 073, `returns:view`): the requests of the buyers and the
  *   refunds an operator prepares and another confirms;
  * - `{area}envios/` the shipping console (FC 061, `shipping:manage`): strategy, free shipping and the
@@ -38,6 +40,8 @@ export interface AccountView {
     | 'users'
     | 'returns'
     | 'pos'
+    | 'fiscal'
+    | 'invoicing'
     | 'shipping';
   /** The open order, or null for the list. */
   orderNumber: string | null;
@@ -61,6 +65,8 @@ export const ACCOUNT_SEGMENTS = {
   returns: 'devoluciones',
   shipping: 'envios',
   pos: 'pos',
+  fiscal: 'datos-fiscales',
+  invoicing: 'facturacion',
 } as const satisfies Partial<Record<AccountView['tab'], string>>;
 
 /** The tabs of the catalog console that have an address of their own (FC 052 T1.1). */

@@ -1767,6 +1767,10 @@
         "pos": {
           "name": "Point of sale",
           "description": "Open the till, sell at the counter and close it."
+        },
+        "invoices": {
+          "name": "Invoicing",
+          "description": "Invoice requests: upload PDF and XML, reject or void."
         }
       }
     },
@@ -2126,6 +2130,220 @@
         "title": "Stripe Link and digital wallets",
         "text": "Stripe Link and digital wallets (Apple Pay and Google Pay) are independent services of Stripe, Inc. and of your device’s manufacturer. Removing or replacing your card at YĒKORA does not delete the cards you saved in Link or on your device: manage them from Link (“Edit wallet”) or from your device’s settings."
       }
+    },
+    "fiscal": {
+      "title": "Invoice data",
+      "intro": "Save your tax data and invoice requests will start filled in. Copy it as your Mexican tax status certificate shows it.",
+      "loading": "Loading…",
+      "save": "Save tax data",
+      "saved": "Your tax data was saved.",
+      "orderTitle": "Invoice",
+      "ask": "Request invoice",
+      "askIntro": "You have 30 days from payment. We issue it and send it to the e-mail you give.",
+      "send": "Send request",
+      "requested": "The invoice request was recorded.",
+      "invalidEmail": "Enter a valid e-mail.",
+      "reasonLine": "Reason: {reason}",
+      "downloadPdf": "Download PDF",
+      "downloadXml": "Download XML",
+      "states": {
+        "PENDING": "Your invoice is being prepared. It will arrive by e-mail.",
+        "COMPLETED": "Your invoice is ready.",
+        "REJECTED": "We could not issue the invoice. Fix the data and request it again within 7 days.",
+        "CANCELLED": "The previous invoice was cancelled. You may request it again within 7 days."
+      },
+      "fields": {
+        "rfc": {
+          "label": "RFC (tax ID)",
+          "description": "With its check digits, no dashes or spaces.",
+          "example": "XAXX010101000"
+        },
+        "legalName": {
+          "label": "Name or legal name",
+          "description": "Without the capital regime (no S.A. de C.V.).",
+          "example": "LA ROSA"
+        },
+        "taxSystem": {
+          "label": "Tax regime",
+          "description": "The one on your certificate.",
+          "example": "612"
+        },
+        "postalCode": {
+          "label": "Tax postal code",
+          "description": "The 5 digits of your tax address.",
+          "example": "98612"
+        },
+        "cfdiUse": {
+          "label": "Invoice use (CFDI)",
+          "description": "What you will use it for.",
+          "example": "G03"
+        },
+        "email": {
+          "label": "E-mail for the invoice",
+          "description": "The PDF and XML arrive there.",
+          "example": "name@mail.com"
+        }
+      },
+      "taxSystems": {
+        "601": "General regime for companies",
+        "603": "Non-profit companies",
+        "605": "Wages and salaries",
+        "606": "Leasing",
+        "607": "Sale or acquisition of goods",
+        "608": "Other income",
+        "610": "Residents abroad",
+        "611": "Dividend income",
+        "612": "Individuals with business and professional activities",
+        "614": "Interest income",
+        "615": "Prize income",
+        "616": "No tax obligations",
+        "620": "Production cooperatives",
+        "621": "Tax incorporation",
+        "622": "Farming, livestock, forestry and fishing",
+        "623": "Groups of companies (optional)",
+        "624": "Coordinated groups",
+        "625": "Technology platforms",
+        "626": "Simplified trust regime"
+      },
+      "cfdiUses": {
+        "G01": "Purchase of goods",
+        "G02": "Returns, discounts or rebates",
+        "G03": "General expenses",
+        "I01": "Buildings",
+        "I02": "Office furniture and equipment",
+        "I03": "Transport equipment",
+        "I04": "Computer equipment",
+        "I05": "Dies, moulds and tooling",
+        "I06": "Telephone communications",
+        "I07": "Satellite communications",
+        "I08": "Other machinery and equipment",
+        "D01": "Medical fees and hospital expenses",
+        "D02": "Disability medical expenses",
+        "D03": "Funeral expenses",
+        "D04": "Donations",
+        "D05": "Mortgage interest",
+        "D06": "Voluntary retirement contributions",
+        "D07": "Medical insurance premiums",
+        "D08": "School transport",
+        "D09": "Savings and pension deposits",
+        "D10": "Tuition",
+        "S01": "No tax effects",
+        "CP01": "Payments",
+        "CN01": "Payroll"
+      },
+      "errors": {
+        "INVALID_RFC_REJECT": "The RFC is not valid.",
+        "INVALID_LEGAL_NAME_REJECT": "Check the name: no quotes and no capital regime.",
+        "INVALID_TAX_SYSTEM_REJECT": "Choose the tax regime.",
+        "INVALID_POSTAL_CODE_REJECT": "The postal code is 5 digits.",
+        "INVALID_CFDI_USE_REJECT": "Choose the invoice use.",
+        "FISCAL_PROFILE_NOT_FOUND": "No tax data saved yet.",
+        "ORDER_NOT_FOUND": "We could not find that order.",
+        "ORDER_BELONGS_TO_ACCOUNT_REJECT": "That order has an account: the buyer requests the invoice there.",
+        "ORDER_NOT_ELIGIBLE_REJECT": "That order cannot be invoiced: it is not paid or was refunded.",
+        "FISCAL_DEADLINE_EXPIRED_REJECT": "The time to request the invoice has passed.",
+        "INVOICE_ALREADY_EXISTS_REJECT": "That order already has a request or an invoice.",
+        "INVOICE_REQUEST_NOT_FOUND": "We could not find the request.",
+        "INVOICE_REQUEST_NOT_PENDING": "The request is no longer pending. Refresh the list.",
+        "INVOICE_REQUEST_NOT_COMPLETED": "The request has no invoice to cancel.",
+        "INVALID_PDF_FILE_REJECT": "The PDF is not valid or is over 2 MB.",
+        "INVALID_XML_FILE_REJECT": "The XML is not a valid CFDI 4.0.",
+        "FISCAL_CONFIGURATION_ERROR": "The store RFC is not configured. Tell the system administrator.",
+        "INVALID_ISSUER_RFC_REJECT": "The store did not issue that invoice: check the file.",
+        "METADATA_MISMATCH_REJECT": "The receiver RFC or the total of the XML does not match the request.",
+        "INVALID_OR_DUPLICATE_UUID_REJECT": "The fiscal folio is missing or already registered.",
+        "INVALID_REQUEST": "Check the data.",
+        "SERVICE_UNAVAILABLE": "The service is not available. Try later.",
+        "PERMISSION_DENIED": "Your account cannot do this.",
+        "SECOND_FACTOR_REQUIRED": "Turn on two-step verification.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts. Wait a moment.",
+        "offline": "No connection.",
+        "timeout": "The store took too long. Check before repeating.",
+        "server": "Something failed in the store.",
+        "invalid": "The answer could not be read.",
+        "unknown": "It could not be completed."
+      }
+    },
+    "invoicing": {
+      "title": "Invoicing",
+      "intro": "Invoices are stamped in the external system. Their PDF and XML are uploaded here and the store delivers them.",
+      "askForBuyer": "Request an invoice for a buyer without an account",
+      "askForBuyerIntro": "For guest or counter purchases.",
+      "searchTitle": "Find requests",
+      "search": "Search",
+      "allStatuses": "All",
+      "empty": "No requests match that filter.",
+      "statuses": {
+        "PENDING": "Waiting",
+        "COMPLETED": "Delivered",
+        "REJECTED": "Rejected",
+        "CANCELLED": "Cancelled"
+      },
+      "facts": {
+        "rfc": "RFC",
+        "legalName": "Legal name",
+        "taxSystem": "Regime",
+        "postalCode": "Postal code",
+        "cfdiUse": "CFDI use",
+        "email": "E-mail",
+        "total": "Order total",
+        "invoicable": "Amount to invoice",
+        "requestedAt": "Requested"
+      },
+      "upload": "Upload invoice",
+      "uploadFor": "Upload the invoice of order {number}",
+      "uploaded": "Invoice recorded and sent. Folio {uuid}.",
+      "chooseBoth": "Choose the PDF and the XML.",
+      "tooLarge": "The PDF may weigh up to 2 MB and the XML up to 512 KB.",
+      "shortReason": "Write a reason of at least 10 letters.",
+      "close": {
+        "reject": {
+          "button": "Reject request",
+          "formFor": "Reject the request of order {number}",
+          "done": "Request rejected."
+        },
+        "cancel": {
+          "button": "Void invoice",
+          "formFor": "Void the invoice of order {number}",
+          "done": "Invoice voided. It may be requested again."
+        }
+      },
+      "fields": {
+        "status": {
+          "label": "Status",
+          "description": "Which requests to see.",
+          "example": "Waiting"
+        },
+        "search": {
+          "label": "Order or RFC",
+          "description": "The full number or the full RFC.",
+          "example": "YEK-2026-AB12CD34"
+        },
+        "orderNumber": {
+          "label": "Order number",
+          "description": "As on the receipt.",
+          "example": "YEK-2026-AB12CD34"
+        },
+        "pdf": {
+          "label": "Invoice PDF",
+          "description": "Up to 2 MB.",
+          "example": "invoice.pdf"
+        },
+        "xml": {
+          "label": "Invoice XML",
+          "description": "The stamped CFDI 4.0, up to 512 KB.",
+          "example": "invoice.xml"
+        },
+        "reason": {
+          "label": "Reason",
+          "description": "The buyer will read it. At least 10 letters.",
+          "example": "The RFC does not match"
+        }
+      },
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {pages}"
     }
   }
 }

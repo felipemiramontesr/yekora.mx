@@ -2,6 +2,7 @@
 
 import {
   ClipboardList,
+  FileText,
   Package,
   RotateCcw,
   ScanBarcode,
@@ -24,6 +25,7 @@ const ICONS: Record<AdminCard['key'], ComponentType<{ size: number }>> = {
   users: ShieldCheck,
   returns: RotateCcw,
   pos: ScanBarcode,
+  invoices: FileText,
 };
 
 /** The view a card opens. */

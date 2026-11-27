@@ -17,9 +17,9 @@ RewriteRule ^es-MX/?(.*)$ /$1 [R=301,L]
 # retired /cuenta/administradores/, is not rewritten and answers a real 404 with no redirect.
 # scripts/checkPlatformGuards.ts keeps this list in step with accountPaths.ts.
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^cuenta/(?:datos|metodos-pago|administracion|usuarios|devoluciones|envios|pos|panel|catalogo(?:/(?:productos|marcas|propiedades|publicar))?|YEK-[0-9]{4}-[0-9A-Z]{8}|panel/YEK-[0-9]{4}-[0-9A-Z]{8})/?$ /cuenta/index.html [L]
+RewriteRule ^cuenta/(?:datos|datos-fiscales|metodos-pago|administracion|usuarios|devoluciones|facturacion|envios|pos|panel|catalogo(?:/(?:productos|marcas|propiedades|publicar))?|YEK-[0-9]{4}-[0-9A-Z]{8}|panel/YEK-[0-9]{4}-[0-9A-Z]{8})/?$ /cuenta/index.html [L]
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^en/account/(?:datos|metodos-pago|administracion|usuarios|devoluciones|envios|pos|panel|catalogo(?:/(?:productos|marcas|propiedades|publicar))?|YEK-[0-9]{4}-[0-9A-Z]{8}|panel/YEK-[0-9]{4}-[0-9A-Z]{8})/?$ /en/account/index.html [L]
+RewriteRule ^en/account/(?:datos|datos-fiscales|metodos-pago|administracion|usuarios|devoluciones|facturacion|envios|pos|panel|catalogo(?:/(?:productos|marcas|propiedades|publicar))?|YEK-[0-9]{4}-[0-9A-Z]{8}|panel/YEK-[0-9]{4}-[0-9A-Z]{8})/?$ /en/account/index.html [L]
 
 # PWA (FC 007): the manifest needs its own MIME type, and the service worker and manifest must
 # never be cached by HTTP, so a new deploy (new SHA inside sw.js) reaches browsers right away.
