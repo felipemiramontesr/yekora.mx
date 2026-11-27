@@ -18,6 +18,7 @@ const migration014 = migration('014');
 const migration016 = migration('016');
 const migration017 = migration('017');
 const migration018 = migration('018');
+const migration020 = migration('020');
 
 describe('permission catalog (FC 028)', () => {
   it('names exactly the permissions migration 004 seeds, so code and database never drift', () => {
@@ -37,8 +38,24 @@ describe('permission catalog (FC 028)', () => {
           permission !== 'orders:manage' &&
           !permission.startsWith('returns:') &&
           permission !== 'roles:manage' &&
-          permission !== 'sellers:manage'
+          permission !== 'sellers:manage' &&
+          !permission.startsWith('pos:')
       ).sort()
+    );
+  });
+
+  it('opens the three pos:* in migration 020: sell and shift for staff_orders, supervisor for owner and admin (FC 076 T0.1)', () => {
+    for (const id of ['pos:sell', 'pos:shift', 'pos:supervisor']) {
+      expect(migration020).toContain(`('${id}', 'pos', `);
+    }
+    expect(migration020).toMatch(
+      /p\.id IN \('pos:sell', 'pos:shift'\)\s+WHERE r\.id IN \('owner', 'admin', 'staff_orders'\)/
+    );
+    expect(migration020).toMatch(
+      /SELECT r\.id, 'pos:supervisor' FROM roles r WHERE r\.id IN \('owner', 'admin'\)/
+    );
+    expect(PERMISSIONS).toEqual(
+      expect.arrayContaining(['pos:sell', 'pos:shift', 'pos:supervisor'])
     );
   });
 
