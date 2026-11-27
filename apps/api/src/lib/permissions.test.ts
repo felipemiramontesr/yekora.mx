@@ -19,6 +19,7 @@ const migration016 = migration('016');
 const migration017 = migration('017');
 const migration018 = migration('018');
 const migration020 = migration('020');
+const migration021 = migration('021');
 
 describe('permission catalog (FC 028)', () => {
   it('names exactly the permissions migration 004 seeds, so code and database never drift', () => {
@@ -39,7 +40,8 @@ describe('permission catalog (FC 028)', () => {
           !permission.startsWith('returns:') &&
           permission !== 'roles:manage' &&
           permission !== 'sellers:manage' &&
-          !permission.startsWith('pos:')
+          !permission.startsWith('pos:') &&
+          !permission.startsWith('invoices:')
       ).sort()
     );
   });
@@ -56,6 +58,25 @@ describe('permission catalog (FC 028)', () => {
     );
     expect(PERMISSIONS).toEqual(
       expect.arrayContaining(['pos:sell', 'pos:shift', 'pos:supervisor'])
+    );
+  });
+
+  it('opens the three invoices:* in migration 021: read and request for staff_orders, upload for owner and admin (FC 077 F0)', () => {
+    for (const id of ['invoices:read', 'invoices:upload', 'invoices:request']) {
+      expect(migration021).toContain(`('${id}', 'invoices', `);
+    }
+    expect(migration021).toMatch(
+      /p\.id IN \('invoices:read', 'invoices:request'\)\s+WHERE r\.id IN \('owner', 'admin', 'staff_orders'\)/
+    );
+    expect(migration021).toMatch(
+      /SELECT r\.id, 'invoices:upload' FROM roles r WHERE r\.id IN \('owner', 'admin'\)/
+    );
+    expect(PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'invoices:read',
+        'invoices:upload',
+        'invoices:request',
+      ])
     );
   });
 
