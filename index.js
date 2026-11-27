@@ -1763,35 +1763,35 @@ var require_helmet2 = __commonJS({
           }
         }
       });
-      fastify.addHook("onRequest", async function helmetConfigureReply(request, reply) {
-        const { helmet: routeOptions } = request.routeOptions.config;
+      fastify.addHook("onRequest", async function helmetConfigureReply(request2, reply) {
+        const { helmet: routeOptions } = request2.routeOptions.config;
         if (routeOptions !== void 0) {
           const { enableCSPNonces: enableRouteCSPNonces, skipRoute, ...helmetRouteConfiguration } = routeOptions;
           const mergedHelmetConfiguration = Object.assign(/* @__PURE__ */ Object.create(null), globalConfiguration, helmetRouteConfiguration);
           const isRouteCSPNonces = skipRoute ? false : enableRouteCSPNonces ?? enableCSPNonces;
-          return replyDecorators(request, reply, mergedHelmetConfiguration, isRouteCSPNonces);
+          return replyDecorators(request2, reply, mergedHelmetConfiguration, isRouteCSPNonces);
         }
-        return replyDecorators(request, reply, globalConfiguration, enableCSPNonces);
+        return replyDecorators(request2, reply, globalConfiguration, enableCSPNonces);
       });
-      fastify.addHook("onRequest", function helmetApplyHeaders(request, reply, next) {
-        const { helmet: routeOptions } = request.routeOptions.config;
+      fastify.addHook("onRequest", function helmetApplyHeaders(request2, reply, next) {
+        const { helmet: routeOptions } = request2.routeOptions.config;
         if (routeOptions !== void 0) {
           const { enableCSPNonces: enableRouteCSPNonces, skipRoute, ...helmetRouteConfiguration } = routeOptions;
           if (skipRoute === true) {
           } else {
             const mergedHelmetConfiguration = Object.assign(/* @__PURE__ */ Object.create(null), globalConfiguration, helmetRouteConfiguration);
             const isRouteCSPNonces = enableRouteCSPNonces ?? enableCSPNonces;
-            return buildHelmetOnRoutes(request, reply, mergedHelmetConfiguration, isRouteCSPNonces);
+            return buildHelmetOnRoutes(request2, reply, mergedHelmetConfiguration, isRouteCSPNonces);
           }
           return next();
         }
         if (isGlobal) {
-          return buildHelmetOnRoutes(request, reply, globalConfiguration, enableCSPNonces);
+          return buildHelmetOnRoutes(request2, reply, globalConfiguration, enableCSPNonces);
         }
         return next();
       });
     }
-    async function replyDecorators(request, reply, configuration, enableCSP) {
+    async function replyDecorators(request2, reply, configuration, enableCSP) {
       if (enableCSP) {
         reply.cspNonce = {
           script: randomBytes8(16).toString("hex"),
@@ -1800,10 +1800,10 @@ var require_helmet2 = __commonJS({
       }
       reply.helmet = function(opts) {
         const helmetConfiguration = opts ? Object.assign(/* @__PURE__ */ Object.create(null), configuration, opts) : configuration;
-        return helmet2(helmetConfiguration)(request.raw, reply.raw, done);
+        return helmet2(helmetConfiguration)(request2.raw, reply.raw, done);
       };
     }
-    async function buildHelmetOnRoutes(request, reply, configuration, enableCSP) {
+    async function buildHelmetOnRoutes(request2, reply, configuration, enableCSP) {
       if (enableCSP === true && configuration.contentSecurityPolicy !== false) {
         const cspDirectives = configuration.contentSecurityPolicy ? configuration.contentSecurityPolicy.directives : helmet2.contentSecurityPolicy.getDefaultDirectives();
         const cspReportOnly = configuration.contentSecurityPolicy ? configuration.contentSecurityPolicy.reportOnly : void 0;
@@ -1818,9 +1818,9 @@ var require_helmet2 = __commonJS({
         directives[styleKey].push(`'nonce-${styleCSPNonce}'`);
         const contentSecurityPolicy = { directives, reportOnly: cspReportOnly, useDefaults: cspUseDefaults };
         const mergedHelmetConfiguration = Object.assign(/* @__PURE__ */ Object.create(null), configuration, { contentSecurityPolicy });
-        helmet2(mergedHelmetConfiguration)(request.raw, reply.raw, done);
+        helmet2(mergedHelmetConfiguration)(request2.raw, reply.raw, done);
       } else {
-        helmet2(configuration)(request.raw, reply.raw, done);
+        helmet2(configuration)(request2.raw, reply.raw, done);
       }
     }
     function done(error63) {
@@ -7123,18 +7123,18 @@ var require_hooks = __commonJS({
       }
     }
     function hookRunnerGenerator(iterator) {
-      return function hookRunner(functions, request, reply, cb) {
+      return function hookRunner(functions, request2, reply, cb) {
         let i = 0;
         function next(err) {
           if (err || i === functions.length) {
-            cb(err, request, reply);
+            cb(err, request2, reply);
             return;
           }
           let result;
           try {
-            result = iterator(functions[i++], request, reply, next);
+            result = iterator(functions[i++], request2, reply, next);
           } catch (error63) {
-            cb(error63, request, reply);
+            cb(error63, request2, reply);
             return;
           }
           if (result && typeof result.then === "function") {
@@ -7148,38 +7148,38 @@ var require_hooks = __commonJS({
           if (!err) {
             err = new FST_ERR_SEND_UNDEFINED_ERR();
           }
-          cb(err, request, reply);
+          cb(err, request2, reply);
         }
         next();
       };
     }
-    function onResponseHookIterator(fn, request, reply, next) {
-      return fn(request, reply, next);
+    function onResponseHookIterator(fn, request2, reply, next) {
+      return fn(request2, reply, next);
     }
     var onResponseHookRunner = hookRunnerGenerator(onResponseHookIterator);
     var preValidationHookRunner = hookRunnerGenerator(hookIterator);
     var preHandlerHookRunner = hookRunnerGenerator(hookIterator);
     var onTimeoutHookRunner = hookRunnerGenerator(hookIterator);
     var onRequestHookRunner = hookRunnerGenerator(hookIterator);
-    function onSendHookRunner(functions, request, reply, payload, cb) {
+    function onSendHookRunner(functions, request2, reply, payload, cb) {
       let i = 0;
       function next(err, newPayload) {
         if (err) {
-          cb(err, request, reply, payload);
+          cb(err, request2, reply, payload);
           return;
         }
         if (newPayload !== void 0) {
           payload = newPayload;
         }
         if (i === functions.length) {
-          cb(null, request, reply, payload);
+          cb(null, request2, reply, payload);
           return;
         }
         let result;
         try {
-          result = functions[i++](request, reply, payload, next);
+          result = functions[i++](request2, reply, payload, next);
         } catch (error63) {
-          cb(error63, request, reply);
+          cb(error63, request2, reply);
           return;
         }
         if (result && typeof result.then === "function") {
@@ -7190,36 +7190,36 @@ var require_hooks = __commonJS({
         try {
           next(null, newPayload);
         } catch (err) {
-          cb(err, request, reply, payload);
+          cb(err, request2, reply, payload);
         }
       }
       function handleReject(err) {
         if (!err) {
           err = new FST_ERR_SEND_UNDEFINED_ERR();
         }
-        cb(err, request, reply, payload);
+        cb(err, request2, reply, payload);
       }
       next();
     }
     var preSerializationHookRunner = onSendHookRunner;
-    function preParsingHookRunner(functions, request, reply, cb) {
+    function preParsingHookRunner(functions, request2, reply, cb) {
       let i = 0;
       function next(err, newPayload) {
         if (reply.sent) {
           return;
         }
         if (newPayload !== void 0) {
-          request[kRequestPayloadStream] = newPayload;
+          request2[kRequestPayloadStream] = newPayload;
         }
         if (err || i === functions.length) {
-          cb(err, request, reply);
+          cb(err, request2, reply);
           return;
         }
         let result;
         try {
-          result = functions[i++](request, reply, request[kRequestPayloadStream], next);
+          result = functions[i++](request2, reply, request2[kRequestPayloadStream], next);
         } catch (error63) {
-          cb(error63, request, reply);
+          cb(error63, request2, reply);
           return;
         }
         if (result && typeof result.then === "function") {
@@ -7233,22 +7233,22 @@ var require_hooks = __commonJS({
         if (!err) {
           err = new FST_ERR_SEND_UNDEFINED_ERR();
         }
-        cb(err, request, reply);
+        cb(err, request2, reply);
       }
       next();
     }
-    function onRequestAbortHookRunner(functions, request, cb) {
+    function onRequestAbortHookRunner(functions, request2, cb) {
       let i = 0;
       function next(err) {
         if (err || i === functions.length) {
-          cb(err, request);
+          cb(err, request2);
           return;
         }
         let result;
         try {
-          result = functions[i++](request, next);
+          result = functions[i++](request2, next);
         } catch (error63) {
-          cb(error63, request);
+          cb(error63, request2);
           return;
         }
         if (result && typeof result.then === "function") {
@@ -7262,13 +7262,13 @@ var require_hooks = __commonJS({
         if (!err) {
           err = new FST_ERR_SEND_UNDEFINED_ERR();
         }
-        cb(err, request);
+        cb(err, request2);
       }
       next();
     }
-    function hookIterator(fn, request, reply, next) {
+    function hookIterator(fn, request2, reply, next) {
       if (reply.sent === true) return void 0;
-      return fn(request, reply, next);
+      return fn(request2, reply, next);
     }
     module2.exports = {
       Hooks,
@@ -8012,15 +8012,15 @@ var require_validation = __commonJS({
         FSTWRN001("params", method, url2);
       }
     }
-    function validateParam(validatorFunction, request, paramName) {
+    function validateParam(validatorFunction, request2, paramName) {
       if (validatorFunction == null) return false;
-      const value = request[paramName];
+      const value = request2[paramName];
       let ret;
       try {
         const data = value === void 0 ? null : value;
         if (validatorFunction.schemaEnv) {
           ret = validatorFunction(data, {
-            parentData: request,
+            parentData: request2,
             parentDataProperty: paramName
           });
         } else {
@@ -8041,22 +8041,22 @@ var require_validation = __commonJS({
       function answer(ret2) {
         if (ret2 === false) return validatorFunction.errors;
         if (ret2 && ret2.error) return ret2.error;
-        if (ret2 && typeof ret2 === "object" && "value" in ret2) request[paramName] = ret2.value;
+        if (ret2 && typeof ret2 === "object" && "value" in ret2) request2[paramName] = ret2.value;
         return false;
       }
     }
-    function validate2(context, request, execution) {
+    function validate2(context, request2, execution) {
       const runExecution = execution === void 0;
       if (runExecution && context[paramsSchema] === void 0 && context[bodySchema] === void 0 && context[querystringSchema] === void 0 && context[headersSchema] === void 0) {
         return false;
       }
       if (runExecution || !execution.skipParams) {
-        const params = validateParam(context[paramsSchema], request, "params");
+        const params = validateParam(context[paramsSchema], request2, "params");
         if (params) {
           if (typeof params.then !== "function") {
             return wrapValidationError(params, "params", context.schemaErrorFormatter);
           } else {
-            return validateAsyncParams(params, context, request);
+            return validateAsyncParams(params, context, request2);
           }
         }
       }
@@ -8065,65 +8065,65 @@ var require_validation = __commonJS({
         if (typeof context[bodySchema] === "function") {
           validatorFunction = context[bodySchema];
         } else if (context[bodySchema]) {
-          const contentSchema = context[bodySchema][request.mediaType];
+          const contentSchema = context[bodySchema][request2.mediaType];
           if (contentSchema) {
             validatorFunction = contentSchema;
           }
         }
-        const body = validateParam(validatorFunction, request, "body");
+        const body = validateParam(validatorFunction, request2, "body");
         if (body) {
           if (typeof body.then !== "function") {
             return wrapValidationError(body, "body", context.schemaErrorFormatter);
           } else {
-            return validateAsyncBody(body, context, request);
+            return validateAsyncBody(body, context, request2);
           }
         }
       }
       if (runExecution || !execution.skipQuery) {
-        const query = validateParam(context[querystringSchema], request, "query");
+        const query = validateParam(context[querystringSchema], request2, "query");
         if (query) {
           if (typeof query.then !== "function") {
             return wrapValidationError(query, "querystring", context.schemaErrorFormatter);
           } else {
-            return validateAsyncQuery(query, context, request);
+            return validateAsyncQuery(query, context, request2);
           }
         }
       }
-      const headers = validateParam(context[headersSchema], request, "headers");
+      const headers = validateParam(context[headersSchema], request2, "headers");
       if (headers) {
         if (typeof headers.then !== "function") {
           return wrapValidationError(headers, "headers", context.schemaErrorFormatter);
         } else {
-          return validateAsyncHeaders(headers, context, request);
+          return validateAsyncHeaders(headers, context, request2);
         }
       }
       return false;
     }
-    function validateAsyncParams(validatePromise, context, request) {
+    function validateAsyncParams(validatePromise, context, request2) {
       return validatePromise.then((paramsResult) => {
         if (paramsResult) {
           return wrapValidationError(paramsResult, "params", context.schemaErrorFormatter);
         }
-        return validate2(context, request, { skipParams: true });
+        return validate2(context, request2, { skipParams: true });
       });
     }
-    function validateAsyncBody(validatePromise, context, request) {
+    function validateAsyncBody(validatePromise, context, request2) {
       return validatePromise.then((bodyResult) => {
         if (bodyResult) {
           return wrapValidationError(bodyResult, "body", context.schemaErrorFormatter);
         }
-        return validate2(context, request, { skipParams: true, skipBody: true });
+        return validate2(context, request2, { skipParams: true, skipBody: true });
       });
     }
-    function validateAsyncQuery(validatePromise, context, request) {
+    function validateAsyncQuery(validatePromise, context, request2) {
       return validatePromise.then((queryResult) => {
         if (queryResult) {
           return wrapValidationError(queryResult, "querystring", context.schemaErrorFormatter);
         }
-        return validate2(context, request, { skipParams: true, skipBody: true, skipQuery: true });
+        return validate2(context, request2, { skipParams: true, skipBody: true, skipQuery: true });
       });
     }
-    function validateAsyncHeaders(validatePromise, context, request) {
+    function validateAsyncHeaders(validatePromise, context, request2) {
       return validatePromise.then((headersResult) => {
         if (headersResult) {
           return wrapValidationError(headersResult, "headers", context.schemaErrorFormatter);
@@ -8305,20 +8305,20 @@ var require_handle_request = __commonJS({
     } = require_symbols2();
     var ContentType = require_content_type();
     var channels = diagnostics.tracingChannel("fastify.request.handler");
-    function handleRequest(err, request, reply) {
+    function handleRequest(err, request2, reply) {
       if (reply.sent === true) return;
       if (err != null) {
         reply[kReplyIsError] = true;
         reply.send(err);
         return;
       }
-      const method = request.method;
+      const method = request2.method;
       if (this[kSupportedHTTPMethods].bodyless.has(method)) {
-        handler(request, reply);
+        handler(request2, reply);
         return;
       }
       if (this[kSupportedHTTPMethods].bodywith.has(method)) {
-        const headers = request.headers;
+        const headers = request2.headers;
         const ctHeader = headers["content-type"];
         if (method === "QUERY") {
           if (ctHeader === void 0) {
@@ -8332,58 +8332,58 @@ var require_handle_request = __commonJS({
           const transferEncoding = headers["transfer-encoding"];
           const isEmptyBody = transferEncoding === void 0 && (contentLength === void 0 || contentLength === "0");
           if (isEmptyBody) {
-            handler(request, reply);
+            handler(request2, reply);
             return;
           }
-          request[kRouteContext].contentTypeParser.run("", handler, request, reply);
+          request2[kRouteContext].contentTypeParser.run("", handler, request2, reply);
           return;
         }
-        if (!request[kRequestContentType]) {
-          request[kRequestContentType] = ContentType.from(ctHeader);
+        if (!request2[kRequestContentType]) {
+          request2[kRequestContentType] = ContentType.from(ctHeader);
         }
-        if (request[kRequestContentType].isValid === false) {
+        if (request2[kRequestContentType].isValid === false) {
           reply[kReplyIsError] = true;
           reply.status(415).send(new FST_ERR_CTP_INVALID_MEDIA_TYPE());
           return;
         }
-        request[kRouteContext].contentTypeParser.run(request[kRequestContentType].toString(), handler, request, reply);
+        request2[kRouteContext].contentTypeParser.run(request2[kRequestContentType].toString(), handler, request2, reply);
         return;
       }
-      handler(request, reply);
+      handler(request2, reply);
     }
-    function handler(request, reply) {
+    function handler(request2, reply) {
       try {
-        if (request[kRouteContext].preValidation !== null) {
+        if (request2[kRouteContext].preValidation !== null) {
           preValidationHookRunner(
-            request[kRouteContext].preValidation,
-            request,
+            request2[kRouteContext].preValidation,
+            request2,
             reply,
             preValidationCallback
           );
         } else {
-          preValidationCallback(null, request, reply);
+          preValidationCallback(null, request2, reply);
         }
       } catch (err) {
-        preValidationCallback(err, request, reply);
+        preValidationCallback(err, request2, reply);
       }
     }
-    function preValidationCallback(err, request, reply) {
+    function preValidationCallback(err, request2, reply) {
       if (reply.sent === true) return;
       if (err != null) {
         reply[kReplyIsError] = true;
         reply.send(err);
         return;
       }
-      const validationErr = validateSchema(reply[kRouteContext], request);
+      const validationErr = validateSchema(reply[kRouteContext], request2);
       const isAsync = validationErr && typeof validationErr.then === "function" || false;
       if (isAsync) {
-        const cb = validationCompleted.bind(null, request, reply);
+        const cb = validationCompleted.bind(null, request2, reply);
         validationErr.then(cb, cb);
       } else {
-        validationCompleted(request, reply, validationErr);
+        validationCompleted(request2, reply, validationErr);
       }
     }
-    function validationCompleted(request, reply, validationErr) {
+    function validationCompleted(request2, reply, validationErr) {
       if (validationErr) {
         if (reply[kRouteContext].attachValidation === false) {
           reply.send(validationErr);
@@ -8391,25 +8391,25 @@ var require_handle_request = __commonJS({
         }
         reply.request.validationError = validationErr;
       }
-      if (request[kRouteContext].preHandler !== null) {
+      if (request2[kRouteContext].preHandler !== null) {
         preHandlerHookRunner(
-          request[kRouteContext].preHandler,
-          request,
+          request2[kRouteContext].preHandler,
+          request2,
           reply,
           preHandlerCallback
         );
       } else {
-        preHandlerCallback(null, request, reply);
+        preHandlerCallback(null, request2, reply);
       }
     }
-    function preHandlerCallback(err, request, reply) {
+    function preHandlerCallback(err, request2, reply) {
       if (reply.sent) return;
-      const context = request[kRouteContext];
+      const context = request2[kRouteContext];
       if (!channels.hasSubscribers || context[kFourOhFourContext] === null) {
-        preHandlerCallbackInner(err, request, reply);
+        preHandlerCallbackInner(err, request2, reply);
       } else {
         const store = {
-          request,
+          request: request2,
           reply,
           async: false,
           route: {
@@ -8418,11 +8418,11 @@ var require_handle_request = __commonJS({
           }
         };
         reply[kDiagnosticsStore] = store;
-        channels.start.runStores(store, preHandlerCallbackInner, void 0, err, request, reply, store);
+        channels.start.runStores(store, preHandlerCallbackInner, void 0, err, request2, reply, store);
       }
     }
-    function preHandlerCallbackInner(err, request, reply, store) {
-      const context = request[kRouteContext];
+    function preHandlerCallbackInner(err, request2, reply, store) {
+      const context = request2[kRouteContext];
       try {
         if (err != null) {
           reply[kReplyIsError] = true;
@@ -8436,7 +8436,7 @@ var require_handle_request = __commonJS({
         }
         let result;
         try {
-          result = context.handler(request, reply);
+          result = context.handler(request2, reply);
         } catch (err2) {
           if (store) {
             store.error = err2;
@@ -9911,11 +9911,11 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object.
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      incomingRequest(request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      incomingRequest(request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
-        request.log.info({ req: request }, "incoming request");
+        request2.log.info({ req: request2 }, "incoming request");
       }
       /**
        * Logs the outcome of a completed request.
@@ -9926,8 +9926,8 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object.
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      requestCompleted(error63, request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      requestCompleted(error63, request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
         if (error63) {
@@ -9945,12 +9945,12 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object (must have `statusCode`).
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      defaultErrorLog(error63, request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      defaultErrorLog(error63, request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
         if (reply.statusCode >= 500) {
-          reply.log.error({ req: request, res: reply, err: error63 }, error63?.message);
+          reply.log.error({ req: request2, res: reply, err: error63 }, error63?.message);
         } else {
           reply.log.info({ res: reply, err: error63 }, error63?.message);
         }
@@ -9964,8 +9964,8 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object.
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      streamError(error63, request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      streamError(error63, request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
         if (error63.code === "ERR_STREAM_PREMATURE_CLOSE") {
@@ -9982,12 +9982,12 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object.
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      routeNotFound(request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      routeNotFound(request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
-        const { url: url2, method } = request.raw;
-        request.log.info(`Route ${method}:${url2} not found`);
+        const { url: url2, method } = request2.raw;
+        request2.log.info(`Route ${method}:${url2} not found`);
       }
       /**
        * Logs a warning when writeHead fails during error handling.
@@ -9997,12 +9997,12 @@ var require_log_controller = __commonJS({
        * @param {object} reply        Fastify reply object.
        * @param {object} [metadata]   Extra contextual data (unused).
        */
-      writeHeadError(error63, request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      writeHeadError(error63, request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
         reply.log.warn(
-          { req: request, res: reply, err: error63 },
+          { req: request2, res: reply, err: error63 },
           error63?.message
         );
       }
@@ -10015,8 +10015,8 @@ var require_log_controller = __commonJS({
        * @param {object} metadata     Extra contextual data.
        * @param {number} metadata.statusCode The status code that triggered the serializer.
        */
-      serializerError(error63, request, reply, metadata) {
-        if (this.isLogDisabled(request)) {
+      serializerError(error63, request2, reply, metadata) {
+        if (this.isLogDisabled(request2)) {
           return;
         }
         reply.log.error({ err: error63, statusCode: metadata.statusCode }, "The serializer for the given status code failed");
@@ -11253,7 +11253,7 @@ var require_sonic_boom = __commonJS({
     var kContentModeUtf8 = "utf8";
     var [major, minor] = (process.versions.node || "0.0").split(".").map(Number);
     var kCopyBuffer = major >= 22 && minor >= 7;
-    function openFile(file2, sonic) {
+    function openFile(file3, sonic) {
       sonic._opening = true;
       sonic._writing = true;
       sonic._asyncDrainScheduled = false;
@@ -11275,7 +11275,7 @@ var require_sonic_boom = __commonJS({
         }
         const reopening = sonic._reopening;
         sonic.fd = fd;
-        sonic.file = file2;
+        sonic.file = file3;
         sonic._reopening = false;
         sonic._opening = false;
         sonic._writing = false;
@@ -11297,20 +11297,20 @@ var require_sonic_boom = __commonJS({
       const mode2 = sonic.mode;
       if (sonic.sync) {
         try {
-          if (sonic.mkdir) fs4.mkdirSync(path3.dirname(file2), { recursive: true });
-          const fd = fs4.openSync(file2, flags, mode2);
+          if (sonic.mkdir) fs4.mkdirSync(path3.dirname(file3), { recursive: true });
+          const fd = fs4.openSync(file3, flags, mode2);
           fileOpened(null, fd);
         } catch (err) {
           fileOpened(err);
           throw err;
         }
       } else if (sonic.mkdir) {
-        fs4.mkdir(path3.dirname(file2), { recursive: true }, (err) => {
+        fs4.mkdir(path3.dirname(file3), { recursive: true }, (err) => {
           if (err) return fileOpened(err);
-          fs4.open(file2, flags, mode2, fileOpened);
+          fs4.open(file3, flags, mode2, fileOpened);
         });
       } else {
-        fs4.open(file2, flags, mode2, fileOpened);
+        fs4.open(file3, flags, mode2, fileOpened);
       }
     }
     function SonicBoom(opts) {
@@ -11616,13 +11616,13 @@ var require_sonic_boom = __commonJS({
       }
       this._actualWrite();
     }
-    SonicBoom.prototype.reopen = function(file2) {
+    SonicBoom.prototype.reopen = function(file3) {
       if (this.destroyed) {
         throw new Error("SonicBoom destroyed");
       }
       if (this._opening) {
         this.once("ready", () => {
-          this.reopen(file2);
+          this.reopen(file3);
         });
         return;
       }
@@ -11632,8 +11632,8 @@ var require_sonic_boom = __commonJS({
       if (!this.file) {
         throw new Error("Unable to reopen a file descriptor, you must pass a file to SonicBoom");
       }
-      if (file2) {
-        this.file = file2;
+      if (file3) {
+        this.file = file3;
       }
       this._reopening = true;
       if (this._writing) {
@@ -15208,10 +15208,10 @@ var require_error_handler = __commonJS({
         reply.send(err);
       }
     }
-    function defaultErrorHandler(error63, request, reply) {
+    function defaultErrorHandler(error63, request2, reply) {
       setErrorHeaders(error63, reply);
       setErrorStatusCode(reply, error63);
-      request.server[kLogController].defaultErrorLog(error63, request, reply);
+      request2.server[kLogController].defaultErrorLog(error63, request2, reply);
       reply.send(error63);
     }
     function fallbackErrorHandler(error63, reply, cb) {
@@ -15480,13 +15480,13 @@ var require_reply = __commonJS({
     var ContentType = require_content_type();
     var toString = Object.prototype.toString;
     var HTTP2_WRITE_CHUNK_SIZE = 64 * 1024;
-    function Reply(res, request, log) {
+    function Reply(res, request2, log) {
       this.raw = res;
       this[kReplySerializer] = null;
       this[kReplyErrorHandlerCalled] = false;
       this[kReplyIsError] = false;
       this[kReplyIsRunningOnErrorHook] = false;
-      this.request = request;
+      this.request = request2;
       this[kReplyHeaders] = {};
       this[kReplyTrailers] = null;
       this[kReplyHasStatusCode] = false;
@@ -15732,8 +15732,8 @@ var require_reply = __commonJS({
       return serialize2;
     };
     Reply.prototype.compileSerializationSchema = function(schema2, httpStatus = null, contentType = null) {
-      const { request } = this;
-      const { method, url: url2 } = request;
+      const { request: request2 } = this;
+      const { method, url: url2 } = request2;
       if (this[kRouteContext][kReplyCacheSerializeFns]?.has(schema2)) {
         return this[kRouteContext][kReplyCacheSerializeFns].get(schema2);
       }
@@ -15803,7 +15803,7 @@ var require_reply = __commonJS({
       return this.header("location", url2).code(code2).send();
     };
     Reply.prototype.callNotFound = function() {
-      notFound(this);
+      notFound2(this);
       return this;
     };
     Reply.prototype.then = function(fulfilled, rejected) {
@@ -15882,7 +15882,7 @@ var require_reply = __commonJS({
         onSendEnd(reply, payload);
       }
     }
-    function wrapOnSendEnd(err, request, reply, payload) {
+    function wrapOnSendEnd(err, request2, reply, payload) {
       if (err != null) {
         onErrorHook(reply, err);
       } else {
@@ -16216,18 +16216,18 @@ var require_reply = __commonJS({
       reply.raw.on("finish", onResFinished);
       reply.raw.on("error", onResFinished);
     }
-    function onResponseCallback(err, request, reply) {
-      reply.server[kLogController].requestCompleted(err, request, reply);
+    function onResponseCallback(err, request2, reply) {
+      reply.server[kLogController].requestCompleted(err, request2, reply);
     }
     function buildReply(R) {
       const props = R.props.slice();
-      function _Reply(res, request, log) {
+      function _Reply(res, request2, log) {
         this.raw = res;
         this[kReplyIsError] = false;
         this[kReplyErrorHandlerCalled] = false;
         this[kReplyHijacked] = false;
         this[kReplySerializer] = null;
-        this.request = request;
+        this.request = request2;
         this[kReplyHeaders] = {};
         this[kReplyTrailers] = null;
         this[kReplyStartTime] = void 0;
@@ -16245,7 +16245,7 @@ var require_reply = __commonJS({
       _Reply.props = props;
       return _Reply;
     }
-    function notFound(reply) {
+    function notFound2(reply) {
       if (reply[kRouteContext][kFourOhFourContext] === null) {
         reply.log.warn("Trying to send a NotFound error inside a 404 handler. Sending basic 404 response.");
         reply.code(404).send("404 Not Found");
@@ -17444,8 +17444,8 @@ var require_request = __commonJS({
       });
       return _Request;
     }
-    function assertsRequestDecoration(request, name2) {
-      if (!decorators.hasKey(request, name2) && !decorators.exist(request, name2)) {
+    function assertsRequestDecoration(request2, name2) {
+      if (!decorators.hasKey(request2, name2) && !decorators.exist(request2, name2)) {
         throw new FST_ERR_DEC_UNDECLARED(name2, "request");
       }
     }
@@ -18003,24 +18003,24 @@ var require_content_type_parser = __commonJS({
       }
       return removed || idx > -1;
     };
-    ContentTypeParser.prototype.run = function(contentType, handler, request, reply) {
+    ContentTypeParser.prototype.run = function(contentType, handler, request2, reply) {
       const parser = this.getParser(contentType);
       if (parser === void 0) {
-        if (request.is404 === true) {
-          handler(request, reply);
+        if (request2.is404 === true) {
+          handler(request2, reply);
           return;
         }
         reply[kReplyIsError] = true;
         reply.send(new FST_ERR_CTP_INVALID_MEDIA_TYPE());
         return;
       }
-      const resource = new AsyncResource("content-type-parser:run", request);
+      const resource = new AsyncResource("content-type-parser:run", request2);
       function done(error63, body) {
         resource.runInAsyncScope(onDone, void 0, error63, body);
       }
       if (parser.asString === true || parser.asBuffer === true) {
         rawBody(
-          request,
+          request2,
           reply,
           reply[kRouteContext]._parserOptions,
           parser,
@@ -18030,7 +18030,7 @@ var require_content_type_parser = __commonJS({
       }
       let result;
       try {
-        result = parser.fn(request, request[kRequestPayloadStream], done);
+        result = parser.fn(request2, request2[kRequestPayloadStream], done);
       } catch (error63) {
         done(error63, void 0);
         return;
@@ -18048,21 +18048,21 @@ var require_content_type_parser = __commonJS({
           reply.send(error63);
           return;
         }
-        request.body = body;
-        handler(request, reply);
+        request2.body = body;
+        handler(request2, reply);
       }
     };
-    function rawBody(request, reply, options, parser, done) {
+    function rawBody(request2, reply, options, parser, done) {
       const asString = parser.asString === true;
       const limit = options.limit === null ? parser.bodyLimit : options.limit;
-      const contentLength = Number(request.headers["content-length"]);
+      const contentLength = Number(request2.headers["content-length"]);
       if (contentLength > limit) {
         done(new FST_ERR_CTP_BODY_TOO_LARGE(), void 0);
         return;
       }
       let receivedLength = 0;
       const chunks = [];
-      const payload = request[kRequestPayloadStream] || request.raw;
+      const payload = request2[kRequestPayloadStream] || request2.raw;
       payload.on("data", onData);
       payload.on("end", onEnd);
       payload.on("error", onEnd);
@@ -18105,7 +18105,7 @@ var require_content_type_parser = __commonJS({
         }
         let result;
         try {
-          result = parser.fn(request, body, done);
+          result = parser.fn(request2, body, done);
         } catch (error63) {
           done(error63, void 0);
           return;
@@ -23285,8 +23285,8 @@ var require_multipleOf = __commonJS({
         const { gen, data, schemaCode, it } = cxt;
         const prec = it.opts.multipleOfPrecision;
         const res = gen.let("res");
-        const invalid = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
+        const invalid2 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
+        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid2}))`);
       }
     };
     exports2.default = def;
@@ -33580,8 +33580,8 @@ var require_multipleOf2 = __commonJS({
         const { gen, data, schemaCode, it } = cxt;
         const prec = it.opts.multipleOfPrecision;
         const res = gen.let("res");
-        const invalid = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
+        const invalid2 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
+        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid2}))`);
       }
     };
     exports2.default = def;
@@ -41132,8 +41132,8 @@ var require_multipleOf3 = __commonJS({
         const { gen, data, schemaCode, it } = cxt;
         const prec = it.opts.multipleOfPrecision;
         const res = gen.let("res");
-        const invalid = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
+        const invalid2 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
+        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid2}))`);
       }
     };
     exports2.default = def;
@@ -52808,14 +52808,14 @@ var require_route = __commonJS({
           req.headers["accept-version"] = req.headers[kRequestAcceptVersion];
           req.headers[kRequestAcceptVersion] = void 0;
         }
-        const request = new context.Request(id, params, req, query, childLogger, context);
-        const reply = new context.Reply(res, request, childLogger);
-        context.server[kLogController].incomingRequest(request, reply);
+        const request2 = new context.Request(id, params, req, query, childLogger, context);
+        const reply = new context.Reply(res, request2, childLogger);
+        context.server[kLogController].incomingRequest(request2, reply);
         const handlerTimeout = context.handlerTimeout;
         if (handlerTimeout > 0) {
           const ac = new AbortController();
-          request[kRequestSignal] = ac;
-          request[kTimeoutTimer] = setTimeout(() => {
+          request2[kRequestSignal] = ac;
+          request2[kTimeoutTimer] = setTimeout(() => {
             if (reply.sent === true) {
               return;
             }
@@ -52836,36 +52836,36 @@ var require_route = __commonJS({
             if (!ac.signal.aborted) {
               ac.abort();
             }
-            clearTimeout(request[kTimeoutTimer]);
+            clearTimeout(request2[kTimeoutTimer]);
           };
           req.on("close", onAbort);
-          request[kOnAbort] = onAbort;
+          request2[kOnAbort] = onAbort;
         }
         if (hasLogger === true || context.onResponse !== null || handlerTimeout > 0) {
           setupResponseListeners(reply);
         }
         if (context.onTimeout !== null) {
-          if (!request.raw.socket._meta) {
-            request.raw.socket.on("timeout", handleTimeout);
+          if (!request2.raw.socket._meta) {
+            request2.raw.socket.on("timeout", handleTimeout);
           }
-          request.raw.socket._meta = { context, request, reply, onTimeout: handleTimeout };
+          request2.raw.socket._meta = { context, request: request2, reply, onTimeout: handleTimeout };
         }
         if (context.onRequest !== null) {
           onRequestHookRunner(
             context.onRequest,
-            request,
+            request2,
             reply,
             runPreParsing
           );
         } else {
-          runPreParsing(null, request, reply);
+          runPreParsing(null, request2, reply);
         }
         if (context.onRequestAbort !== null) {
           req.on("close", () => {
             if (req.aborted) {
               onRequestAbortHookRunner(
                 context.onRequestAbort,
-                request,
+                request2,
                 handleOnRequestAbortHooksErrors.bind(null, reply)
               );
             }
@@ -52879,10 +52879,10 @@ var require_route = __commonJS({
       }
     }
     function handleTimeout() {
-      const { context, request, reply } = this._meta;
+      const { context, request: request2, reply } = this._meta;
       onTimeoutHookRunner(
         context.onTimeout,
-        request,
+        request2,
         reply,
         noop
       );
@@ -52921,18 +52921,18 @@ var require_route = __commonJS({
         throw new FST_ERR_ROUTE_LOG_LEVEL_INVALID(method, path3, logLevel);
       }
     }
-    function runPreParsing(err, request, reply) {
+    function runPreParsing(err, request2, reply) {
       if (reply.sent === true) return;
       if (err != null) {
         reply[kReplyIsError] = true;
         reply.send(err);
         return;
       }
-      request[kRequestPayloadStream] = request.raw;
-      if (request[kRouteContext].preParsing !== null) {
-        preParsingHookRunner(request[kRouteContext].preParsing, request, reply, handleRequest.bind(request.server));
+      request2[kRequestPayloadStream] = request2.raw;
+      if (request2[kRouteContext].preParsing !== null) {
+        preParsingHookRunner(request2[kRouteContext].preParsing, request2, reply, handleRequest.bind(request2.server));
       } else {
-        handleRequest.call(request.server, null, request, reply);
+        handleRequest.call(request2.server, null, request2, reply);
       }
     }
     function buildRouterOptions(options, defaultOptions) {
@@ -52995,9 +52995,9 @@ var require_four_oh_four = __commonJS({
         instance[kCanSetNotFoundHandler] = true;
         router.defaultRoute = router.defaultRoute.bind(instance);
       }
-      function basic404(request, reply) {
-        request.server[kLogController].routeNotFound(request, reply);
-        const { url: url2, method } = request.raw;
+      function basic404(request2, reply) {
+        request2.server[kLogController].routeNotFound(request2, reply);
+        const { url: url2, method } = request2.raw;
         reply.code(404).send({
           message: `Route ${method}:${url2} not found`,
           error: "Not Found",
@@ -53080,11 +53080,11 @@ var require_four_oh_four = __commonJS({
         const fourOhFourContext = this[kFourOhFourLevelInstance][kFourOhFourContext];
         const id = getGenReqId(fourOhFourContext.server, req);
         const childLogger = createChildLogger(fourOhFourContext, logger, req, id);
-        const request = new Request(id, null, req, null, childLogger, fourOhFourContext);
-        const reply = new Reply(res, request, childLogger);
-        fourOhFourContext.server[kLogController].incomingRequest(request, reply);
-        request.log.warn("the default handler for 404 did not catch this, this is likely a fastify bug, please report it");
-        request.log.warn(router.prettyPrint());
+        const request2 = new Request(id, null, req, null, childLogger, fourOhFourContext);
+        const reply = new Reply(res, request2, childLogger);
+        fourOhFourContext.server[kLogController].incomingRequest(request2, reply);
+        request2.log.warn("the default handler for 404 did not catch this, this is likely a fastify bug, please report it");
+        request2.log.warn(router.prettyPrint());
         reply.code(404).send(new FST_ERR_NOT_FOUND());
       }
     }
@@ -56065,10 +56065,10 @@ var require_fastify = __commonJS({
         if (options.frameworkErrors) {
           const id = getGenReqId(routeEventContext.server, req);
           const childLogger = createChildLogger(routeEventContext, options.logger, req, id);
-          const request = new Request(id, null, req, null, childLogger, routeEventContext);
-          const reply = new Reply(res, request, childLogger);
-          routeEventContext.server[kLogController].incomingRequest(request, reply);
-          return options.frameworkErrors(new FST_ERR_BAD_URL(path3), request, reply);
+          const request2 = new Request(id, null, req, null, childLogger, routeEventContext);
+          const reply = new Reply(res, request2, childLogger);
+          routeEventContext.server[kLogController].incomingRequest(request2, reply);
+          return options.frameworkErrors(new FST_ERR_BAD_URL(path3), request2, reply);
         }
         const body = JSON.stringify({
           error: "Bad Request",
@@ -56086,10 +56086,10 @@ var require_fastify = __commonJS({
         if (options.frameworkErrors) {
           const id = getGenReqId(routeEventContext.server, req);
           const childLogger = createChildLogger(routeEventContext, options.logger, req, id);
-          const request = new Request(id, null, req, null, childLogger, routeEventContext);
-          const reply = new Reply(res, request, childLogger);
-          routeEventContext.server[kLogController].incomingRequest(request, reply);
-          return options.frameworkErrors(new FST_ERR_MAX_PARAM_LENGTH(path3), request, reply);
+          const request2 = new Request(id, null, req, null, childLogger, routeEventContext);
+          const reply = new Reply(res, request2, childLogger);
+          routeEventContext.server[kLogController].incomingRequest(request2, reply);
+          return options.frameworkErrors(new FST_ERR_MAX_PARAM_LENGTH(path3), request2, reply);
         }
         const body = JSON.stringify({
           error: "Bad Request",
@@ -56110,10 +56110,10 @@ var require_fastify = __commonJS({
             if (options.frameworkErrors) {
               const id = getGenReqId(routeEventContext.server, req);
               const childLogger = createChildLogger(routeEventContext, options.logger, req, id);
-              const request = new Request(id, null, req, null, childLogger, routeEventContext);
-              const reply = new Reply(res, request, childLogger);
-              routeEventContext.server[kLogController].incomingRequest(request, reply);
-              return options.frameworkErrors(new FST_ERR_ASYNC_CONSTRAINT(), request, reply);
+              const request2 = new Request(id, null, req, null, childLogger, routeEventContext);
+              const reply = new Reply(res, request2, childLogger);
+              routeEventContext.server[kLogController].incomingRequest(request2, reply);
+              return options.frameworkErrors(new FST_ERR_ASYNC_CONSTRAINT(), request2, reply);
             }
             const body = '{"error":"Internal Server Error","message":"Unexpected error from async constraint","statusCode":500}';
             res.writeHead(500, {
@@ -75522,8 +75522,8 @@ var require_query2 = __commonJS({
       }
       row(packet, _connection) {
         if (packet.isEOF()) {
-          const status = packet.eofStatusFlags();
-          const moreResults = status & ServerStatus.SERVER_MORE_RESULTS_EXISTS;
+          const status2 = packet.eofStatusFlags();
+          const moreResults = status2 & ServerStatus.SERVER_MORE_RESULTS_EXISTS;
           if (moreResults) {
             this._resultIndex++;
             return _Query.prototype.resultsetHeader;
@@ -99563,14 +99563,24 @@ function carriesCapitalRegime(name2) {
   const plain = name2.replaceAll(".", "").replaceAll(/[,\s-]+/g, " ").trim();
   return CAPITAL_REGIMES.some((regime) => plain.endsWith(` ${regime}`));
 }
-var capitals = external_exports.string().max(300).trim().toUpperCase();
+var capitalsSchema = external_exports.string().max(300).trim().toUpperCase();
+var fiscalDataShape = {
+  rfc: capitalsSchema,
+  legalName: capitalsSchema,
+  taxSystem: capitalsSchema,
+  postalCode: capitalsSchema
+};
 var fiscalProfileRequestSchema = external_exports.strictObject({
-  rfc: capitals,
-  legalName: capitals,
-  taxSystem: capitals,
-  postalCode: capitals,
-  defaultCfdiUse: capitals
+  ...fiscalDataShape,
+  defaultCfdiUse: capitalsSchema
 });
+var FISCAL_DATA_TITLES = {
+  INVALID_RFC_REJECT: "The RFC is not valid",
+  INVALID_LEGAL_NAME_REJECT: "The legal name is not valid, or carries its capital regime",
+  INVALID_TAX_SYSTEM_REJECT: "The tax regime is not in the SAT catalog",
+  INVALID_POSTAL_CODE_REJECT: "The postal code is not valid",
+  INVALID_CFDI_USE_REJECT: "The CFDI use is not in the SAT catalog"
+};
 var isLegalName = (name2) => LEGAL_NAME.test(name2) && new TextEncoder().encode(name2).length <= LEGAL_NAME_BYTES && !carriesCapitalRegime(name2);
 function fiscalDataVerdict(data) {
   if (!RFC.test(data.rfc)) return "INVALID_RFC_REJECT";
@@ -99589,130 +99599,6 @@ var fiscalProfileSchema = external_exports.object({
 });
 var fiscalProfileSavedSchema = external_exports.object({ saved: external_exports.literal(true) });
 
-// ../../lib/account/paymentsBunkerTypes.ts
-var mode = external_exports.enum(["sandbox", "live"]);
-var paymentModePrepareSchema = external_exports.strictObject({
-  targetMode: mode,
-  reason: external_exports.string().trim().min(1).max(255)
-});
-var paymentModeTicketSchema = external_exports.strictObject({
-  challengeId: external_exports.string(),
-  targetMode: mode,
-  expiresAt: external_exports.string()
-});
-var paymentModeConfirmSchema = external_exports.strictObject({
-  challengeId: external_exports.string().regex(/^[0-9a-f]{64}$/),
-  confirmationPhrase: external_exports.string().max(64),
-  totpCode: external_exports.string().regex(/^\d{6}$/)
-});
-var paymentModeApprovalSchema = external_exports.strictObject({
-  code: external_exports.literal("SWITCH_PERMITTED"),
-  targetMode: mode,
-  /** The moment by which the approved mode must be started to stay approved, ISO 8601. */
-  approvalExpiresAt: external_exports.string()
-});
-
-// ../../lib/account/posTypes.ts
-var CENTS_MAX = 1e8;
-var cents = external_exports.number().int().min(0).max(CENTS_MAX);
-var openShiftSchema = external_exports.strictObject({
-  openingCashMxnCents: cents
-});
-var posShiftSchema = external_exports.strictObject({
-  id: external_exports.number().int().positive(),
-  cashierUserId: external_exports.string(),
-  openedAt: external_exports.string(),
-  openingCashMxnCents: external_exports.number().int().min(0)
-});
-var currentShiftSchema = external_exports.strictObject({
-  shift: posShiftSchema.nullable()
-});
-var cashMovementSchema = external_exports.strictObject({
-  shiftId: external_exports.number().int().positive(),
-  type: external_exports.enum(["IN", "OUT"]),
-  amountMxnCents: external_exports.number().int().min(1).max(CENTS_MAX),
-  reason: external_exports.string().trim().min(1).max(255)
-});
-var cashMovementResultSchema = external_exports.strictObject({
-  id: external_exports.number().int().positive(),
-  shiftId: external_exports.number().int().positive(),
-  type: external_exports.enum(["IN", "OUT"]),
-  amountMxnCents: external_exports.number().int().positive()
-});
-var closeShiftSchema = external_exports.strictObject({
-  countedCashMxnCents: cents,
-  notes: external_exports.string().trim().max(255).optional()
-});
-var shiftParams = external_exports.strictObject({
-  id: external_exports.coerce.number().int().positive()
-});
-var closedShiftSchema = external_exports.strictObject({
-  id: external_exports.number().int().positive(),
-  expectedCashMxnCents: external_exports.number().int().min(0),
-  countedCashMxnCents: external_exports.number().int().min(0),
-  differenceMxnCents: external_exports.number().int()
-});
-var posProductsQuery = external_exports.strictObject({
-  q: external_exports.string().trim().min(1).max(64).optional()
-});
-var posProductsSchema = external_exports.strictObject({
-  items: external_exports.array(
-    external_exports.strictObject({
-      sku: external_exports.string(),
-      nameEs: external_exports.string(),
-      nameEn: external_exports.string(),
-      priceMxnCents: external_exports.number().int().positive(),
-      available: external_exports.number().int()
-    })
-  )
-});
-var saleLine = external_exports.strictObject({
-  sku: external_exports.string().min(1).max(64),
-  quantity: external_exports.number().int().min(1).max(99)
-});
-var posSaleSchema = external_exports.strictObject({
-  items: external_exports.array(saleLine).min(1).max(50).refine(
-    (items) => new Set(items.map((item) => item.sku)).size === items.length,
-    "A product appears twice"
-  ),
-  payment: external_exports.strictObject({
-    method: external_exports.string().max(32),
-    tenderedMxnCents: cents.optional(),
-    confirmedAmountMxnCents: cents.optional(),
-    terminalAuthCode: external_exports.string().max(64).optional(),
-    cardLastFour: external_exports.string().max(16).optional(),
-    cardBrand: external_exports.string().max(16).optional(),
-    voucherFolio: external_exports.string().max(64).optional()
-  }),
-  /** Where to send the receipt, only if the buyer wants it. */
-  customerEmail: external_exports.email().max(254).optional()
-});
-var posSaleResultSchema = external_exports.strictObject({
-  orderNumber: external_exports.string(),
-  method: external_exports.enum(["POS_CASH", "POS_CARD_MANUAL"]),
-  totalMxnCents: external_exports.number().int().positive(),
-  changeMxnCents: external_exports.number().int().min(0)
-});
-var receiptQuery = external_exports.strictObject({
-  width: external_exports.enum(["80", "58"]).default("80")
-});
-var receiptSchema = external_exports.strictObject({
-  orderNumber: external_exports.string(),
-  widthMm: external_exports.union([external_exports.literal(80), external_exports.literal(58)]),
-  lines: external_exports.array(external_exports.string())
-});
-
-// ../../lib/account/paymentsHealthTypes.ts
-var processorHealthSchema = external_exports.enum(["ok", "unreachable", "unconfigured"]);
-var paymentsHealthSchema = external_exports.strictObject({
-  status: external_exports.enum(["ok", "degraded"]),
-  mode: external_exports.enum(["sandbox", "live"]),
-  processors: external_exports.strictObject({
-    stripe: processorHealthSchema,
-    mercadoPago: processorHealthSchema
-  })
-});
-
 // ../../lib/cart/cartTypes.ts
 var MAX_LINES = 50;
 var MAX_QUANTITY = 99;
@@ -99728,44 +99614,44 @@ var destinationSchema = external_exports.strictObject({
   stateCode: external_exports.string().regex(/^[A-Z]{3}$/, "State code must be 3 capital letters"),
   postalCode: external_exports.string().regex(/^\d{5}$/, "Postal code must be 5 digits").optional()
 });
-var cents2 = external_exports.number().int();
+var cents = external_exports.number().int();
 var cartQuoteSchema = external_exports.object({
   items: external_exports.array(
     external_exports.object({
       sku: external_exports.string(),
       slug: external_exports.string().nullable(),
       name: external_exports.string().nullable(),
-      quantity: cents2.min(1),
-      unitPriceMxnCents: cents2.positive().nullable(),
-      lineTotalMxnCents: cents2.nonnegative().nullable(),
-      lineBaseMxnCents: cents2.nonnegative().nullable(),
-      lineTaxMxnCents: cents2.nonnegative().nullable(),
+      quantity: cents.min(1),
+      unitPriceMxnCents: cents.positive().nullable(),
+      lineTotalMxnCents: cents.nonnegative().nullable(),
+      lineBaseMxnCents: cents.nonnegative().nullable(),
+      lineTaxMxnCents: cents.nonnegative().nullable(),
       stockStatus: external_exports.enum([
         "available",
         "low_stock",
         "out_of_stock",
         "unavailable"
       ]),
-      availableQuantity: cents2.min(0).max(MAX_QUANTITY),
+      availableQuantity: cents.min(0).max(MAX_QUANTITY),
       purchasable: external_exports.boolean()
     })
   ),
   summary: external_exports.object({
-    itemsBaseMxnCents: cents2.nonnegative(),
-    itemsTaxMxnCents: cents2.nonnegative(),
-    itemsTotalMxnCents: cents2.nonnegative(),
+    itemsBaseMxnCents: cents.nonnegative(),
+    itemsTaxMxnCents: cents.nonnegative(),
+    itemsTotalMxnCents: cents.nonnegative(),
     // FC 011: null without a destination; a zero charge when no rule covers it.
     shippingCode: external_exports.enum(["STANDARD_RATE", "FREE_SHIPPING", "UNSERVICEABLE_DESTINATION"]).nullable(),
-    shippingBaseMxnCents: cents2.nonnegative().nullable(),
-    shippingTaxMxnCents: cents2.nonnegative().nullable(),
-    shippingTotalMxnCents: cents2.nonnegative().nullable(),
+    shippingBaseMxnCents: cents.nonnegative().nullable(),
+    shippingTaxMxnCents: cents.nonnegative().nullable(),
+    shippingTotalMxnCents: cents.nonnegative().nullable(),
     serviceable: external_exports.boolean(),
-    freeShippingRemainingMxnCents: cents2.nonnegative().nullable(),
-    subtotalMxnCents: cents2.nonnegative(),
-    taxMxnCents: cents2.nonnegative(),
-    totalMxnCents: cents2.nonnegative(),
-    totalItems: cents2.nonnegative(),
-    referenceUsdCents: cents2.nonnegative().nullable(),
+    freeShippingRemainingMxnCents: cents.nonnegative().nullable(),
+    subtotalMxnCents: cents.nonnegative(),
+    taxMxnCents: cents.nonnegative(),
+    totalMxnCents: cents.nonnegative(),
+    totalItems: cents.nonnegative(),
+    referenceUsdCents: cents.nonnegative().nullable(),
     exchangeRate: external_exports.object({ series: external_exports.string(), date: external_exports.string(), rate: external_exports.string() }).nullable()
   }).refine(
     (s) => s.itemsBaseMxnCents + s.itemsTaxMxnCents === s.itemsTotalMxnCents && (s.shippingBaseMxnCents ?? 0) + (s.shippingTaxMxnCents ?? 0) === (s.shippingTotalMxnCents ?? 0) && s.subtotalMxnCents === s.itemsBaseMxnCents + (s.shippingBaseMxnCents ?? 0) && s.taxMxnCents === s.itemsTaxMxnCents + (s.shippingTaxMxnCents ?? 0) && s.subtotalMxnCents + s.taxMxnCents === s.totalMxnCents
@@ -99907,6 +99793,178 @@ var CHECKOUT_RETURN_PATHS = {
   "es-MX": { success: "/checkout/exito/", cancel: "/checkout/cancelado/" },
   en: { success: "/en/checkout/success/", cancel: "/en/checkout/cancel/" }
 };
+
+// ../../lib/account/invoiceTypes.ts
+var status = external_exports.enum(["PENDING", "COMPLETED", "REJECTED", "CANCELLED"]);
+var request = external_exports.strictObject({
+  ...fiscalDataShape,
+  cfdiUse: capitalsSchema,
+  emailForInvoice: customerSchema.shape.email
+});
+var invoiceRequestSchema = request;
+var staffInvoiceRequestSchema = request.extend({
+  orderNumber: external_exports.string().max(20)
+});
+var invoiceRequestedSchema = external_exports.object({
+  id: external_exports.number().int(),
+  status
+});
+var orderInvoiceStateSchema = external_exports.object({
+  status: status.nullable(),
+  reason: external_exports.string().nullable()
+});
+var invoiceQueueQuery = external_exports.strictObject({
+  status: status.optional(),
+  /** An order number or an RFC, exactly. */
+  search: external_exports.string().trim().toUpperCase().min(1).max(20).optional(),
+  page: external_exports.coerce.number().int().min(1).max(1e3).default(1)
+});
+var queuedSchema = external_exports.object({
+  id: external_exports.number().int(),
+  orderNumber: external_exports.string(),
+  channel: external_exports.string(),
+  totalMxnCents: external_exports.number().int(),
+  invoicableMxnCents: external_exports.number().int(),
+  status,
+  rfc: external_exports.string(),
+  legalName: external_exports.string(),
+  taxSystem: external_exports.string(),
+  postalCode: external_exports.string(),
+  cfdiUse: external_exports.string(),
+  email: external_exports.string(),
+  reason: external_exports.string().nullable(),
+  requestedAt: external_exports.string()
+});
+var invoiceQueueSchema = external_exports.object({
+  items: external_exports.array(queuedSchema),
+  total: external_exports.number().int(),
+  page: external_exports.number().int(),
+  pageSize: external_exports.number().int()
+});
+
+// ../../lib/account/paymentsBunkerTypes.ts
+var mode = external_exports.enum(["sandbox", "live"]);
+var paymentModePrepareSchema = external_exports.strictObject({
+  targetMode: mode,
+  reason: external_exports.string().trim().min(1).max(255)
+});
+var paymentModeTicketSchema = external_exports.strictObject({
+  challengeId: external_exports.string(),
+  targetMode: mode,
+  expiresAt: external_exports.string()
+});
+var paymentModeConfirmSchema = external_exports.strictObject({
+  challengeId: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  confirmationPhrase: external_exports.string().max(64),
+  totpCode: external_exports.string().regex(/^\d{6}$/)
+});
+var paymentModeApprovalSchema = external_exports.strictObject({
+  code: external_exports.literal("SWITCH_PERMITTED"),
+  targetMode: mode,
+  /** The moment by which the approved mode must be started to stay approved, ISO 8601. */
+  approvalExpiresAt: external_exports.string()
+});
+
+// ../../lib/account/posTypes.ts
+var CENTS_MAX = 1e8;
+var cents2 = external_exports.number().int().min(0).max(CENTS_MAX);
+var openShiftSchema = external_exports.strictObject({
+  openingCashMxnCents: cents2
+});
+var posShiftSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  cashierUserId: external_exports.string(),
+  openedAt: external_exports.string(),
+  openingCashMxnCents: external_exports.number().int().min(0)
+});
+var currentShiftSchema = external_exports.strictObject({
+  shift: posShiftSchema.nullable()
+});
+var cashMovementSchema = external_exports.strictObject({
+  shiftId: external_exports.number().int().positive(),
+  type: external_exports.enum(["IN", "OUT"]),
+  amountMxnCents: external_exports.number().int().min(1).max(CENTS_MAX),
+  reason: external_exports.string().trim().min(1).max(255)
+});
+var cashMovementResultSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  shiftId: external_exports.number().int().positive(),
+  type: external_exports.enum(["IN", "OUT"]),
+  amountMxnCents: external_exports.number().int().positive()
+});
+var closeShiftSchema = external_exports.strictObject({
+  countedCashMxnCents: cents2,
+  notes: external_exports.string().trim().max(255).optional()
+});
+var shiftParams = external_exports.strictObject({
+  id: external_exports.coerce.number().int().positive()
+});
+var closedShiftSchema = external_exports.strictObject({
+  id: external_exports.number().int().positive(),
+  expectedCashMxnCents: external_exports.number().int().min(0),
+  countedCashMxnCents: external_exports.number().int().min(0),
+  differenceMxnCents: external_exports.number().int()
+});
+var posProductsQuery = external_exports.strictObject({
+  q: external_exports.string().trim().min(1).max(64).optional()
+});
+var posProductsSchema = external_exports.strictObject({
+  items: external_exports.array(
+    external_exports.strictObject({
+      sku: external_exports.string(),
+      nameEs: external_exports.string(),
+      nameEn: external_exports.string(),
+      priceMxnCents: external_exports.number().int().positive(),
+      available: external_exports.number().int()
+    })
+  )
+});
+var saleLine = external_exports.strictObject({
+  sku: external_exports.string().min(1).max(64),
+  quantity: external_exports.number().int().min(1).max(99)
+});
+var posSaleSchema = external_exports.strictObject({
+  items: external_exports.array(saleLine).min(1).max(50).refine(
+    (items) => new Set(items.map((item) => item.sku)).size === items.length,
+    "A product appears twice"
+  ),
+  payment: external_exports.strictObject({
+    method: external_exports.string().max(32),
+    tenderedMxnCents: cents2.optional(),
+    confirmedAmountMxnCents: cents2.optional(),
+    terminalAuthCode: external_exports.string().max(64).optional(),
+    cardLastFour: external_exports.string().max(16).optional(),
+    cardBrand: external_exports.string().max(16).optional(),
+    voucherFolio: external_exports.string().max(64).optional()
+  }),
+  /** Where to send the receipt, only if the buyer wants it. */
+  customerEmail: external_exports.email().max(254).optional()
+});
+var posSaleResultSchema = external_exports.strictObject({
+  orderNumber: external_exports.string(),
+  method: external_exports.enum(["POS_CASH", "POS_CARD_MANUAL"]),
+  totalMxnCents: external_exports.number().int().positive(),
+  changeMxnCents: external_exports.number().int().min(0)
+});
+var receiptQuery = external_exports.strictObject({
+  width: external_exports.enum(["80", "58"]).default("80")
+});
+var receiptSchema = external_exports.strictObject({
+  orderNumber: external_exports.string(),
+  widthMm: external_exports.union([external_exports.literal(80), external_exports.literal(58)]),
+  lines: external_exports.array(external_exports.string())
+});
+
+// ../../lib/account/paymentsHealthTypes.ts
+var processorHealthSchema = external_exports.enum(["ok", "unreachable", "unconfigured"]);
+var paymentsHealthSchema = external_exports.strictObject({
+  status: external_exports.enum(["ok", "degraded"]),
+  mode: external_exports.enum(["sandbox", "live"]),
+  processors: external_exports.strictObject({
+    stripe: processorHealthSchema,
+    mercadoPago: processorHealthSchema
+  })
+});
 
 // ../../lib/cart/postalRanges.ts
 var RANGES = [
@@ -100422,8 +100480,8 @@ var problemSchema = external_exports.object({
   detail: external_exports.string().optional()
 });
 var PROBLEM_TYPE = "application/problem+json";
-function problem(status, title, detail) {
-  return detail === void 0 ? { type: "about:blank", title, status } : { type: "about:blank", title, status, detail };
+function problem(status2, title, detail) {
+  return detail === void 0 ? { type: "about:blank", title, status: status2 } : { type: "about:blank", title, status: status2, detail };
 }
 
 // src/lib/money.ts
@@ -100466,10 +100524,10 @@ function quoteLine(line, row4, lang) {
   const stock = Number(row4.stock);
   const total = unit * line.quantity;
   const { base: base2, tax } = splitVat(total);
-  const status = stockStatus(stock);
+  const status2 = stockStatus(stock);
   const purchasable = stock >= line.quantity;
   let warning;
-  if (status === "out_of_stock") warning = "out_of_stock";
+  if (status2 === "out_of_stock") warning = "out_of_stock";
   else if (!purchasable) warning = "insufficient_stock";
   return {
     quoted: {
@@ -100481,7 +100539,7 @@ function quoteLine(line, row4, lang) {
       lineTotalMxnCents: total,
       lineBaseMxnCents: base2,
       lineTaxMxnCents: tax,
-      stockStatus: status,
+      stockStatus: status2,
       availableQuantity: Math.min(Math.max(stock, 0), MAX_QUANTITY2),
       purchasable
     },
@@ -100606,10 +100664,10 @@ function registerCartRoutes(app, deps) {
       bodyLimit: 16 * 1024,
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
     },
-    async (request, reply) => {
-      const body = cartQuoteRequestSchema.safeParse(request.body);
+    async (request2, reply) => {
+      const body = cartQuoteRequestSchema.safeParse(request2.body);
       const language = languageSchema.safeParse(
-        request.query.lang
+        request2.query.lang
       );
       if (!body.success || !language.success) {
         return reply.code(400).type(PROBLEM_TYPE).send(
@@ -100723,8 +100781,8 @@ function present(row4, language, fix, properties) {
   };
 }
 function registerCatalogRoutes(app, deps) {
-  app.get("/v1/catalog", async (request, reply) => {
-    const parsed = catalogListQuery.safeParse(request.query);
+  app.get("/v1/catalog", async (request2, reply) => {
+    const parsed = catalogListQuery.safeParse(request2.query);
     if (!parsed.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", parsed.error.issues[0]?.message));
     }
@@ -100750,10 +100808,10 @@ function registerCatalogRoutes(app, deps) {
       exchangeRate: rate
     };
   });
-  app.get("/v1/catalog/:slug", async (request, reply) => {
-    const params = catalogItemParams.safeParse(request.params);
+  app.get("/v1/catalog/:slug", async (request2, reply) => {
+    const params = catalogItemParams.safeParse(request2.params);
     const language = languageSchema.safeParse(
-      request.query.lang
+      request2.query.lang
     );
     if (!params.success || !language.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid request"));
@@ -100828,22 +100886,22 @@ async function recordAudit(db, entry) {
   );
 }
 function auditTrail(db) {
-  return async (request, reply) => {
-    const route = request.routeOptions.url;
-    if (request.user === null || !route?.startsWith("/v1/admin/")) return;
-    const params = Object.values(request.params);
+  return async (request2, reply) => {
+    const route = request2.routeOptions.url;
+    if (request2.user === null || !route?.startsWith("/v1/admin/")) return;
+    const params = Object.values(request2.params);
     try {
       await recordAudit(db, {
-        userId: request.user.userId,
-        action: `${request.method} ${route}`,
+        userId: request2.user.userId,
+        action: `${request2.method} ${route}`,
         entityType: route.split("/")[3],
         entityId: params[0] ?? "*",
         before: null,
-        after: { query: request.query, status: reply.statusCode },
-        ip: request.ip
+        after: { query: request2.query, status: reply.statusCode },
+        ip: request2.ip
       });
     } catch (error63) {
-      request.log.error({ err: error63 }, "audit_log write failed");
+      request2.log.error({ err: error63 }, "audit_log write failed");
     }
   };
 }
@@ -100864,15 +100922,15 @@ function requestHash(contentType, body) {
 }
 var keyHash = (userId, key) => (0, import_node_crypto.createHash)("sha256").update(`${userId}
 ${key}`).digest("hex");
-function runIdempotent(db, request, work) {
-  const hash2 = keyHash(request.userId, request.key);
+function runIdempotent(db, request2, work) {
+  const hash2 = keyHash(request2.userId, request2.key);
   return db.transaction(async (tx) => {
     const [row4] = await tx.query(
       "SELECT route, request_hash, response_status, response_body, expires_at FROM idempotency_keys WHERE key_hash = ? FOR UPDATE",
       [hash2]
     );
-    if (row4 && new Date(row4.expires_at) > request.now) {
-      if (row4.route !== request.route || row4.request_hash !== request.requestHash)
+    if (row4 && new Date(row4.expires_at) > request2.now) {
+      if (row4.route !== request2.route || row4.request_hash !== request2.requestHash)
         return { code: "IDEMP_PAYLOAD_MISMATCH" };
       return {
         code: "IDEMP_REPLAY_SUCCESS",
@@ -100891,13 +100949,13 @@ function runIdempotent(db, request, work) {
         "INSERT INTO idempotency_keys (key_hash, user_id, route, request_hash, response_status, response_headers, response_body, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
           hash2,
-          request.userId,
-          request.route,
-          request.requestHash,
+          request2.userId,
+          request2.route,
+          request2.requestHash,
           answer.status,
           "{}",
           JSON.stringify(answer.body),
-          new Date(request.now.getTime() + TTL_MS)
+          new Date(request2.now.getTime() + TTL_MS)
         ]
       );
     }
@@ -100916,20 +100974,20 @@ var REFUSALS = {
   CAT_REFERENCE_INVALID: [422, "Unknown or retired reference"],
   CAT_STOCK_BELOW_RESERVED: [409, "Stock below reserved units"]
 };
-function refuse(reply, status, title, code2) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, title, code2));
+function refuse(reply, status2, title, code2) {
+  return reply.code(status2).type(PROBLEM_TYPE).send(problem(status2, title, code2));
 }
-async function runOnce(deps, request, reply, key, mutation) {
-  const userId = request.user.userId;
+async function runOnce(deps, request2, reply, key, mutation) {
+  const userId = request2.user.userId;
   const outcome = await runIdempotent(
     deps.db,
     {
       userId,
       key,
-      route: `${request.method} ${request.routeOptions.url}`,
+      route: `${request2.method} ${request2.routeOptions.url}`,
       requestHash: requestHash(
-        String(request.headers["content-type"]),
-        request.body
+        String(request2.headers["content-type"]),
+        request2.body
       ),
       now: deps.now()
     },
@@ -100938,22 +100996,22 @@ async function runOnce(deps, request, reply, key, mutation) {
   if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
     return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
   }
-  const { status, body } = outcome.answer;
-  if (status >= 400) reply.type(PROBLEM_TYPE);
-  return reply.code(status).header("idempotency-status", outcome.code).send(body);
+  const { status: status2, body } = outcome.answer;
+  if (status2 >= 400) reply.type(PROBLEM_TYPE);
+  return reply.code(status2).header("idempotency-status", outcome.code).send(body);
 }
 var isDuplicate = (error63) => error63?.code === "ER_DUP_ENTRY";
 function mutationRoute(app, deps, route) {
   app.route({
     method: route.method,
     url: route.url,
-    handler: async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    handler: async (request2, reply) => {
+      const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
       if (key.code !== "IDEMP_KEY_ACCEPTED") {
         return refuse(reply, 400, "Idempotency-Key required", key.code);
       }
-      const params = (route.params ?? external_exports.object({})).safeParse(request.params);
-      const body = route.body.safeParse(request.body);
+      const params = (route.params ?? external_exports.object({})).safeParse(request2.params);
+      const body = route.body.safeParse(request2.body);
       if (!params.success || !body.success) {
         return refuse(
           reply,
@@ -100962,7 +101020,7 @@ function mutationRoute(app, deps, route) {
           "CAT_VALIDATION_ERROR"
         );
       }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
         let change;
         try {
           change = await route.run(tx, {
@@ -100977,8 +101035,8 @@ function mutationRoute(app, deps, route) {
           };
         }
         if (typeof change === "string") {
-          const [status, title] = REFUSALS[change];
-          return { status, body: problem(status, title, change) };
+          const [status2, title] = REFUSALS[change];
+          return { status: status2, body: problem(status2, title, change) };
         }
         await recordAudit(tx, {
           userId,
@@ -100987,7 +101045,7 @@ function mutationRoute(app, deps, route) {
           entityId: String(change.after.id),
           before: change.before,
           after: change.after,
-          ip: request.ip
+          ip: request2.ip
         });
         return { status: change.before ? 200 : 201, body: change.after };
       });
@@ -101119,8 +101177,8 @@ function matchesDigest(data, sha2562) {
 var mediaParams = external_exports.object({ sha256: external_exports.string().regex(SHA256_HEX) });
 var IMMUTABLE = "public, max-age=31536000, immutable";
 function registerMediaRoutes(app, deps) {
-  app.get("/v1/media/:sha256", async (request, reply) => {
-    const params = mediaParams.safeParse(request.params);
+  app.get("/v1/media/:sha256", async (request2, reply) => {
+    const params = mediaParams.safeParse(request2.params);
     if (!params.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid media digest"));
     }
@@ -101130,7 +101188,7 @@ function registerMediaRoutes(app, deps) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Media not found"));
     }
     if (!matchesDigest(media.data, sha2562)) {
-      request.log.error({ sha256: sha2562 }, "media blob does not match its digest");
+      request2.log.error({ sha256: sha2562 }, "media blob does not match its digest");
       return reply.code(500).type(PROBLEM_TYPE).send(problem(500, "Internal error"));
     }
     return reply.type(media.mimeType).header("cache-control", IMMUTABLE).header("cross-origin-resource-policy", "same-site").header("x-content-type-options", "nosniff").send(media.data);
@@ -101430,7 +101488,7 @@ var PROCESSOR_OF = {
   SPEI: "MERCADO_PAGO",
   MERCADO_PAGO_BALANCE: "MERCADO_PAGO"
 };
-var refuse2 = (status, code2) => ({ ok: false, status, code: code2 });
+var refuse2 = (status2, code2) => ({ ok: false, status: status2, code: code2 });
 function affected(result) {
   return result.affectedRows;
 }
@@ -101518,15 +101576,15 @@ function admit(deps, body) {
   }
   return { request: parsed.data, method, processorCode, processor, secrets };
 }
-async function price(deps, request, lang) {
+async function price(deps, request2, lang) {
   const quoted = await quoteCartToDestination(
     deps.db,
-    request.items,
+    request2.items,
     await deps.rate(),
     lang,
     {
-      stateCode: request.address.stateCode,
-      postalCode: request.address.postalCode
+      stateCode: request2.address.stateCode,
+      postalCode: request2.address.postalCode
     },
     deps.shipping
   );
@@ -101540,19 +101598,19 @@ async function price(deps, request, lang) {
   if (shippingCode !== "STANDARD_RATE" && shippingCode !== "FREE_SHIPPING") {
     return refuse2(400, "UNSERVICEABLE_DESTINATION");
   }
-  if (totalMxnCents !== request.expectedTotalMxnCents) {
+  if (totalMxnCents !== request2.expectedTotalMxnCents) {
     return refuse2(409, "PRICE_CHANGED");
   }
   return quoted.quote;
 }
 async function persist(deps, admitted, quote, order2) {
-  const { request, secrets } = admitted;
-  const { customer, address } = request;
+  const { request: request2, secrets } = admitted;
+  const { customer, address } = request2;
   const summary2 = quote.summary;
   const seal = (field, value) => encryptPii(secrets.piiKey, order2.orderNumber, field, value);
   try {
     return await deps.db.transaction(async (tx) => {
-      const productIds = await reserveLines(tx, request.items);
+      const productIds = await reserveLines(tx, request2.items);
       const inserted = await tx.query(
         "INSERT INTO orders (order_number, user_id, status_id, payment_method_id, shipping_zone_id, items_base_mxn_cents, items_tax_mxn_cents, items_total_mxn_cents, shipping_base_mxn_cents, shipping_tax_mxn_cents, shipping_total_mxn_cents, total_mxn_cents, customer_name_enc, customer_email_enc, customer_phone_enc, shipping_address_enc, customer_email_hmac, access_token_hash, privacy_consent_at, expires_at, is_test, locale) SELECT ?, ?, 1, ?, z.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM shipping_zones z WHERE z.code = ?",
         [
@@ -101580,7 +101638,7 @@ async function persist(deps, admitted, quote, order2) {
         ]
       );
       const id = inserted.insertId;
-      if (order2.userId !== null && request.saveAddress === true && stateOfPostalCode(address.postalCode) === address.stateCode) {
+      if (order2.userId !== null && request2.saveAddress === true && stateOfPostalCode(address.postalCode) === address.stateCode) {
         await createAddress(
           tx,
           secrets.piiKey,
@@ -101808,16 +101866,16 @@ function registerOrderRoutes(app, deps) {
   app.get(
     "/v1/orders/:order_number",
     { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
-    async (request, reply) => {
-      const notFound = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
+    async (request2, reply) => {
+      const notFound2 = () => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
       const secrets = deps.payments.checkout;
       if (secrets === null) {
         return reply.code(503).type(PROBLEM_TYPE).send(problem(503, "Payments unavailable", "SERVICE_UNAVAILABLE"));
       }
-      const { order_number: orderNumber } = request.params;
-      const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
+      const { order_number: orderNumber } = request2.params;
+      const token = BEARER.exec(request2.headers.authorization ?? "")?.[1];
       if (!ORDER_NUMBER.test(orderNumber) || token === void 0)
-        return notFound();
+        return notFound2();
       await expireOverdueOrders(deps.db, deps.now());
       const [row4] = await deps.db.query(
         "SELECT o.order_number, s.code AS status, m.code AS method, o.items_total_mxn_cents, o.shipping_total_mxn_cents, o.total_mxn_cents, o.expires_at, o.paid_at, o.access_token_hash FROM orders o JOIN order_statuses s ON s.id = o.status_id JOIN payment_methods m ON m.id = o.payment_method_id WHERE o.order_number = ?",
@@ -101827,12 +101885,12 @@ function registerOrderRoutes(app, deps) {
         Buffer.from(row4.access_token_hash),
         tokenHash(secrets.tokenPepper, token)
       )) {
-        return notFound();
+        return notFound2();
       }
-      const { status, fulfillment } = splitStatus(row4.status);
+      const { status: status2, fulfillment } = splitStatus(row4.status);
       return orderViewSchema.parse({
         orderNumber: row4.order_number,
-        status,
+        status: status2,
         fulfillment,
         method: row4.method,
         itemsTotalMxnCents: Number(row4.items_total_mxn_cents),
@@ -102565,6 +102623,62 @@ var ROUTE_CONTRACTS = [
   },
   {
     method: "POST",
+    path: "/v1/account/orders/:order_number/invoice-request",
+    summary: "The buyer asks for the invoice of one of their paid orders (Idempotency-Key, audited, FC 077)",
+    permission: "account:self",
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      body: invoiceRequestSchema
+    },
+    responses: {
+      201: invoiceRequestedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/orders/:order_number/invoice-request",
+    summary: "Where the latest invoice request of one order stands (FC 077)",
+    permission: "account:self",
+    request: { params: orderParams },
+    responses: {
+      200: orderInvoiceStateSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/invoices/requests",
+    summary: "The staff asks for the invoice of an order without an account (Idempotency-Key, audited, FC 077)",
+    permission: "invoices:request",
+    request: { headers: mutationHeaders, body: staffInvoiceRequestSchema },
+    responses: {
+      201: invoiceRequestedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/invoices/requests",
+    summary: "The queue of invoice requests, by status, order or RFC (FC 077)",
+    permission: "invoices:read",
+    request: { query: invoiceQueueQuery },
+    responses: {
+      200: invoiceQueueSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
     path: "/v1/admin/returns/:id/prepare",
     summary: "Sets the amount to refund and whether the units go back to the shelf (audited)",
     permission: "returns:prepare",
@@ -103172,10 +103286,10 @@ var TITLES = {
   CAT_FORBIDDEN: "Not allowed"
 };
 function permissionGuard(deps) {
-  return (permission) => async (request, reply) => {
-    const refuse4 = (status, code2) => reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES[code2], code2));
+  return (permission) => async (request2, reply) => {
+    const refuse4 = (status2, code2) => reply.code(status2).type(PROBLEM_TYPE).send(problem(status2, TITLES[code2], code2));
     if (deps.auth === null) return refuse4(503, "AUTH_UNAVAILABLE");
-    const token = readSessionToken(request.headers.cookie);
+    const token = readSessionToken(request2.headers.cookie);
     const user = token ? await sessionUser(deps.db, token, deps.now()) : null;
     if (user === null) return refuse4(401, "SESSION_INVALID_OR_EXPIRED");
     if (!secondFactorSatisfied(user))
@@ -103185,7 +103299,7 @@ function permissionGuard(deps) {
         403,
         permission === "catalog:write" ? "CAT_FORBIDDEN" : "PERMISSION_DENIED"
       );
-    request.user = user;
+    request2.user = user;
   };
 }
 
@@ -103199,9 +103313,9 @@ var PaymentProcessorError = class extends Error {
    * @param message - Safe description (processor and HTTP status at most).
    * @param status - HTTP status the processor answered, when it did.
    */
-  constructor(message, status = null) {
+  constructor(message, status2 = null) {
     super(message);
-    this.status = status;
+    this.status = status2;
     this.name = "PaymentProcessorError";
   }
 };
@@ -103266,8 +103380,8 @@ var ADDRESS_REFUSALS = {
   ADDRESS_NOT_FOUND: [404, "Not found"],
   ADDRESS_LIMIT_REACHED: [409, "The account already holds five addresses"]
 };
-function writeGate(deps, request, reply) {
-  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+function writeGate(deps, request2, reply) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
   if (key.code !== "IDEMP_KEY_ACCEPTED") {
     refuse(reply, 400, "Idempotency-Key required", key.code);
     return null;
@@ -103283,8 +103397,8 @@ function writeGate(deps, request, reply) {
   }
   return { key: key.key, pii: deps.piiKey };
 }
-function cardsWriteGate(deps, request, reply) {
-  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+function cardsWriteGate(deps, request2, reply) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
   if (key.code !== "IDEMP_KEY_ACCEPTED") {
     refuse(reply, 400, "Idempotency-Key required", key.code);
     return null;
@@ -103300,10 +103414,10 @@ var stripeDown = () => ({
   body: problem(503, "Stripe did not answer", "SERVICE_UNAVAILABLE")
 });
 function refusalOf(refusal) {
-  const [status, title] = ADDRESS_REFUSALS[refusal];
-  return { status, body: problem(status, title, refusal) };
+  const [status2, title] = ADDRESS_REFUSALS[refusal];
+  return { status: status2, body: problem(status2, title, refusal) };
 }
-function auditAddress(tx, request, userId, action, saved) {
+function auditAddress(tx, request2, userId, action, saved) {
   return recordAudit(tx, {
     userId,
     action,
@@ -103311,18 +103425,18 @@ function auditAddress(tx, request, userId, action, saved) {
     entityId: saved.id,
     before: null,
     after: { isDefault: saved.isDefault, isComplete: saved.isComplete },
-    ip: request.ip
+    ip: request2.ip
   });
 }
 function registerAccountRoutes(app, deps) {
-  app.get("/v1/account/me", async (request, reply) => {
-    const user = request.user;
+  app.get("/v1/account/me", async (request2, reply) => {
+    const user = request2.user;
     const delivery = await accountDelivery(
       deps.db,
       deps.piiKey,
       user.userId
     ).catch((error63) => {
-      request.log.error({ err: error63 }, "account data unreadable");
+      request2.log.error({ err: error63 }, "account data unreadable");
       return {
         phone: null,
         postalCode: null,
@@ -103341,10 +103455,10 @@ function registerAccountRoutes(app, deps) {
       })
     );
   });
-  app.patch("/v1/account/profile", async (request, reply) => {
-    const gate2 = writeGate(deps, request, reply);
+  app.patch("/v1/account/profile", async (request2, reply) => {
+    const gate2 = writeGate(deps, request2, reply);
     if (gate2 === null) return reply;
-    if (unsupportedLocale(request.body, "preferredLocale")) {
+    if (unsupportedLocale(request2.body, "preferredLocale")) {
       return refuse(
         reply,
         400,
@@ -103352,11 +103466,11 @@ function registerAccountRoutes(app, deps) {
         "LOCALE_INPUT_UNSUPPORTED"
       );
     }
-    const body = profileUpdateRequestSchema.safeParse(request.body);
+    const body = profileUpdateRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
-    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
       await updateProfile(tx, gate2.pii, userId, body.data);
       await recordAudit(tx, {
         userId,
@@ -103367,7 +103481,7 @@ function registerAccountRoutes(app, deps) {
         after: {
           changed: body.data.preferredLocale === void 0 ? ["fullName", "phone"] : ["fullName", "phone", "preferredLocale"]
         },
-        ip: request.ip
+        ip: request2.ip
       });
       return {
         status: 200,
@@ -103378,7 +103492,7 @@ function registerAccountRoutes(app, deps) {
       };
     });
   });
-  app.get("/v1/account/addresses", async (request, reply) => {
+  app.get("/v1/account/addresses", async (request2, reply) => {
     if (deps.piiKey === null) {
       return refuse(
         reply,
@@ -103390,19 +103504,19 @@ function registerAccountRoutes(app, deps) {
     const items = await listAddresses(
       deps.db,
       deps.piiKey,
-      request.user.userId
+      request2.user.userId
     );
     return addressListSchema.parse({ items, max: MAX_USER_ADDRESSES });
   });
-  app.post("/v1/account/addresses", async (request, reply) => {
-    const gate2 = writeGate(deps, request, reply);
+  app.post("/v1/account/addresses", async (request2, reply) => {
+    const gate2 = writeGate(deps, request2, reply);
     if (gate2 === null) return reply;
-    const body = addressUpsertRequestSchema.safeParse(request.body);
+    const body = addressUpsertRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
     const { isDefault, ...address } = body.data;
-    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
       const saved = await createAddress(
         tx,
         gate2.pii,
@@ -103411,19 +103525,19 @@ function registerAccountRoutes(app, deps) {
         isDefault === true
       );
       if (typeof saved === "string") return refusalOf(saved);
-      await auditAddress(tx, request, userId, "ADDRESS_CREATED", saved);
+      await auditAddress(tx, request2, userId, "ADDRESS_CREATED", saved);
       return { status: 201, body: addressSavedSchema.parse(saved) };
     });
   });
-  app.patch("/v1/account/addresses/:id", async (request, reply) => {
-    const gate2 = writeGate(deps, request, reply);
+  app.patch("/v1/account/addresses/:id", async (request2, reply) => {
+    const gate2 = writeGate(deps, request2, reply);
     if (gate2 === null) return reply;
-    const params = addressParams.safeParse(request.params);
-    const body = addressPatchRequestSchema.safeParse(request.body);
+    const params = addressParams.safeParse(request2.params);
+    const body = addressPatchRequestSchema.safeParse(request2.body);
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
-    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
       const saved = await updateAddress(
         tx,
         gate2.pii,
@@ -103432,21 +103546,21 @@ function registerAccountRoutes(app, deps) {
         body.data
       );
       if (typeof saved === "string") return refusalOf(saved);
-      await auditAddress(tx, request, userId, "ADDRESS_UPDATED", saved);
+      await auditAddress(tx, request2, userId, "ADDRESS_UPDATED", saved);
       return { status: 200, body: addressSavedSchema.parse(saved) };
     });
   });
-  app.delete("/v1/account/addresses/:id", async (request, reply) => {
-    const gate2 = writeGate(deps, request, reply);
+  app.delete("/v1/account/addresses/:id", async (request2, reply) => {
+    const gate2 = writeGate(deps, request2, reply);
     if (gate2 === null) return reply;
-    const params = addressParams.safeParse(request.params);
+    const params = addressParams.safeParse(request2.params);
     if (!params.success) {
       return refuse(reply, 400, "Invalid address", "INVALID_ADDRESS");
     }
-    return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
       const refusal = await deleteAddress(tx, userId, params.data.id);
       if (refusal !== null) return refusalOf(refusal);
-      await auditAddress(tx, request, userId, "ADDRESS_DELETED", {
+      await auditAddress(tx, request2, userId, "ADDRESS_DELETED", {
         id: params.data.id
       });
       return { status: 204, body: null };
@@ -103455,7 +103569,7 @@ function registerAccountRoutes(app, deps) {
   app.get(
     "/v1/account/payment-methods",
     CARDS_LIMIT,
-    async (request, reply) => {
+    async (request2, reply) => {
       if (deps.cards === null) {
         return refuse(
           reply,
@@ -103468,12 +103582,12 @@ function registerAccountRoutes(app, deps) {
         const saved = await listSavedCards(
           deps.db,
           deps.cards,
-          request.user.userId
+          request2.user.userId
         );
         return paymentMethodListResponseSchema.parse(saved);
       } catch (error63) {
         if (!(error63 instanceof PaymentProcessorError)) throw error63;
-        request.log.warn(
+        request2.log.warn(
           { err: error63 },
           `saved cards: Stripe refused the list: ${error63.message}`
         );
@@ -103489,12 +103603,12 @@ function registerAccountRoutes(app, deps) {
   app.post(
     "/v1/account/payment-methods/setup",
     CARDS_LIMIT,
-    async (request, reply) => {
-      const gate2 = cardsWriteGate(deps, request, reply);
+    async (request2, reply) => {
+      const gate2 = cardsWriteGate(deps, request2, reply);
       if (gate2 === null) return reply;
-      const lang = request.query.lang === "en" ? "en" : "es-MX";
+      const lang = request2.query.lang === "en" ? "en" : "es-MX";
       const page = `${deps.siteUrl}${CARDS_PAGE[lang]}`;
-      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
         try {
           const redirectUrl = await startCardSetup(tx, gate2.cards, userId, {
             successUrl: `${page}${CARD_ADDED_MARK}`,
@@ -103506,7 +103620,7 @@ function registerAccountRoutes(app, deps) {
           };
         } catch (error63) {
           if (!(error63 instanceof PaymentProcessorError)) throw error63;
-          request.log.warn(
+          request2.log.warn(
             { err: error63 },
             `saved cards: Stripe refused the setup: ${error63.message}`
           );
@@ -103518,14 +103632,14 @@ function registerAccountRoutes(app, deps) {
   app.delete(
     "/v1/account/payment-methods/:id",
     CARDS_LIMIT,
-    async (request, reply) => {
-      const gate2 = cardsWriteGate(deps, request, reply);
+    async (request2, reply) => {
+      const gate2 = cardsWriteGate(deps, request2, reply);
       if (gate2 === null) return reply;
-      const params = paymentMethodParams.safeParse(request.params);
+      const params = paymentMethodParams.safeParse(request2.params);
       if (!params.success) {
         return refuse(reply, 404, "Not found", "PAYMENT_METHOD_NOT_FOUND");
       }
-      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
         try {
           const refusal = await detachSavedCard(
             tx,
@@ -103545,7 +103659,7 @@ function registerAccountRoutes(app, deps) {
             after: {
               detached_payment_method_id: fingerprint(params.data.id)
             },
-            ip: request.ip
+            ip: request2.ip
           });
           return {
             status: 200,
@@ -103553,7 +103667,7 @@ function registerAccountRoutes(app, deps) {
           };
         } catch (error63) {
           if (!(error63 instanceof PaymentProcessorError)) throw error63;
-          request.log.warn(
+          request2.log.warn(
             { err: error63 },
             `saved cards: Stripe refused the detach: ${error63.message}`
           );
@@ -103565,10 +103679,10 @@ function registerAccountRoutes(app, deps) {
   app.post(
     "/v1/account/payment-methods/settle",
     CARDS_LIMIT,
-    async (request, reply) => {
-      const gate2 = cardsWriteGate(deps, request, reply);
+    async (request2, reply) => {
+      const gate2 = cardsWriteGate(deps, request2, reply);
       if (gate2 === null) return reply;
-      return runOnce(deps, request, reply, gate2.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, gate2.key, async (tx, userId) => {
         try {
           const settled = await settleSavedCards(tx, gate2.cards, userId);
           if (settled === "CARD_ATTACH_FAILED") {
@@ -103598,7 +103712,7 @@ function registerAccountRoutes(app, deps) {
                 )
               }
             },
-            ip: request.ip
+            ip: request2.ip
           });
           return {
             status: 200,
@@ -103609,7 +103723,7 @@ function registerAccountRoutes(app, deps) {
           };
         } catch (error63) {
           if (!(error63 instanceof PaymentProcessorError)) throw error63;
-          request.log.warn(
+          request2.log.warn(
             { err: error63 },
             `saved cards: Stripe refused the settle: ${error63.message}`
           );
@@ -103618,37 +103732,37 @@ function registerAccountRoutes(app, deps) {
       });
     }
   );
-  app.post("/v1/account/forget-device", async (request, reply) => {
-    const token = readDeviceToken(request.headers.cookie);
+  app.post("/v1/account/forget-device", async (request2, reply) => {
+    const token = readDeviceToken(request2.headers.cookie);
     if (token !== null) {
-      await forgetDevice(deps.db, token, request.user.userId);
+      await forgetDevice(deps.db, token, request2.user.userId);
     }
     return reply.header("Set-Cookie", clearedDeviceCookie()).code(204).send();
   });
-  app.post("/v1/account/logout", async (request, reply) => {
-    await closeSession(deps.db, request.user.sessionId);
+  app.post("/v1/account/logout", async (request2, reply) => {
+    await closeSession(deps.db, request2.user.sessionId);
     return reply.header("Set-Cookie", clearedSessionCookie()).code(204).send();
   });
-  app.get("/v1/account/orders", async (request, reply) => {
-    const query = accountOrdersQuery.safeParse(request.query);
+  app.get("/v1/account/orders", async (request2, reply) => {
+    const query = accountOrdersQuery.safeParse(request2.query);
     if (!query.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
     }
     await expireOverdueOrders(deps.db, deps.now());
     const { items, total } = await listOrders(
       deps.db,
-      { userId: request.user.userId },
+      { userId: request2.user.userId },
       query.data
     );
     return orderPageSchema.parse({ items, total, ...query.data });
   });
-  app.get("/v1/account/orders/:order_number", async (request, reply) => {
-    const { order_number: orderNumber } = request.params;
+  app.get("/v1/account/orders/:order_number", async (request2, reply) => {
+    const { order_number: orderNumber } = request2.params;
     const found = await lookUpOrder(deps, orderNumber);
     if (found === null) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
     }
-    if (found.ownerId !== request.user.userId) {
+    if (found.ownerId !== request2.user.userId) {
       return reply.code(403).type(PROBLEM_TYPE).send(problem(403, "Not your order", "DATA_DOMAIN_FORBIDDEN"));
     }
     return orderDetailSchema.parse(found.order);
@@ -103690,13 +103804,6 @@ async function saveFiscalProfile(tx, key, userId, profile) {
 }
 
 // src/routes/accountFiscal.ts
-var TITLES2 = {
-  INVALID_RFC_REJECT: "The RFC is not valid",
-  INVALID_LEGAL_NAME_REJECT: "The legal name is not valid, or carries its capital regime",
-  INVALID_TAX_SYSTEM_REJECT: "The tax regime is not in the SAT catalog",
-  INVALID_POSTAL_CODE_REJECT: "The postal code is not valid",
-  INVALID_CFDI_USE_REJECT: "The CFDI use is not in the SAT catalog"
-};
 var unavailable = (reply) => refuse(
   reply,
   503,
@@ -103704,12 +103811,12 @@ var unavailable = (reply) => refuse(
   "SERVICE_UNAVAILABLE"
 );
 function registerAccountFiscalRoutes(app, deps) {
-  app.get("/v1/account/fiscal-profile", async (request, reply) => {
+  app.get("/v1/account/fiscal-profile", async (request2, reply) => {
     if (deps.piiKey === null) return unavailable(reply);
     const profile = await readFiscalProfile(
       deps.db,
       deps.piiKey,
-      request.user.userId
+      request2.user.userId
     );
     if (profile === null) {
       return refuse(
@@ -103721,14 +103828,14 @@ function registerAccountFiscalRoutes(app, deps) {
     }
     return fiscalProfileSchema.parse(profile);
   });
-  app.put("/v1/account/fiscal-profile", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.put("/v1/account/fiscal-profile", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
     const { piiKey } = deps;
     if (piiKey === null) return unavailable(reply);
-    const body = fiscalProfileRequestSchema.safeParse(request.body);
+    const body = fiscalProfileRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
@@ -103737,9 +103844,9 @@ function registerAccountFiscalRoutes(app, deps) {
       cfdiUse: body.data.defaultCfdiUse
     });
     if (verdict !== "FISCAL_DATA_ACCEPTED") {
-      return refuse(reply, 400, TITLES2[verdict], verdict);
+      return refuse(reply, 400, FISCAL_DATA_TITLES[verdict], verdict);
     }
-    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
       await saveFiscalProfile(tx, piiKey, userId, body.data);
       await recordAudit(tx, {
         userId,
@@ -103748,13 +103855,238 @@ function registerAccountFiscalRoutes(app, deps) {
         entityId: userId,
         before: null,
         after: null,
-        ip: request.ip
+        ip: request2.ip
       });
       return {
         status: 200,
         body: fiscalProfileSavedSchema.parse({ saved: true })
       };
     });
+  });
+}
+
+// src/services/invoiceRequests.ts
+var INVOICEABLE_STATUSES = /* @__PURE__ */ new Set([2, 7, 8, 9]);
+var DAY_MS = 24 * 60 * 60 * 1e3;
+var WINDOW_AFTER_PAYMENT_MS = 30 * DAY_MS;
+var WINDOW_AFTER_REFUSAL_MS = 7 * DAY_MS;
+var PAGE_SIZE = 50;
+var INVOICE_REFUSALS = {
+  ORDER_NOT_FOUND: [404, "Not found"],
+  ORDER_BELONGS_TO_ACCOUNT_REJECT: [
+    409,
+    "The buyer has an account and asks from it"
+  ],
+  ORDER_NOT_ELIGIBLE_REJECT: [409, "The order cannot be invoiced"],
+  FISCAL_DEADLINE_EXPIRED_REJECT: [400, "The time to ask for it has passed"],
+  INVOICE_ALREADY_EXISTS_REJECT: [409, "The order already has a request"]
+};
+var within = (since, length, now) => since !== null && now.getTime() - since.getTime() <= length;
+async function invoicableCents(tx, orderId, totalCents) {
+  const [row4] = await tx.query(
+    "SELECT COALESCE(SUM(refund_mxn_cents), 0) AS n FROM order_returns WHERE order_id = ? AND status IN ('REFUNDING', 'REFUNDED')",
+    [orderId]
+  );
+  return totalCents - Number(row4.n);
+}
+async function requestInvoice(tx, input2, context) {
+  const { orderNumber, ownerId, data, now } = input2;
+  const [order2] = await tx.query(
+    "SELECT id, user_id, status_id, total_mxn_cents, paid_at FROM orders WHERE order_number = ? FOR UPDATE",
+    [orderNumber]
+  );
+  if (order2 === void 0 || ownerId !== null && order2.user_id !== ownerId) {
+    return "ORDER_NOT_FOUND";
+  }
+  if (ownerId === null && order2.user_id !== null) {
+    return "ORDER_BELONGS_TO_ACCOUNT_REJECT";
+  }
+  if (!INVOICEABLE_STATUSES.has(order2.status_id) || await invoicableCents(tx, order2.id, order2.total_mxn_cents) <= 0) {
+    return "ORDER_NOT_ELIGIBLE_REJECT";
+  }
+  const [history] = await tx.query(
+    "SELECT COALESCE(SUM(status IN ('PENDING', 'COMPLETED')), 0) AS active, MAX(rejected_at) AS rejected_at, MAX(cancelled_at) AS cancelled_at FROM invoice_requests WHERE order_id = ?",
+    [order2.id]
+  );
+  const inWindow = within(order2.paid_at, WINDOW_AFTER_PAYMENT_MS, now) || within(history.rejected_at, WINDOW_AFTER_REFUSAL_MS, now) || within(history.cancelled_at, WINDOW_AFTER_REFUSAL_MS, now);
+  if (!inWindow) return "FISCAL_DEADLINE_EXPIRED_REJECT";
+  if (Number(history.active) > 0) return "INVOICE_ALREADY_EXISTS_REJECT";
+  const { piiKey, emailPepper } = context.secrets;
+  const email3 = data.emailForInvoice;
+  const inserted = await tx.query(
+    "INSERT INTO invoice_requests (order_id, user_id, rfc, legal_name_enc, tax_system, postal_code_enc, cfdi_use, email_for_invoice_enc, email_for_invoice_hmac) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      order2.id,
+      order2.user_id,
+      data.rfc,
+      encryptPii(piiKey, orderNumber, "fiscal_legal_name", data.legalName),
+      data.taxSystem,
+      encryptPii(piiKey, orderNumber, "fiscal_postal_code", data.postalCode),
+      data.cfdiUse,
+      encryptPii(piiKey, orderNumber, "invoice_email", email3),
+      emailHmac(emailPepper, email3).toString("hex")
+    ]
+  );
+  const { insertId } = inserted;
+  await recordAudit(tx, {
+    userId: context.userId,
+    action: "INVOICE_REQUESTED",
+    entityType: "invoice_requests",
+    entityId: String(insertId),
+    before: null,
+    after: { orderNumber },
+    ip: context.ip
+  });
+  return { id: Number(insertId), status: "PENDING" };
+}
+async function orderInvoiceState(db, orderNumber, ownerId) {
+  const [row4] = await db.query(
+    "SELECT r.status, r.rejection_reason, r.cancellation_reason FROM orders o LEFT JOIN invoice_requests r ON r.order_id = o.id WHERE o.order_number = ? AND o.user_id = ? ORDER BY r.id DESC LIMIT 1",
+    [orderNumber, ownerId]
+  );
+  if (row4 === void 0) return null;
+  return {
+    status: row4.status,
+    reason: row4.cancellation_reason ?? row4.rejection_reason
+  };
+}
+async function listInvoiceRequests(db, piiKey, filter) {
+  const status2 = filter.status ?? null;
+  const search = filter.search ?? null;
+  const [rows, [count]] = await Promise.all([
+    db.query(
+      "SELECT r.id, o.order_number, o.channel, o.total_mxn_cents, (SELECT COALESCE(SUM(x.refund_mxn_cents), 0) FROM order_returns x WHERE x.order_id = o.id AND x.status IN ('REFUNDING', 'REFUNDED')) AS returned, r.status, r.rfc, r.legal_name_enc, r.tax_system, r.postal_code_enc, r.cfdi_use, r.email_for_invoice_enc, r.rejection_reason, r.cancellation_reason, r.requested_at FROM invoice_requests r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) AND (? IS NULL OR o.order_number = ? OR r.rfc = ?) ORDER BY r.requested_at DESC, r.id DESC LIMIT ? OFFSET ?",
+      [
+        status2,
+        status2,
+        search,
+        search,
+        search,
+        PAGE_SIZE,
+        (filter.page - 1) * PAGE_SIZE
+      ]
+    ),
+    db.query(
+      "SELECT COUNT(*) AS n FROM invoice_requests r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) AND (? IS NULL OR o.order_number = ? OR r.rfc = ?)",
+      [status2, status2, search, search, search]
+    )
+  ]);
+  return {
+    items: rows.map((row4) => ({
+      id: row4.id,
+      orderNumber: row4.order_number,
+      channel: row4.channel,
+      totalMxnCents: row4.total_mxn_cents,
+      invoicableMxnCents: row4.total_mxn_cents - Number(row4.returned),
+      status: row4.status,
+      rfc: row4.rfc,
+      legalName: decryptPii(
+        piiKey,
+        row4.order_number,
+        "fiscal_legal_name",
+        row4.legal_name_enc
+      ),
+      taxSystem: row4.tax_system,
+      postalCode: decryptPii(
+        piiKey,
+        row4.order_number,
+        "fiscal_postal_code",
+        row4.postal_code_enc
+      ),
+      cfdiUse: row4.cfdi_use,
+      email: decryptPii(
+        piiKey,
+        row4.order_number,
+        "invoice_email",
+        row4.email_for_invoice_enc
+      ),
+      reason: row4.cancellation_reason ?? row4.rejection_reason,
+      requestedAt: row4.requested_at.toISOString()
+    })),
+    total: Number(count.n),
+    page: filter.page,
+    pageSize: PAGE_SIZE
+  };
+}
+
+// src/routes/invoiceRequests.ts
+var unavailable2 = (reply) => refuse(
+  reply,
+  503,
+  "Personal data cannot be read or saved right now",
+  "SERVICE_UNAVAILABLE"
+);
+var notFound = (reply) => refuse(reply, ...INVOICE_REFUSALS.ORDER_NOT_FOUND, "ORDER_NOT_FOUND");
+var invalid = (reply) => refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+var orderOf = (request2) => {
+  const { order_number: orderNumber } = request2.params;
+  return ORDER_NUMBER.test(orderNumber) ? orderNumber : null;
+};
+function file2(deps, request2, reply, asked) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    return refuse(reply, 400, "Idempotency-Key required", key.code);
+  }
+  const { secrets } = deps;
+  if (secrets === null) return unavailable2(reply);
+  const verdict = fiscalDataVerdict(asked.data);
+  if (verdict !== "FISCAL_DATA_ACCEPTED") {
+    return refuse(reply, 400, FISCAL_DATA_TITLES[verdict], verdict);
+  }
+  return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
+    const outcome = await requestInvoice(
+      tx,
+      {
+        orderNumber: asked.orderNumber,
+        ownerId: asked.byOwner ? userId : null,
+        data: asked.data,
+        now: deps.now()
+      },
+      { secrets, userId, ip: request2.ip }
+    );
+    if (typeof outcome === "string") {
+      const [status2, title] = INVOICE_REFUSALS[outcome];
+      return { status: status2, body: problem(status2, title, outcome) };
+    }
+    return { status: 201, body: invoiceRequestedSchema.parse(outcome) };
+  });
+}
+function registerInvoiceRequestRoutes(app, deps) {
+  const own2 = "/v1/account/orders/:order_number/invoice-request";
+  app.post(own2, async (request2, reply) => {
+    const orderNumber = orderOf(request2);
+    if (orderNumber === null) return notFound(reply);
+    const body = invoiceRequestSchema.safeParse(request2.body);
+    if (!body.success) return invalid(reply);
+    return file2(deps, request2, reply, {
+      orderNumber,
+      data: body.data,
+      byOwner: true
+    });
+  });
+  app.get(own2, async (request2, reply) => {
+    const orderNumber = orderOf(request2);
+    const state = orderNumber === null ? null : await orderInvoiceState(
+      deps.db,
+      orderNumber,
+      request2.user.userId
+    );
+    return state === null ? notFound(reply) : orderInvoiceStateSchema.parse(state);
+  });
+  app.post("/v1/admin/invoices/requests", async (request2, reply) => {
+    const body = staffInvoiceRequestSchema.safeParse(request2.body);
+    if (!body.success) return invalid(reply);
+    const { orderNumber, ...data } = body.data;
+    if (!ORDER_NUMBER.test(orderNumber)) return notFound(reply);
+    return file2(deps, request2, reply, { orderNumber, data, byOwner: false });
+  });
+  app.get("/v1/admin/invoices/requests", async (request2, reply) => {
+    const query = invoiceQueueQuery.safeParse(request2.query);
+    if (!query.success) return invalid(reply);
+    if (deps.secrets === null) return unavailable2(reply);
+    return invoiceQueueSchema.parse(
+      await listInvoiceRequests(deps.db, deps.secrets.piiKey, query.data)
+    );
   });
 }
 
@@ -103854,21 +104186,21 @@ async function readPaymentsHealth(mode2, processors) {
 
 // src/routes/admin.ts
 function registerAdminRoutes(app, deps) {
-  app.get("/v1/admin/orders", async (request, reply) => {
-    const query = adminOrdersQuery.safeParse(request.query);
+  app.get("/v1/admin/orders", async (request2, reply) => {
+    const query = adminOrdersQuery.safeParse(request2.query);
     if (!query.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid query", "INVALID_REQUEST"));
     }
-    const { status, ...paging2 } = query.data;
+    const { status: status2, ...paging2 } = query.data;
     await expireOverdueOrders(deps.db, deps.now());
     const { items, total } = await listOrders(
       deps.db,
-      { status: status ?? null },
+      { status: status2 ?? null },
       paging2
     );
     return orderPageSchema.parse({ items, total, ...paging2 });
   });
-  app.get("/v1/admin/payments/health", async (request) => {
+  app.get("/v1/admin/payments/health", async (request2) => {
     const health = paymentsHealthSchema.parse(
       await readPaymentsHealth(deps.mode, deps.processors)
     );
@@ -103880,17 +104212,17 @@ function registerAdminRoutes(app, deps) {
       failed.map(
         ([processor]) => noteProbeFailure(deps.db, processor, deps.now()).catch(
           (error63) => {
-            request.log.error({ error: error63 }, "probe failure not recorded");
+            request2.log.error({ error: error63 }, "probe failure not recorded");
             return false;
           }
         )
       )
     );
-    if (alerted.includes(true)) request.outboxQueued = true;
+    if (alerted.includes(true)) request2.outboxQueued = true;
     return health;
   });
-  app.get("/v1/admin/orders/:order_number", async (request, reply) => {
-    const { order_number: orderNumber } = request.params;
+  app.get("/v1/admin/orders/:order_number", async (request2, reply) => {
+    const { order_number: orderNumber } = request2.params;
     const found = await lookUpOrder(deps, orderNumber);
     if (found === null) {
       return reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"));
@@ -103941,28 +104273,28 @@ var PHRASES = {
   live: "CONFIRMAR_CAMBIO_A_LIVE",
   sandbox: "CONFIRMAR_CAMBIO_A_SANDBOX"
 };
-async function prepareModeSwitch(tx, request, actor, now) {
-  if (request.targetMode === request.currentMode) {
+async function prepareModeSwitch(tx, request2, actor, now) {
+  if (request2.targetMode === request2.currentMode) {
     return "SWITCH_TARGET_UNCHANGED";
   }
   const challengeId = (0, import_node_crypto9.randomBytes)(32).toString("hex");
   const expiresAt = new Date(now.getTime() + TICKET_MS);
   await tx.query(
     "INSERT INTO payments_mode_tickets (challenge_id, target_mode, requested_by, reason, expires_at) VALUES (?, ?, ?, ?, ?)",
-    [challengeId, request.targetMode, actor.userId, request.reason, expiresAt]
+    [challengeId, request2.targetMode, actor.userId, request2.reason, expiresAt]
   );
   await recordAudit(tx, {
     userId: actor.userId,
     action: "PAYMENTS_MODE_PREPARED",
     entityType: "payments",
-    entityId: request.targetMode,
-    before: { mode: request.currentMode },
-    after: { mode: request.targetMode },
+    entityId: request2.targetMode,
+    before: { mode: request2.currentMode },
+    after: { mode: request2.targetMode },
     ip: actor.ip
   });
   return {
     challengeId,
-    targetMode: request.targetMode,
+    targetMode: request2.targetMode,
     expiresAt: expiresAt.toISOString()
   };
 }
@@ -104048,21 +104380,21 @@ var REFUSALS2 = {
   SWITCH_OWNER_REQUIRED: [403, "Only the owner confirms"]
 };
 function refusalOf2(code2) {
-  const [status, title] = REFUSALS2[code2];
-  return { status, body: problem(status, title, code2) };
+  const [status2, title] = REFUSALS2[code2];
+  return { status: status2, body: problem(status2, title, code2) };
 }
 function registerAdminPaymentRoutes(app, deps) {
-  app.post("/v1/admin/payments/mode/prepare", async (request, reply) => {
-    const body = paymentModePrepareSchema.safeParse(request.body);
+  app.post("/v1/admin/payments/mode/prepare", async (request2, reply) => {
+    const body = paymentModePrepareSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
-    const { userId } = request.user;
+    const { userId } = request2.user;
     const outcome = await deps.db.transaction(
       (tx) => prepareModeSwitch(
         tx,
         { ...body.data, currentMode: deps.mode },
-        { userId, ip: request.ip },
+        { userId, ip: request2.ip },
         deps.now()
       )
     );
@@ -104077,12 +104409,12 @@ function registerAdminPaymentRoutes(app, deps) {
     }
     return reply.code(201).send(outcome);
   });
-  app.post("/v1/admin/payments/mode/confirm", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.post("/v1/admin/payments/mode/confirm", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = paymentModeConfirmSchema.safeParse(request.body);
+    const body = paymentModeConfirmSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
@@ -104090,18 +104422,18 @@ function registerAdminPaymentRoutes(app, deps) {
       return refuse(reply, 503, "Identity unavailable", "SERVICE_UNAVAILABLE");
     }
     const { totpKey } = deps.auth;
-    const { roles } = request.user;
-    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+    const { roles } = request2.user;
+    return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
       const outcome = await confirmModeSwitch(
         tx,
         { ...body.data, owner: roles.includes("owner"), totpKey },
-        { userId, ip: request.ip },
+        { userId, ip: request2.ip },
         deps.now()
       );
       if (typeof outcome === "string") {
         return refusalOf2(outcome);
       }
-      request.outboxQueued = true;
+      request2.outboxQueued = true;
       return { status: 200, body: outcome };
     });
   });
@@ -104547,27 +104879,27 @@ var REFUSALS3 = {
   INVALID_VOUCHER_DATA_REJECT: [400, "The voucher data is incomplete"]
 };
 function refusalOf3(code2) {
-  const [status, title] = REFUSALS3[code2];
-  return { status, body: problem(status, title, code2) };
+  const [status2, title] = REFUSALS3[code2];
+  return { status: status2, body: problem(status2, title, code2) };
 }
-function actorOf(request) {
-  const user = request.user;
+function actorOf(request2) {
+  const user = request2.user;
   return {
     userId: user.userId,
     supervisor: user.permissions.includes("pos:supervisor"),
-    ip: request.ip
+    ip: request2.ip
   };
 }
-function write(deps, request, reply, body, run) {
-  const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+function write(deps, request2, reply, body, run) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
   if (key.code !== "IDEMP_KEY_ACCEPTED") {
     return refuse(reply, 400, "Idempotency-Key required", key.code);
   }
   if (body === void 0) {
     return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
   }
-  const actor = actorOf(request);
-  return runOnce(deps, request, reply, key.key, (tx) => run(tx, body, actor));
+  const actor = actorOf(request2);
+  return runOnce(deps, request2, reply, key.key, (tx) => run(tx, body, actor));
 }
 function registerPosRoutes(app, deps) {
   app.get("/v1/admin/pos/shifts/current", async () => ({
@@ -104575,11 +104907,11 @@ function registerPosRoutes(app, deps) {
   }));
   app.post(
     "/v1/admin/pos/shifts/open",
-    async (request, reply) => write(
+    async (request2, reply) => write(
       deps,
-      request,
+      request2,
       reply,
-      openShiftSchema.safeParse(request.body).data,
+      openShiftSchema.safeParse(request2.body).data,
       async (tx, body, actor) => {
         const outcome = await openShift(tx, body.openingCashMxnCents, actor);
         return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
@@ -104588,23 +104920,23 @@ function registerPosRoutes(app, deps) {
   );
   app.post(
     "/v1/admin/pos/shifts/movements",
-    async (request, reply) => write(
+    async (request2, reply) => write(
       deps,
-      request,
+      request2,
       reply,
-      cashMovementSchema.safeParse(request.body).data,
+      cashMovementSchema.safeParse(request2.body).data,
       async (tx, body, actor) => {
         const outcome = await moveCash(tx, body, actor);
         return typeof outcome === "string" ? refusalOf3(outcome) : { status: 201, body: outcome };
       }
     )
   );
-  app.post("/v1/admin/pos/shifts/:id/close", async (request, reply) => {
-    const params = shiftParams.safeParse(request.params);
-    const body = closeShiftSchema.safeParse(request.body).data;
+  app.post("/v1/admin/pos/shifts/:id/close", async (request2, reply) => {
+    const params = shiftParams.safeParse(request2.params);
+    const body = closeShiftSchema.safeParse(request2.body).data;
     return write(
       deps,
-      request,
+      request2,
       reply,
       params.success && body ? { id: params.data.id, ...body } : void 0,
       async (tx, input2, actor) => {
@@ -104619,23 +104951,23 @@ function registerPosRoutes(app, deps) {
       }
     );
   });
-  app.get("/v1/admin/pos/products", async (request, reply) => {
-    const query = posProductsQuery.safeParse(request.query);
+  app.get("/v1/admin/pos/products", async (request2, reply) => {
+    const query = posProductsQuery.safeParse(request2.query);
     if (!query.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return posProducts(deps.db, query.data.q);
   });
-  app.post("/v1/admin/pos/checkout", async (request, reply) => {
+  app.post("/v1/admin/pos/checkout", async (request2, reply) => {
     const { checkout: secrets } = deps;
     if (secrets === null) {
       return refuse(reply, 503, "Checkout unavailable", "SERVICE_UNAVAILABLE");
     }
     return write(
       deps,
-      request,
+      request2,
       reply,
-      posSaleSchema.safeParse(request.body).data,
+      posSaleSchema.safeParse(request2.body).data,
       async (tx, body, actor) => {
         const outcome = await sellAtCounter(tx, body, {
           actor,
@@ -104643,19 +104975,19 @@ function registerPosRoutes(app, deps) {
           now: deps.now()
         });
         if (typeof outcome === "string") return refusalOf3(outcome);
-        if (body.customerEmail !== void 0) request.outboxQueued = true;
+        if (body.customerEmail !== void 0) request2.outboxQueued = true;
         return { status: 201, body: outcome };
       }
     );
   });
   app.get(
     "/v1/admin/pos/orders/:order_number/receipt",
-    async (request, reply) => {
-      const query = receiptQuery.safeParse(request.query);
+    async (request2, reply) => {
+      const query = receiptQuery.safeParse(request2.query);
       if (!query.success) {
         return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
       }
-      const { order_number: orderNumber } = request.params;
+      const { order_number: orderNumber } = request2.params;
       const receipt = await posReceipt(
         deps.db,
         orderNumber,
@@ -104750,18 +105082,18 @@ function registerAdminOrderRoutes(app, deps) {
   for (const step of STEP_ROUTES) {
     app.post(
       `/v1/admin/orders/:order_number/${step}`,
-      async (request, reply) => {
-        const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+      async (request2, reply) => {
+        const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
         if (key.code !== "IDEMP_KEY_ACCEPTED") {
           return refuse(reply, 400, "Idempotency-Key required", key.code);
         }
-        const { order_number: orderNumber } = request.params;
+        const { order_number: orderNumber } = request2.params;
         if (!ORDER_NUMBER.test(orderNumber)) {
           return refuse(reply, 400, "Invalid order", "ORDER_PAYLOAD_INVALID");
         }
         let parcel = null;
         if (step === "ship") {
-          const body = shipRequestSchema.safeParse(request.body);
+          const body = shipRequestSchema.safeParse(request2.body);
           if (!body.success) {
             return refuse(
               reply,
@@ -104772,22 +105104,22 @@ function registerAdminOrderRoutes(app, deps) {
           }
           parcel = body.data;
         }
-        return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+        return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
           const outcome = await transitionOrder(
             tx,
             step,
             orderNumber,
             parcel,
-            { userId, ip: request.ip },
+            { userId, ip: request2.ip },
             deps.now()
           );
           if (typeof outcome !== "string") {
             return { status: 200, body: outcome };
           }
-          const [status, title] = REFUSALS4[outcome];
+          const [status2, title] = REFUSALS4[outcome];
           return {
-            status,
-            body: problem(status, title, outcome)
+            status: status2,
+            body: problem(status2, title, outcome)
           };
         });
       }
@@ -104959,62 +105291,62 @@ var REFUSALS5 = {
     "The administrator role cannot be changed that way"
   ]
 };
-function actorOf2(request) {
-  const user = request.user;
+function actorOf2(request2) {
+  const user = request2.user;
   return {
     userId: user.userId,
     roles: user.roles,
     permissions: user.permissions,
     totpEnabled: user.totpEnabled,
-    ip: request.ip
+    ip: request2.ip
   };
 }
 function answerOf(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS5[outcome];
-  return { status, body: problem(status, title, outcome) };
+  const [status2, title] = REFUSALS5[outcome];
+  return { status: status2, body: problem(status2, title, outcome) };
 }
 function registerAdminRoleRoutes(app, deps) {
   app.get(
     "/v1/admin/roles",
     async () => roleListSchema.parse(await listRoles(deps.db))
   );
-  app.post("/v1/admin/roles", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.post("/v1/admin/roles", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = roleCreateRequestSchema.safeParse(request.body);
+    const body = roleCreateRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
-      async (tx) => answerOf(await createRole(tx, body.data, actorOf2(request)), true)
+      async (tx) => answerOf(await createRole(tx, body.data, actorOf2(request2)), true)
     );
   });
-  app.patch("/v1/admin/roles/:id", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.patch("/v1/admin/roles/:id", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const params = roleParams.safeParse(request.params);
-    const body = rolePatchRequestSchema.safeParse(request.body);
+    const params = roleParams.safeParse(request2.params);
+    const body = rolePatchRequestSchema.safeParse(request2.body);
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
       async (tx) => answerOf(
-        await patchRole(tx, params.data.id, body.data, actorOf2(request)),
+        await patchRole(tx, params.data.id, body.data, actorOf2(request2)),
         false
       )
     );
@@ -105023,7 +105355,7 @@ function registerAdminRoleRoutes(app, deps) {
 
 // src/services/returnsEligibility.ts
 var RETURN_WINDOW_DAYS = 60;
-var DAY_MS = 24 * 60 * 60 * 1e3;
+var DAY_MS2 = 24 * 60 * 60 * 1e3;
 function decideReturnLine(inputs) {
   if (!inputs.owner) return "DATA_DOMAIN_FORBIDDEN";
   if (!inputs.delivered) return "ORDER_NOT_DELIVERED_REJECT";
@@ -105032,7 +105364,7 @@ function decideReturnLine(inputs) {
   return inputs.validQuantity ? "RETURN_ELIGIBLE_OK" : "INVALID_QUANTITY_REJECT";
 }
 function withinReturnWindow(deliveredAt, now) {
-  return deliveredAt !== null && now.getTime() <= new Date(deliveredAt).getTime() + RETURN_WINDOW_DAYS * DAY_MS;
+  return deliveredAt !== null && now.getTime() <= new Date(deliveredAt).getTime() + RETURN_WINDOW_DAYS * DAY_MS2;
 }
 function decideConfirmation(inputs) {
   if (!inputs.prepared) return "RETURN_NOT_PREPARED_REJECT";
@@ -105168,15 +105500,15 @@ async function requestReturn(tx, input2, actor) {
   });
   return viewOf2(tx, insertId);
 }
-async function listReturns(db, status) {
+async function listReturns(db, status2) {
   const [rows, [count]] = await Promise.all([
     db.query(
       "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at, o.channel FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200",
-      [status, status]
+      [status2, status2]
     ),
     db.query(
       "SELECT COUNT(*) AS n FROM order_returns WHERE (? IS NULL OR status = ?)",
-      [status, status]
+      [status2, status2]
     )
   ]);
   return { items: await withLines(db, rows), total: Number(count.n) };
@@ -105386,8 +105718,8 @@ async function finishRefund(tx, intent, reference, confirmer, processorRefundedC
   return viewOf2(tx, intent.returnId);
 }
 var refusalAnswer = (code2) => {
-  const [status, title] = RETURN_REFUSALS[code2];
-  return { status, body: problem(status, title, code2) };
+  const [status2, title] = RETURN_REFUSALS[code2];
+  return { status: status2, body: problem(status2, title, code2) };
 };
 async function confirmReturn(deps, id, confirmer, ip) {
   const processorRefunded = await readProcessorRefunded(deps, id);
@@ -105464,43 +105796,43 @@ async function isReturnRefund(db, orderId, refundIds) {
 
 // src/routes/returns.ts
 function refusalOf5(code2) {
-  const [status, title] = RETURN_REFUSALS[code2];
-  return { status, body: problem(status, title, code2) };
+  const [status2, title] = RETURN_REFUSALS[code2];
+  return { status: status2, body: problem(status2, title, code2) };
 }
 function registerReturnRoutes(app, deps) {
   app.post(
     "/v1/account/orders/:order_number/returns",
-    async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    async (request2, reply) => {
+      const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
       if (key.code !== "IDEMP_KEY_ACCEPTED") {
         return refuse(reply, 400, "Idempotency-Key required", key.code);
       }
-      const { order_number: orderNumber } = request.params;
-      const body = returnRequestSchema.safeParse(request.body);
+      const { order_number: orderNumber } = request2.params;
+      const body = returnRequestSchema.safeParse(request2.body);
       if (!ORDER_NUMBER.test(orderNumber) || !body.success) {
         return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
       }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
         const outcome = await requestReturn(
           tx,
           { orderNumber, userId, request: body.data, now: deps.now() },
-          { userId, ip: request.ip }
+          { userId, ip: request2.ip }
         );
         return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
       });
     }
   );
-  app.post("/v1/admin/returns/pos", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.post("/v1/admin/returns/pos", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = posReturnRequestSchema.safeParse(request.body);
+    const body = posReturnRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
     }
     const { orderNumber, ...asked } = body.data;
-    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
       const outcome = await requestReturn(
         tx,
         {
@@ -105510,25 +105842,25 @@ function registerReturnRoutes(app, deps) {
           now: deps.now(),
           counter: true
         },
-        { userId, ip: request.ip }
+        { userId, ip: request2.ip }
       );
       return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
     });
   });
-  app.get("/v1/admin/returns", async (request, reply) => {
-    const query = returnListQuery.safeParse(request.query);
+  app.get("/v1/admin/returns", async (request2, reply) => {
+    const query = returnListQuery.safeParse(request2.query);
     if (!query.success) {
       return refuse(reply, 400, "Invalid filter", "RETURN_PAYLOAD_INVALID");
     }
     return listReturns(deps.db, query.data.status ?? null);
   });
-  app.post("/v1/admin/returns/:id/prepare", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.post("/v1/admin/returns/:id/prepare", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const params = returnParams.safeParse(request.params);
-    const body = returnPrepareRequestSchema.safeParse(request.body);
+    const params = returnParams.safeParse(request2.params);
+    const body = returnPrepareRequestSchema.safeParse(request2.body);
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
     }
@@ -105537,27 +105869,27 @@ function registerReturnRoutes(app, deps) {
       params.data.id
     );
     if (processorRefundedCents === "REFUND_PROCESSOR_ERROR") {
-      const [status, title] = RETURN_REFUSALS[processorRefundedCents];
-      return refuse(reply, status, title, processorRefundedCents);
+      const [status2, title] = RETURN_REFUSALS[processorRefundedCents];
+      return refuse(reply, status2, title, processorRefundedCents);
     }
-    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+    return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
       const outcome = await prepareReturn(
         tx,
         params.data.id,
         { ...body.data, processorRefundedCents },
-        { userId, ip: request.ip },
+        { userId, ip: request2.ip },
         deps.now()
       );
       return typeof outcome === "string" ? refusalOf5(outcome) : { status: 200, body: outcome };
     });
   });
-  app.post("/v1/admin/returns/:id/confirm", async (request, reply) => {
-    const params = returnParams.safeParse(request.params);
-    const body = returnConfirmRequestSchema.safeParse(request.body ?? {});
+  app.post("/v1/admin/returns/:id/confirm", async (request2, reply) => {
+    const params = returnParams.safeParse(request2.params);
+    const body = returnConfirmRequestSchema.safeParse(request2.body ?? {});
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid request", "RETURN_PAYLOAD_INVALID");
     }
-    const user = request.user;
+    const user = request2.user;
     const answer = await confirmReturn(
       deps,
       params.data.id,
@@ -105567,7 +105899,7 @@ function registerReturnRoutes(app, deps) {
         manualReference: body.data.manualReference ?? null,
         refundMethod: body.data.refundMethod ?? null
       },
-      request.ip
+      request2.ip
     );
     if (answer.status >= 400) reply.type(PROBLEM_TYPE);
     return reply.code(answer.status).send(answer.body);
@@ -105854,45 +106186,45 @@ var REFUSALS6 = {
   ROLE_NOT_FOUND: [422, "Unknown or retired role"],
   STAFF_ALREADY_EXISTS: [409, "Already part of the staff"]
 };
-function actorOf3(request) {
-  const user = request.user;
+function actorOf3(request2) {
+  const user = request2.user;
   return {
     userId: user.userId,
     roles: user.roles,
     totpEnabled: user.totpEnabled,
-    ip: request.ip
+    ip: request2.ip
   };
 }
 function answerOf2(outcome, created) {
   if (typeof outcome !== "string") {
     return { status: created ? 201 : 200, body: outcome };
   }
-  const [status, title] = REFUSALS6[outcome];
-  return { status, body: problem(status, title, outcome) };
+  const [status2, title] = REFUSALS6[outcome];
+  return { status: status2, body: problem(status2, title, outcome) };
 }
 function registerStaffUserRoutes(app, deps) {
   app.get(
     "/v1/admin/users",
-    async (request) => adminUserListSchema.parse({
+    async (request2) => adminUserListSchema.parse({
       items: await listStaff(
         deps.db,
-        request.user.roles.includes("owner")
+        request2.user.roles.includes("owner")
       )
     })
   );
-  app.post("/v1/admin/users", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.post("/v1/admin/users", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = staffCreateRequestSchema.safeParse(request.body);
+    const body = staffCreateRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     const { totpKey } = deps.auth;
     const sent = await runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
       async (tx) => answerOf2(
@@ -105905,34 +106237,34 @@ function registerStaffUserRoutes(app, deps) {
             totpKey,
             now: deps.now()
           },
-          actorOf3(request)
+          actorOf3(request2)
         ),
         true
       )
     );
-    request.outboxQueued = reply.statusCode === 201;
+    request2.outboxQueued = reply.statusCode === 201;
     return sent;
   });
-  app.patch("/v1/admin/users/:id", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.patch("/v1/admin/users/:id", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const params = adminUserParams.safeParse(request.params);
-    const body = staffUpdateRequestSchema.safeParse(request.body);
+    const params = adminUserParams.safeParse(request2.params);
+    const body = staffUpdateRequestSchema.safeParse(request2.body);
     if (!params.success || !body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
       async (tx) => answerOf2(
         await updateStaff(
           tx,
           { id: params.data.id, ...body.data },
-          actorOf3(request)
+          actorOf3(request2)
         ),
         false
       )
@@ -106074,49 +106406,49 @@ var REFUSALS7 = {
 };
 function answerOf3(outcome) {
   if (typeof outcome !== "string") return { status: 200, body: outcome };
-  const [status, title] = REFUSALS7[outcome];
-  return { status, body: problem(status, title, outcome) };
+  const [status2, title] = REFUSALS7[outcome];
+  return { status: status2, body: problem(status2, title, outcome) };
 }
 function registerAdminShippingRoutes(app, deps) {
   app.get(
     "/v1/admin/shipping",
     async () => shippingAdminViewSchema.parse(await readShippingAdmin(deps.db))
   );
-  app.put("/v1/admin/shipping/config", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.put("/v1/admin/shipping/config", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = shippingConfigRequestSchema.safeParse(request.body);
+    const body = shippingConfigRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
       async (tx, userId) => answerOf3(
-        await updateShippingConfig(tx, body.data, { userId, ip: request.ip })
+        await updateShippingConfig(tx, body.data, { userId, ip: request2.ip })
       )
     );
   });
-  app.put("/v1/admin/shipping/rules", async (request, reply) => {
-    const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+  app.put("/v1/admin/shipping/rules", async (request2, reply) => {
+    const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
     if (key.code !== "IDEMP_KEY_ACCEPTED") {
       return refuse(reply, 400, "Idempotency-Key required", key.code);
     }
-    const body = shippingRulesRequestSchema.safeParse(request.body);
+    const body = shippingRulesRequestSchema.safeParse(request2.body);
     if (!body.success) {
       return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
     }
     return runOnce(
       deps,
-      request,
+      request2,
       reply,
       key.key,
       async (tx, userId) => answerOf3(
-        await updateShippingRules(tx, body.data, { userId, ip: request.ip })
+        await updateShippingRules(tx, body.data, { userId, ip: request2.ip })
       )
     );
   });
@@ -106300,7 +106632,7 @@ var RESET_REQUEST_ANSWER = {
   ok: true,
   message: "Si el correo est\xE1 registrado, enviamos instrucciones para restablecer tu contrase\xF1a."
 };
-var TITLES3 = {
+var TITLES2 = {
   AUTH_UNAVAILABLE: "Sign-in unavailable",
   MAIL_UNAVAILABLE: "Sign-in by e-mail unavailable",
   INVALID_REQUEST: "Invalid request",
@@ -106323,8 +106655,8 @@ var TITLES3 = {
   PASSWORD_COMMON: "The password is too common",
   PASSWORD_BREACHED: "The password appears in a known data breach"
 };
-function refuse3(reply, status, code2) {
-  return reply.code(status).type(PROBLEM_TYPE).send(problem(status, TITLES3[code2], code2));
+function refuse3(reply, status2, code2) {
+  return reply.code(status2).type(PROBLEM_TYPE).send(problem(status2, TITLES2[code2], code2));
 }
 async function strongEnough(password, context, reply, breach) {
   const broken = passwordViolation(password, context);
@@ -106341,12 +106673,12 @@ var CHALLENGE_LIMIT = {
   config: { rateLimit: { max: 30, timeWindow: "1 minute" } }
 };
 function registerAuthRoutes(app, deps) {
-  function parse4(schema2, request, reply) {
+  function parse4(schema2, request2, reply) {
     if (deps.auth === null) {
       void refuse3(reply, 503, "AUTH_UNAVAILABLE");
       return null;
     }
-    const body = schema2.safeParse(request.body);
+    const body = schema2.safeParse(request2.body);
     if (!body.success) {
       void refuse3(reply, 400, "INVALID_REQUEST");
       return null;
@@ -106359,7 +106691,7 @@ function registerAuthRoutes(app, deps) {
     void refuse3(reply, 401, "INVALID_CHALLENGE");
     return null;
   }
-  async function passMailedCode(request, reply, auth2, challenge, code2, remember) {
+  async function passMailedCode(request2, reply, auth2, challenge, code2, remember) {
     if (!sameHash(challenge.codeHash, codeHash(auth2.secret, code2))) {
       await failChallenge(deps.db, challenge.id);
       return refuse3(reply, 401, "INVALID_CODE");
@@ -106370,12 +106702,12 @@ function registerAuthRoutes(app, deps) {
       await passEmailChallenge(deps.db, auth2.secret, challenge.id);
       return refuse3(reply, 409, "TOTP_NOT_ENROLLED");
     }
-    await signIn(request, reply, challenge, roles, remember);
+    await signIn(request2, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
   }
-  async function signIn(request, reply, passed, roles, remember = false) {
+  async function signIn(request2, reply, passed, roles, remember = false) {
     const privileged = isPrivileged(roles);
-    const facts = clientFacts(request.ip, request.headers["user-agent"]);
+    const facts = clientFacts(request2.ip, request2.headers["user-agent"]);
     const cookies = await deps.db.transaction(async (tx) => {
       const { token, maxAgeSeconds } = await openSession(tx, {
         challengeId: passed.id,
@@ -106431,11 +106763,11 @@ function registerAuthRoutes(app, deps) {
       return issueChallenge(deps.auth.secret, deps.now());
     }
   );
-  app.post("/v1/auth/register", LIMITED, async (request, reply) => {
-    if (unsupportedLocale(request.body, "preferredLocale")) {
+  app.post("/v1/auth/register", LIMITED, async (request2, reply) => {
+    if (unsupportedLocale(request2.body, "preferredLocale")) {
       return refuse3(reply, 400, "LOCALE_INPUT_UNSUPPORTED");
     }
-    const parsed = parse4(registerRequestSchema, request, reply);
+    const parsed = parse4(registerRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     if (!await botCheck(auth2, body.altcha, reply)) return reply;
@@ -106450,9 +106782,9 @@ function registerAuthRoutes(app, deps) {
     });
     return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
   });
-  app.post("/v1/auth/forgot-password", LIMITED, async (request, reply) => {
+  app.post("/v1/auth/forgot-password", LIMITED, async (request2, reply) => {
     const started = deps.now().getTime();
-    const parsed = parse4(forgotPasswordRequestSchema, request, reply);
+    const parsed = parse4(forgotPasswordRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     if (!await botCheck(auth2, body.altcha, reply)) return reply;
@@ -106466,7 +106798,7 @@ function registerAuthRoutes(app, deps) {
       await deps.db.transaction(
         (tx) => mailResetLink(tx, user.id, auth2.totpKey, deps.now())
       );
-      request.outboxQueued = true;
+      request2.outboxQueued = true;
     } else {
       decoyReset(auth2.totpKey);
     }
@@ -106474,9 +106806,9 @@ function registerAuthRoutes(app, deps) {
     await wait(Math.max(0, RESET_REQUEST_FLOOR_MS - elapsed));
     return forgotPasswordResponseSchema.parse(RESET_REQUEST_ANSWER);
   });
-  app.post("/v1/auth/reset-password/check", LIMITED, async (request, reply) => {
+  app.post("/v1/auth/reset-password/check", LIMITED, async (request2, reply) => {
     reply.header("Cache-Control", "no-store");
-    const parsed = parse4(resetCheckRequestSchema, request, reply);
+    const parsed = parse4(resetCheckRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const reset = await liveReset(deps.db, parsed.body.token, deps.now());
     if (reset === null) return refuse3(reply, 400, "RESET_TOKEN_INVALID");
@@ -106485,8 +106817,8 @@ function registerAuthRoutes(app, deps) {
       fullName: reset.fullName
     });
   });
-  app.post("/v1/auth/reset-password", LIMITED, async (request, reply) => {
-    const parsed = parse4(resetPasswordRequestSchema, request, reply);
+  app.post("/v1/auth/reset-password", LIMITED, async (request2, reply) => {
+    const parsed = parse4(resetPasswordRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { body } = parsed;
     const reset = await liveReset(deps.db, body.token, deps.now());
@@ -106499,14 +106831,14 @@ function registerAuthRoutes(app, deps) {
       reset,
       await hashPassword(body.password),
       deps.now(),
-      clientFacts(request.ip, void 0).ip
+      clientFacts(request2.ip, void 0).ip
     );
     if (!changed) return refuse3(reply, 400, "RESET_TOKEN_INVALID");
-    request.outboxQueued = true;
+    request2.outboxQueued = true;
     return reply.header("Set-Cookie", clearedSessionCookie()).send(resetPasswordResponseSchema.parse({ ok: true }));
   });
-  app.post("/v1/auth/login", LIMITED, async (request, reply) => {
-    const parsed = parse4(loginRequestSchema, request, reply);
+  app.post("/v1/auth/login", LIMITED, async (request2, reply) => {
+    const parsed = parse4(loginRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     if (!await botCheck(auth2, body.altcha, reply)) return reply;
@@ -106518,12 +106850,12 @@ function registerAuthRoutes(app, deps) {
     if (user === null || !valid) {
       return refuse3(reply, 401, "INVALID_CREDENTIALS");
     }
-    const device = readDeviceToken(request.headers.cookie);
+    const device = readDeviceToken(request2.headers.cookie);
     if (device !== null) {
       const { roles } = await capabilitiesOf(deps.db, user.id);
       const trusted = !isPrivileged(roles) && await isTrustedDevice(deps.db, device, user.id, deps.now());
       if (trusted) {
-        await signIn(request, reply, { id: null, userId: user.id }, roles);
+        await signIn(request2, reply, { id: null, userId: user.id }, roles);
         return reply.code(201).send(signedInSchema.parse({ status: "signed_in" }));
       }
     }
@@ -106558,15 +106890,15 @@ function registerAuthRoutes(app, deps) {
       });
       return id;
     });
-    request.outboxQueued = true;
+    request2.outboxQueued = true;
     return loginResponseSchema.parse({
       challengeId,
       next: "verify",
       channel: "email"
     });
   });
-  app.post("/v1/auth/totp/enroll", LIMITED, async (request, reply) => {
-    const parsed = parse4(challengeRequestSchema, request, reply);
+  app.post("/v1/auth/totp/enroll", LIMITED, async (request2, reply) => {
+    const parsed = parse4(challengeRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
@@ -106586,8 +106918,8 @@ function registerAuthRoutes(app, deps) {
       otpauthUri: otpauthUri(email3, secret)
     });
   });
-  app.post("/v1/auth/totp/confirm", LIMITED, async (request, reply) => {
-    const parsed = parse4(codeRequestSchema, request, reply);
+  app.post("/v1/auth/totp/confirm", LIMITED, async (request2, reply) => {
+    const parsed = parse4(codeRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     const challenge = await challengeOf(body.challengeId, ["TOTP"], reply);
@@ -106613,13 +106945,13 @@ function registerAuthRoutes(app, deps) {
       );
       await enqueueMail(tx, { type: "TOTP_ENABLED", userId: challenge.userId });
     });
-    request.outboxQueued = true;
+    request2.outboxQueued = true;
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles);
+    await signIn(request2, reply, challenge, roles);
     return confirmResponseSchema.parse({ backupCodes });
   });
-  app.post("/v1/auth/verify", LIMITED, async (request, reply) => {
-    const parsed = parse4(verifyRequestSchema, request, reply);
+  app.post("/v1/auth/verify", LIMITED, async (request2, reply) => {
+    const parsed = parse4(verifyRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
     const remember = body.rememberDevice === true;
@@ -106631,7 +106963,7 @@ function registerAuthRoutes(app, deps) {
     if (challenge === null) return reply;
     if (challenge.type === "EMAIL") {
       return passMailedCode(
-        request,
+        request2,
         reply,
         auth2,
         challenge,
@@ -106658,7 +106990,7 @@ function registerAuthRoutes(app, deps) {
       return refuse3(reply, 401, "INVALID_CODE");
     }
     const { roles } = await capabilitiesOf(deps.db, challenge.userId);
-    await signIn(request, reply, challenge, roles, remember);
+    await signIn(request2, reply, challenge, roles, remember);
     return signedInSchema.parse({ status: "signed_in" });
   });
 }
@@ -107111,21 +107443,21 @@ async function replaceGallery(tx, id, images) {
 
 // src/routes/catalogProducts.ts
 function registerCatalogProductRoutes(app, deps) {
-  app.get("/v1/admin/catalog/products", async (request, reply) => {
-    const query = productListQuery.safeParse(request.query);
+  app.get("/v1/admin/catalog/products", async (request2, reply) => {
+    const query = productListQuery.safeParse(request2.query);
     if (!query.success) {
       return reply.code(400).type(PROBLEM_TYPE).send(problem(400, "Invalid catalog data", "CAT_VALIDATION_ERROR"));
     }
     return { ...await listAdminProducts(deps.db, query.data), ...query.data };
   });
-  app.get("/v1/admin/catalog/products/:id", async (request, reply) => {
-    const params = idParams.safeParse(request.params);
+  app.get("/v1/admin/catalog/products/:id", async (request2, reply) => {
+    const params = idParams.safeParse(request2.params);
     const product = params.success ? await readAdminProduct(deps.db, params.data.id) : null;
     if (product === null) {
-      const status = params.success ? 404 : 400;
-      return reply.code(status).type(PROBLEM_TYPE).send(
+      const status2 = params.success ? 404 : 400;
+      return reply.code(status2).type(PROBLEM_TYPE).send(
         problem(
-          status,
+          status2,
           params.success ? "Not found" : "Invalid catalog data",
           params.success ? "CAT_NOT_FOUND" : "CAT_VALIDATION_ERROR"
         )
@@ -107186,8 +107518,8 @@ function registerCatalogPublishRoute(app, deps) {
   app.post(
     "/v1/admin/catalog/publish",
     { config: { rateLimit: { max: 3, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    async (request2, reply) => {
+      const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
       if (key.code !== "IDEMP_KEY_ACCEPTED") {
         return refuse(reply, 400, "Idempotency-Key required", key.code);
       }
@@ -107200,7 +107532,7 @@ function registerCatalogPublishRoute(app, deps) {
           "CAT_PUBLISH_UNAVAILABLE"
         );
       }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
         const outcome = await dispatchDeploy(token);
         if (outcome === "CAT_PUBLISH_FAILED") {
           return {
@@ -107220,7 +107552,7 @@ function registerCatalogPublishRoute(app, deps) {
           entityId: "deploy.yml",
           before: null,
           after: published,
-          ip: request.ip
+          ip: request2.ip
         });
         return { status: 202, body: { code: outcome, ...published } };
       });
@@ -107245,29 +107577,29 @@ function registerCatalogAdminRoutes(app, deps) {
     "/v1/admin/catalog/media",
     {
       bodyLimit: UPLOAD_READ_LIMIT,
-      errorHandler: (error63, request, reply) => {
+      errorHandler: (error63, request2, reply) => {
         if (error63.code !== "FST_ERR_CTP_BODY_TOO_LARGE")
           throw error63;
         const safe = SAFE_IMAGE_TYPES.includes(
-          String(request.headers["content-type"])
+          String(request2.headers["content-type"])
         );
         const code2 = safe ? "MEDIA_SIZE_EXCEEDED" : "MEDIA_UNSAFE_TYPE";
-        const [status, title] = MEDIA_REFUSALS[code2];
-        return refuse(reply, status, title, code2);
+        const [status2, title] = MEDIA_REFUSALS[code2];
+        return refuse(reply, status2, title, code2);
       }
     },
-    async (request, reply) => {
-      const key = checkIdempotencyKey(request.headers["idempotency-key"]);
+    async (request2, reply) => {
+      const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
       if (key.code !== "IDEMP_KEY_ACCEPTED") {
         return refuse(reply, 400, "Idempotency-Key required", key.code);
       }
-      const bytes = request.body;
-      const verdict = Buffer.isBuffer(bytes) ? inspectMedia(bytes, String(request.headers["content-type"])) : { code: "MEDIA_UNSAFE_TYPE" };
+      const bytes = request2.body;
+      const verdict = Buffer.isBuffer(bytes) ? inspectMedia(bytes, String(request2.headers["content-type"])) : { code: "MEDIA_UNSAFE_TYPE" };
       if (verdict.code !== "MEDIA_ACCEPTED") {
-        const [status, title] = MEDIA_REFUSALS[verdict.code];
-        return refuse(reply, status, title, verdict.code);
+        const [status2, title] = MEDIA_REFUSALS[verdict.code];
+        return refuse(reply, status2, title, verdict.code);
       }
-      return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      return runOnce(deps, request2, reply, key.key, async (tx, userId) => {
         const created = await storeMedia(tx, bytes, verdict);
         const { code: code2, ...stored } = verdict;
         await recordAudit(tx, {
@@ -107277,7 +107609,7 @@ function registerCatalogAdminRoutes(app, deps) {
           entityId: verdict.sha256,
           before: created ? null : stored,
           after: stored,
-          ip: request.ip
+          ip: request2.ip
         });
         return { status: 201, body: { code: code2, created, ...stored } };
       });
@@ -107293,7 +107625,7 @@ function registerCatalogAdminRoutes(app, deps) {
 }
 
 // src/routes/checkout.ts
-var TITLES4 = {
+var TITLES3 = {
   INVALID_REQUEST: "Invalid checkout request",
   SERVICE_UNAVAILABLE: "Payments unavailable",
   INVALID_SHIPPING_ADDRESS: "Invalid shipping address",
@@ -107310,20 +107642,20 @@ function registerCheckoutRoutes(app, deps) {
       bodyLimit: 16 * 1024,
       config: { rateLimit: { max: 10, timeWindow: "1 minute" } }
     },
-    async (request, reply) => {
+    async (request2, reply) => {
       const language = languageSchema.safeParse(
-        request.query.lang
+        request2.query.lang
       );
-      const token = readSessionToken(request.headers.cookie);
+      const token = readSessionToken(request2.headers.cookie);
       const buyer = token ? await sessionUser(deps.db, token, deps.now()) : null;
       const outcome = language.success ? await createCheckout(
         deps,
-        request.body,
+        request2.body,
         language.data,
         buyer?.userId ?? null
       ) : { ok: false, status: 400, code: "INVALID_REQUEST" };
       if (!outcome.ok) {
-        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES3[outcome.code], outcome.code));
       }
       return reply.code(201).send(checkoutSessionSchema.parse(outcome.session));
     }
@@ -107476,12 +107808,12 @@ function refundOrder(deps, base2, order2) {
       "SELECT status_id FROM orders WHERE id = ? FOR UPDATE",
       [order2.id]
     );
-    const status = Number(current.status_id);
-    const outcome = decideRefund(status);
+    const status2 = Number(current.status_id);
+    const outcome = decideRefund(status2);
     const conflict = outcome === "REFUND_STATUS_CONFLICT_ANOMALY";
     const recorded = await recordEvent(tx, {
       ...base2,
-      resultingStatusId: conflict ? status : 5,
+      resultingStatusId: conflict ? status2 : 5,
       alert: conflict
     });
     if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
@@ -107547,15 +107879,15 @@ function settleOrder(deps, base2, order2) {
       "SELECT status_id, payment_resource_id FROM orders WHERE id = ? FOR UPDATE",
       [order2.id]
     );
-    const status = Number(current.status_id);
+    const status2 = Number(current.status_id);
     const row4 = settle2(
-      status === STATUS.PENDING,
-      status === STATUS.PAID && current.payment_resource_id === resourceId,
-      status === STATUS.EXPIRED || status === STATUS.CANCELLED
+      status2 === STATUS.PENDING,
+      status2 === STATUS.PAID && current.payment_resource_id === resourceId,
+      status2 === STATUS.EXPIRED || status2 === STATUS.CANCELLED
     );
     const recorded = await recordEvent(tx, {
       ...base2,
-      resultingStatusId: row4.nextStatusId ?? status,
+      resultingStatusId: row4.nextStatusId ?? status2,
       alert: row4.alert
     });
     if (!recorded) return { status: 200, code: "IDEMPOTENT_IGNORED" };
@@ -107571,7 +107903,7 @@ function settleOrder(deps, base2, order2) {
         [order2.id]
       );
     }
-    if (status === STATUS.PENDING && row4.nextStatusId === STATUS.PAID) {
+    if (status2 === STATUS.PENDING && row4.nextStatusId === STATUS.PAID) {
       await enqueueMail(tx, { type: "ORDER_CONFIRMED", orderId: order2.id });
     }
     return { status: row4.httpStatus, code: row4.code };
@@ -107639,7 +107971,7 @@ var ROUTES = [
   ["stripe", "STRIPE"],
   ["mercadopago", "MERCADO_PAGO"]
 ];
-var TITLES5 = {
+var TITLES4 = {
   INVALID_SIGNATURE: "Invalid signature",
   SERVICE_UNAVAILABLE: "Payments unavailable",
   STATE_CONFLICT_ANOMALY: "Order state conflict",
@@ -107654,28 +107986,28 @@ async function registerWebhookRoutes(app, deps) {
       (_request, body, done2) => done2(null, body)
     );
     for (const [path3, code2] of ROUTES) {
-      scope.post(`/v1/webhooks/${path3}`, async (request, reply) => {
+      scope.post(`/v1/webhooks/${path3}`, async (request2, reply) => {
         const outcome = await receiveWebhook(deps, code2, {
-          rawBody: request.body ?? Buffer.alloc(0),
-          headers: request.headers,
-          query: request.query
+          rawBody: request2.body ?? Buffer.alloc(0),
+          headers: request2.headers,
+          query: request2.query
         });
         if (outcome.status === 200) {
-          request.outboxQueued = true;
+          request2.outboxQueued = true;
           return { code: outcome.code };
         }
         if (outcome.code === "INVALID_SIGNATURE") {
           const alerted = await noteRejectedSignature(
             deps.db,
-            { processor: code2, ip: request.ip },
+            { processor: code2, ip: request2.ip },
             deps.now()
           ).catch((error63) => {
-            request.log.error({ error: error63 }, "rejected signature not recorded");
+            request2.log.error({ error: error63 }, "rejected signature not recorded");
             return false;
           });
-          if (alerted) request.outboxQueued = true;
+          if (alerted) request2.outboxQueued = true;
         }
-        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES5[outcome.code], outcome.code));
+        return reply.code(outcome.status).type(PROBLEM_TYPE).send(problem(outcome.status, TITLES4[outcome.code], outcome.code));
       });
     }
     done();
@@ -107757,15 +108089,15 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
     return answer.json();
   }
   return {
-    async createSession(request) {
-      const allowed = ALLOWED_TYPES[request.method];
+    async createSession(request2) {
+      const allowed = ALLOWED_TYPES[request2.method];
       if (allowed === void 0) {
         throw new PaymentProcessorError(
-          `Mercado Pago: unsupported method ${request.method}`
+          `Mercado Pago: unsupported method ${request2.method}`
         );
       }
-      const remoteExpiresAt = remoteDeadline(request.expiresAt);
-      if (remoteExpiresAt <= request.now) {
+      const remoteExpiresAt = remoteDeadline(request2.expiresAt);
+      if (remoteExpiresAt <= request2.now) {
         throw new PaymentProcessorError(
           "Mercado Pago: the order hold is too short"
         );
@@ -107776,23 +108108,23 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
         body: JSON.stringify({
           items: [
             {
-              id: request.orderNumber,
-              title: request.description,
+              id: request2.orderNumber,
+              title: request2.description,
               quantity: 1,
               currency_id: "MXN",
-              unit_price: request.totalMxnCents / 100
+              unit_price: request2.totalMxnCents / 100
             }
           ],
-          external_reference: request.orderNumber,
+          external_reference: request2.orderNumber,
           back_urls: {
-            success: request.successUrl,
-            pending: request.successUrl,
-            failure: request.cancelUrl
+            success: request2.successUrl,
+            pending: request2.successUrl,
+            failure: request2.cancelUrl
           },
           auto_return: "approved",
-          notification_url: request.notificationUrl,
+          notification_url: request2.notificationUrl,
           expires: true,
-          expiration_date_from: request.now.toISOString(),
+          expiration_date_from: request2.now.toISOString(),
           expiration_date_to: until,
           date_of_expiration: until,
           payment_methods: {
@@ -107854,14 +108186,14 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
           method: "GET"
         }
       );
-      const status = typeof payment2.status === "string" ? payment2.status : "unknown";
+      const status2 = typeof payment2.status === "string" ? payment2.status : "unknown";
       const amount = typeof payment2.transaction_amount === "number" && Number.isFinite(payment2.transaction_amount) ? Math.round(payment2.transaction_amount * 100) : null;
       return {
-        paid: status === "approved",
+        paid: status2 === "approved",
         amountMxnCents: amount,
         currency: typeof payment2.currency_id === "string" ? payment2.currency_id.toUpperCase() : null,
         orderNumber: typeof payment2.external_reference === "string" ? payment2.external_reference : null,
-        processorStatus: status
+        processorStatus: status2
       };
     }
   };
@@ -122102,10 +122434,10 @@ function toRule(row4) {
 }
 function createTableRateProvider(db) {
   return {
-    async quote(request) {
+    async quote(request2) {
       const [zone] = await db.query(
         "SELECT id FROM shipping_zones WHERE code = ? AND is_active = 1",
-        [request.stateCode]
+        [request2.stateCode]
       );
       if (zone === void 0)
         return { serviceable: false, code: "INVALID_DESTINATION" };
@@ -122138,11 +122470,11 @@ function createTableRateProvider(db) {
       return evaluateShipping(config2, rules.map(toRule), {
         zoneId: zone.id,
         classId: purchaseClass(
-          request.lines.map((line) => line.classId),
+          request2.lines.map((line) => line.classId),
           classes.map((c) => ({ id: c.id, rank: c.class_rank }))
         ),
-        chargeableGrams: purchaseWeight(request.lines).chargeableGrams,
-        itemsTotalMxnCents: request.itemsTotalMxnCents
+        chargeableGrams: purchaseWeight(request2.lines).chargeableGrams,
+        itemsTotalMxnCents: request2.itemsTotalMxnCents
       });
     }
   };
@@ -122169,10 +122501,10 @@ function oxxoVoucherEnd(now) {
   );
   return new Date(endLocal - MEXICO_CITY_OFFSET_MS);
 }
-function sessionExpiry(request) {
-  const now = request.now.getTime();
+function sessionExpiry(request2) {
+  const now = request2.now.getTime();
   const latest = Math.min(
-    remoteDeadline(request.expiresAt).getTime(),
+    remoteDeadline(request2.expiresAt).getTime(),
     now + MAX_SESSION_MS
   );
   if (latest - now < MIN_SESSION_MS) {
@@ -122182,30 +122514,30 @@ function sessionExpiry(request) {
   }
   return new Date(latest);
 }
-function sessionForm(request, expiresAt) {
+function sessionForm(request2, expiresAt) {
   const form = new URLSearchParams({
     mode: "payment",
-    "payment_method_types[0]": request.method === "OXXO" ? "oxxo" : "card",
+    "payment_method_types[0]": request2.method === "OXXO" ? "oxxo" : "card",
     "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": "mxn",
-    "line_items[0][price_data][unit_amount]": String(request.totalMxnCents),
-    "line_items[0][price_data][product_data][name]": request.description,
-    client_reference_id: request.orderNumber,
-    "metadata[order_number]": request.orderNumber,
-    success_url: request.successUrl,
-    cancel_url: request.cancelUrl,
+    "line_items[0][price_data][unit_amount]": String(request2.totalMxnCents),
+    "line_items[0][price_data][product_data][name]": request2.description,
+    client_reference_id: request2.orderNumber,
+    "metadata[order_number]": request2.orderNumber,
+    success_url: request2.successUrl,
+    cancel_url: request2.cancelUrl,
     expires_at: String(Math.floor(expiresAt.getTime() / 1e3)),
     // Always charge in MXN: Adaptive Pricing would show and settle a foreign buyer's local
     // currency, and reconciliation (T1.3 R) only accepts the exact total in MXN. Sent on every
     // session so a dashboard toggle can never turn it back on.
     "adaptive_pricing[enabled]": "false"
   });
-  if (request.method === "OXXO") {
+  if (request2.method === "OXXO") {
     form.set("payment_method_options[oxxo][expires_after_days]", "1");
   }
-  if (request.method === "CARD" && request.customerId !== void 0) {
-    form.set("customer", request.customerId);
-    if (request.saveCard === true) {
+  if (request2.method === "CARD" && request2.customerId !== void 0) {
+    form.set("customer", request2.customerId);
+    if (request2.saveCard === true) {
       form.set("saved_payment_method_options[payment_method_save]", "enabled");
     }
   }
@@ -122249,15 +122581,15 @@ async function stripeCall(secrets, fetchImpl, path3, init) {
 function createStripeAdapter(secrets, fetchImpl = fetch) {
   const call = (path3, init) => stripeCall(secrets, fetchImpl, path3, init);
   return {
-    async createSession(request) {
-      if (request.method !== "CARD" && request.method !== "OXXO") {
+    async createSession(request2) {
+      if (request2.method !== "CARD" && request2.method !== "OXXO") {
         throw new PaymentProcessorError(
-          `Stripe: unsupported method ${request.method}`
+          `Stripe: unsupported method ${request2.method}`
         );
       }
-      const expiresAt = sessionExpiry(request);
-      const remoteExpiresAt = request.method === "OXXO" ? oxxoVoucherEnd(request.now) : expiresAt;
-      if (remoteExpiresAt > remoteDeadline(request.expiresAt)) {
+      const expiresAt = sessionExpiry(request2);
+      const remoteExpiresAt = request2.method === "OXXO" ? oxxoVoucherEnd(request2.now) : expiresAt;
+      if (remoteExpiresAt > remoteDeadline(request2.expiresAt)) {
         throw new PaymentProcessorError(
           "Stripe: the voucher would outlive the order hold"
         );
@@ -122265,7 +122597,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       const body = await call("/checkout/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: sessionForm(request, expiresAt).toString()
+        body: sessionForm(request2, expiresAt).toString()
       });
       if (typeof body.id !== "string" || typeof body.url !== "string") {
         throw new PaymentProcessorError("Stripe: unexpected session answer");
@@ -122306,13 +122638,13 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         `/checkout/sessions/${encodeURIComponent(sessionId)}`,
         { method: "GET" }
       );
-      const status = typeof session.payment_status === "string" ? session.payment_status : "unknown";
+      const status2 = typeof session.payment_status === "string" ? session.payment_status : "unknown";
       return {
-        paid: status === "paid",
+        paid: status2 === "paid",
         amountMxnCents: Number.isInteger(session.amount_total) ? session.amount_total : null,
         currency: typeof session.currency === "string" ? session.currency.toUpperCase() : null,
         orderNumber: typeof session.client_reference_id === "string" ? session.client_reference_id : null,
-        processorStatus: status
+        processorStatus: status2
       };
     },
     async ping() {
@@ -122364,9 +122696,9 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
       }
       return refunded;
     },
-    async createRefund(request) {
+    async createRefund(request2) {
       const session = await call(
-        `/checkout/sessions/${encodeURIComponent(request.paymentResourceId)}`,
+        `/checkout/sessions/${encodeURIComponent(request2.paymentResourceId)}`,
         { method: "GET" }
       );
       if (typeof session.payment_intent !== "string") {
@@ -122376,11 +122708,11 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Idempotency-Key": request.idempotencyKey
+          "Idempotency-Key": request2.idempotencyKey
         },
         body: new URLSearchParams({
           payment_intent: session.payment_intent,
-          amount: String(request.amountMxnCents),
+          amount: String(request2.amountMxnCents),
           reason: "requested_by_customer"
         }).toString()
       });
@@ -122527,9 +122859,9 @@ async function buildApp(deps) {
   });
   await app.register(import_rate_limit.default, { max: 120, timeWindow: "1 minute" });
   app.setErrorHandler((error63, _request, reply) => {
-    const status = error63.statusCode && error63.statusCode < 500 ? error63.statusCode : 500;
-    if (status === 500) app.log.error(error63);
-    return reply.code(status).type(PROBLEM_TYPE).send(problem(status, status === 500 ? "Internal error" : error63.message));
+    const status2 = error63.statusCode && error63.statusCode < 500 ? error63.statusCode : 500;
+    if (status2 === 500) app.log.error(error63);
+    return reply.code(status2).type(PROBLEM_TYPE).send(problem(status2, status2 === 500 ? "Internal error" : error63.message));
   });
   app.setNotFoundHandler(
     (_request, reply) => reply.code(404).type(PROBLEM_TYPE).send(problem(404, "Not found"))
@@ -122576,8 +122908,8 @@ async function buildApp(deps) {
     log: app.log
   }) : null;
   app.decorateRequest("outboxQueued", false);
-  app.addHook("onResponse", (request, _reply, done) => {
-    if (request.outboxQueued) dispatcher?.kick();
+  app.addHook("onResponse", (request2, _reply, done) => {
+    if (request2.outboxQueued) dispatcher?.kick();
     done();
   });
   if (dispatcher) {
@@ -122631,6 +122963,11 @@ async function buildApp(deps) {
   registerAdminRoleRoutes(app, { db: deps.db, now });
   registerAdminOrderRoutes(app, { db: deps.db, now });
   registerReturnRoutes(app, { db: deps.db, now, processors });
+  registerInvoiceRequestRoutes(app, {
+    db: deps.db,
+    now,
+    secrets: deps.config.payments.checkout
+  });
   registerAdminShippingRoutes(app, { db: deps.db, now });
   registerCatalogAdminRoutes(app, {
     db: deps.db,
@@ -122991,7 +123328,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "e31940c598bae4d6dcd4b441eb93b190102cf8bf" : void 0;
+var sha = true ? "ee4757f52a99e11543c21170ed25f96a8fe54086" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
