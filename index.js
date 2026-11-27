@@ -100220,7 +100220,9 @@ var returnSchema = external_exports.strictObject({
   restock: external_exports.boolean().nullable(),
   createdAt: external_exports.string(),
   preparedAt: external_exports.string().nullable(),
-  confirmedAt: external_exports.string().nullable()
+  confirmedAt: external_exports.string().nullable(),
+  /** True for the return of a counter sale, paid back in cash or on the terminal (FC 076). */
+  counter: external_exports.boolean()
 });
 var returnListSchema = external_exports.strictObject({
   items: external_exports.array(returnSchema),
@@ -104859,12 +104861,13 @@ async function withLines(db, rows) {
     restock: row4.restock === null ? null : Number(row4.restock) === 1,
     createdAt: iso3(row4.created_at),
     preparedAt: iso3(row4.prepared_at),
-    confirmedAt: iso3(row4.confirmed_at)
+    confirmedAt: iso3(row4.confirmed_at),
+    counter: row4.channel === "pos"
   }));
 }
 async function viewOf2(db, id) {
   const rows = await db.query(
-    "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ?",
+    "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at, o.channel FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ?",
     [id]
   );
   return (await withLines(db, rows))[0];
@@ -104931,7 +104934,7 @@ async function requestReturn(tx, input2, actor) {
 async function listReturns(db, status) {
   const [rows, [count]] = await Promise.all([
     db.query(
-      "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200",
+      "SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at, o.channel FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200",
       [status, status]
     ),
     db.query(
@@ -122746,7 +122749,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "c1e2384219fe539c748dbc06f9c2655093048e74" : void 0;
+var sha = true ? "47b597b79281791d1361d670686161215f3d30da" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
