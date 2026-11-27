@@ -101,6 +101,7 @@ test('every sub-path of the account area answers its own page', async ({
     ['/cuenta/administracion/', 'Mi cuenta'],
     ['/cuenta/usuarios/', 'Mi cuenta'],
     ['/cuenta/devoluciones/', 'Mi cuenta'],
+    ['/cuenta/pos/', 'Mi cuenta'],
     ['/cuenta/envios/', 'Mi cuenta'],
     ['/cuenta/catalogo/', 'Mi cuenta'],
     ['/cuenta/catalogo/publicar/', 'Mi cuenta'],

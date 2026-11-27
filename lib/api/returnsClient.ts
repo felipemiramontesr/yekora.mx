@@ -16,6 +16,7 @@
 import type { z } from 'zod';
 import {
   returnListSchema,
+  type posReturnRequestSchema,
   type returnConfirmRequestSchema,
   type returnPrepareRequestSchema,
   type returnRequestSchema,
@@ -44,6 +45,9 @@ const CODES = [
   'MANUAL_REFERENCE_REQUIRED',
   'REFUND_PROCESSOR_UNAVAILABLE',
   'REFUND_PROCESSOR_ERROR',
+  'REFUND_METHOD_REQUIRED',
+  'POS_SHIFT_CLOSED_REJECT',
+  'INSUFFICIENT_DRAWER_CASH_REJECT',
   'IDEMP_KEY_MISSING',
   'IDEMP_KEY_INVALID',
   'PERMISSION_DENIED',
@@ -172,6 +176,27 @@ export function confirmReturn(
     'POST',
     input,
     { idempotent: false },
+    fetchImpl
+  );
+}
+
+/**
+ * The staff asks for the return of a counter sale (FC 076), with a fresh Idempotency-Key.
+ *
+ * @param input - Order number, lines, reason and an optional comment.
+ * @param fetchImpl - `fetch`, injectable for tests.
+ * @returns The request as the board shows it, or why it was refused.
+ */
+export function requestCounterReturn(
+  input: z.input<typeof posReturnRequestSchema>,
+  fetchImpl: typeof fetch = fetch
+) {
+  return request(
+    '/v1/admin/returns/pos',
+    returnSchema,
+    'POST',
+    input,
+    { idempotent: true },
     fetchImpl
   );
 }

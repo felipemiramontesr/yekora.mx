@@ -48,6 +48,8 @@ export const returnSchema = z.strictObject({
   createdAt: z.string(),
   preparedAt: z.string().nullable(),
   confirmedAt: z.string().nullable(),
+  /** True for the return of a counter sale, paid back in cash or on the terminal (FC 076). */
+  counter: z.boolean(),
 });
 
 /** One request of the board, as a type. */

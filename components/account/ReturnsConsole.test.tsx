@@ -14,6 +14,7 @@ import {
   confirmReturn,
   listReturns,
   prepareReturn,
+  requestCounterReturn,
 } from '@/lib/api/returnsClient';
 import { ReturnsConsole } from './ReturnsConsole';
 
@@ -21,12 +22,14 @@ vi.mock('@/lib/api/returnsClient', () => ({
   listReturns: vi.fn(),
   prepareReturn: vi.fn(),
   confirmReturn: vi.fn(),
+  requestCounterReturn: vi.fn(),
 }));
 
 const api = {
   list: vi.mocked(listReturns),
   prepare: vi.mocked(prepareReturn),
   confirm: vi.mocked(confirmReturn),
+  counter: vi.mocked(requestCounterReturn),
 };
 
 const t = getMessages('es-MX').account.returns;
@@ -43,6 +46,7 @@ const request = (overrides: Partial<ReturnView> = {}): ReturnView => ({
   createdAt: '2026-11-25T18:00:00.000Z',
   preparedAt: null,
   confirmedAt: null,
+  counter: false,
   ...overrides,
 });
 
@@ -80,6 +84,7 @@ beforeEach(() => {
   api.list.mockReset();
   api.prepare.mockReset();
   api.confirm.mockReset();
+  api.counter.mockReset();
 });
 afterEach(cleanup);
 
@@ -338,5 +343,98 @@ describe('board of returns (FC 073 F1)', () => {
     late(page([request()]));
     await Promise.resolve();
     expect(screen.queryByText('Pedido YEK-2026-AAAA0001')).toBeNull();
+  });
+});
+
+describe('returns of the counter on the board (FC 076 F4)', () => {
+  /** The board with no requests yet. */
+  const openEmpty = async (grants = BOTH) => {
+    api.list.mockResolvedValue(page([]));
+    render(<ReturnsConsole texts={t} locale="es-MX" {...grants} />);
+    await screen.findByText(t.empty);
+  };
+
+  const counter = request({
+    status: 'PREPARED',
+    refundMxnCents: 48500,
+    restock: true,
+    counter: true,
+  });
+
+  it('asks how a counter sale is paid back, and sends the choice with the terminal folio', async () => {
+    await open([counter]);
+    api.confirm.mockResolvedValue(ok({ ...counter, status: 'REFUNDED' }));
+    fireEvent.click(screen.getByRole('button', { name: t.confirm }));
+    fireEvent.submit(screen.getByRole('form'));
+    expect(
+      await screen.findByText(t.errors.REFUND_METHOD_REQUIRED)
+    ).toBeTruthy();
+    expect(api.confirm).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(t.refundMethod), {
+      target: { value: 'TERMINAL' },
+    });
+    fireEvent.change(screen.getByLabelText(t.manualReference), {
+      target: { value: 'REV-9' },
+    });
+    fireEvent.submit(screen.getByRole('form'));
+    await waitFor(() =>
+      expect(api.confirm).toHaveBeenCalledWith(7, {
+        manualReference: 'REV-9',
+        refundMethod: 'TERMINAL',
+      })
+    );
+  });
+
+  it('creates the request of a counter sale and reads the board again', async () => {
+    await openEmpty();
+    fireEvent.click(screen.getByRole('button', { name: t.counterTitle }));
+    const form = screen.getByRole('form', { name: t.counterTitle });
+    fireEvent.submit(form);
+    expect(screen.getByText(t.counterInvalid)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(t.counterOrder), {
+      target: { value: ' YEK-2026-AAAA0001 ' },
+    });
+    fireEvent.change(screen.getByLabelText(t.counterSku), {
+      target: { value: 'PACK ' },
+    });
+    fireEvent.change(screen.getByLabelText(t.reasonLabel), {
+      target: { value: 'DEFECT' },
+    });
+    api.counter.mockResolvedValueOnce(no('ORDER_NOT_FOUND'));
+    fireEvent.submit(form);
+    await screen.findByText(t.errors.unknown);
+    api.counter.mockResolvedValue(ok(counter));
+    api.list.mockResolvedValue(page([counter]));
+    fireEvent.submit(form);
+    expect(await screen.findByText(t.counterDone)).toBeTruthy();
+    expect(api.counter).toHaveBeenLastCalledWith({
+      orderNumber: 'YEK-2026-AAAA0001',
+      items: [{ sku: 'PACK', quantity: 1 }],
+      reason: 'DEFECT',
+    });
+    await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it('refuses units that are not a whole number, and closes with Cancel', async () => {
+    await openEmpty();
+    fireEvent.click(screen.getByRole('button', { name: t.counterTitle }));
+    fireEvent.change(screen.getByLabelText(t.reasonLabel), {
+      target: { value: 'DEFECT' },
+    });
+    for (const units of ['0', '1.5']) {
+      fireEvent.change(screen.getByLabelText(t.counterUnits), {
+        target: { value: units },
+      });
+      fireEvent.submit(screen.getByRole('form', { name: t.counterTitle }));
+      expect(screen.getByText(t.counterInvalid)).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole('button', { name: t.cancel }));
+    expect(screen.queryByRole('form', { name: t.counterTitle })).toBeNull();
+    expect(api.counter).not.toHaveBeenCalled();
+  });
+
+  it('offers no counter return to who cannot prepare', async () => {
+    await openEmpty({ canPrepare: false, canConfirm: true });
+    expect(screen.queryByRole('button', { name: t.counterTitle })).toBeNull();
   });
 });

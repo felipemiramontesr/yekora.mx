@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Package,
   RotateCcw,
+  ScanBarcode,
   ShieldCheck,
   Tags,
   Truck,
@@ -22,6 +23,7 @@ const ICONS: Record<AdminCard['key'], ComponentType<{ size: number }>> = {
   shipping: Truck,
   users: ShieldCheck,
   returns: RotateCcw,
+  pos: ScanBarcode,
 };
 
 /** The view a card opens. */

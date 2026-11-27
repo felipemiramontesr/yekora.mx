@@ -39,6 +39,7 @@ import {
   shipOrder,
 } from '@/lib/api/fulfillmentClient';
 import { listPaymentMethods } from '@/lib/api/paymentMethodsClient';
+import { readShift } from '@/lib/api/posClient';
 import { listReturns, requestReturn } from '@/lib/api/returnsClient';
 import { readShippingAdmin } from '@/lib/api/shippingAdminClient';
 import { AccountView } from '../views/AccountView';
@@ -86,6 +87,16 @@ vi.mock('@/lib/api/fulfillmentClient', () => ({
   prepareOrder: vi.fn(),
   shipOrder: vi.fn(),
   deliverOrder: vi.fn(),
+}));
+
+vi.mock('@/lib/api/posClient', () => ({
+  readShift: vi.fn(),
+  openTill: vi.fn(),
+  moveTillCash: vi.fn(),
+  closeTill: vi.fn(),
+  listCounterProducts: vi.fn(),
+  sell: vi.fn(),
+  readReceipt: vi.fn(),
 }));
 
 vi.mock('@/lib/api/returnsClient', () => ({
@@ -1949,6 +1960,7 @@ describe('returns in the area (FC 073)', () => {
         createdAt: '2026-11-25T18:00:00.000Z',
         preparedAt: null,
         confirmedAt: null,
+        counter: false,
       },
     });
     renderApp();
@@ -1984,5 +1996,32 @@ describe('returns in the area (FC 073)', () => {
     expect(
       screen.queryByRole('button', { name: account.returnRequest.open })
     ).toBeNull();
+  });
+});
+
+describe('point of sale in the area (FC 076 F4)', () => {
+  it('opens /pos/ under Administración for a counter account, and shows others their orders', async () => {
+    globalThis.history.replaceState(null, '', '/cuenta/pos/');
+    api.me.mockResolvedValue(
+      ok({
+        ...BUYER,
+        roles: ['staff_orders'],
+        permissions: ['account:self', 'pos:sell', 'pos:shift'],
+      })
+    );
+    vi.mocked(readShift).mockResolvedValue({ ok: true, data: { shift: null } });
+    renderApp();
+    await screen.findByRole('form', { name: account.pos.openTitle });
+    expect(
+      screen
+        .getByText(account.adminHub.cards.pos.name, { selector: 'li' })
+        .getAttribute('aria-current')
+    ).toBe('page');
+    cleanup();
+    api.me.mockResolvedValue(ok(BUYER));
+    vi.mocked(readShift).mockClear();
+    renderApp();
+    await screen.findByText(/Hola, /);
+    expect(readShift).not.toHaveBeenCalled();
   });
 });

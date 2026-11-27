@@ -55,6 +55,7 @@ const created = {
     createdAt: '2026-11-25T18:00:00.000Z',
     preparedAt: null,
     confirmedAt: null,
+    counter: false,
   },
 };
 const no = (reason: string) => ({ ok: false as const, reason }) as never;

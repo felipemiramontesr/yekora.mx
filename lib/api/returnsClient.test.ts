@@ -3,6 +3,7 @@ import {
   confirmReturn,
   listReturns,
   prepareReturn,
+  requestCounterReturn,
   requestReturn,
 } from './returnsClient';
 
@@ -18,6 +19,7 @@ const RETURN = {
   createdAt: '2026-11-25T18:00:00.000Z',
   preparedAt: null,
   confirmedAt: null,
+  counter: false,
 };
 
 /** A fetch that answers once with `status` and `body`. */
@@ -142,5 +144,24 @@ describe('client of the returns screens (FC 073 F0)', () => {
       ok: false,
       reason: 'offline',
     });
+  });
+});
+
+describe('client of the counter return (FC 076)', () => {
+  it('posts the order and its lines with a fresh Idempotency-Key', async () => {
+    const fetchImpl = answering(201, { ...RETURN, counter: true });
+    await expect(
+      requestCounterReturn(
+        {
+          orderNumber: 'YEK-2026-AAAA0001',
+          items: [{ sku: 'E2E-0001', quantity: 1 }],
+          reason: 'DEFECT',
+        },
+        fetchImpl
+      )
+    ).resolves.toMatchObject({ ok: true });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://apiv1.yekora.mx/v1/admin/returns/pos');
+    expect(keyOf(init)).toMatch(/^[0-9a-f-]{36}$/);
   });
 });

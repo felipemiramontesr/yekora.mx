@@ -152,6 +152,9 @@ const USERS: Record<Persona, object> = {
       'returns:view',
       'returns:prepare',
       'returns:confirm',
+      'pos:sell',
+      'pos:shift',
+      'pos:supervisor',
     ],
   },
 };
@@ -726,6 +729,7 @@ export async function mockAccountApi(
   const roleRows = staffRoles();
   const fulfillment = newFulfillment(options.delivered ? 'DELIVERED' : null);
   const returns = newReturns(options.seedReturns === true);
+  const till: Till = { opening: null, cash: 0 };
   const shippingStates = SHIPPING_STATES.map((state) => ({ ...state }));
   const shippingConfig: { free: boolean; threshold: number | null } = {
     free: false,
@@ -788,24 +792,21 @@ export async function mockAccountApi(
     'https://apiv1.yekora.mx/v1/admin/**',
     withCors((route) => {
       const path = new URL(route.request().url()).pathname;
-      if (path.startsWith('/v1/admin/users')) {
+      // The consoles of the owner; anyone else gets 403, as the API does.
+      const consoles: [string, () => unknown][] = [
+        ['/v1/admin/users', () => answerStaff(route, staffRows)],
+        ['/v1/admin/roles', () => answerRoles(route, roleRows)],
+        [
+          '/v1/admin/shipping',
+          () => answerShipping(route, shippingStates, shippingConfig),
+        ],
+        ['/v1/admin/pos/', () => answerPos(route, till)],
+        ['/v1/admin/returns', () => answerReturns(route, returns, 'owner')],
+      ];
+      const found = consoles.find(([start]) => path.startsWith(start));
+      if (found) {
         return user === 'owner'
-          ? answerStaff(route, staffRows)
-          : problem(route, 403, 'PERMISSION_DENIED');
-      }
-      if (path.startsWith('/v1/admin/roles')) {
-        return user === 'owner'
-          ? answerRoles(route, roleRows)
-          : problem(route, 403, 'PERMISSION_DENIED');
-      }
-      if (path.startsWith('/v1/admin/shipping')) {
-        return user === 'owner'
-          ? answerShipping(route, shippingStates, shippingConfig)
-          : problem(route, 403, 'PERMISSION_DENIED');
-      }
-      if (path.startsWith('/v1/admin/returns')) {
-        return user === 'owner'
-          ? answerReturns(route, returns, user)
+          ? (found[1]() as Promise<void>)
           : problem(route, 403, 'PERMISSION_DENIED');
       }
       // FC 068: staff who only read orders may not operate them.
@@ -1014,6 +1015,7 @@ const RETURN_BASE: ReturnView = {
   createdAt: '2026-11-20T16:00:00.000Z',
   preparedAt: null,
   confirmedAt: null,
+  counter: false,
 };
 
 /** Fresh returns: none, or a request to prepare and one prepared by someone else. */
@@ -1133,6 +1135,81 @@ function answerReturnRequest(
   returns.rows.push(row);
   return json(route, 201, row);
 }
+/** The till of the interceptor (FC 076): the open shift, if any, and the cash of its drawer. */
+interface Till {
+  opening: number | null;
+  cash: number;
+}
+
+const COUNTER_PRODUCT = {
+  sku: 'E2E-0001',
+  nameEs: 'Mochila E2E',
+  nameEn: 'E2E backpack',
+  priceMxnCents: 116000,
+  available: 3,
+};
+
+/** Answers `/v1/admin/pos/*`: the till and a cash sale, as the API does for the screen. */
+function answerPos(route: Route, till: Till) {
+  const request = route.request();
+  const path = new URL(request.url()).pathname.replace('/v1/admin/pos/', '');
+  if (path === 'products') {
+    return json(route, 200, { items: [COUNTER_PRODUCT] });
+  }
+  if (path.endsWith('/receipt')) {
+    return json(route, 200, {
+      orderNumber: E2E_ORDER,
+      widthMm: 80,
+      lines: ['YEKORA', 'TOTAL $1160.00', 'No es comprobante fiscal'],
+    });
+  }
+  const shift = {
+    id: 1,
+    cashierUserId: OWNER_ID,
+    openedAt: '2026-11-27T16:00:00.000Z',
+    openingCashMxnCents: till.opening ?? 0,
+  };
+  if (path === 'shifts/current') {
+    return json(route, 200, { shift: till.opening === null ? null : shift });
+  }
+  if (!request.headers()['idempotency-key']) {
+    return problem(route, 400, 'IDEMP_KEY_MISSING');
+  }
+  const body = request.postDataJSON() as Record<string, never>;
+  if (path === 'shifts/open') {
+    till.opening = Number(body.openingCashMxnCents);
+    till.cash = till.opening;
+    return json(route, 201, { ...shift, openingCashMxnCents: till.opening });
+  }
+  if (path === 'checkout') {
+    const payment = body.payment as {
+      method: string;
+      tenderedMxnCents: number;
+    };
+    if (payment.tenderedMxnCents < COUNTER_PRODUCT.priceMxnCents) {
+      return problem(route, 400, 'INSUFFICIENT_TENDERED_REJECT');
+    }
+    till.cash += COUNTER_PRODUCT.priceMxnCents;
+    return json(route, 201, {
+      orderNumber: E2E_ORDER,
+      method: payment.method,
+      totalMxnCents: COUNTER_PRODUCT.priceMxnCents,
+      changeMxnCents: payment.tenderedMxnCents - COUNTER_PRODUCT.priceMxnCents,
+    });
+  }
+  const counted = Number(body.countedCashMxnCents);
+  if (counted !== till.cash && String(body.notes ?? '').length < 10) {
+    return problem(route, 400, 'MISSING_DIFF_JUSTIFICATION_REJECT');
+  }
+  till.opening = null;
+  return json(route, 200, {
+    id: 1,
+    expectedCashMxnCents: till.cash,
+    countedCashMxnCents: counted,
+    differenceMxnCents: counted - till.cash,
+  });
+}
+
 /** An upload the page sent to the catalog backoffice, as the browser decoded it. */
 export interface Upload {
   /** The Content-Type of the request: what the Canvas encoded. */

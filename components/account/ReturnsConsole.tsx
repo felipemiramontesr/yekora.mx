@@ -8,6 +8,7 @@ import {
   confirmReturn,
   listReturns,
   prepareReturn,
+  requestCounterReturn,
   type ReturnsFailure,
 } from '@/lib/api/returnsClient';
 import { fill, formatMoney } from '@/lib/catalog/format';
@@ -20,6 +21,9 @@ export type ReturnsTexts = Messages['account']['returns'];
 
 /** The stages of a request, in the order the filter offers them. */
 const STAGES = ['REQUESTED', 'PREPARED', 'REFUNDING', 'REFUNDED'] as const;
+
+/** The reasons of a return, in the order the lists offer them. */
+const REASONS = ['DEFECT', 'NOT_AS_DESCRIBED', 'CHANGED_MIND'] as const;
 
 /** What the board says after an action, or about the list. */
 type Note = { kind: 'ok' | 'error'; text: string } | null;
@@ -43,6 +47,9 @@ const BUTTON =
 /** The quiet button next to it. */
 const QUIET =
   'tap-target self-start rounded-lg border border-petroleo/40 px-5 font-semibold';
+
+/** How a counter return is paid back. */
+const REFUND_METHODS = ['CASH', 'TERMINAL'] as const;
 
 /** The message of a refusal: the board names each code; anything else is generic. */
 function failureText(texts: ReturnsTexts, reason: ReturnsFailure) {
@@ -88,6 +95,7 @@ function ReturnCard({
   const [amount, setAmount] = useState('');
   const [restock, setRestock] = useState(true);
   const [reference, setReference] = useState('');
+  const [refundMethod, setRefundMethod] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<Note>(null);
   const actions = boardActionsOf(item.status, grants);
@@ -128,9 +136,17 @@ function ReturnCard({
   function confirm(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const typed = reference.trim();
+    const method = REFUND_METHODS.find((name) => name === refundMethod);
+    if (item.counter && method === undefined) {
+      setNote({ kind: 'error', text: texts.errors.REFUND_METHOD_REQUIRED });
+      return;
+    }
     void run(
       () =>
-        confirmReturn(item.id, typed === '' ? {} : { manualReference: typed }),
+        confirmReturn(item.id, {
+          ...(typed === '' ? {} : { manualReference: typed }),
+          ...(item.counter ? { refundMethod: method } : {}),
+        }),
       texts.confirmedDone
     );
   }
@@ -256,7 +272,29 @@ function ReturnCard({
             })}
           </p>
           {item.status === 'REFUNDING' && <p>{texts.retryNote}</p>}
-          <p className="text-sm text-petroleo/80">{texts.manualNote}</p>
+          {item.counter ? (
+            <Field
+              id={`${base}-refund-method`}
+              label={texts.refundMethod}
+              {...texts.fields.refundMethod}
+              exampleLabel={texts.exampleLabel}
+            >
+              {(control) => (
+                <select
+                  {...control}
+                  className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
+                  value={refundMethod}
+                  onChange={(event) => setRefundMethod(event.target.value)}
+                >
+                  <option value="">{texts.refundMethodChoose}</option>
+                  <option value="CASH">{texts.refundCash}</option>
+                  <option value="TERMINAL">{texts.refundTerminal}</option>
+                </select>
+              )}
+            </Field>
+          ) : (
+            <p className="text-sm text-petroleo/80">{texts.manualNote}</p>
+          )}
           <TextField
             id={`${base}-reference`}
             label={texts.manualReference}
@@ -288,6 +326,131 @@ function ReturnCard({
 }
 
 /**
+ * The staff asks for the return of a counter sale (FC 076 F3): the order of the receipt, one SKU,
+ * its units, the reason and a comment. The request then follows the board like any other.
+ */
+function CounterReturn({
+  texts,
+  onCreated,
+}: Readonly<{ texts: ReturnsTexts; onCreated: () => void }>) {
+  const base = useId();
+  const [open, setOpen] = useState(false);
+  const [orderNumber, setOrderNumber] = useState('');
+  const [sku, setSku] = useState('');
+  const [units, setUnits] = useState('1');
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState<Note>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const why = REASONS.find((name) => name === reason);
+    const quantity = Number(units);
+    if (why === undefined || !Number.isInteger(quantity) || quantity < 1) {
+      setNote({ kind: 'error', text: texts.counterInvalid });
+      return;
+    }
+    setBusy(true);
+    const result = await requestCounterReturn({
+      orderNumber: orderNumber.trim(),
+      items: [{ sku: sku.trim(), quantity }],
+      reason: why,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setNote({ kind: 'error', text: failureText(texts, result.reason) });
+      return;
+    }
+    setOrderNumber('');
+    setSku('');
+    setReason('');
+    setNote({ kind: 'ok', text: texts.counterDone });
+    onCreated();
+  }
+
+  const field = (
+    key: 'counterOrder' | 'counterSku' | 'counterUnits',
+    value: string,
+    onChange: (next: string) => void
+  ) => (
+    <TextField
+      id={`${base}-${key}`}
+      label={texts[key]}
+      {...texts.fields[key]}
+      exampleLabel={texts.exampleLabel}
+      input={{
+        autoComplete: 'off',
+        value,
+        onChange: (event) => onChange(event.target.value),
+      }}
+    />
+  );
+
+  return (
+    <div className="flex max-w-md flex-col gap-3">
+      {note && (
+        <output
+          className={`block ${note.kind === 'error' ? 'text-red-800' : ''}`}
+        >
+          {note.text}
+        </output>
+      )}
+      {open ? (
+        <form
+          noValidate
+          onSubmit={(event) => void submit(event)}
+          aria-label={texts.counterTitle}
+          className="flex flex-col gap-3"
+        >
+          <h3 className="font-semibold">{texts.counterTitle}</h3>
+          {field('counterOrder', orderNumber, setOrderNumber)}
+          {field('counterSku', sku, setSku)}
+          {field('counterUnits', units, setUnits)}
+          <Field
+            id={`${base}-reason`}
+            label={texts.reasonLabel}
+            {...texts.fields.counterReason}
+            exampleLabel={texts.exampleLabel}
+          >
+            {(control) => (
+              <select
+                {...control}
+                className="min-h-11 rounded-md border border-petroleo/30 bg-white px-3"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              >
+                <option value="">{texts.refundMethodChoose}</option>
+                {REASONS.map((name) => (
+                  <option key={name} value={name}>
+                    {texts.reasons[name]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <div className="flex flex-wrap gap-3">
+            <button type="submit" disabled={busy} className={BUTTON}>
+              {texts.counterSubmit}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className={QUIET}
+            >
+              {texts.cancel}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={QUIET}>
+          {texts.counterTitle}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * The board of returns of `{area}devoluciones/` (FC 073 F1, K-80 second part): shown only to an
  * account with `returns:view`, and only as a convenience, since the API refuses everyone else.
  * It lists up to 200 requests, newest first, every stage or just one, and offers each its step to
@@ -315,6 +478,8 @@ export function ReturnsConsole({
   const [stage, setStage] = useState<ReturnView['status'] | ''>('');
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [items, setItems] = useState<ReturnView[]>([]);
+  // A counter request just created asks the board to be read again.
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let current = true;
@@ -331,7 +496,7 @@ export function ReturnsConsole({
     return () => {
       current = false;
     };
-  }, [stage]);
+  }, [stage, reload]);
 
   /** Shows a request as the API answered it after a step. */
   function replace(next: ReturnView) {
@@ -342,6 +507,12 @@ export function ReturnsConsole({
     <section aria-label={texts.title} className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">{texts.title}</h2>
       <p className="text-petroleo/80">{texts.intro}</p>
+      {canPrepare && (
+        <CounterReturn
+          texts={texts}
+          onCreated={() => setReload((count) => count + 1)}
+        />
+      )}
       <div className="max-w-md">
         <Field
           id={filterId}

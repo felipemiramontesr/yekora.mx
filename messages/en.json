@@ -921,6 +921,7 @@
       "users": "Users, roles and permissions",
       "shipping": "Shipping",
       "returns": "Returns",
+      "pos": "Point of sale",
       "ownerBadge": "Owner",
       "breadcrumb": "Where you are in your account",
       "profile": "My information",
@@ -1758,10 +1759,25 @@
         "returns": {
           "name": "Returns",
           "description": "The return requests: prepare the refund and have someone else confirm it."
+        },
+        "pos": {
+          "name": "Point of sale",
+          "description": "Open the till, sell at the counter and close it."
         }
       }
     },
     "returns": {
+      "refundMethod": "How it is paid back",
+      "refundMethodChoose": "Choose an option",
+      "refundCash": "In cash, from the open drawer",
+      "refundTerminal": "On the Banorte terminal",
+      "counterTitle": "Counter return",
+      "counterOrder": "Order number on the receipt",
+      "counterSku": "Product SKU",
+      "counterUnits": "Pieces returned",
+      "counterSubmit": "Create request",
+      "counterDone": "Request created. Now prepare it and have someone else confirm it.",
+      "counterInvalid": "Check the pieces and choose the reason.",
       "title": "Return requests",
       "loading": "Loading the returns…",
       "intro": "Here you see the return requests of the people who bought. One person prepares the refund (the amount and whether the pieces go back to the inventory) and a different one confirms it, so two people review every refund.",
@@ -1803,6 +1819,26 @@
       "manualReference": "Reference of the refund made at Mercado Pago",
       "manualNote": "If the order was paid with Mercado Pago, the refund is made by hand there and you write its reference here. With Stripe leave it empty.",
       "fields": {
+        "refundMethod": {
+          "description": "Cash comes out of the drawer; on the terminal you reverse it and copy the folio.",
+          "example": "In cash"
+        },
+        "counterOrder": {
+          "description": "As printed on the receipt.",
+          "example": "YEK-2026-7F3K9QX2"
+        },
+        "counterSku": {
+          "description": "The SKU on the receipt.",
+          "example": "PACK-30"
+        },
+        "counterUnits": {
+          "description": "How many pieces are returned.",
+          "example": "1"
+        },
+        "counterReason": {
+          "description": "What the person returning says.",
+          "example": "The product arrived defective"
+        },
         "filter": {
           "description": "Choose a stage to see only those requests, or all of them.",
           "example": "Prepared"
@@ -1821,6 +1857,9 @@
       "preparedDone": "Done. The refund of order {number} is prepared; someone else must confirm it.",
       "confirmedDone": "Done. Order {number} was refunded.",
       "errors": {
+        "REFUND_METHOD_REQUIRED": "Choose how this counter sale is paid back.",
+        "POS_SHIFT_CLOSED_REJECT": "Open a till shift before giving cash.",
+        "INSUFFICIENT_DRAWER_CASH_REJECT": "The drawer does not hold that much cash.",
         "DUAL_CONTROL_VIOLATION_REJECT": "Someone else must confirm what you prepared.",
         "UNAUTHORIZED_CONFIRMER_REJECT": "Your account cannot confirm refunds.",
         "PERMISSION_DENIED": "Your account cannot do this action.",
@@ -1893,6 +1932,140 @@
         "offline": "You seem to be offline.",
         "timeout": "The server took too long. Try again.",
         "invalid": "The answer of the server could not be read. Try again.",
+        "unknown": "Something failed. Try again."
+      }
+    },
+    "pos": {
+      "title": "Point of sale",
+      "loading": "Loading the till…",
+      "exampleLabel": "Example",
+      "openTitle": "Open the till",
+      "openingCash": "Opening cash (MXN)",
+      "open": "Open shift",
+      "shiftOpen": "Shift open with {amount} in the drawer.",
+      "invalidAmount": "Write an amount in pesos with up to two decimals.",
+      "invalidMovement": "Write an amount greater than 0 and the reason.",
+      "movementsTitle": "Cash in and out",
+      "movementType": "Type",
+      "movementOut": "Withdrawal",
+      "movementIn": "Cash in",
+      "movementAmount": "Amount (MXN)",
+      "movementReason": "Reason",
+      "recordMovement": "Record movement",
+      "moved": "Movement recorded.",
+      "closeTitle": "Close the shift",
+      "closeIntro": "Count the cash in the drawer and write the total: the system compares afterwards. A difference needs a note of at least 10 letters, and above $100 a supervisor closes it.",
+      "counted": "Cash counted (MXN)",
+      "notes": "Note about the difference (if any)",
+      "close": "Close shift",
+      "closed": "Shift closed. {expected} was expected; difference: {difference}.",
+      "saleTitle": "New sale",
+      "searchTitle": "Find a product",
+      "search": "SKU or name",
+      "searchButton": "Search",
+      "available": "available: {n}",
+      "add": "Add",
+      "remove": "Remove",
+      "chargeTitle": "Charge",
+      "total": "Total",
+      "method": "Payment method",
+      "cash": "Cash",
+      "card": "Card (Banorte terminal)",
+      "tendered": "Received (MXN)",
+      "change": "Change",
+      "chargeOnTerminal": "Charge {total} on the Banorte terminal and copy the voucher data. Never write the whole card number.",
+      "authCode": "Authorization code",
+      "lastFour": "Last 4 digits",
+      "brand": "Card brand",
+      "folio": "Voucher folio",
+      "email": "E-mail for the receipt (optional)",
+      "charge": "Record sale",
+      "charging": "Recording…",
+      "sold": "Sale {number} recorded: {total}. Change: {change}.",
+      "showReceipt": "See receipt",
+      "print": "Print",
+      "fields": {
+        "openingCash": {
+          "description": "The cash the drawer starts with.",
+          "example": "500.00"
+        },
+        "movementType": {
+          "description": "A withdrawal takes cash out; cash in adds it.",
+          "example": "Withdrawal"
+        },
+        "movementAmount": {
+          "description": "Pesos with up to two decimals. Above $2,000 a supervisor authorizes it.",
+          "example": "200.00"
+        },
+        "movementReason": {
+          "description": "Why the cash moves.",
+          "example": "Courier payment"
+        },
+        "counted": {
+          "description": "The total you counted in the drawer.",
+          "example": "1850.00"
+        },
+        "notes": {
+          "description": "Explain the difference if the count does not match.",
+          "example": "Change of one sale missing"
+        },
+        "search": {
+          "description": "Part of the SKU or name. Empty shows all.",
+          "example": "backpack"
+        },
+        "method": {
+          "description": "How the person pays.",
+          "example": "Cash"
+        },
+        "tendered": {
+          "description": "What the person hands you.",
+          "example": "500.00"
+        },
+        "authCode": {
+          "description": "The code on the voucher.",
+          "example": "A1B2C3"
+        },
+        "lastFour": {
+          "description": "Only the last four digits.",
+          "example": "4242"
+        },
+        "brand": {
+          "description": "As the voucher says.",
+          "example": "Visa"
+        },
+        "folio": {
+          "description": "The voucher folio.",
+          "example": "000123"
+        },
+        "email": {
+          "description": "Only if they want their receipt.",
+          "example": "ana@mail.com"
+        }
+      },
+      "errors": {
+        "POS_SHIFT_ALREADY_OPEN": "A shift is already open. Reload the page.",
+        "PERMISSION_DENIED": "Your account cannot do this action.",
+        "SHIFT_NOT_OPEN_REJECT": "The shift is no longer open. Reload the page.",
+        "MISSING_DIFF_JUSTIFICATION_REJECT": "There is a difference: write a note of at least 10 letters.",
+        "SUPERVISOR_REQUIRED_FOR_LARGE_DIFF": "The difference is above $100: a supervisor must close it.",
+        "INSUFFICIENT_DRAWER_CASH_REJECT": "The drawer does not hold that much cash.",
+        "SUPERVISOR_PERMISSION_REQUIRED": "A withdrawal above $2,000 is made by a supervisor.",
+        "POS_PRODUCT_UNKNOWN": "A product is no longer available. Search it again.",
+        "INSUFFICIENT_STOCK_REJECT": "There are not enough pieces.",
+        "STOCK_RESERVED_ONLINE_REJECT": "Those pieces are held by online orders.",
+        "POS_SHIFT_CLOSED_REJECT": "Open a shift before selling.",
+        "INVALID_POS_METHOD_REJECT": "That is not a counter payment method.",
+        "INSUFFICIENT_TENDERED_REJECT": "The cash received does not cover the total.",
+        "TERMINAL_AMOUNT_MISMATCH_REJECT": "The amount charged on the terminal does not match the total.",
+        "INVALID_VOUCHER_DATA_REJECT": "Check the voucher data (4 digits, authorization, brand and folio). Never the whole number.",
+        "INVALID_REQUEST": "Check what you wrote.",
+        "SERVICE_UNAVAILABLE": "Sales are not available right now. Tell whoever runs the system.",
+        "SECOND_FACTOR_REQUIRED": "Turn on two-step verification to use the till.",
+        "SESSION_INVALID_OR_EXPIRED": "Your session ended. Sign in again.",
+        "rate_limited": "Too many attempts in a row. Wait a few minutes.",
+        "offline": "You seem to be offline.",
+        "timeout": "The server took too long. Check the sale before repeating it.",
+        "invalid": "The answer of the server could not be read.",
         "unknown": "Something failed. Try again."
       }
     },

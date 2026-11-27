@@ -43,6 +43,7 @@ import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
 import type { UsersTexts } from './AccountUsersConsole';
+import type { PosTexts } from './AccountPosConsole';
 import type { ReturnsTexts } from './ReturnsConsole';
 import type { ShippingAdminTexts } from './ShippingAdminConsole';
 import type { CatalogTexts } from './catalog/catalogTexts';
@@ -74,6 +75,13 @@ const AccountUsersConsole = dynamic<{ texts: UsersTexts; owner: boolean }>(
     import('./AccountUsersConsole').then(
       (module) => module.AccountUsersConsole
     ),
+  { ssr: false }
+);
+
+/** The point of sale, in its own chunk (FC 076): only the counter staff opens it. */
+const AccountPosConsole = dynamic<{ texts: PosTexts; locale: Locale }>(
+  () =>
+    import('./AccountPosConsole').then((module) => module.AccountPosConsole),
   { ssr: false }
 );
 
@@ -393,6 +401,7 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
   if (view.tab === 'panel') return cards.orders.name;
   if (view.tab === 'users') return cards.users.name;
   if (view.tab === 'returns') return cards.returns.name;
+  if (view.tab === 'pos') return cards.pos.name;
   if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
     return (view.section === 'productos' ? cards.products : cards.catalog).name;
@@ -432,6 +441,7 @@ function Dashboard({
     tab === 'catalog' ||
     tab === 'users' ||
     tab === 'returns' ||
+    tab === 'pos' ||
     tab === 'shipping';
   const scope = tab === 'panel' ? 'admin' : 'account';
   const isOrders = tab === 'orders' || tab === 'panel';
@@ -518,6 +528,9 @@ function Dashboard({
           texts={texts.account.users}
           owner={user.roles.includes('owner')}
         />
+      )}
+      {tab === 'pos' && (
+        <AccountPosConsole texts={texts.account.pos} locale={locale} />
       )}
       {tab === 'returns' && (
         <ReturnsConsole

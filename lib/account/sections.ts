@@ -22,6 +22,7 @@ type AccountSection =
   | 'catalog'
   | 'users'
   | 'returns'
+  | 'pos'
   | 'shipping';
 
 /** The permission that opens the panel's orders. */
@@ -35,6 +36,9 @@ const SHIPPING_PERMISSION = 'shipping:manage';
 
 /** The permission that opens the board of returns (FC 073). */
 const RETURNS_PERMISSION = 'returns:view';
+
+/** The permissions that open the point of sale (FC 076): selling or running the till. */
+const POS_PERMISSIONS = ['pos:sell', 'pos:shift'];
 
 /** The role of the owner (FC 044 T2.1): the panel of users shows it everything and protects it. */
 const OWNER_ROLE = 'owner';
@@ -55,11 +59,14 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
     ACCESS.catalog(user) ||
     ACCESS.shipping(user) ||
     ACCESS.users(user) ||
-    ACCESS.returns(user),
+    ACCESS.returns(user) ||
+    ACCESS.pos(user),
   panel: (user) => user.permissions.includes(PANEL_PERMISSION),
   catalog: (user) => user.permissions.includes(CATALOG_PERMISSION),
   users: (user) => user.permissions.includes(USERS_PERMISSION),
   returns: (user) => user.permissions.includes(RETURNS_PERMISSION),
+  pos: (user) =>
+    user.permissions.some((permission) => POS_PERMISSIONS.includes(permission)),
   shipping: (user) => user.permissions.includes(SHIPPING_PERMISSION),
 };
 
@@ -96,9 +103,16 @@ export function canOpen(user: Who, section: AccountSection): boolean {
 /** A card of the administration hub. */
 export interface AdminCard {
   /** Which text it reads from `account.adminHub.cards`. */
-  key: 'orders' | 'products' | 'catalog' | 'shipping' | 'users' | 'returns';
+  key:
+    | 'orders'
+    | 'products'
+    | 'catalog'
+    | 'shipping'
+    | 'users'
+    | 'returns'
+    | 'pos';
   /** The console it opens. */
-  tab: 'panel' | 'catalog' | 'shipping' | 'users' | 'returns';
+  tab: 'panel' | 'catalog' | 'shipping' | 'users' | 'returns' | 'pos';
   /** The tab of the catalog console it opens, for the two that open it. */
   section: 'productos' | 'marcas' | null;
 }
@@ -106,6 +120,7 @@ export interface AdminCard {
 /** The cards, in order, each with the section that grants it. */
 const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
   { key: 'orders', tab: 'panel', section: null, grantedBy: 'panel' },
+  { key: 'pos', tab: 'pos', section: null, grantedBy: 'pos' },
   {
     key: 'products',
     tab: 'catalog',

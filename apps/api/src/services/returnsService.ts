@@ -120,6 +120,8 @@ interface ReturnRow {
   created_at: Date;
   prepared_at: Date | null;
   confirmed_at: Date | null;
+  /** `orders.channel`: 'pos' for a counter sale (FC 076). */
+  channel?: string;
 }
 
 /** The requests of `rows` with their lines, as the contract names them. */
@@ -151,13 +153,14 @@ async function withLines(
     createdAt: iso(row.created_at) as string,
     preparedAt: iso(row.prepared_at),
     confirmedAt: iso(row.confirmed_at),
+    counter: row.channel === 'pos',
   }));
 }
 
 /** One request by id, as the contract names it. */
 async function viewOf(db: TxQuery, id: number): Promise<ReturnView> {
   const rows = await db.query<ReturnRow>(
-    'SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ?',
+    'SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at, o.channel FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE r.id = ?',
     [id]
   );
   return (await withLines(db, rows))[0];
@@ -270,7 +273,7 @@ export async function listReturns(
 ): Promise<{ items: ReturnView[]; total: number }> {
   const [rows, [count]] = await Promise.all([
     db.query<ReturnRow>(
-      'SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200',
+      'SELECT r.id, o.order_number, r.status, r.reason, r.comment, r.refund_mxn_cents, r.restock, r.created_at, r.prepared_at, r.confirmed_at, o.channel FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE (? IS NULL OR r.status = ?) ORDER BY r.created_at DESC, r.id DESC LIMIT 200',
       [status, status]
     ),
     db.query<{ n: number }>(

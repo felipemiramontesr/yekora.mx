@@ -176,6 +176,7 @@ describe('the address table of the area (FC 074 K-77, T2.4, T2.5)', () => {
       users: 'usuarios',
       returns: 'devoluciones',
       shipping: 'envios',
+      pos: 'pos',
     });
     expect(CATALOG_SECTIONS).toEqual([
       'productos',

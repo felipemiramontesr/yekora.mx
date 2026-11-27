@@ -11435,6 +11435,9 @@
                     },
                     "confirmedAt": {
                       "type": ["string", "null"]
+                    },
+                    "counter": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -11448,7 +11451,8 @@
                     "restock",
                     "createdAt",
                     "preparedAt",
-                    "confirmedAt"
+                    "confirmedAt",
+                    "counter"
                   ],
                   "additionalProperties": false
                 }
@@ -11725,6 +11729,9 @@
                           },
                           "confirmedAt": {
                             "type": ["string", "null"]
+                          },
+                          "counter": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -11738,7 +11745,8 @@
                           "restock",
                           "createdAt",
                           "preparedAt",
-                          "confirmedAt"
+                          "confirmedAt",
+                          "counter"
                         ],
                         "additionalProperties": false
                       }
@@ -11993,6 +12001,9 @@
                     },
                     "confirmedAt": {
                       "type": ["string", "null"]
+                    },
+                    "counter": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -12006,7 +12017,8 @@
                     "restock",
                     "createdAt",
                     "preparedAt",
-                    "confirmedAt"
+                    "confirmedAt",
+                    "counter"
                   ],
                   "additionalProperties": false
                 }
@@ -12301,6 +12313,9 @@
                     },
                     "confirmedAt": {
                       "type": ["string", "null"]
+                    },
+                    "counter": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -12314,7 +12329,8 @@
                     "restock",
                     "createdAt",
                     "preparedAt",
-                    "confirmedAt"
+                    "confirmedAt",
+                    "counter"
                   ],
                   "additionalProperties": false
                 }
@@ -12600,6 +12616,9 @@
                     },
                     "confirmedAt": {
                       "type": ["string", "null"]
+                    },
+                    "counter": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -12613,7 +12632,8 @@
                     "restock",
                     "createdAt",
                     "preparedAt",
-                    "confirmedAt"
+                    "confirmedAt",
+                    "counter"
                   ],
                   "additionalProperties": false
                 }

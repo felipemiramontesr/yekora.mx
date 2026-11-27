@@ -921,6 +921,7 @@
       "users": "Usuarios, roles y permisos",
       "shipping": "Envíos",
       "returns": "Devoluciones",
+      "pos": "Punto de venta",
       "ownerBadge": "Owner",
       "breadcrumb": "Dónde estás en tu cuenta",
       "profile": "Mi información",
@@ -1758,10 +1759,25 @@
         "returns": {
           "name": "Devoluciones",
           "description": "Las solicitudes de devolución: prepara el reembolso y que otra persona lo confirme."
+        },
+        "pos": {
+          "name": "Punto de venta",
+          "description": "Abre la caja, cobra en el mostrador y ciérrala."
         }
       }
     },
     "returns": {
+      "refundMethod": "Cómo se reembolsa",
+      "refundMethodChoose": "Elige una opción",
+      "refundCash": "En efectivo, de la caja abierta",
+      "refundTerminal": "En la terminal Banorte",
+      "counterTitle": "Devolución de mostrador",
+      "counterOrder": "Número de pedido del comprobante",
+      "counterSku": "Clave del producto",
+      "counterUnits": "Piezas que devuelve",
+      "counterSubmit": "Crear solicitud",
+      "counterDone": "Solicitud creada. Ahora prepárala y que otra persona la confirme.",
+      "counterInvalid": "Revisa las piezas y elige el motivo.",
       "title": "Solicitudes de devolución",
       "loading": "Cargando las devoluciones…",
       "intro": "Aquí ves las solicitudes de devolución de quienes compraron. Una persona prepara el reembolso (el monto y si las piezas vuelven al inventario) y otra distinta lo confirma: así dos personas revisan cada reembolso.",
@@ -1803,6 +1819,26 @@
       "manualReference": "Referencia del reembolso hecho en Mercado Pago",
       "manualNote": "Si el pedido se pagó con Mercado Pago, el reembolso se hace a mano allá y aquí escribes su referencia. Con Stripe déjala vacía.",
       "fields": {
+        "refundMethod": {
+          "description": "En efectivo sale de la caja; en la terminal se hace la reversa y se copia el folio.",
+          "example": "En efectivo"
+        },
+        "counterOrder": {
+          "description": "Como aparece en el comprobante.",
+          "example": "YEK-2026-7F3K9QX2"
+        },
+        "counterSku": {
+          "description": "La clave que aparece en el comprobante.",
+          "example": "PACK-30"
+        },
+        "counterUnits": {
+          "description": "Cuántas piezas devuelve.",
+          "example": "1"
+        },
+        "counterReason": {
+          "description": "Lo que dice la persona que devuelve.",
+          "example": "El producto llegó defectuoso"
+        },
         "filter": {
           "description": "Elige una etapa para ver solo esas solicitudes, o todas.",
           "example": "Preparada"
@@ -1821,6 +1857,9 @@
       "preparedDone": "Listo. El reembolso del pedido {number} quedó preparado; otra persona debe confirmarlo.",
       "confirmedDone": "Listo. El pedido {number} quedó reembolsado.",
       "errors": {
+        "REFUND_METHOD_REQUIRED": "Elige cómo se reembolsa esta venta de mostrador.",
+        "POS_SHIFT_CLOSED_REJECT": "Abre un turno de caja antes de dar efectivo.",
+        "INSUFFICIENT_DRAWER_CASH_REJECT": "La caja no tiene tanto efectivo.",
         "DUAL_CONTROL_VIOLATION_REJECT": "Otra persona debe confirmar lo que tú preparaste.",
         "UNAUTHORIZED_CONFIRMER_REJECT": "Tu cuenta no puede confirmar reembolsos.",
         "PERMISSION_DENIED": "Tu cuenta no puede hacer esta acción.",
@@ -1893,6 +1932,140 @@
         "offline": "Parece que no tienes conexión.",
         "timeout": "El servidor tardó demasiado. Inténtalo de nuevo.",
         "invalid": "La respuesta del servidor no se pudo leer. Inténtalo de nuevo.",
+        "unknown": "Algo falló. Inténtalo de nuevo."
+      }
+    },
+    "pos": {
+      "title": "Punto de venta",
+      "loading": "Cargando la caja…",
+      "exampleLabel": "Ejemplo",
+      "openTitle": "Abrir la caja",
+      "openingCash": "Fondo inicial (MXN)",
+      "open": "Abrir turno",
+      "shiftOpen": "Turno abierto con un fondo de {amount}.",
+      "invalidAmount": "Escribe un monto en pesos con hasta dos decimales.",
+      "invalidMovement": "Escribe un monto mayor que 0 y el motivo.",
+      "movementsTitle": "Entradas y retiros de efectivo",
+      "movementType": "Tipo",
+      "movementOut": "Retiro",
+      "movementIn": "Entrada",
+      "movementAmount": "Monto (MXN)",
+      "movementReason": "Motivo",
+      "recordMovement": "Registrar movimiento",
+      "moved": "Movimiento registrado.",
+      "closeTitle": "Cerrar el turno",
+      "closeIntro": "Cuenta el efectivo de la caja y escribe el total: el sistema compara después. Una diferencia pide una nota de al menos 10 letras, y si pasa de $100 la cierra un supervisor.",
+      "counted": "Efectivo contado (MXN)",
+      "notes": "Nota de la diferencia (si la hay)",
+      "close": "Cerrar turno",
+      "closed": "Turno cerrado. Se esperaban {expected}; diferencia: {difference}.",
+      "saleTitle": "Nueva venta",
+      "searchTitle": "Buscar producto",
+      "search": "Clave o nombre",
+      "searchButton": "Buscar",
+      "available": "disponibles: {n}",
+      "add": "Agregar",
+      "remove": "Quitar",
+      "chargeTitle": "Cobrar",
+      "total": "Total",
+      "method": "Forma de pago",
+      "cash": "Efectivo",
+      "card": "Tarjeta (terminal Banorte)",
+      "tendered": "Recibido (MXN)",
+      "change": "Cambio",
+      "chargeOnTerminal": "Cobra {total} en la terminal Banorte y copia los datos del voucher. Nunca escribas el número completo de la tarjeta.",
+      "authCode": "Código de autorización",
+      "lastFour": "Últimos 4 dígitos",
+      "brand": "Marca de la tarjeta",
+      "folio": "Folio del voucher",
+      "email": "Correo para el comprobante (opcional)",
+      "charge": "Registrar venta",
+      "charging": "Registrando…",
+      "sold": "Venta {number} registrada: {total}. Cambio: {change}.",
+      "showReceipt": "Ver comprobante",
+      "print": "Imprimir",
+      "fields": {
+        "openingCash": {
+          "description": "El efectivo con el que empieza la caja.",
+          "example": "500.00"
+        },
+        "movementType": {
+          "description": "Retiro saca efectivo de la caja; entrada lo agrega.",
+          "example": "Retiro"
+        },
+        "movementAmount": {
+          "description": "Pesos con hasta dos decimales. Un retiro mayor de $2,000 lo autoriza un supervisor.",
+          "example": "200.00"
+        },
+        "movementReason": {
+          "description": "Para qué se mueve el efectivo.",
+          "example": "Pago de paquetería"
+        },
+        "counted": {
+          "description": "El total que contaste en la caja.",
+          "example": "1850.00"
+        },
+        "notes": {
+          "description": "Explica la diferencia si lo contado no coincide.",
+          "example": "Faltó cambio de una venta"
+        },
+        "search": {
+          "description": "Parte de la clave o del nombre. Vacío muestra todo.",
+          "example": "mochila"
+        },
+        "method": {
+          "description": "Cómo paga la persona.",
+          "example": "Efectivo"
+        },
+        "tendered": {
+          "description": "Lo que te entrega la persona.",
+          "example": "500.00"
+        },
+        "authCode": {
+          "description": "El código del voucher.",
+          "example": "A1B2C3"
+        },
+        "lastFour": {
+          "description": "Solo los últimos cuatro dígitos.",
+          "example": "4242"
+        },
+        "brand": {
+          "description": "Como dice el voucher.",
+          "example": "Visa"
+        },
+        "folio": {
+          "description": "El folio del voucher.",
+          "example": "000123"
+        },
+        "email": {
+          "description": "Solo si quiere recibir su comprobante.",
+          "example": "ana@correo.com"
+        }
+      },
+      "errors": {
+        "POS_SHIFT_ALREADY_OPEN": "Ya hay un turno abierto. Recarga la página.",
+        "PERMISSION_DENIED": "Tu cuenta no puede hacer esta acción.",
+        "SHIFT_NOT_OPEN_REJECT": "El turno ya no está abierto. Recarga la página.",
+        "MISSING_DIFF_JUSTIFICATION_REJECT": "Hay una diferencia: escribe una nota de al menos 10 letras.",
+        "SUPERVISOR_REQUIRED_FOR_LARGE_DIFF": "La diferencia pasa de $100: debe cerrar un supervisor.",
+        "INSUFFICIENT_DRAWER_CASH_REJECT": "La caja no tiene tanto efectivo.",
+        "SUPERVISOR_PERMISSION_REQUIRED": "Un retiro mayor de $2,000 lo hace un supervisor.",
+        "POS_PRODUCT_UNKNOWN": "Un producto ya no está disponible. Búscalo de nuevo.",
+        "INSUFFICIENT_STOCK_REJECT": "No hay suficientes piezas.",
+        "STOCK_RESERVED_ONLINE_REJECT": "Esas piezas están apartadas por pedidos en línea.",
+        "POS_SHIFT_CLOSED_REJECT": "Abre un turno antes de vender.",
+        "INVALID_POS_METHOD_REJECT": "Esa forma de pago no es del mostrador.",
+        "INSUFFICIENT_TENDERED_REJECT": "El efectivo recibido no cubre el total.",
+        "TERMINAL_AMOUNT_MISMATCH_REJECT": "El importe cobrado en la terminal no coincide con el total.",
+        "INVALID_VOUCHER_DATA_REJECT": "Revisa los datos del voucher (4 dígitos, autorización, marca y folio). Nunca el número completo.",
+        "INVALID_REQUEST": "Revisa los datos que escribiste.",
+        "SERVICE_UNAVAILABLE": "La venta no está disponible ahora. Avisa a quien administra el sistema.",
+        "SECOND_FACTOR_REQUIRED": "Activa la verificación en dos pasos para usar la caja.",
+        "SESSION_INVALID_OR_EXPIRED": "Tu sesión terminó. Vuelve a entrar.",
+        "rate_limited": "Hubo demasiados intentos seguidos. Espera unos minutos.",
+        "offline": "Parece que no tienes conexión.",
+        "timeout": "El servidor tardó demasiado. Revisa la venta antes de repetirla.",
+        "invalid": "La respuesta del servidor no se pudo leer.",
         "unknown": "Algo falló. Inténtalo de nuevo."
       }
     },

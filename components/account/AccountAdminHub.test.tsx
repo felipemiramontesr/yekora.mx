@@ -37,6 +37,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'shipping:manage',
         'returns:view',
         'sellers:manage',
+        'pos:sell',
       ],
     });
     expect(screen.getByRole('heading', { name: texts.title })).toBeTruthy();
@@ -45,7 +46,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       expect(screen.getByText(card.name)).toBeTruthy();
       expect(screen.getByText(card.description)).toBeTruthy();
     }
-    expect(screen.getAllByText(texts.open)).toHaveLength(6);
+    expect(screen.getAllByText(texts.open)).toHaveLength(7);
   });
 
   it.each([
@@ -61,6 +62,8 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       { ...none, permissions: ['shipping:manage'] },
       ['Envíos'],
     ],
+    ['pos:sell', { ...none, permissions: ['pos:sell'] }, ['Punto de venta']],
+    ['pos:shift', { ...none, permissions: ['pos:shift'] }, ['Punto de venta']],
     [
       'returns:view',
       { ...none, permissions: ['returns:view'] },
@@ -84,6 +87,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
         'Catálogo',
         'Envíos',
         'Devoluciones',
+        'Punto de venta',
         'Usuarios, roles y permisos',
       ]) {
         if (!shown.includes(absent)) {
