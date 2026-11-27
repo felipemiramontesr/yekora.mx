@@ -383,10 +383,34 @@ interface SealedAddress {
   stateCode: string;
   postalCode: string;
   references?: string;
+  /** Set instead of an address when the sale was made at the counter (FC 076). */
+  counter?: string;
 }
 
 /** The words of the three order messages, in each language. */
 const ORDER_COPY = {
+  POS_RECEIPT_EMAIL: {
+    'es-MX': ({ number, site }: OrderContext): Copy => ({
+      subject: `Tu comprobante de compra ${number}`,
+      content: {
+        heading: 'Gracias por tu compra en la tienda',
+        paragraphs: [
+          `Este es el comprobante de tu compra ${number}. Consérvalo para cualquier devolución dentro de los 60 días naturales.`,
+        ],
+        button: { label: 'Ir a YĒKORA', url: `${site}/` },
+      },
+    }),
+    en: ({ number, site }: OrderContext): Copy => ({
+      subject: `Your receipt ${number}`,
+      content: {
+        heading: 'Thank you for shopping at the store',
+        paragraphs: [
+          `This is the receipt of your purchase ${number}. Keep it for any return within 60 calendar days.`,
+        ],
+        button: { label: 'Go to YĒKORA', url: `${site}/en/` },
+      },
+    }),
+  },
   ORDER_CONFIRMED: {
     'es-MX': ({ name, number, site }: OrderContext): Copy => ({
       subject: `Confirmamos tu pedido ${number} en YĒKORA`,
@@ -601,6 +625,8 @@ function money(cents: number, locale: MailLocale): string {
 
 /** The delivery address as the lines a person reads. */
 function addressLines(address: SealedAddress, state: string): string[] {
+  // A counter sale ships nothing: its sealed copy only names the counter.
+  if (address.counter !== undefined) return [address.counter];
   const number = [address.exteriorNumber, address.interiorNumber]
     .filter((part) => part !== undefined && part !== '')
     .join(' int. ');

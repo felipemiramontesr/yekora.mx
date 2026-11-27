@@ -80,6 +80,9 @@ import {
   useBackupCode,
 } from './services/identity';
 import { findOrder, listOrders } from './services/orderReads';
+import { posProducts, sellAtCounter } from './services/posCheckout';
+import { posReceipt } from './services/posReceipt';
+import { closeShift, openShift } from './services/posShifts';
 import { assertPaymentsModeApproved } from './services/paymentsModeGate';
 import { provisionOwner, recoverOwner } from './services/ownerProvision';
 import { enqueueMail } from './services/outbox';
@@ -3051,5 +3054,141 @@ describe('the tickets of the payments mode switch on real SQL (migration 019, FC
     await db.query(
       "DELETE FROM payments_mode_tickets WHERE challenge_id LIKE 'itest%'"
     );
+  });
+});
+
+describe('the point of sale on real SQL (migration 020, FC 076)', () => {
+  const secrets = {
+    piiKey: Buffer.alloc(32, 1),
+    emailPepper: 'e'.repeat(32),
+    tokenPepper: 't'.repeat(32),
+  };
+
+  it('sells from the shared stock and pays a return back from the drawer, with one open shift at a time', async () => {
+    const users = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 2'
+    );
+    const [cashier, confirmer] = [users[0].id, users[1].id];
+    const actor = { userId: cashier, supervisor: true, ip: null };
+    const [product] = await db.query<{
+      id: number;
+      sku: string;
+      stock: number;
+      reserved_stock: number;
+    }>(
+      'SELECT id, sku, stock, reserved_stock FROM products WHERE is_active = 1 AND stock - reserved_stock >= 1 ORDER BY id LIMIT 1'
+    );
+    const stockOf = async () =>
+      (
+        await db.query<{ stock: number; reserved_stock: number }>(
+          'SELECT stock, reserved_stock FROM products WHERE id = ?',
+          [product.id]
+        )
+      )[0];
+
+    const shift = await db.transaction((tx) => openShift(tx, 100000, actor));
+    if (typeof shift === 'string') throw new Error(shift);
+    await expect(db.transaction((tx) => openShift(tx, 1, actor))).resolves.toBe(
+      'POS_SHIFT_ALREADY_OPEN'
+    );
+    const listed = await posProducts(db, product.sku);
+    expect(listed.items.map((item) => item.sku)).toContain(product.sku);
+
+    const sale = await db.transaction((tx) =>
+      sellAtCounter(
+        tx,
+        {
+          items: [{ sku: product.sku, quantity: 1 }],
+          payment: { method: 'POS_CASH', tenderedMxnCents: 100_000_000 },
+        },
+        { actor, secrets, now: new Date() }
+      )
+    );
+    if (typeof sale === 'string') throw new Error(sale);
+    const after = await stockOf();
+    expect(Number(after.stock)).toBe(Number(product.stock) - 1);
+    expect(Number(after.reserved_stock)).toBe(Number(product.reserved_stock));
+    const found = await findOrder(db, sale.orderNumber);
+    expect(found?.order).toMatchObject({
+      status: 'PAID',
+      fulfillment: 'DELIVERED',
+      method: 'POS_CASH',
+    });
+    const receipt = await posReceipt(db, sale.orderNumber, 58);
+    expect(receipt?.lines.join(' ')).toContain(sale.orderNumber);
+
+    const asked = await db.transaction((tx) =>
+      requestReturn(
+        tx,
+        {
+          orderNumber: sale.orderNumber,
+          userId: cashier,
+          request: {
+            items: [{ sku: product.sku, quantity: 1 }],
+            reason: 'DEFECT',
+          },
+          now: new Date(),
+          counter: true,
+        },
+        { userId: cashier, ip: null }
+      )
+    );
+    if (typeof asked === 'string') throw new Error(asked);
+    await db.transaction((tx) =>
+      prepareReturn(
+        tx,
+        asked.id,
+        {
+          refundMxnCents: sale.totalMxnCents,
+          restock: true,
+          processorRefundedCents: 0,
+        },
+        { userId: cashier, ip: null },
+        new Date()
+      )
+    );
+    const done = await confirmReturn(
+      { db, processors: {}, now: () => new Date() },
+      asked.id,
+      {
+        userId: confirmer,
+        canConfirm: true,
+        manualReference: null,
+        refundMethod: 'CASH',
+      },
+      null
+    );
+    expect(done.status).toBe(200);
+    expect(Number((await stockOf()).stock)).toBe(Number(product.stock));
+    const closed = await db.transaction((tx) =>
+      closeShift(
+        tx,
+        shift.id,
+        { countedCashMxnCents: 100000 },
+        actor,
+        new Date()
+      )
+    );
+    expect(closed).toMatchObject({ differenceMxnCents: 0 });
+
+    await db.query('DELETE FROM pos_cash_movements WHERE shift_id = ?', [
+      shift.id,
+    ]);
+    await db.query(
+      'DELETE ri FROM order_return_items ri JOIN order_returns r ON r.id = ri.return_id JOIN orders o ON o.id = r.order_id WHERE o.order_number = ?',
+      [sale.orderNumber]
+    );
+    await db.query(
+      'DELETE r FROM order_returns r JOIN orders o ON o.id = r.order_id WHERE o.order_number = ?',
+      [sale.orderNumber]
+    );
+    await db.query(
+      'DELETE i FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.order_number = ?',
+      [sale.orderNumber]
+    );
+    await db.query('DELETE FROM orders WHERE order_number = ?', [
+      sale.orderNumber,
+    ]);
+    await db.query('DELETE FROM pos_shifts WHERE id = ?', [shift.id]);
   });
 });

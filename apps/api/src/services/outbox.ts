@@ -62,6 +62,11 @@ export type MailEvent = (
       processor: string;
     }
   | {
+      /** The receipt of a counter sale the buyer asked to get by e-mail (FC 076, K-79). */
+      type: 'POS_RECEIPT_EMAIL';
+      orderId: number;
+    }
+  | {
       /** The payment of an order was confirmed (FC 066, K-88). */
       type: 'ORDER_CONFIRMED';
       /** `orders.id`: the buyer's data is read and decrypted only when the mail is sent. */

@@ -52,6 +52,7 @@ const PERMISSIONS: Record<string, string[]> = {
 
 const store = {
   delivered: true,
+  channel: 'online',
   status: 'REQUESTED',
   preparedBy: null as string | null,
   processor: 'STRIPE',
@@ -127,13 +128,14 @@ const HANDLERS: [string, Handler][] = [
     },
   ],
   [
-    'SELECT id, user_id, status_id, delivered_at FROM orders',
+    'SELECT id, user_id, status_id, delivered_at, channel FROM orders',
     (p) =>
       p[0] === NUMBER
         ? [
             {
               id: 7,
               user_id: BUYER,
+              channel: store.channel,
               status_id: store.delivered ? 9 : 8,
               delivered_at: store.delivered
                 ? new Date('2026-11-10T12:00:00Z')
@@ -572,5 +574,51 @@ describe('POST /v1/admin/returns/:id/confirm', () => {
         })
       ).statusCode
     ).toBe(400);
+  });
+});
+
+describe('POST /v1/admin/returns/pos (FC 076 F3)', () => {
+  const ask = (body: object, key: string | null = 'pos-key-1') =>
+    app.inject({
+      method: 'POST',
+      url: '/v1/admin/returns/pos',
+      payload: body,
+      headers: {
+        cookie: session('w'),
+        ...(key === null ? {} : { 'idempotency-key': key }),
+      },
+    });
+  const body = {
+    orderNumber: NUMBER,
+    items: [{ sku: 'TENT', quantity: 1 }],
+    reason: 'DEFECT',
+  };
+
+  it('asks for a key, a reason and a well-formed order number', async () => {
+    expect((await ask(body, null)).json()).toMatchObject({
+      detail: 'IDEMP_KEY_MISSING',
+    });
+    const withoutReason: Partial<typeof body> = { ...body };
+    delete withoutReason.reason;
+    expect((await ask(withoutReason, 'pos-key-2')).json()).toMatchObject({
+      detail: 'RETURN_PAYLOAD_INVALID',
+    });
+    expect(
+      (await ask({ ...body, orderNumber: 'X' }, 'pos-key-3')).statusCode
+    ).toBe(400);
+  });
+
+  it('creates the request of a counter sale for the staff', async () => {
+    store.channel = 'pos';
+    const answer = await ask(body, 'pos-key-5');
+    store.channel = 'online';
+    expect(answer.statusCode).toBe(201);
+    expect(answer.json()).toMatchObject({ id: 5 });
+  });
+
+  it('answers 404 for an order that is not of the counter', async () => {
+    const answer = await ask(body, 'pos-key-4');
+    expect(answer.statusCode).toBe(404);
+    expect(answer.json()).toMatchObject({ detail: 'ORDER_NOT_FOUND' });
   });
 });

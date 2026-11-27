@@ -73,9 +73,16 @@ export const returnPrepareRequestSchema = z.strictObject({
 /** What the confirmer sends; a refund made by hand at Mercado Pago names its reference. */
 export const returnConfirmRequestSchema = z.strictObject({
   manualReference: z.string().trim().min(1).max(128).optional(),
+  /** How a counter sale is paid back (FC 076): cash from the drawer or the terminal. */
+  refundMethod: z.enum(['CASH', 'TERMINAL']).optional(),
 });
 
 /** Path parameter of one request. */
 export const returnParams = z.strictObject({
   id: z.coerce.number().int().positive(),
+});
+
+/** What the staff of the counter sends to ask for the return of a counter sale (FC 076 F3). */
+export const posReturnRequestSchema = returnRequestSchema.extend({
+  orderNumber: z.string().regex(/^YEK-\d{4}-[0-9A-Z]{8}$/),
 });

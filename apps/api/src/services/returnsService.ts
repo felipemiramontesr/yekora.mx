@@ -36,6 +36,7 @@ import {
   type EligibilityCode,
   withinReturnWindow,
 } from './returnsEligibility';
+import { drawerCash, writeMovement } from './posShifts';
 
 /** Why a request changed nothing: the rows of both gates and the cases of the routes. */
 export type ReturnRefusal =
@@ -47,7 +48,10 @@ export type ReturnRefusal =
   | 'RETURN_STATUS_CONFLICT'
   | 'MANUAL_REFERENCE_REQUIRED'
   | 'REFUND_PROCESSOR_UNAVAILABLE'
-  | 'REFUND_PROCESSOR_ERROR';
+  | 'REFUND_PROCESSOR_ERROR'
+  | 'REFUND_METHOD_REQUIRED'
+  | 'POS_SHIFT_CLOSED_REJECT'
+  | 'INSUFFICIENT_DRAWER_CASH_REJECT';
 
 /** Status and title of each refusal; the route answers with them and the code as the detail. */
 export const RETURN_REFUSALS: Readonly<
@@ -75,6 +79,12 @@ export const RETURN_REFUSALS: Readonly<
     'Another person has to confirm what you prepared',
   ],
   INVALID_REFUND_AMOUNT_REJECT: [409, 'The amount exceeds what the order paid'],
+  REFUND_METHOD_REQUIRED: [
+    400,
+    'A counter refund is paid back in cash or on the terminal',
+  ],
+  POS_SHIFT_CLOSED_REJECT: [409, 'Open a shift before giving cash back'],
+  INSUFFICIENT_DRAWER_CASH_REJECT: [400, 'The drawer does not hold it'],
   MANUAL_REFERENCE_REQUIRED: [
     400,
     'The reference of the refund made by hand is required',
@@ -169,6 +179,8 @@ export async function requestReturn(
     userId: string;
     request: ReturnRequest;
     now: Date;
+    /** True when the staff of the counter asks for a counter sale (FC 076 F3). */
+    counter?: boolean;
   },
   actor: Actor
 ): Promise<ReturnView | ReturnRefusal> {
@@ -177,11 +189,15 @@ export async function requestReturn(
     user_id: string | null;
     status_id: number;
     delivered_at: Date | null;
+    channel: string;
   }>(
-    'SELECT id, user_id, status_id, delivered_at FROM orders WHERE order_number = ? FOR UPDATE',
+    'SELECT id, user_id, status_id, delivered_at, channel FROM orders WHERE order_number = ? FOR UPDATE',
     [input.orderNumber]
   );
   if (order === undefined) return 'ORDER_NOT_FOUND';
+  // The counter's route reaches only counter sales; the buyer's route only the buyer's own.
+  if (input.counter === true && order.channel !== 'pos')
+    return 'ORDER_NOT_FOUND';
   const skus = input.request.items.map((line) => line.sku);
   if (new Set(skus).size !== skus.length) return 'RETURN_PAYLOAD_INVALID';
   const lines = await tx.query<{
@@ -194,7 +210,7 @@ export async function requestReturn(
     'SELECT i.id, i.sku, i.quantity, i.allows_return, COALESCE(SUM(ri.quantity), 0) AS returned FROM order_items i LEFT JOIN order_return_items ri ON ri.order_item_id = i.id WHERE i.order_id = ? GROUP BY i.id, i.sku, i.quantity, i.allows_return',
     [order.id]
   );
-  const owner = order.user_id === input.userId;
+  const owner = input.counter === true || order.user_id === input.userId;
   const delivered = Number(order.status_id) === 9;
   const withinWindow = withinReturnWindow(order.delivered_at, input.now);
   const chosen: { id: number; quantity: number }[] = [];
@@ -312,7 +328,7 @@ export async function readProcessorRefunded(
   id: number
 ): Promise<number | 'REFUND_PROCESSOR_ERROR'> {
   const [row] = await deps.db.query<{
-    processor_code: ProcessorCode;
+    processor_code: OrderProcessor;
     payment_resource_id: string | null;
   }>(
     'SELECT p.code AS processor_code, o.payment_resource_id FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ?',
@@ -397,12 +413,18 @@ export async function prepareReturn(
   return viewOf(tx, id);
 }
 
+/** How a counter sale is paid back: cash from the drawer, or the terminal (FC 076). */
+type RefundMethod = 'CASH' | 'TERMINAL';
+
+/** Who took the money: a processor, or LOCAL for the counter (FC 076). */
+type OrderProcessor = ProcessorCode | 'LOCAL';
+
 /** What the processor call needs, read when the intent is recorded. */
 interface RefundIntent {
   returnId: number;
   orderId: number;
   orderNumber: string;
-  processor: ProcessorCode;
+  processor: OrderProcessor;
   paymentResourceId: string | null;
   refundMxnCents: number;
 }
@@ -418,6 +440,7 @@ async function beginRefund(
     userId: string;
     canConfirm: boolean;
     hasManualReference: boolean;
+    refundMethod: RefundMethod | null;
   },
   now: Date,
   ip: string | null,
@@ -435,7 +458,7 @@ async function beginRefund(
     refund_mxn_cents: number | null;
     total_mxn_cents: number;
     payment_resource_id: string | null;
-    processor_code: ProcessorCode;
+    processor_code: OrderProcessor;
   }>(
     'SELECT r.order_id, o.order_number, r.status, r.prepared_by, r.refund_mxn_cents, o.total_mxn_cents, o.payment_resource_id, p.code AS processor_code FROM order_returns r JOIN orders o ON o.id = r.order_id JOIN payment_methods m ON m.id = o.payment_method_id JOIN payment_processors p ON p.id = m.processor_id WHERE r.id = ? FOR UPDATE',
     [id]
@@ -463,6 +486,18 @@ async function beginRefund(
   if (row.processor_code === 'MERCADO_PAGO' && !confirmer.hasManualReference) {
     return { kind: 'refusal', code: 'MANUAL_REFERENCE_REQUIRED' };
   }
+  // FC 076 F3: a counter sale is paid back by hand, in cash or on the terminal.
+  if (row.processor_code === 'LOCAL') {
+    if (confirmer.refundMethod === null) {
+      return { kind: 'refusal', code: 'REFUND_METHOD_REQUIRED' };
+    }
+    if (
+      confirmer.refundMethod === 'TERMINAL' &&
+      !confirmer.hasManualReference
+    ) {
+      return { kind: 'refusal', code: 'MANUAL_REFERENCE_REQUIRED' };
+    }
+  }
   await tx.query(
     "UPDATE order_returns SET status = 'REFUNDING', confirmed_by = ?, confirmed_at = ? WHERE id = ?",
     [confirmer.userId, now, id]
@@ -489,6 +524,38 @@ async function beginRefund(
   };
 }
 
+/** Takes the cash of a counter return from the open drawer, or says why it cannot. */
+async function payFromDrawer(
+  tx: TxQuery,
+  intent: RefundIntent,
+  userId: string
+): Promise<
+  'POS_SHIFT_CLOSED_REJECT' | 'INSUFFICIENT_DRAWER_CASH_REJECT' | null
+> {
+  const [open] = await tx.query<{
+    id: number;
+    opening_cash_mxn_cents: number | string;
+  }>(
+    "SELECT id, opening_cash_mxn_cents FROM pos_shifts WHERE status = 'OPEN' FOR UPDATE"
+  );
+  if (open === undefined) return 'POS_SHIFT_CLOSED_REJECT';
+  if (intent.refundMxnCents > (await drawerCash(tx, open))) {
+    return 'INSUFFICIENT_DRAWER_CASH_REJECT';
+  }
+  await writeMovement(
+    tx,
+    {
+      shiftId: Number(open.id),
+      type: 'OUT',
+      amountMxnCents: intent.refundMxnCents,
+      reason: `Devolución mostrador #${intent.returnId}`,
+      returnId: intent.returnId,
+    },
+    userId
+  );
+  return null;
+}
+
 /**
  * Second transaction of a confirmation: the request is REFUNDED, the units go back to the shelf if
  * the operator said so (T2.3), the order becomes REFUNDED when the refunds add up to its total
@@ -497,18 +564,33 @@ async function beginRefund(
 async function finishRefund(
   tx: TxQuery,
   intent: RefundIntent,
-  reference: { refundId: string | null; manualReference: string | null },
+  reference: {
+    refundId: string | null;
+    manualReference: string | null;
+    refundMethod: RefundMethod | null;
+  },
   confirmer: Actor,
   processorRefundedCents: number
-): Promise<ReturnView> {
+): Promise<ReturnView | ReturnRefusal> {
   const [row] = await tx.query<{ status: string; restock: number }>(
     'SELECT status, restock FROM order_returns WHERE id = ? FOR UPDATE',
     [intent.returnId]
   );
   if (row.status !== 'REFUNDING') return viewOf(tx, intent.returnId);
+  const counter = intent.processor === 'LOCAL';
+  // The cash leaves the drawer in the same transaction that closes the return (FC 076 T2.6).
+  if (counter && reference.refundMethod === 'CASH') {
+    const refused = await payFromDrawer(tx, intent, confirmer.userId);
+    if (refused !== null) return refused;
+  }
   await tx.query(
-    "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ? WHERE id = ?",
-    [reference.refundId, reference.manualReference, intent.returnId]
+    "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ?, refund_method = ? WHERE id = ?",
+    [
+      reference.refundId,
+      reference.manualReference,
+      counter ? reference.refundMethod : null,
+      intent.returnId,
+    ]
   );
   if (Number(row.restock) === 1) {
     await tx.query(
@@ -537,11 +619,14 @@ async function finishRefund(
       intent.orderId,
     ]);
   }
-  await enqueueMail(tx, {
-    type: 'RETURN_REFUNDED',
-    orderId: intent.orderId,
-    refundMxnCents: intent.refundMxnCents,
-  });
+  // A counter sale has no account to write to.
+  if (!counter) {
+    await enqueueMail(tx, {
+      type: 'RETURN_REFUNDED',
+      orderId: intent.orderId,
+      refundMxnCents: intent.refundMxnCents,
+    });
+  }
   await recordAudit(tx, {
     userId: confirmer.userId,
     action: 'RETURN_REFUNDED',
@@ -591,6 +676,8 @@ export async function confirmReturn(
     userId: string;
     canConfirm: boolean;
     manualReference: string | null;
+    /** How a counter sale is paid back (FC 076 F3). */
+    refundMethod?: RefundMethod | null;
   },
   ip: string | null
 ): Promise<Answer> {
@@ -606,6 +693,7 @@ export async function confirmReturn(
         userId: confirmer.userId,
         canConfirm: confirmer.canConfirm,
         hasManualReference: confirmer.manualReference !== null,
+        refundMethod: confirmer.refundMethod ?? null,
       },
       deps.now(),
       ip,
@@ -646,12 +734,18 @@ export async function confirmReturn(
     finishRefund(
       tx,
       intent,
-      { refundId, manualReference: confirmer.manualReference },
+      {
+        refundId,
+        manualReference: confirmer.manualReference,
+        refundMethod: confirmer.refundMethod ?? null,
+      },
       { userId: confirmer.userId, ip },
       typeof settled === 'number' ? settled : 0
     )
   );
-  return { status: 200, body: view };
+  return typeof view === 'string'
+    ? refusalAnswer(view)
+    : { status: 200, body: view };
 }
 
 /**

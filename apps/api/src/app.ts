@@ -23,6 +23,7 @@ import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAdminRoutes } from './routes/admin';
 import { registerAdminPaymentRoutes } from './routes/adminPayments';
+import { registerPosRoutes } from './routes/adminPos';
 import { registerAdminOrderRoutes } from './routes/adminOrders';
 import { registerAdminRoleRoutes } from './routes/adminRoles';
 import { registerReturnRoutes } from './routes/returns';
@@ -250,6 +251,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     now,
     processors,
     mode: deps.config.payments.mode,
+  });
+  // FC 076: the point of sale, the till (pos:shift) and the sale (pos:sell).
+  registerPosRoutes(app, {
+    db: deps.db,
+    now,
+    checkout: deps.config.payments.checkout,
   });
   // FC 075 F2: the payments mode switch, an approval the start of the API demands.
   registerAdminPaymentRoutes(app, {

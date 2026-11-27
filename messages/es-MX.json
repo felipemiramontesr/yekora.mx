@@ -646,6 +646,14 @@
         "MERCADO_PAGO_BALANCE": {
           "label": "Saldo de Mercado Pago",
           "detail": "Pagas con tu cuenta de Mercado Pago."
+        },
+        "POS_CASH": {
+          "label": "Efectivo en mostrador",
+          "detail": "Efectivo en mostrador"
+        },
+        "POS_CARD_MANUAL": {
+          "label": "Tarjeta en terminal Banorte",
+          "detail": "Tarjeta en terminal Banorte"
         }
       }
     },

@@ -45,6 +45,22 @@ import {
   paymentModePrepareSchema,
   paymentModeTicketSchema,
 } from '../../../lib/account/paymentsBunkerTypes';
+import {
+  cashMovementResultSchema,
+  cashMovementSchema,
+  closedShiftSchema,
+  closeShiftSchema,
+  currentShiftSchema,
+  openShiftSchema,
+  posProductsQuery,
+  posProductsSchema,
+  posSaleResultSchema,
+  posSaleSchema,
+  posShiftSchema,
+  receiptQuery,
+  receiptSchema,
+  shiftParams,
+} from '../../../lib/account/posTypes';
 import { paymentsHealthSchema } from '../../../lib/account/paymentsHealthTypes';
 import { cartQuoteSchema } from '../../../lib/cart/cartTypes';
 import {
@@ -114,6 +130,7 @@ import {
   staffUpdateRequestSchema,
 } from '../../../lib/account/staffTypes';
 import {
+  posReturnRequestSchema,
   returnConfirmRequestSchema,
   returnListQuery,
   returnListSchema,
@@ -649,6 +666,101 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     },
   },
   {
+    method: 'GET',
+    path: '/v1/admin/pos/shifts/current',
+    summary: 'The open till shift, without its expected cash (blind count)',
+    permission: 'pos:shift',
+    request: {},
+    responses: {
+      200: currentShiftSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/pos/shifts/open',
+    summary: 'Opens the till shift; one at a time (Idempotency-Key, audited)',
+    permission: 'pos:shift',
+    request: { body: openShiftSchema },
+    responses: {
+      201: posShiftSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/pos/shifts/movements',
+    summary:
+      'Cash put in or taken out of the drawer (T1.4, Idempotency-Key, audited)',
+    permission: 'pos:shift',
+    request: { body: cashMovementSchema },
+    responses: {
+      201: cashMovementResultSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/pos/shifts/:id/close',
+    summary:
+      'Closes the shift with a blind count (T1.2, Idempotency-Key, audited)',
+    permission: 'pos:shift',
+    request: { params: shiftParams, body: closeShiftSchema },
+    responses: {
+      200: closedShiftSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/pos/products',
+    summary:
+      'The products of the counter, with what is left after online reservations',
+    permission: 'pos:sell',
+    request: { query: posProductsQuery },
+    responses: {
+      200: posProductsSchema,
+      400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/pos/checkout',
+    summary:
+      'Sells at the counter from the shared stock (T1.1, T1.3, Idempotency-Key, audited)',
+    permission: 'pos:sell',
+    request: { body: posSaleSchema },
+    responses: {
+      201: posSaleResultSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/pos/orders/:order_number/receipt',
+    summary: 'The thermal receipt of a counter sale, 80 or 58 mm',
+    permission: 'pos:sell',
+    request: {
+      params: z.object({ order_number: z.string() }),
+      query: receiptQuery,
+    },
+    responses: {
+      200: receiptSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
     method: 'POST',
     path: '/v1/admin/payments/mode/prepare',
     summary:
@@ -827,6 +939,21 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     responses: {
       200: returnListSchema,
       400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/returns/pos',
+    summary:
+      'The staff asks for the return of a counter sale (Idempotency-Key, audited)',
+    permission: 'returns:prepare',
+    request: { body: posReturnRequestSchema },
+    responses: {
+      201: returnSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

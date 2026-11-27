@@ -88,7 +88,7 @@ function fakeDb(s: Scenario) {
   const log: { sql: string; params: readonly unknown[] }[] = [];
   const routes: [string, (p: readonly unknown[]) => unknown][] = [
     [
-      'SELECT id, user_id, status_id, delivered_at FROM orders',
+      'SELECT id, user_id, status_id, delivered_at, channel FROM orders',
       () => (s.order ? [s.order] : []),
     ],
     ['SELECT i.id, i.sku', () => s.lines],
@@ -571,7 +571,7 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
     ).toEqual(['user-2', NOW, 5]);
     expect(
       harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")[0].params
-    ).toEqual(['re_1', null, 5]);
+    ).toEqual(['re_1', null, null, 5]);
     expect(harness.wrote('UPDATE products p')[0].params).toEqual([5]);
     expect(harness.wrote('INSERT INTO outbox_events')[0].params[0]).toBe(
       'RETURN_REFUNDED'
@@ -884,7 +884,7 @@ describe('confirmReturn (T1.2, T2.1, T2.2, T2.3, T2.4)', () => {
       expect(createRefund).not.toHaveBeenCalled();
       expect(
         harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")[0].params
-      ).toEqual([null, 'SPEI-778', 5]);
+      ).toEqual([null, 'SPEI-778', null, 5]);
     });
   });
 });
@@ -996,5 +996,141 @@ describe('isReturnRefund (link with the webhook of FC 069)', () => {
   it('searches the refund ids as one list', async () => {
     const { log } = await check(1, 0, ['re_1']);
     expect(log[0].params).toEqual([7, ['re_1']]);
+  });
+});
+
+describe('returns of the counter (FC 076 F3, T0.5, T2.6)', () => {
+  const POS_BEGIN = {
+    order_id: 7,
+    order_number: 'YEK-2026-ABCD1234',
+    status: 'PREPARED',
+    prepared_by: 'user-1',
+    refund_mxn_cents: 45000,
+    total_mxn_cents: 200000,
+    payment_resource_id: 'pos:YEK-2026-ABCD1234',
+    processor_code: 'LOCAL',
+  };
+  const ask = (order: Record<string, unknown>) => {
+    const harness = fakeDb(scenario({ order }));
+    return {
+      harness,
+      result: requestReturn(
+        harness.db,
+        {
+          orderNumber: 'YEK-2026-ABCD1234',
+          userId: 'staff-1',
+          request: { items: [{ sku: 'TENT', quantity: 1 }], reason: 'DEFECT' },
+          now: NOW,
+          counter: true,
+        },
+        ACTOR
+      ),
+    };
+  };
+  const sale = {
+    id: 7,
+    user_id: null,
+    status_id: 9,
+    delivered_at: DELIVERED,
+    channel: 'pos',
+  };
+
+  it('lets the staff ask for a counter sale, and only for a counter sale', async () => {
+    const asked = ask(sale);
+    await expect(asked.result).resolves.toMatchObject({ id: 5 });
+    expect(asked.harness.wrote('INSERT INTO order_returns')[0].params[3]).toBe(
+      'staff-1'
+    );
+    await expect(ask({ ...sale, channel: 'online' }).result).resolves.toBe(
+      'ORDER_NOT_FOUND'
+    );
+  });
+
+  interface Till {
+    open?: boolean;
+    cash?: number;
+  }
+  async function confirmPos(
+    refundMethod: 'CASH' | 'TERMINAL' | null,
+    manualReference: string | null = null,
+    till: Till = {}
+  ) {
+    const harness = fakeDb(scenario({ begin: POS_BEGIN }));
+    const original = harness.db.query.bind(harness.db);
+    const moves: unknown[][] = [];
+    harness.db.query = (async (sql: string, p: unknown[] = []) => {
+      if (sql.startsWith('SELECT id, opening_cash_mxn_cents')) {
+        return till.open === false
+          ? []
+          : [{ id: 3, opening_cash_mxn_cents: till.cash ?? 100000 }];
+      }
+      if (sql.startsWith('SELECT COALESCE(SUM(total_mxn_cents)')) {
+        return [{ cents: 0 }];
+      }
+      if (sql.startsWith('SELECT COALESCE(SUM(CASE')) return [{ cents: 0 }];
+      if (sql.startsWith('INSERT INTO pos_cash_movements')) {
+        moves.push(p);
+        return { insertId: 1 };
+      }
+      return original(sql, p);
+    }) as typeof harness.db.query;
+    harness.db.transaction = (async (
+      work: (tx: typeof harness.db) => unknown
+    ) => work(harness.db)) as typeof harness.db.transaction;
+    const answer = await confirmReturn(
+      { db: harness.db, processors: {}, now: () => NOW },
+      5,
+      {
+        userId: 'user-2',
+        canConfirm: true,
+        manualReference,
+        refundMethod,
+      },
+      null
+    );
+    return { answer, harness, moves };
+  }
+  const detail = (answer: { body: unknown }) =>
+    (answer.body as { detail?: string }).detail;
+
+  it('asks how a counter refund is paid, and the voucher folio for the terminal', async () => {
+    expect(detail((await confirmPos(null)).answer)).toBe(
+      'REFUND_METHOD_REQUIRED'
+    );
+    expect(detail((await confirmPos('TERMINAL')).answer)).toBe(
+      'MANUAL_REFERENCE_REQUIRED'
+    );
+  });
+
+  it('pays cash from the open drawer, in the same close, and sends no mail', async () => {
+    const { answer, harness, moves } = await confirmPos('CASH');
+    expect(answer.status).toBe(200);
+    expect(moves).toEqual([
+      [3, 'OUT', 45000, 'Devolución mostrador #5', 'user-2', 5],
+    ]);
+    expect(
+      harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")[0].params
+    ).toEqual([null, null, 'CASH', 5]);
+    expect(harness.wrote('INSERT INTO outbox_events')).toHaveLength(0);
+  });
+
+  it('refuses cash without a shift or without enough in the drawer, closing nothing', async () => {
+    const closed = await confirmPos('CASH', null, { open: false });
+    expect(detail(closed.answer)).toBe('POS_SHIFT_CLOSED_REJECT');
+    expect(
+      closed.harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")
+    ).toHaveLength(0);
+    const poor = await confirmPos('CASH', null, { cash: 100 });
+    expect(detail(poor.answer)).toBe('INSUFFICIENT_DRAWER_CASH_REJECT');
+    expect(poor.moves).toHaveLength(0);
+  });
+
+  it('closes a terminal refund with its folio and no movement of cash', async () => {
+    const { answer, harness, moves } = await confirmPos('TERMINAL', 'REV-9');
+    expect(answer.status).toBe(200);
+    expect(moves).toHaveLength(0);
+    expect(
+      harness.wrote("UPDATE order_returns SET status = 'REFUNDED'")[0].params
+    ).toEqual([null, 'REV-9', 'TERMINAL', 5]);
   });
 });

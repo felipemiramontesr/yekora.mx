@@ -65,6 +65,14 @@ const INVENTORY = [
   // FC 075: the payments mode switch (users:manage: the owner and the administrators).
   '├── /v1/admin/payments/mode/prepare (POST)',
   '├── /v1/admin/payments/mode/confirm (POST)',
+  // FC 076: the till of the point of sale (pos:shift).
+  '├── /v1/admin/pos/shifts/current (GET, HEAD)',
+  '├── /v1/admin/pos/shifts/open (POST)',
+  '├── /v1/admin/pos/shifts/movements (POST)',
+  '├── /v1/admin/pos/shifts/:id/close (POST)',
+  '├── /v1/admin/pos/products (GET, HEAD)',
+  '├── /v1/admin/pos/checkout (POST)',
+  '├── /v1/admin/pos/orders/:order_number/receipt (GET, HEAD)',
   // FC 072: the staff and the roles of the panel «Usuarios, roles y permisos».
   '├── /v1/admin/users (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
@@ -73,6 +81,7 @@ const INVENTORY = [
   // FC 071: the board of returns (returns:view), prepared (returns:prepare) and confirmed by
   // another person (returns:confirm).
   '├── /v1/admin/returns (GET, HEAD)',
+  '│   ├── /pos (POST)',
   '│   ├── /:id/prepare (POST)',
   '│   └── /:id/confirm (POST)',
   // FC 061: the shipping console (shipping:manage).
@@ -267,6 +276,14 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       // FC 075: the payments mode switch (users:manage: the owner and the administrators).
       '├── /v1/admin/payments/mode/prepare (POST)',
       '├── /v1/admin/payments/mode/confirm (POST)',
+      // FC 076: the till of the point of sale (pos:shift).
+      '├── /v1/admin/pos/shifts/current (GET, HEAD)',
+      '├── /v1/admin/pos/shifts/open (POST)',
+      '├── /v1/admin/pos/shifts/movements (POST)',
+      '├── /v1/admin/pos/shifts/:id/close (POST)',
+      '├── /v1/admin/pos/products (GET, HEAD)',
+      '├── /v1/admin/pos/checkout (POST)',
+      '├── /v1/admin/pos/orders/:order_number/receipt (GET, HEAD)',
       '├── /v1/admin/users (GET, HEAD, POST)',
       '├── /v1/admin/roles (GET, HEAD, POST)',
       '├── /v1/admin/returns (GET, HEAD)',

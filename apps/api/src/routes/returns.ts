@@ -20,6 +20,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import {
+  posReturnRequestSchema,
   returnConfirmRequestSchema,
   returnListQuery,
   returnParams,
@@ -100,6 +101,35 @@ export function registerReturnRoutes(
     }
   );
 
+  // FC 076 F3: the staff asks for the return of a counter sale; the rest of the flow is the same.
+  app.post('/v1/admin/returns/pos', async (request, reply) => {
+    const key = checkIdempotencyKey(request.headers['idempotency-key']);
+    if (key.code !== 'IDEMP_KEY_ACCEPTED') {
+      return refuse(reply, 400, 'Idempotency-Key required', key.code);
+    }
+    const body = posReturnRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return refuse(reply, 400, 'Invalid request', 'RETURN_PAYLOAD_INVALID');
+    }
+    const { orderNumber, ...asked } = body.data;
+    return runOnce(deps, request, reply, key.key, async (tx, userId) => {
+      const outcome = await requestReturn(
+        tx,
+        {
+          orderNumber,
+          userId,
+          request: asked,
+          now: deps.now(),
+          counter: true,
+        },
+        { userId, ip: request.ip }
+      );
+      return typeof outcome === 'string'
+        ? refusalOf(outcome)
+        : { status: 201, body: outcome };
+    });
+  });
+
   app.get('/v1/admin/returns', async (request, reply) => {
     const query = returnListQuery.safeParse(request.query);
     if (!query.success) {
@@ -155,6 +185,7 @@ export function registerReturnRoutes(
         userId: user.userId,
         canConfirm: user.permissions.includes('returns:confirm'),
         manualReference: body.data.manualReference ?? null,
+        refundMethod: body.data.refundMethod ?? null,
       },
       request.ip
     );

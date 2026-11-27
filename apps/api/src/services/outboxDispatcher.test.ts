@@ -568,6 +568,25 @@ describe('the order mails of the outbox (FC 066 T1.1, T2.2, T2.3, T2.4)', () => 
     expect(message.text).toContain(`https://yekora.mx/cuenta/${ORDER_NUMBER}/`);
   });
 
+  it.each([
+    ['es-MX', 'Tu comprobante de compra', 'https://yekora.mx/'],
+    ['en', 'Your receipt', 'https://yekora.mx/en/'],
+  ])(
+    'POS_RECEIPT_EMAIL sends the counter receipt in %s, naming the counter instead of an address (FC 076)',
+    async (locale, subject, home) => {
+      const due = [event('POS_RECEIPT_EMAIL', locale)];
+      const { send } = await sentFor(
+        due,
+        orderDb(due, orderRow(), { counter: 'Mostrador Yekora' } as never)
+      );
+      const [message] = send.mock.calls.map(([sent]) => sent);
+      expect(message.subject).toBe(`${subject} ${ORDER_NUMBER}`);
+      expect(message.text).toContain(home);
+      expect(message.text).toContain('TENT');
+      expect(message.text).toContain('Mostrador Yekora');
+    }
+  );
+
   it('RETURN_REFUNDED in English, with the English link and no Spanish', async () => {
     const { send } = await sentFor([
       row(1, {

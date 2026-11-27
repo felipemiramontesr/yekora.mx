@@ -76,6 +76,10 @@ beforeAll(async () => {
  * FC 028: the account needs account:self and the panel orders:read; a write on an order path
  * is a public 405 refusal; everything else stays public.
  */
+/** The permission of a route of the point of sale: the till or the sale (FC 076). */
+const posPermission = (path: string) =>
+  path.startsWith('/v1/admin/pos/shifts') ? 'pos:shift' : 'pos:sell';
+
 function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (Object.keys(route.responses).join() === '405') return 'public';
   if (route.path.startsWith('/v1/account/')) return 'account:self';
@@ -93,10 +97,13 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (route.path.startsWith('/v1/admin/roles') && route.method !== 'GET')
     return 'roles:manage';
   if (/^\/v1\/admin\/(users|roles)/.test(route.path)) return 'sellers:manage';
+  // FC 076: the till of the point of sale and the sale.
+  if (route.path.startsWith('/v1/admin/pos/')) return posPermission(route.path);
   // FC 075: the payments mode switch (owner and administrators; the owner alone confirms).
   if (route.path.startsWith('/v1/admin/payments/mode')) return 'users:manage';
   // FC 071: the board lists, one operator prepares and another confirms.
   if (route.path === '/v1/admin/returns') return 'returns:view';
+  if (route.path === '/v1/admin/returns/pos') return 'returns:prepare';
   if (route.path === '/v1/admin/returns/:id/prepare') return 'returns:prepare';
   if (route.path === '/v1/admin/returns/:id/confirm') return 'returns:confirm';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';

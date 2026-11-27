@@ -22,6 +22,16 @@ export const PAYMENT_METHOD_CODES = [
   'MERCADO_PAGO_BALANCE',
 ] as const;
 
+/**
+ * The methods an order may carry: the checkout's, plus the counter's (FC 076), which the checkout
+ * never offers nor accepts.
+ */
+const ORDER_METHOD_CODES = [
+  ...PAYMENT_METHOD_CODES,
+  'POS_CASH',
+  'POS_CARD_MANUAL',
+] as const;
+
 const STATE_CODES = new Set(MEXICAN_STATES.map((state) => state.code));
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -126,7 +136,7 @@ export function splitStatus(code: string): {
 export const orderViewSchema = z.object({
   orderNumber: z.string(),
   status: z.enum(ORDER_STATUS_CODES),
-  method: z.enum(PAYMENT_METHOD_CODES),
+  method: z.enum(ORDER_METHOD_CODES),
   itemsTotalMxnCents: z.number().int().nonnegative(),
   shippingTotalMxnCents: z.number().int().nonnegative(),
   totalMxnCents: z.number().int().positive(),

@@ -646,6 +646,14 @@
         "MERCADO_PAGO_BALANCE": {
           "label": "Mercado Pago balance",
           "detail": "Pay with your Mercado Pago account."
+        },
+        "POS_CASH": {
+          "label": "Cash at the counter",
+          "detail": "Cash at the counter"
+        },
+        "POS_CARD_MANUAL": {
+          "label": "Card at the Banorte terminal",
+          "detail": "Card at the Banorte terminal"
         }
       }
     },
