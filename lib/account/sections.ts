@@ -38,7 +38,7 @@ const SHIPPING_PERMISSION = 'shipping:manage';
 const RETURNS_PERMISSION = 'returns:view';
 
 /** The permissions that open the point of sale (FC 076): selling or running the till. */
-const POS_PERMISSIONS = ['pos:sell', 'pos:shift'];
+const POS_PERMISSIONS = new Set(['pos:sell', 'pos:shift']);
 
 /** The role of the owner (FC 044 T2.1): the panel of users shows it everything and protects it. */
 const OWNER_ROLE = 'owner';
@@ -66,7 +66,7 @@ const ACCESS: Readonly<Record<AccountSection, (user: Who) => boolean>> = {
   users: (user) => user.permissions.includes(USERS_PERMISSION),
   returns: (user) => user.permissions.includes(RETURNS_PERMISSION),
   pos: (user) =>
-    user.permissions.some((permission) => POS_PERMISSIONS.includes(permission)),
+    user.permissions.some((permission) => POS_PERMISSIONS.has(permission)),
   shipping: (user) => user.permissions.includes(SHIPPING_PERMISSION),
 };
 
