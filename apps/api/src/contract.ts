@@ -336,6 +336,55 @@ const webhook = (processor: string, path: string): RouteContract => ({
   },
 });
 
+/** A write of the staff on one invoice request (FC 077): Idempotency-Key and every refusal. */
+const invoiceAction = (
+  action: 'upload' | 'reject' | 'cancel',
+  summary: string,
+  shape: { body: z.ZodType; answer: z.ZodType }
+): RouteContract => ({
+  method: 'POST',
+  path: `/v1/admin/invoices/requests/:id/${action}`,
+  summary,
+  permission: 'invoices:upload',
+  request: {
+    params: invoiceParams,
+    headers: mutationHeaders,
+    body: shape.body,
+  },
+  responses: {
+    200: shape.answer,
+    400: problemSchema,
+    404: problemSchema,
+    409: problemSchema,
+    500: problemSchema,
+    ...SIGNED_IN_REFUSALS,
+  },
+});
+
+/** One file of the invoice of an order, for its buyer or for the staff (FC 077, audited). */
+const invoiceFile = (
+  kind: 'xml' | 'pdf',
+  reader: 'buyer' | 'staff'
+): RouteContract => ({
+  method: 'GET',
+  path:
+    reader === 'buyer'
+      ? `/v1/account/orders/:order_number/invoice/${kind}`
+      : `/v1/admin/invoices/:order_number/download/${kind}`,
+  summary:
+    reader === 'buyer'
+      ? `The ${kind.toUpperCase()} of the invoice of one of the buyer’s orders (audited, FC 077)`
+      : `The ${kind.toUpperCase()} of the invoice of any order, for the staff (audited, FC 077)`,
+  permission: reader === 'buyer' ? 'account:self' : 'invoices:read',
+  request: { params: orderParams },
+  responses: {
+    200: binarySchema,
+    404: problemSchema,
+    ...SIGNED_IN_REFUSALS,
+  },
+  binary: [`application/${kind}`],
+});
+
 /** Every route the API serves, in registration order (app.ts). */
 export const ROUTE_CONTRACTS: readonly RouteContract[] = [
   {
@@ -1059,122 +1108,25 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       ...SIGNED_IN_REFUSALS,
     },
   },
-  {
-    method: 'POST',
-    path: '/v1/admin/invoices/requests/:id/upload',
-    summary:
-      'Takes the XML and the PDF of a waiting request, checks them and queues their delivery (Idempotency-Key, audited, FC 077)',
-    permission: 'invoices:upload',
-    request: {
-      params: invoiceParams,
-      headers: mutationHeaders,
-      body: invoiceUploadRequestSchema,
-    },
-    responses: {
-      200: invoiceUploadedSchema,
-      400: problemSchema,
-      404: problemSchema,
-      409: problemSchema,
-      500: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-  },
-  {
-    method: 'POST',
-    path: '/v1/admin/invoices/requests/:id/reject',
-    summary:
-      'Rejects a waiting request with its reason; the buyer may ask again for 7 days (FC 077)',
-    permission: 'invoices:upload',
-    request: {
-      params: invoiceParams,
-      headers: mutationHeaders,
-      body: invoiceCloseRequestSchema,
-    },
-    responses: {
-      200: invoiceClosedSchema,
-      400: problemSchema,
-      404: problemSchema,
-      409: problemSchema,
-      500: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-  },
-  {
-    method: 'POST',
-    path: '/v1/admin/invoices/requests/:id/cancel',
-    summary:
-      'Cancels a completed invoice, so another may be asked for within 7 days (FC 077)',
-    permission: 'invoices:upload',
-    request: {
-      params: invoiceParams,
-      headers: mutationHeaders,
-      body: invoiceCloseRequestSchema,
-    },
-    responses: {
-      200: invoiceClosedSchema,
-      400: problemSchema,
-      404: problemSchema,
-      409: problemSchema,
-      500: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-  },
-  {
-    method: 'GET',
-    path: '/v1/account/orders/:order_number/invoice/xml',
-    summary:
-      'The XML of the invoice of one of the buyer’s orders (audited, FC 077)',
-    permission: 'account:self',
-    request: { params: orderParams },
-    responses: {
-      200: binarySchema,
-      404: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-    binary: ['application/xml'],
-  },
-  {
-    method: 'GET',
-    path: '/v1/admin/invoices/:order_number/download/xml',
-    summary:
-      'The XML of the invoice of any order, for the staff (audited, FC 077)',
-    permission: 'invoices:read',
-    request: { params: orderParams },
-    responses: {
-      200: binarySchema,
-      404: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-    binary: ['application/xml'],
-  },
-  {
-    method: 'GET',
-    path: '/v1/account/orders/:order_number/invoice/pdf',
-    summary:
-      'The PDF of the invoice of one of the buyer’s orders (audited, FC 077)',
-    permission: 'account:self',
-    request: { params: orderParams },
-    responses: {
-      200: binarySchema,
-      404: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-    binary: ['application/pdf'],
-  },
-  {
-    method: 'GET',
-    path: '/v1/admin/invoices/:order_number/download/pdf',
-    summary:
-      'The PDF of the invoice of any order, for the staff (audited, FC 077)',
-    permission: 'invoices:read',
-    request: { params: orderParams },
-    responses: {
-      200: binarySchema,
-      404: problemSchema,
-      ...SIGNED_IN_REFUSALS,
-    },
-    binary: ['application/pdf'],
-  },
+  invoiceAction(
+    'upload',
+    'Takes the XML and the PDF of a waiting request, checks them and queues their delivery (Idempotency-Key, audited, FC 077)',
+    { body: invoiceUploadRequestSchema, answer: invoiceUploadedSchema }
+  ),
+  invoiceAction(
+    'reject',
+    'Rejects a waiting request with its reason; the buyer may ask again for 7 days (FC 077)',
+    { body: invoiceCloseRequestSchema, answer: invoiceClosedSchema }
+  ),
+  invoiceAction(
+    'cancel',
+    'Cancels a completed invoice, so another may be asked for within 7 days (FC 077)',
+    { body: invoiceCloseRequestSchema, answer: invoiceClosedSchema }
+  ),
+  invoiceFile('xml', 'buyer'),
+  invoiceFile('xml', 'staff'),
+  invoiceFile('pdf', 'buyer'),
+  invoiceFile('pdf', 'staff'),
   {
     method: 'POST',
     path: '/v1/admin/returns/:id/prepare',
