@@ -21,6 +21,7 @@ import { permissionGuard } from './lib/guard';
 import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
+import { registerAccountFiscalRoutes } from './routes/accountFiscal';
 import { registerAdminRoutes } from './routes/admin';
 import { registerAdminPaymentRoutes } from './routes/adminPayments';
 import { registerPosRoutes } from './routes/adminPos';
@@ -245,6 +246,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     piiKey: deps.config.payments.checkout?.piiKey ?? null,
     cards,
     siteUrl: deps.config.payments.siteUrl,
+  });
+  registerAccountFiscalRoutes(app, {
+    db: deps.db,
+    now,
+    piiKey: deps.config.payments.checkout?.piiKey ?? null,
   });
   registerAdminRoutes(app, {
     db: deps.db,

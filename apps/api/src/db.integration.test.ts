@@ -52,6 +52,10 @@ import {
   updateAddress,
   updateProfile,
 } from './services/accountAddresses';
+import {
+  readFiscalProfile,
+  saveFiscalProfile,
+} from './services/fiscalProfiles';
 import { createDb } from './services/db';
 import {
   confirmReturn,
@@ -3193,5 +3197,35 @@ describe('the point of sale on real SQL (migration 020, FC 076)', () => {
       sale.orderNumber,
     ]);
     await db.query('DELETE FROM pos_shifts WHERE id = ?', [shift.id]);
+  });
+});
+
+describe('the fiscal profile on real SQL (migration 021, fiscalProfiles.ts, FC 077 F1)', () => {
+  it('keeps one profile per account, replacing it, with the name and the postal code sealed', async () => {
+    const [{ id }] = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 1'
+    );
+    const key = Buffer.alloc(32, 1);
+    const profile = {
+      rfc: 'XAXX010101000',
+      legalName: 'LA ROSA',
+      taxSystem: '612',
+      postalCode: '98612',
+      defaultCfdiUse: 'G03',
+    };
+    await db.transaction((tx) => saveFiscalProfile(tx, key, id, profile));
+    const changed = { ...profile, rfc: 'ÑAB010101AB1', defaultCfdiUse: 'CP01' };
+    await db.transaction((tx) => saveFiscalProfile(tx, key, id, changed));
+
+    expect(await readFiscalProfile(db, key, id)).toEqual(changed);
+    const rows = await db.query<{ legal_name_enc: Buffer }>(
+      'SELECT legal_name_enc FROM customer_fiscal_profiles WHERE user_id = ?',
+      [id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(String(rows[0].legal_name_enc)).not.toContain('LA ROSA');
+    await db.query('DELETE FROM customer_fiscal_profiles WHERE user_id = ?', [
+      id,
+    ]);
   });
 });

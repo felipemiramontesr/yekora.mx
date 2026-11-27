@@ -40,7 +40,9 @@ export type PiiField =
   | 'customer_phone'
   | 'shipping_address'
   | 'user_phone'
-  | 'user_address';
+  | 'user_address'
+  | 'fiscal_legal_name'
+  | 'fiscal_postal_code';
 
 /**
  * Decodes and checks CHECKOUT_PII_KEY: exactly 32 bytes in base64, or the API refuses to start.

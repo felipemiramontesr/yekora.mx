@@ -48,6 +48,7 @@ const INVENTORY = [
   '├── /v1/account/addresses (GET, HEAD, POST)',
   '│   └── /:id (PATCH, DELETE)',
   '├── /v1/account/forget-device (POST)',
+  '├── /v1/account/fiscal-profile (GET, HEAD, PUT)',
   '├── /v1/account/logout (POST)',
   '├── /v1/account/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',

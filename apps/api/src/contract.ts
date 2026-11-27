@@ -40,6 +40,11 @@ import {
   productSchema,
 } from '../../../lib/api/catalogClient';
 import {
+  fiscalProfileRequestSchema,
+  fiscalProfileSavedSchema,
+  fiscalProfileSchema,
+} from '../../../lib/account/fiscalTypes';
+import {
   paymentModeApprovalSchema,
   paymentModeConfirmSchema,
   paymentModePrepareSchema,
@@ -488,6 +493,32 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     responses: {
       200: profileUpdatedSchema,
       400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/fiscal-profile',
+    summary: 'The fiscal data the account saved to be invoiced (FC 077)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: fiscalProfileSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'PUT',
+    path: '/v1/account/fiscal-profile',
+    summary:
+      'Saves the fiscal data of the account, judged value by value; the answer repeats none of it (FC 077)',
+    permission: 'account:self',
+    request: { headers: mutationHeaders, body: fiscalProfileRequestSchema },
+    responses: {
+      200: fiscalProfileSavedSchema,
+      400: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },
