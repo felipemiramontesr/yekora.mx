@@ -56,6 +56,11 @@ import {
   readFiscalProfile,
   saveFiscalProfile,
 } from './services/fiscalProfiles';
+import {
+  listInvoiceRequests,
+  orderInvoiceState,
+  requestInvoice,
+} from './services/invoiceRequests';
 import { createDb } from './services/db';
 import {
   confirmReturn,
@@ -3123,6 +3128,49 @@ describe('the point of sale on real SQL (migration 020, FC 076)', () => {
     });
     const receipt = await posReceipt(db, sale.orderNumber, 58);
     expect(receipt?.lines.join(' ')).toContain(sale.orderNumber);
+
+    // FC 077 F2: the counter sale has no account, so the staff asks for its invoice.
+    const fiscal = {
+      piiKey: secrets.piiKey,
+      emailPepper: secrets.emailPepper,
+    };
+    const ask = () =>
+      db.transaction((tx) =>
+        requestInvoice(
+          tx,
+          {
+            orderNumber: sale.orderNumber,
+            ownerId: null,
+            data: {
+              rfc: 'XAXX010101000',
+              legalName: 'LA ROSA',
+              taxSystem: '612',
+              postalCode: '98612',
+              cfdiUse: 'G03',
+              emailForInvoice: 'ana@example.test',
+            },
+            now: new Date(),
+          },
+          { secrets: fiscal, userId: cashier, ip: '127.0.0.1' }
+        )
+      );
+    const filed = await ask();
+    if (typeof filed === 'string') throw new Error(filed);
+    expect(await ask()).toBe('INVOICE_ALREADY_EXISTS_REJECT');
+    const queue = await listInvoiceRequests(db, fiscal.piiKey, {
+      status: 'PENDING',
+      search: sale.orderNumber,
+      page: 1,
+    });
+    expect(queue.total).toBe(1);
+    expect(queue.items[0]).toMatchObject({
+      id: filed.id,
+      invoicableMxnCents: sale.totalMxnCents,
+      legalName: 'LA ROSA',
+      email: 'ana@example.test',
+    });
+    expect(await orderInvoiceState(db, sale.orderNumber, cashier)).toBeNull();
+    await db.query('DELETE FROM invoice_requests WHERE id = ?', [filed.id]);
 
     const asked = await db.transaction((tx) =>
       requestReturn(

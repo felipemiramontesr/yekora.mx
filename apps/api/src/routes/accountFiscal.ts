@@ -7,7 +7,7 @@
  */
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
-  type FiscalDataRefusal,
+  FISCAL_DATA_TITLES,
   fiscalDataVerdict,
   fiscalProfileRequestSchema,
   fiscalProfileSavedSchema,
@@ -32,16 +32,6 @@ interface AccountFiscalDeps {
   /** CHECKOUT_PII_KEY, or null when the checkout secrets are not configured (FC 047). */
   piiKey: Buffer | null;
 }
-
-/** The title of each refusal of T1.2; the code says which value failed. */
-const TITLES: Readonly<Record<FiscalDataRefusal, string>> = {
-  INVALID_RFC_REJECT: 'The RFC is not valid',
-  INVALID_LEGAL_NAME_REJECT:
-    'The legal name is not valid, or carries its capital regime',
-  INVALID_TAX_SYSTEM_REJECT: 'The tax regime is not in the SAT catalog',
-  INVALID_POSTAL_CODE_REJECT: 'The postal code is not valid',
-  INVALID_CFDI_USE_REJECT: 'The CFDI use is not in the SAT catalog',
-};
 
 const unavailable = (reply: FastifyReply) =>
   refuse(
@@ -95,7 +85,7 @@ export function registerAccountFiscalRoutes(
       cfdiUse: body.data.defaultCfdiUse,
     });
     if (verdict !== 'FISCAL_DATA_ACCEPTED') {
-      return refuse(reply, 400, TITLES[verdict], verdict);
+      return refuse(reply, 400, FISCAL_DATA_TITLES[verdict], verdict);
     }
     return runOnce(deps, request, reply, key.key, async (tx, userId) => {
       await saveFiscalProfile(tx, piiKey, userId, body.data);

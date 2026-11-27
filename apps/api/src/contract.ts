@@ -45,6 +45,14 @@ import {
   fiscalProfileSchema,
 } from '../../../lib/account/fiscalTypes';
 import {
+  invoiceQueueQuery,
+  invoiceQueueSchema,
+  invoiceRequestedSchema,
+  invoiceRequestSchema,
+  orderInvoiceStateSchema,
+  staffInvoiceRequestSchema,
+} from '../../../lib/account/invoiceTypes';
+import {
   paymentModeApprovalSchema,
   paymentModeConfirmSchema,
   paymentModePrepareSchema,
@@ -985,6 +993,64 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
       400: problemSchema,
       404: problemSchema,
       409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/orders/:order_number/invoice-request',
+    summary:
+      'The buyer asks for the invoice of one of their paid orders (Idempotency-Key, audited, FC 077)',
+    permission: 'account:self',
+    request: {
+      params: orderParams,
+      headers: mutationHeaders,
+      body: invoiceRequestSchema,
+    },
+    responses: {
+      201: invoiceRequestedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/orders/:order_number/invoice-request',
+    summary: 'Where the latest invoice request of one order stands (FC 077)',
+    permission: 'account:self',
+    request: { params: orderParams },
+    responses: {
+      200: orderInvoiceStateSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/invoices/requests',
+    summary:
+      'The staff asks for the invoice of an order without an account (Idempotency-Key, audited, FC 077)',
+    permission: 'invoices:request',
+    request: { headers: mutationHeaders, body: staffInvoiceRequestSchema },
+    responses: {
+      201: invoiceRequestedSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/admin/invoices/requests',
+    summary: 'The queue of invoice requests, by status, order or RFC (FC 077)',
+    permission: 'invoices:read',
+    request: { query: invoiceQueueQuery },
+    responses: {
+      200: invoiceQueueSchema,
+      400: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

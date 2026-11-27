@@ -76,6 +76,20 @@ beforeAll(async () => {
  * FC 028: the account needs account:self and the panel orders:read; a write on an order path
  * is a public 405 refusal; everything else stays public.
  */
+/**
+ * The invoice requests (FC 077: reading the queue, or asking for a buyer without an account) and
+ * the board of returns (FC 071: it lists, one operator prepares and another confirms).
+ */
+function deskPermission(route: { path: string; method: string }) {
+  if (route.path.startsWith('/v1/admin/invoices/')) {
+    return route.method === 'GET' ? 'invoices:read' : 'invoices:request';
+  }
+  if (route.path === '/v1/admin/returns') return 'returns:view';
+  return route.path.endsWith('/confirm')
+    ? 'returns:confirm'
+    : 'returns:prepare';
+}
+
 /** The permission of a route of the point of sale: the till or the sale (FC 076). */
 const posPermission = (path: string) =>
   path.startsWith('/v1/admin/pos/shifts') ? 'pos:shift' : 'pos:sell';
@@ -99,13 +113,11 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   if (/^\/v1\/admin\/(users|roles)/.test(route.path)) return 'sellers:manage';
   // FC 076: the till of the point of sale and the sale.
   if (route.path.startsWith('/v1/admin/pos/')) return posPermission(route.path);
+  // FC 077, FC 071: the invoice requests and the board of returns, by their own rule.
+  if (/^\/v1\/admin\/(invoices|returns)\b/.test(route.path))
+    return deskPermission(route);
   // FC 075: the payments mode switch (owner and administrators; the owner alone confirms).
   if (route.path.startsWith('/v1/admin/payments/mode')) return 'users:manage';
-  // FC 071: the board lists, one operator prepares and another confirms.
-  if (route.path === '/v1/admin/returns') return 'returns:view';
-  if (route.path === '/v1/admin/returns/pos') return 'returns:prepare';
-  if (route.path === '/v1/admin/returns/:id/prepare') return 'returns:prepare';
-  if (route.path === '/v1/admin/returns/:id/confirm') return 'returns:confirm';
   if (route.path.startsWith('/v1/admin/')) return 'orders:read';
   return 'public';
 }

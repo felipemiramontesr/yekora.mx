@@ -42,7 +42,8 @@ export type PiiField =
   | 'user_phone'
   | 'user_address'
   | 'fiscal_legal_name'
-  | 'fiscal_postal_code';
+  | 'fiscal_postal_code'
+  | 'invoice_email';
 
 /**
  * Decodes and checks CHECKOUT_PII_KEY: exactly 32 bytes in base64, or the API refuses to start.

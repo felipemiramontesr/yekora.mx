@@ -114,22 +114,27 @@ function carriesCapitalRegime(name: string): boolean {
 }
 
 /** A field as it is judged: trimmed and in capitals, as the SAT writes it. */
-const capitals = z.string().max(300).trim().toUpperCase();
+export const capitalsSchema = z.string().max(300).trim().toUpperCase();
 
 /**
- * Body of `PUT /v1/account/fiscal-profile`. It fixes the shape only; what each value may be is
- * decided by {@link fiscalDataVerdict}, so every refusal carries its own code.
+ * The four fields a profile and an invoice request share. They fix the shape only; what each value
+ * may be is decided by {@link fiscalDataVerdict}, so every refusal carries its own code.
  */
+export const fiscalDataShape = {
+  rfc: capitalsSchema,
+  legalName: capitalsSchema,
+  taxSystem: capitalsSchema,
+  postalCode: capitalsSchema,
+};
+
+/** Body of `PUT /v1/account/fiscal-profile`. */
 export const fiscalProfileRequestSchema = z.strictObject({
-  rfc: capitals,
-  legalName: capitals,
-  taxSystem: capitals,
-  postalCode: capitals,
-  defaultCfdiUse: capitals,
+  ...fiscalDataShape,
+  defaultCfdiUse: capitalsSchema,
 });
 
 /** Why fiscal data is refused (T1.2). */
-export type FiscalDataRefusal =
+type FiscalDataRefusal =
   | 'INVALID_RFC_REJECT'
   | 'INVALID_LEGAL_NAME_REJECT'
   | 'INVALID_TAX_SYSTEM_REJECT'
@@ -144,6 +149,16 @@ interface FiscalData {
   postalCode: string;
   cfdiUse: string;
 }
+
+/** The title of each refusal of T1.2; the code says which value failed. */
+export const FISCAL_DATA_TITLES: Readonly<Record<FiscalDataRefusal, string>> = {
+  INVALID_RFC_REJECT: 'The RFC is not valid',
+  INVALID_LEGAL_NAME_REJECT:
+    'The legal name is not valid, or carries its capital regime',
+  INVALID_TAX_SYSTEM_REJECT: 'The tax regime is not in the SAT catalog',
+  INVALID_POSTAL_CODE_REJECT: 'The postal code is not valid',
+  INVALID_CFDI_USE_REJECT: 'The CFDI use is not in the SAT catalog',
+};
 
 const isLegalName = (name: string): boolean =>
   LEGAL_NAME.test(name) &&
