@@ -61,6 +61,11 @@ import {
   orderInvoiceState,
   requestInvoice,
 } from './services/invoiceRequests';
+import {
+  closeInvoiceRequest,
+  readInvoiceFile,
+  uploadInvoice,
+} from './services/invoicesService';
 import { createDb } from './services/db';
 import {
   confirmReturn,
@@ -3170,7 +3175,50 @@ describe('the point of sale on real SQL (migration 020, FC 076)', () => {
       email: 'ana@example.test',
     });
     expect(await orderInvoiceState(db, sale.orderNumber, cashier)).toBeNull();
-    await db.query('DELETE FROM invoice_requests WHERE id = ?', [filed.id]);
+
+    // FC 077 F3: the upload with both files, the download, the cancellation and a new request.
+    const actor077 = { userId: cashier, ip: '127.0.0.1' };
+    const document = `<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Version="4.0" Total="${(sale.totalMxnCents / 100).toFixed(2)}"><cfdi:Emisor Rfc="YEK010101AB1"/><cfdi:Receptor Rfc="XAXX010101000"/><cfdi:Complemento><tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" Version="1.1" UUID="6F1C2A3B-4D5E-4F60-8A9B-0C1D2E3F4A5B" FechaTimbrado="2026-11-27T10:15:00"/></cfdi:Complemento></cfdi:Comprobante>`;
+    const files = {
+      xmlBase64: Buffer.from(document).toString('base64'),
+      pdfBase64: Buffer.from('%PDF-1.7 prueba').toString('base64'),
+    };
+    const send = (id: number) =>
+      db.transaction((tx) =>
+        uploadInvoice(tx, id, files, {
+          storeRfc: 'YEK010101AB1',
+          actor: actor077,
+        })
+      );
+    expect(await send(filed.id)).toMatchObject({ status: 'COMPLETED' });
+    const kept = await readInvoiceFile(db, sale.orderNumber, 'xml', null);
+    expect(kept?.data.toString()).toBe(document);
+    expect(
+      await readInvoiceFile(db, sale.orderNumber, 'pdf', cashier)
+    ).toBeNull();
+    await db.transaction((tx) =>
+      closeInvoiceRequest(tx, filed.id, {
+        to: 'CANCELLED',
+        reason: 'Datos equivocados',
+        now: new Date(),
+        actor: actor077,
+      })
+    );
+    expect(await readInvoiceFile(db, sale.orderNumber, 'pdf', null)).toBeNull();
+    // A new request is possible, and the folio of the cancelled one is never taken again.
+    const again = await ask();
+    if (typeof again === 'string') throw new Error(again);
+    expect(await send(again.id)).toBe('INVALID_OR_DUPLICATE_UUID_REJECT');
+    await db.query(
+      "DELETE FROM outbox_events WHERE event_type = 'INVOICE_DELIVERED'"
+    );
+    await db.query('DELETE FROM order_invoices WHERE invoice_request_id = ?', [
+      filed.id,
+    ]);
+    await db.query('DELETE FROM invoice_requests WHERE id IN (?, ?)', [
+      filed.id,
+      again.id,
+    ]);
 
     const asked = await db.transaction((tx) =>
       requestReturn(

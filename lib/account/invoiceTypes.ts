@@ -79,3 +79,32 @@ export const invoiceQueueSchema = z.object({
 
 /** One page of the queue of requests. */
 export type InvoiceQueue = z.infer<typeof invoiceQueueSchema>;
+
+/** Path parameter of the routes of one request. */
+export const invoiceParams = z.strictObject({
+  id: z.coerce.number().int().min(1),
+});
+
+/** Body of `POST /v1/admin/invoices/requests/:id/upload`: both files in base64. */
+export const invoiceUploadRequestSchema = z.strictObject({
+  xmlBase64: z.string().min(1),
+  pdfBase64: z.string().min(1),
+});
+
+/** Answer of an upload: the request completed and its fiscal folio. */
+export const invoiceUploadedSchema = z.object({
+  id: z.number().int(),
+  status,
+  uuid: z.string(),
+});
+
+/** Body of a rejection or a cancellation: why, as the person will read it. */
+export const invoiceCloseRequestSchema = z.strictObject({
+  reason: z.string().trim().min(10).max(255),
+});
+
+/** Answer of a rejection or a cancellation. */
+export const invoiceClosedSchema = z.object({
+  id: z.number().int(),
+  status,
+});

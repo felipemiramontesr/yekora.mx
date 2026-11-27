@@ -52,6 +52,8 @@ interface MailMessage {
   text: string;
   /** HTML body of the brand template. */
   html?: string;
+  /** Files that travel with the message (FC 077: the XML and the PDF of an invoice). */
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
 /** Sends one message, or throws. */
@@ -284,7 +286,7 @@ const COPY = {
  */
 function copyOf(
   keys: { totpKey: Buffer; siteUrl: string },
-  event: Exclude<MailEvent, OrderEvent>,
+  event: Exclude<MailEvent, OrderEvent | InvoiceEvent>,
   locale: MailLocale
 ): Copy {
   switch (event.type) {
@@ -320,7 +322,11 @@ function copyOf(
 }
 
 /** The three order events, which carry an order id instead of an account. */
-type OrderEvent = Extract<MailEvent, { orderId: number }>;
+type InvoiceEvent = Extract<MailEvent, { type: 'INVOICE_DELIVERED' }>;
+type OrderEvent = Exclude<
+  Extract<MailEvent, { orderId: number }>,
+  InvoiceEvent
+>;
 
 /** What the words of an order message are made of. */
 interface OrderContext {
@@ -750,6 +756,86 @@ async function renderOrder(
   return { to, subject, text, html };
 }
 
+/** The words of the mail that delivers an invoice, in each language. */
+const INVOICE_COPY = {
+  'es-MX': (number: string): Copy => ({
+    subject: `Tu factura del pedido ${number}`,
+    content: {
+      heading: 'Tu factura',
+      paragraphs: [
+        `Van adjuntos el XML y el PDF de la factura del pedido ${number}.`,
+        'Si algún dato no es correcto, escríbenos y la revisamos.',
+      ],
+    },
+  }),
+  en: (number: string): Copy => ({
+    subject: `Your invoice for order ${number}`,
+    content: {
+      heading: 'Your invoice',
+      paragraphs: [
+        `The XML and the PDF of the invoice of order ${number} are attached.`,
+        'If something in it is wrong, write to us and we will review it.',
+      ],
+    },
+  }),
+};
+
+/** One active invoice as the mail reads it. */
+interface DeliveredInvoice {
+  order_number: string;
+  order_locale: string | null;
+  email_for_invoice_enc: Buffer;
+  xml_filename: string;
+  xml_data: Buffer;
+  pdf_filename: string;
+  pdf_data: Buffer;
+}
+
+/**
+ * The mail of one invoice (FC 077 T2.6): the queue carries ids only; the address is decrypted and
+ * the files are read here, in memory, when the message is about to leave. An invoice cancelled
+ * before that is never sent.
+ */
+async function renderInvoice(
+  db: Db,
+  keys: { piiKey: Buffer | null; siteUrl: string },
+  event: InvoiceEvent
+): Promise<MailMessage> {
+  if (keys.piiKey === null) throw new Error('CHECKOUT_PII_KEY is not set');
+  const [invoice] = await db.query<DeliveredInvoice>(
+    "SELECT o.order_number, o.locale AS order_locale, r.email_for_invoice_enc, i.xml_filename, i.xml_data, i.pdf_filename, i.pdf_data FROM invoice_requests r JOIN orders o ON o.id = r.order_id JOIN order_invoices i ON i.invoice_request_id = r.id AND i.status = 'ACTIVE' WHERE r.id = ?",
+    [event.requestId]
+  );
+  if (invoice === undefined) throw new Error('No active invoice to deliver');
+  const locale = pickMailLocale(event.locale, invoice.order_locale);
+  const { subject, content } = INVOICE_COPY[locale](invoice.order_number);
+  const { html, text } = renderEmail({ ...content, locale }, keys.siteUrl);
+  assertMultipart(html, text);
+  return {
+    to: decryptPii(
+      keys.piiKey,
+      invoice.order_number,
+      'invoice_email',
+      invoice.email_for_invoice_enc
+    ),
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        filename: invoice.xml_filename,
+        content: invoice.xml_data,
+        contentType: 'application/xml',
+      },
+      {
+        filename: invoice.pdf_filename,
+        content: invoice.pdf_data,
+        contentType: 'application/pdf',
+      },
+    ],
+  };
+}
+
 /**
  * The message of one queued event: both bodies, in one language, addressed to the account's
  * current e-mail.
@@ -763,6 +849,7 @@ async function render(
     type: row.event_type,
     ...JSON.parse(row.payload),
   } as MailEvent;
+  if (event.type === 'INVOICE_DELIVERED') return renderInvoice(db, keys, event);
   if ('orderId' in event) return renderOrder(db, keys, event);
   const to = await emailOf(db, event.userId);
   // FC 067 T1.1: what the event asked for, then the account's preference.

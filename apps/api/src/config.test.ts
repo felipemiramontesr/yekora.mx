@@ -24,6 +24,8 @@ describe('loadConfig', () => {
       banxicoToken: undefined,
       // FC 029 T2.5: no GitHub token, so publishing the catalog stays closed (503).
       publishToken: null,
+      // FC 077: no RFC of the store, so every upload of an invoice is refused.
+      fiscalRfc: null,
       version: '0.8.6',
       sha: 'dev',
       // FC 012: sandbox by default and nothing configured, so the checkout stays closed (503).

@@ -65,6 +65,7 @@ const schema = z.object({
     ),
   BANXICO_TOKEN: z.string().optional(),
   GITHUB_PUBLISH_TOKEN: z.string().optional(),
+  YEKORA_FISCAL_RFC: z.string().optional(),
   API_VERSION: z.string().default('0.8.6'),
   GIT_SHA: z.string().default('dev'),
   PAYMENTS_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
@@ -173,6 +174,11 @@ export interface ApiConfig {
   host: string;
   /** Database settings. */
   db: DbConfig;
+  /**
+   * The RFC the shop invoices with (FC 077): an uploaded CFDI must be issued by it; without it
+   * every upload is refused.
+   */
+  fiscalRfc: string | null;
   /** Banxico SIE token; without it the API serves the last stored FIX only. */
   banxicoToken: string | undefined;
   /**
@@ -313,6 +319,7 @@ export function loadConfig(env: Record<string, string | undefined>): ApiConfig {
     },
     banxicoToken: parsed.BANXICO_TOKEN || undefined,
     publishToken: parsed.GITHUB_PUBLISH_TOKEN || null,
+    fiscalRfc: parsed.YEKORA_FISCAL_RFC?.trim().toUpperCase() || null,
     version: parsed.API_VERSION,
     sha: parsed.GIT_SHA,
     payments: loadPayments(parsed),

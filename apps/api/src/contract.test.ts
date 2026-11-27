@@ -82,7 +82,10 @@ beforeAll(async () => {
  */
 function deskPermission(route: { path: string; method: string }) {
   if (route.path.startsWith('/v1/admin/invoices/')) {
-    return route.method === 'GET' ? 'invoices:read' : 'invoices:request';
+    if (route.method === 'GET') return 'invoices:read';
+    return route.path.endsWith('/requests')
+      ? 'invoices:request'
+      : 'invoices:upload';
   }
   if (route.path === '/v1/admin/returns') return 'returns:view';
   return route.path.endsWith('/confirm')

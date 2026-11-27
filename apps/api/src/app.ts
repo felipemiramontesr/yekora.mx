@@ -23,6 +23,7 @@ import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAccountFiscalRoutes } from './routes/accountFiscal';
 import { registerInvoiceRequestRoutes } from './routes/invoiceRequests';
+import { registerAdminInvoiceRoutes } from './routes/adminInvoices';
 import { registerAdminRoutes } from './routes/admin';
 import { registerAdminPaymentRoutes } from './routes/adminPayments';
 import { registerPosRoutes } from './routes/adminPos';
@@ -285,6 +286,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     db: deps.db,
     now,
     secrets: deps.config.payments.checkout,
+  });
+  // FC 077 F3: the upload of the invoices, their delivery and their downloads.
+  registerAdminInvoiceRoutes(app, {
+    db: deps.db,
+    now,
+    fiscalRfc: deps.config.fiscalRfc,
   });
   // FC 061 F1: the shipping console (strategy, free shipping and the rate of each state).
   registerAdminShippingRoutes(app, { db: deps.db, now });

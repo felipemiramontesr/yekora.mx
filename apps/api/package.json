@@ -19,6 +19,7 @@
     "@fastify/cors": "^11",
     "@fastify/helmet": "^13",
     "@fastify/rate-limit": "^11",
+    "fast-xml-parser": "5.12.1",
     "fastify": "^5",
     "hash-wasm": "4.13.0",
     "mysql2": "^3",

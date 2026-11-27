@@ -62,6 +62,13 @@ export type MailEvent = (
       processor: string;
     }
   | {
+      /** The invoice of an order was uploaded (FC 077): its files travel attached. */
+      type: 'INVOICE_DELIVERED';
+      /** `invoice_requests.id`: the address and the files are read only when the mail is sent. */
+      requestId: number;
+      orderId: number;
+    }
+  | {
       /** The receipt of a counter sale the buyer asked to get by e-mail (FC 076, K-79). */
       type: 'POS_RECEIPT_EMAIL';
       orderId: number;

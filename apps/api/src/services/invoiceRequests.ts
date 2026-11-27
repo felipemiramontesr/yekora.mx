@@ -79,7 +79,7 @@ const within = (since: Date | null, length: number, now: Date) =>
  * @param totalCents - What it charged.
  * @returns The amount an invoice of it may carry.
  */
-async function invoicableCents(
+export async function invoicableCents(
   tx: TxQuery,
   orderId: number,
   totalCents: number

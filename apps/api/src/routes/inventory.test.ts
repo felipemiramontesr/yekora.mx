@@ -55,7 +55,9 @@ const INVENTORY = [
   // FC 071: the buyer asks to return units of a delivered order.
   '│       ├── /returns (POST)',
   // FC 077: asking for the invoice of an order, from the account and from the staff.
-  '│       └── /invoice-request (POST, GET, HEAD)',
+  '│       ├── /invoice-request (POST, GET, HEAD)',
+  '│       ├── /invoice/xml (GET, HEAD)',
+  '│       └── /invoice/pdf (GET, HEAD)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 068: the three steps of the fulfillment (orders:manage); PUT, PATCH and DELETE on the
@@ -89,6 +91,12 @@ const INVENTORY = [
   '│   └── /:id/confirm (POST)',
   // FC 077: the queue of invoice requests (invoices:read) and the staff asking (invoices:request).
   '├── /v1/admin/invoices/requests (POST, GET, HEAD)',
+  // FC 077 F3: upload, reject and cancel (invoices:upload), and the files for the staff.
+  '│   ├── /:id/upload (POST)',
+  '│   ├── /:id/reject (POST)',
+  '│   └── /:id/cancel (POST)',
+  '├── /v1/admin/invoices/:order_number/download/xml (GET, HEAD)',
+  '├── /v1/admin/invoices/:order_number/download/pdf (GET, HEAD)',
   // FC 061: the shipping console (shipping:manage).
   '├── /v1/admin/shipping (GET, HEAD)',
   '│   ├── /config (PUT)',
@@ -293,6 +301,8 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       '├── /v1/admin/roles (GET, HEAD, POST)',
       '├── /v1/admin/returns (GET, HEAD)',
       '├── /v1/admin/invoices/requests (POST, GET, HEAD)',
+      '├── /v1/admin/invoices/:order_number/download/xml (GET, HEAD)',
+      '├── /v1/admin/invoices/:order_number/download/pdf (GET, HEAD)',
       '├── /v1/admin/shipping (GET, HEAD)',
       '├── /v1/admin/catalog/media (POST)',
       '├── /v1/admin/catalog/brands (GET, HEAD, POST)',

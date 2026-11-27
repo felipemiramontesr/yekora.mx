@@ -1097,3 +1097,88 @@ describe('the alerts of the payments (FC 075 T2.4)', () => {
     }
   );
 });
+
+describe('the mail of an invoice (FC 077 T2.6)', () => {
+  const NUMBER = 'YEK-2026-AB12CD34';
+  const invoice = (locale: string) => ({
+    order_number: NUMBER,
+    order_locale: locale,
+    email_for_invoice_enc: encryptPii(
+      PII_KEY,
+      NUMBER,
+      'invoice_email',
+      'factura@example.test'
+    ),
+    xml_filename: `${NUMBER}-factura.xml`,
+    xml_data: Buffer.from('<x/>'),
+    pdf_filename: `${NUMBER}-factura.pdf`,
+    pdf_data: Buffer.from('%PDF-'),
+  });
+  const event = row(1, {
+    event_type: 'INVOICE_DELIVERED',
+    payload: JSON.stringify({ requestId: 12, orderId: 7 }),
+  });
+
+  const run = async (found: object[], piiKey: Buffer | null = PII_KEY) => {
+    const send = vi.fn(async () => undefined);
+    const errors: unknown[] = [];
+    let served = false;
+    const db = {
+      async query(text: string) {
+        if (text.startsWith('SELECT id, event_type')) {
+          const due = served ? [] : [event];
+          served = true;
+          return due;
+        }
+        if (text.startsWith('SELECT o.order_number')) return found;
+        if (text.startsWith("UPDATE outbox_events SET status = 'PROCESSING'"))
+          return { affectedRows: 1 };
+        if (text.startsWith('UPDATE outbox_events SET status = ?'))
+          errors.push(text);
+        return [];
+      },
+    } as unknown as Db;
+    const dispatcher = createOutboxDispatcher({
+      db,
+      totpKey: KEY,
+      piiKey,
+      siteUrl: 'https://yekora.mx',
+      send,
+      now: () => NOW,
+      log: { error: () => undefined },
+      wait: async () => undefined,
+    });
+    dispatcher.kick();
+    await dispatcher.drain();
+    return { send, errors };
+  };
+
+  it.each([
+    ['es-MX', 'Tu factura del pedido'],
+    ['en', 'Your invoice for order'],
+  ])(
+    'attaches the XML and the PDF and opens the address only to send it (%s)',
+    async (locale, subject) => {
+      const { send } = await run([invoice(locale)]);
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'factura@example.test',
+          subject: `${subject} ${NUMBER}`,
+          attachments: [
+            expect.objectContaining({ filename: `${NUMBER}-factura.xml` }),
+            expect.objectContaining({ contentType: 'application/pdf' }),
+          ],
+        })
+      );
+    }
+  );
+
+  it.each([
+    ['the invoice was cancelled', [], PII_KEY],
+    ['there is no key of personal data', [invoice('es-MX')], null],
+  ])('sends nothing when %s', async (_case, found, key) => {
+    const { send, errors } = await run(found, key);
+    expect(send).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+  });
+});
