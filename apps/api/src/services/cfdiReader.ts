@@ -10,7 +10,10 @@
  *
  * @module
  */
-import { XMLParser, XMLValidator } from 'fast-xml-parser';
+// XMLValidator is marked deprecated in favour of a separate package (fast-xml-validator) that would
+// bring more dependencies into the server that holds fiscal data; the bundled one still works and
+// carries no advisory.
+import { XMLParser, XMLValidator } from 'fast-xml-parser'; // NOSONAR
 
 // XML namespace names, not addresses anything connects to: the SAT publishes them with http, and
 // a document that names them otherwise is not a CFDI.
@@ -138,7 +141,7 @@ export function readCfdi(bytes: Buffer): CfdiSummary | null {
     return null;
   }
   if (/<!(DOCTYPE|ENTITY)/i.test(text)) return null;
-  if (XMLValidator.validate(text) !== true) return null;
+  if (XMLValidator.validate(text) !== true) return null; // NOSONAR
   const document: Element = {
     uri: '',
     name: '',
