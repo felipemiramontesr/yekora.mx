@@ -115,9 +115,15 @@ const EDITOR = {
 
 /** The console as the area drives it: the open tab lives above it, in the address (FC 052). */
 function Console() {
-  const [open, setOpen] = useState<CatalogSection | null>(null);
+  const [open, setOpen] = useState<CatalogSection | null>('marcas');
   return (
-    <CatalogConsole texts={t} locale="es-MX" open={open} onOpen={setOpen} />
+    <CatalogConsole
+      texts={t}
+      locale="es-MX"
+      open={open}
+      hrefOf={(section) => `/cuenta/catalogo/${section}/`}
+      onOpen={setOpen}
+    />
   );
 }
 const renderConsole = () => render(<Console />);
@@ -185,9 +191,17 @@ describe('catalog tab of /cuenta (FC 029 F3)', () => {
     );
     expect(
       (
-        await screen.findByText(account.dashboard.catalog, { selector: 'li' })
+        await screen.findByText(account.adminHub.cards.products.name, {
+          selector: 'li',
+        })
       ).getAttribute('aria-current')
     ).toBe('page');
+    // FC 078 T2.4: its own address is the centre; a card opens its section.
+    fireEvent.click(
+      await screen.findByRole('link', {
+        name: new RegExp(t.center.brands.name),
+      })
+    );
     expect(await screen.findByText('Cumbre')).toBeTruthy();
     expect(screen.queryByText(account.dashboard.panel)).toBeNull();
   });

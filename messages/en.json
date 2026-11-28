@@ -1356,7 +1356,29 @@
         "MEDIA_SIZE_EXCEEDED": "The photo is over 2 MB. Choose a smaller size.",
         "MEDIA_DIMENSIONS_INVALID": "The photo dimensions are not valid."
       },
-      "exampleLabel": "Example"
+      "exampleLabel": "Example",
+      "center": {
+        "brands": {
+          "name": "Brands",
+          "description": "The brands of your products: name and website.",
+          "crumb": "Brands"
+        },
+        "facets": {
+          "name": "Product properties",
+          "description": "Groups and values to filter by: size, color and more.",
+          "crumb": "Properties"
+        },
+        "products": {
+          "name": "Product catalog",
+          "description": "Create and edit products: photos, stock and price.",
+          "crumb": "Catalog"
+        },
+        "publish": {
+          "name": "Publish changes",
+          "description": "Update the store with what you saved.",
+          "crumb": "Publish"
+        }
+      }
     },
     "users": {
       "tabs": {
@@ -1761,11 +1783,7 @@
         },
         "products": {
           "name": "Products",
-          "description": "Create and edit products: their photos, their stock and their price."
-        },
-        "catalog": {
-          "name": "Catalog",
-          "description": "Brands, product properties and publishing the catalog to the store."
+          "description": "Products, brands, properties and publishing of the catalog."
         },
         "shipping": {
           "name": "Shipping",

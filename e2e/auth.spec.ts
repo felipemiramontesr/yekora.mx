@@ -348,6 +348,12 @@ test('the owner crops a photo in the browser Canvas and uploads it at the chosen
     .getByRole('main')
     .getByRole('link', { name: /^Productos/ })
     .click();
+  // FC 078: the centre of the catalog, then its list of products.
+  await expect(page).toHaveURL(/\/cuenta\/catalogo\/$/);
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Catálogo de productos/ })
+    .click();
   await expect(page).toHaveURL(/\/cuenta\/catalogo\/productos\/$/);
   await page.getByRole('button', { name: 'Galería: Tenis trail E2E' }).click();
   // A real modal: it opens over the page, Escape closes it, and the page can open it again.

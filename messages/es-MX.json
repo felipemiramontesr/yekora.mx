@@ -1356,7 +1356,29 @@
         "MEDIA_SIZE_EXCEEDED": "La foto pesa más de 2 MB. Elige un tamaño menor.",
         "MEDIA_DIMENSIONS_INVALID": "Las dimensiones de la foto no son válidas."
       },
-      "exampleLabel": "Ejemplo"
+      "exampleLabel": "Ejemplo",
+      "center": {
+        "brands": {
+          "name": "Marcas",
+          "description": "Las marcas de tus productos: nombre y sitio web.",
+          "crumb": "Marcas"
+        },
+        "facets": {
+          "name": "Propiedades de producto",
+          "description": "Grupos y valores para filtrar: talla, color y más.",
+          "crumb": "Propiedades"
+        },
+        "products": {
+          "name": "Catálogo de productos",
+          "description": "Crea y edita productos: fotos, inventario y precio.",
+          "crumb": "Catálogo"
+        },
+        "publish": {
+          "name": "Publicar cambios",
+          "description": "Actualiza la tienda con lo que guardaste.",
+          "crumb": "Publicar"
+        }
+      }
     },
     "users": {
       "tabs": {
@@ -1761,11 +1783,7 @@
         },
         "products": {
           "name": "Productos",
-          "description": "Crea y edita productos: sus fotos, su inventario y su precio."
-        },
-        "catalog": {
-          "name": "Catálogo",
-          "description": "Marcas, propiedades de producto y publicación del catálogo en la tienda."
+          "description": "Productos, marcas, propiedades y publicación del catálogo."
         },
         "shipping": {
           "name": "Envíos",

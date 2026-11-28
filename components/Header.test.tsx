@@ -117,8 +117,13 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
     reason:
       'the sections of the account area are paths it routes itself (no page per path in the export); inside the area a click changes the view without a reload',
   },
+  'components/account/catalog/CatalogConsole.tsx': {
+    count: 1,
+    reason:
+      'the cards of the centre of the catalog (FC 078): each one a section of the area, same in-area router',
+  },
   'components/account/AccountApp.tsx': {
-    count: 3,
+    count: 4,
     reason:
       'the breadcrumb of the account area, its «Administración» step and the link to «Datos para factura» (FC 077): its own paths (Apache fallback, no export), changed without a reload',
   },

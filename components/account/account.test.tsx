@@ -1207,8 +1207,7 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
       .map((link) => link.getAttribute('href'));
     expect(cards).toEqual([
       '/cuenta/panel/',
-      '/cuenta/catalogo/productos/',
-      '/cuenta/catalogo/marcas/',
+      '/cuenta/catalogo/',
       '/cuenta/usuarios/',
     ]);
     fireEvent.click(
@@ -1216,8 +1215,20 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
         name: new RegExp(account.adminHub.cards.products.name),
       })
     );
+    // FC 078 T2.4: «Productos» opens the centre of the catalog, four cards and no tabs.
+    expect(globalThis.location.pathname).toBe('/cuenta/catalogo/');
+    const centre = await screen.findByRole('region', {
+      name: account.catalog.sectionsLabel,
+    });
+    expect(within(centre).getAllByRole('link')).toHaveLength(4);
+    expect(screen.queryByRole('tablist')).toBeNull();
+    fireEvent.click(
+      within(centre).getByRole('link', {
+        name: new RegExp(account.catalog.center.products.name),
+      })
+    );
     expect(globalThis.location.pathname).toBe('/cuenta/catalogo/productos/');
-    // The tab the address names is the one that opens, under Mi cuenta › Administración › Productos.
+    // The tab the address names is the one that opens, under … › Productos › Catálogo.
     expect(
       await screen.findByRole('tab', { name: 'Productos', selected: true })
     ).toBeTruthy();
@@ -1226,9 +1237,20 @@ describe('account area · orders (FC 028 F2, T2.6)', () => {
     });
     expect(
       within(crumbs)
-        .getByText(account.adminHub.cards.products.name)
+        .getByText(account.catalog.center.products.crumb)
         .getAttribute('aria-current')
     ).toBe('page');
+    const back = within(crumbs).getByRole('link', {
+      name: account.adminHub.cards.products.name,
+    });
+    expect(back.getAttribute('href')).toBe('/cuenta/catalogo/');
+    fireEvent.click(back);
+    expect(globalThis.location.pathname).toBe('/cuenta/catalogo/');
+    fireEvent.click(
+      screen.getByRole('link', {
+        name: new RegExp(account.catalog.center.products.name),
+      })
+    );
     // The tabs of the console change the address too, so the back button returns to the one before.
     fireEvent.click(screen.getByRole('tab', { name: /Propiedades/ }));
     expect(globalThis.location.pathname).toBe('/cuenta/catalogo/propiedades/');

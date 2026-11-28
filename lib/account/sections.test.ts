@@ -64,7 +64,6 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
     ]);
     expect(keys({ roles: [], permissions: ['catalog:write'] })).toEqual([
       'products',
-      'catalog',
     ]);
     expect(keys({ roles: [], permissions: ['shipping:manage'] })).toEqual([
       'shipping',
@@ -87,14 +86,7 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
           'sellers:manage',
         ],
       })
-    ).toEqual([
-      'orders',
-      'products',
-      'catalog',
-      'shipping',
-      'returns',
-      'users',
-    ]);
+    ).toEqual(['orders', 'products', 'shipping', 'returns', 'users']);
     // Each card names the console and the tab it opens.
     expect(
       adminCardsOf({
@@ -109,8 +101,7 @@ describe('sections of the account area (FC 044 T1.4, FC 047)', () => {
       })
     ).toEqual([
       { key: 'orders', tab: 'panel', section: null },
-      { key: 'products', tab: 'catalog', section: 'productos' },
-      { key: 'catalog', tab: 'catalog', section: 'marcas' },
+      { key: 'products', tab: 'catalog', section: null },
       { key: 'shipping', tab: 'shipping', section: null },
       { key: 'returns', tab: 'returns', section: null },
       { key: 'users', tab: 'users', section: null },

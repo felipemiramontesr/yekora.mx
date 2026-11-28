@@ -120,7 +120,6 @@ export interface AdminCard {
   key:
     | 'orders'
     | 'products'
-    | 'catalog'
     | 'shipping'
     | 'users'
     | 'returns'
@@ -135,21 +134,15 @@ export interface AdminCard {
     | 'returns'
     | 'invoicing'
     | 'pos';
-  /** The tab of the catalog console it opens, for the two that open it. */
-  section: 'productos' | 'marcas' | null;
+  /** No card opens a tab of its console: «Productos» opens the centre of the catalog (FC 078). */
+  section: null;
 }
 
 /** The cards, in order, each with the section that grants it. */
 const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
   { key: 'orders', tab: 'panel', section: null, grantedBy: 'panel' },
   { key: 'pos', tab: 'pos', section: null, grantedBy: 'pos' },
-  {
-    key: 'products',
-    tab: 'catalog',
-    section: 'productos',
-    grantedBy: 'catalog',
-  },
-  { key: 'catalog', tab: 'catalog', section: 'marcas', grantedBy: 'catalog' },
+  { key: 'products', tab: 'catalog', section: null, grantedBy: 'catalog' },
   { key: 'shipping', tab: 'shipping', section: null, grantedBy: 'shipping' },
   { key: 'returns', tab: 'returns', section: null, grantedBy: 'returns' },
   {
@@ -163,8 +156,8 @@ const CARDS: readonly (AdminCard & { grantedBy: AccountSection })[] = [
 
 /**
  * The cards of the administration hub an account is shown (FC 052 T2.4): each one if and only if
- * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Envíos» with `shipping:manage`, «Devoluciones» with `returns:view`, «Facturación» with `invoices:read`, «Usuarios, roles y permisos» with `sellers:manage`.
+ * the account holds its own privilege: «Pedidos» with `orders:read`, «Productos» (the whole catalog, FC 078)
+ * with `catalog:write`, «Envíos» with `shipping:manage`, «Devoluciones» with `returns:view`, «Facturación» with `invoices:read`, «Usuarios, roles y permisos» with `sellers:manage`.
  *
  * @param user - Its roles and permissions.
  * @returns The cards, in order.

@@ -7,7 +7,6 @@ import {
   RotateCcw,
   ScanBarcode,
   ShieldCheck,
-  Tags,
   Truck,
 } from 'lucide-react';
 import type { ComponentType, MouseEvent } from 'react';
@@ -20,7 +19,6 @@ import { type AdminCard, adminCardsOf } from '@/lib/account/sections';
 const ICONS: Record<AdminCard['key'], ComponentType<{ size: number }>> = {
   orders: ClipboardList,
   products: Package,
-  catalog: Tags,
   shipping: Truck,
   users: ShieldCheck,
   returns: RotateCcw,
@@ -35,8 +33,8 @@ function viewOf(card: AdminCard): AccountView {
 
 /**
  * «Administración» (FC 052 T1.1, T2.4): one card for each console of the store the account may
- * open, and none for one it may not: «Pedidos» with `orders:read`, «Productos» and «Catálogo» with
- * `catalog:write`, «Usuarios, roles y permisos» with `sellers:manage`. It is a convenience only; the API refuses what
+ * open, and none for one it may not: «Pedidos» with `orders:read`, «Productos» (the centre of the
+ * catalog, FC 078) with `catalog:write`, «Usuarios, roles y permisos» with `sellers:manage`. It is a convenience only; the API refuses what
  * the account cannot do. Each card is a link to the console's own address, which the area routes
  * without reloading.
  *

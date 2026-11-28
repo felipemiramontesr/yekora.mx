@@ -62,6 +62,7 @@ const CatalogConsole = dynamic<{
   texts: CatalogTexts;
   locale: Locale;
   open: CatalogSection | null;
+  hrefOf: (section: CatalogSection) => string;
   onOpen: (section: CatalogSection) => void;
 }>(
   () =>
@@ -415,6 +416,14 @@ export function AccountApp({
   );
 }
 
+/** The address of each section of the catalog, with the key of its texts. */
+const CATALOG_CRUMBS = [
+  ['marcas', 'brands'],
+  ['propiedades', 'facets'],
+  ['productos', 'products'],
+  ['publicar', 'publish'],
+] as const;
+
 /**
  * The name of the last step of the breadcrumb: the section, or the console under «Administración».
  */
@@ -428,7 +437,13 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
   if (view.tab === 'fiscal') return texts.fiscal.title;
   if (view.tab === 'shipping') return cards.shipping.name;
   if (view.tab === 'catalog') {
-    return (view.section === 'productos' ? cards.products : cards.catalog).name;
+    // FC 078: the centre is «Productos»; inside it, each section says its own name.
+    const section = CATALOG_CRUMBS.find(
+      ([address]) => address === view.section
+    );
+    return section
+      ? texts.catalog.center[section[1]].crumb
+      : cards.products.name;
   }
   return texts.dashboard[view.tab];
 }
@@ -509,6 +524,23 @@ function Dashboard({
                 </li>
               </>
             )}
+            {tab === 'catalog' && view.section && (
+              <>
+                <li aria-hidden="true">›</li>
+                <li>
+                  <a
+                    href={accountPath(area, { tab, orderNumber: null })}
+                    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                      event.preventDefault();
+                      onNavigate({ tab, orderNumber: null });
+                    }}
+                    className="tap-target underline underline-offset-4"
+                  >
+                    {texts.account.adminHub.cards.products.name}
+                  </a>
+                </li>
+              </>
+            )}
             <li aria-hidden="true">›</li>
             <li aria-current="page" className="font-semibold text-petroleo">
               {crumbOf({ ...view, tab }, texts.account)}
@@ -571,6 +603,9 @@ function Dashboard({
           texts={texts.account.catalog}
           locale={locale}
           open={view.section ?? null}
+          hrefOf={(section) =>
+            accountPath(area, { tab: 'catalog', orderNumber: null, section })
+          }
           onOpen={(section) =>
             onNavigate({ tab: 'catalog', orderNumber: null, section })
           }

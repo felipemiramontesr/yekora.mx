@@ -47,7 +47,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       expect(screen.getByText(card.name)).toBeTruthy();
       expect(screen.getByText(card.description)).toBeTruthy();
     }
-    expect(screen.getAllByText(texts.open)).toHaveLength(8);
+    expect(screen.getAllByText(texts.open)).toHaveLength(7);
   });
 
   it.each([
@@ -56,7 +56,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
     [
       'catalog:write',
       { ...none, permissions: ['catalog:write'] },
-      ['Productos', 'Catálogo'],
+      ['Productos'],
     ],
     [
       'shipping:manage',
@@ -90,7 +90,6 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
       for (const absent of [
         'Pedidos',
         'Productos',
-        'Catálogo',
         'Envíos',
         'Devoluciones',
         'Punto de venta',
@@ -121,8 +120,7 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
     const links = screen.getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/en/account/panel/',
-      '/en/account/catalogo/productos/',
-      '/en/account/catalogo/marcas/',
+      '/en/account/catalogo/',
       '/en/account/envios/',
       '/en/account/devoluciones/',
       '/en/account/usuarios/',
@@ -132,21 +130,21 @@ describe('administration hub (FC 052 T1.1, T2.4)', () => {
     expect(open).toHaveBeenCalledWith({
       tab: 'catalog',
       orderNumber: null,
-      section: 'productos',
+      section: null,
     });
-    fireEvent.click(links[3]);
+    fireEvent.click(links[2]);
     expect(open).toHaveBeenLastCalledWith({
       tab: 'shipping',
       orderNumber: null,
       section: null,
     });
-    fireEvent.click(links[4]);
+    fireEvent.click(links[3]);
     expect(open).toHaveBeenLastCalledWith({
       tab: 'returns',
       orderNumber: null,
       section: null,
     });
-    fireEvent.click(links[5]);
+    fireEvent.click(links[4]);
     expect(open).toHaveBeenLastCalledWith({
       tab: 'users',
       orderNumber: null,
