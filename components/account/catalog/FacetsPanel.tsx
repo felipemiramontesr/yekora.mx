@@ -19,10 +19,14 @@ import {
 } from '@/lib/api/catalogAdminClient';
 import { TextField } from '../../ui/TextField';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
+import { EnglishDisclosure } from './EnglishDisclosure';
 import { type Note, textOf } from './formHelpers';
 
 /** `account.catalog.facets` texts, with the word that introduces an example. */
-type Texts = CatalogTexts['facets'] & { exampleLabel: string };
+type Texts = CatalogTexts['facets'] & {
+  exampleLabel: string;
+  bilingual: CatalogTexts['bilingual'];
+};
 
 /**
  * A guided text field of this panel (FC 050 T2.1): its label, how to fill it in with the simplest
@@ -99,7 +103,11 @@ function valueFieldsOf(form: HTMLFormElement) {
  * @param texts - `account.catalog` texts.
  */
 export function FacetsPanel({ texts }: Readonly<{ texts: CatalogTexts }>) {
-  const t: Texts = { ...texts.facets, exampleLabel: texts.exampleLabel };
+  const t: Texts = {
+    ...texts.facets,
+    exampleLabel: texts.exampleLabel,
+    bilingual: texts.bilingual,
+  };
   const base = useId();
   const [groups, setGroups] = useState<FacetGroup[] | null>(null);
   const [note, setNote] = useState<Note>(null);
@@ -244,30 +252,38 @@ function GroupFields({
 }: Readonly<{ texts: Texts; group?: FacetGroup; idBase: string }>) {
   return (
     <>
-      <PanelField
-        texts={texts}
-        id={`${idBase}-nameEs`}
-        name="nameEs"
-        label={texts.nameEs}
-        input={{
-          name: 'nameEs',
-          required: true,
-          maxLength: 100,
-          defaultValue: group?.nameEs,
-        }}
-      />
-      <PanelField
-        texts={texts}
-        id={`${idBase}-nameEn`}
-        name="nameEn"
-        label={texts.nameEn}
-        input={{
-          name: 'nameEn',
-          required: true,
-          maxLength: 100,
-          defaultValue: group?.nameEn,
-        }}
-      />
+      <fieldset className="flex flex-col gap-3">
+        <legend className="font-semibold">{texts.bilingual.name}</legend>
+        <PanelField
+          texts={texts}
+          id={`${idBase}-nameEs`}
+          name="nameEs"
+          label={texts.nameEs}
+          input={{
+            name: 'nameEs',
+            required: true,
+            maxLength: 100,
+            defaultValue: group?.nameEs,
+          }}
+        />
+        <EnglishDisclosure
+          label={texts.bilingual.englishRequired}
+          filled={Boolean(group?.nameEn)}
+        >
+          <PanelField
+            texts={texts}
+            id={`${idBase}-nameEn`}
+            name="nameEn"
+            label={texts.nameEn}
+            input={{
+              name: 'nameEn',
+              required: true,
+              maxLength: 100,
+              defaultValue: group?.nameEn,
+            }}
+          />
+        </EnglishDisclosure>
+      </fieldset>
       <PanelField
         texts={texts}
         id={`${idBase}-order`}
@@ -418,13 +434,18 @@ function GroupCard({
           label={texts.valueEs}
           input={{ name: 'valueEs', required: true, maxLength: 100 }}
         />
-        <PanelField
-          texts={texts}
-          id={`${base}-value-en`}
-          name="valueEn"
-          label={texts.valueEn}
-          input={{ name: 'valueEn', required: true, maxLength: 100 }}
-        />
+        <EnglishDisclosure
+          label={texts.bilingual.englishRequired}
+          filled={false}
+        >
+          <PanelField
+            texts={texts}
+            id={`${base}-value-en`}
+            name="valueEn"
+            label={texts.valueEn}
+            input={{ name: 'valueEn', required: true, maxLength: 100 }}
+          />
+        </EnglishDisclosure>
         <PanelField
           texts={texts}
           id={`${base}-value-order`}
@@ -500,18 +521,23 @@ function ValuesTable({
                         defaultValue: value.valueEs,
                       }}
                     />
-                    <PanelField
-                      texts={texts}
-                      id={`${base}-edit-en`}
-                      name="valueEn"
-                      label={texts.valueEn}
-                      input={{
-                        name: 'valueEn',
-                        required: true,
-                        maxLength: 100,
-                        defaultValue: value.valueEn,
-                      }}
-                    />
+                    <EnglishDisclosure
+                      label={texts.bilingual.englishRequired}
+                      filled={Boolean(value.valueEn)}
+                    >
+                      <PanelField
+                        texts={texts}
+                        id={`${base}-edit-en`}
+                        name="valueEn"
+                        label={texts.valueEn}
+                        input={{
+                          name: 'valueEn',
+                          required: true,
+                          maxLength: 100,
+                          defaultValue: value.valueEn,
+                        }}
+                      />
+                    </EnglishDisclosure>
                     <PanelField
                       texts={texts}
                       id={`${base}-edit-order`}

@@ -19,6 +19,7 @@ import {
 import { fill } from '@/lib/catalog/format';
 import { Field } from '../../ui/Field';
 import { type CatalogTexts, catalogFailureText } from './catalogTexts';
+import { EnglishDisclosure } from './EnglishDisclosure';
 import { FIELD, textOf } from './formHelpers';
 import { imagesOf, type Photo, PhotoList, photosInRange } from './PhotoList';
 
@@ -242,46 +243,68 @@ export function ProductForm({
               {t.sku}: {product.sku} · {t.slug}: {product.slug}
             </p>
           )}
-          {guided(texts, 'nameEs', t.nameEs, (control) => (
-            <input
-              {...control}
-              name="nameEs"
-              required
-              maxLength={200}
-              defaultValue={product?.nameEs}
-              className={FIELD}
-            />
-          ))}
-          {guided(texts, 'nameEn', t.nameEn, (control) => (
-            <input
-              {...control}
-              name="nameEn"
-              required
-              maxLength={200}
-              defaultValue={product?.nameEn}
-              className={FIELD}
-            />
-          ))}
-          {guided(texts, 'descriptionEs', t.descriptionEs, (control) => (
-            <textarea
-              {...control}
-              name="descriptionEs"
-              rows={4}
-              maxLength={10000}
-              defaultValue={product?.descriptionEs}
-              className={FIELD}
-            />
-          ))}
-          {guided(texts, 'descriptionEn', t.descriptionEn, (control) => (
-            <textarea
-              {...control}
-              name="descriptionEn"
-              rows={4}
-              maxLength={10000}
-              defaultValue={product?.descriptionEn}
-              className={FIELD}
-            />
-          ))}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="font-semibold">{texts.bilingual.name}</legend>
+            {guided(texts, 'nameEs', t.nameEs, (control) => (
+              <input
+                {...control}
+                name="nameEs"
+                required
+                maxLength={200}
+                defaultValue={product?.nameEs}
+                className={FIELD}
+              />
+            ))}
+            <EnglishDisclosure
+              label={texts.bilingual.englishRequired}
+              filled={Boolean(product?.nameEn)}
+            >
+              <div className="flex flex-col">
+                {guided(texts, 'nameEn', t.nameEn, (control) => (
+                  <input
+                    {...control}
+                    name="nameEn"
+                    required
+                    maxLength={200}
+                    defaultValue={product?.nameEn}
+                    className={FIELD}
+                  />
+                ))}
+              </div>
+            </EnglishDisclosure>
+          </fieldset>
+          <fieldset className="flex flex-col gap-3">
+            <legend className="font-semibold">
+              {texts.bilingual.description}
+            </legend>
+            {guided(texts, 'descriptionEs', t.descriptionEs, (control) => (
+              <textarea
+                {...control}
+                name="descriptionEs"
+                rows={4}
+                maxLength={10000}
+                defaultValue={product?.descriptionEs}
+                className={FIELD}
+              />
+            ))}
+            <EnglishDisclosure
+              label={texts.bilingual.englishOptional}
+              filled={Boolean(product?.descriptionEn)}
+            >
+              <div className="flex flex-col">
+                {guided(texts, 'descriptionEn', t.descriptionEn, (control) => (
+                  <textarea
+                    {...control}
+                    name="descriptionEn"
+                    rows={4}
+                    maxLength={10000}
+                    defaultValue={product?.descriptionEn}
+                    className={FIELD}
+                  />
+                ))}
+              </div>
+            </EnglishDisclosure>
+          </fieldset>
           {guided(texts, 'priceMxn', t.priceMxn, (control) => (
             <input
               {...control}

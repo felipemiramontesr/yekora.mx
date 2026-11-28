@@ -1378,6 +1378,12 @@
           "description": "Actualiza la tienda con lo que guardaste.",
           "crumb": "Publicar"
         }
+      },
+      "bilingual": {
+        "name": "Nombre",
+        "description": "Descripción",
+        "englishRequired": "Inglés (obligatorio)",
+        "englishOptional": "Inglés (opcional)"
       }
     },
     "users": {

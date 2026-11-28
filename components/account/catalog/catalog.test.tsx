@@ -39,7 +39,9 @@ import {
 } from '@/lib/api/catalogAdminClient';
 import { canvasBlob, drawSquare, openImage } from '@/lib/catalog/imageCrop';
 import { AccountApp } from '../AccountApp';
+import { BrandsPanel } from './BrandsPanel';
 import { CatalogConsole } from './CatalogConsole';
+import { ProductForm } from './ProductForm';
 
 vi.mock('@/lib/api/accountClient', () => ({
   me: vi.fn(),
@@ -1436,5 +1438,74 @@ describe('product gallery (FC 029 F3d)', () => {
       name: g.full,
     }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+  });
+});
+
+describe('the English halves of the bilingual fields (FC 078 F3, T1.3, T2.7)', () => {
+  const disclosureOf = (label: string) =>
+    screen.getByLabelText(label).closest('details') as HTMLDetailsElement;
+
+  it('starts folded when empty, and opens itself when its required field is refused', async () => {
+    api.listBrands.mockResolvedValue(ok([]));
+    api.listFacets.mockResolvedValue(ok([]));
+    render(
+      <ProductForm
+        texts={t}
+        product={null}
+        onSaved={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    await screen.findByRole('form', { name: t.products.titleNew });
+    const name = disclosureOf(t.products.nameEn);
+    const description = disclosureOf(t.products.descriptionEn);
+    expect(name.open).toBe(false);
+    expect(description.open).toBe(false);
+    expect(name.querySelector('summary')?.textContent).toBe(
+      t.bilingual.englishRequired
+    );
+    expect(description.querySelector('summary')?.textContent).toBe(
+      t.bilingual.englishOptional
+    );
+    // Both languages stay in the form, folded or not.
+    expect(
+      screen.getByLabelText(t.products.nameEn).hasAttribute('required')
+    ).toBe(true);
+    expect(
+      screen.getByLabelText(t.products.descriptionEn).hasAttribute('required')
+    ).toBe(false);
+    fireEvent.invalid(screen.getByLabelText(t.products.nameEn));
+    expect(name.open).toBe(true);
+  });
+
+  it('starts open when editing text that is already there, and never in the brands', async () => {
+    api.listBrands.mockResolvedValue(ok([]));
+    api.listFacets.mockResolvedValue(ok([]));
+    render(
+      <ProductForm
+        texts={t}
+        product={
+          {
+            id: 1,
+            sku: 'A',
+            slug: 'a',
+            nameEs: 'Zapato',
+            nameEn: 'Shoe',
+            descriptionEs: '',
+            descriptionEn: '',
+            facetValueIds: [],
+          } as never
+        }
+        onSaved={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    await screen.findByRole('form', { name: t.products.titleEdit });
+    expect(disclosureOf(t.products.nameEn).open).toBe(true);
+    expect(disclosureOf(t.products.descriptionEn).open).toBe(false);
+    cleanup();
+    const { container } = render(<BrandsPanel texts={t} />);
+    await waitFor(() => expect(api.listBrands).toHaveBeenCalled());
+    expect(container.querySelector('details')).toBeNull();
   });
 });

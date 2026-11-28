@@ -1373,6 +1373,8 @@ export async function mockCatalogApi(
     withCors(async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
+      // No brands and no groups of properties: the product form offers none.
+      if (/\/catalog\/(brands|facets)$/.test(path)) return json(route, 200, []);
       if (path.endsWith('/products') && request.method() === 'GET') {
         return json(route, 200, {
           items: [product],

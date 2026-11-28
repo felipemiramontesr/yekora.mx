@@ -1378,6 +1378,12 @@
           "description": "Update the store with what you saved.",
           "crumb": "Publish"
         }
+      },
+      "bilingual": {
+        "name": "Name",
+        "description": "Description",
+        "englishRequired": "English (required)",
+        "englishOptional": "English (optional)"
       }
     },
     "users": {
