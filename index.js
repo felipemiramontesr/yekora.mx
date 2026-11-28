@@ -1056,9 +1056,9 @@ var require_cors = __commonJS({
       });
     }
     function addCorsHeaders(req, reply, originOption, corsOptions) {
-      const origin = getAccessControlAllowOriginHeader(req.headers.origin, originOption);
-      if (origin) {
-        reply.header("Access-Control-Allow-Origin", origin);
+      const origin2 = getAccessControlAllowOriginHeader(req.headers.origin, originOption);
+      if (origin2) {
+        reply.header("Access-Control-Allow-Origin", origin2);
       }
       if (corsOptions.credentials) {
         reply.header("Access-Control-Allow-Credentials", "true");
@@ -1094,9 +1094,9 @@ var require_cors = __commonJS({
         reply.header("Cache-Control", corsOptions.cacheControl);
       }
     }
-    function resolveOriginWrapper(fastify, origin) {
+    function resolveOriginWrapper(fastify, origin2) {
       return function(req, cb) {
-        const result = origin.call(fastify, req.headers.origin, cb);
+        const result = origin2.call(fastify, req.headers.origin, cb);
         if (result && typeof result.then === "function") {
           result.then((res) => cb(null, res), cb);
         }
@@ -12770,26 +12770,26 @@ var require_transport = __commonJS({
         stream[transportUsesMultistreamSym] = true;
       }
       return stream;
-      function fixTarget(origin) {
-        origin = bundlerOverrides[origin] || origin;
-        if (isAbsolute(origin) || origin.indexOf("file://") === 0) {
-          return origin;
+      function fixTarget(origin2) {
+        origin2 = bundlerOverrides[origin2] || origin2;
+        if (isAbsolute(origin2) || origin2.indexOf("file://") === 0) {
+          return origin2;
         }
-        if (origin === "pino/file") {
+        if (origin2 === "pino/file") {
           return join(__dirname, "..", "file.js");
         }
         let fixTarget2;
         for (const filePath of callers) {
           try {
             const context = filePath === "node:repl" ? process.cwd() + sep2 : filePath;
-            fixTarget2 = createRequire(context).resolve(origin);
+            fixTarget2 = createRequire(context).resolve(origin2);
             break;
           } catch (err) {
             continue;
           }
         }
         if (!fixTarget2) {
-          throw new Error(`unable to determine transport target for "${origin}"`);
+          throw new Error(`unable to determine transport target for "${origin2}"`);
         }
         return fixTarget2;
       }
@@ -56946,7 +56946,7 @@ var require_index_umd = __commonJS({
         return __awaiter(this, void 0, void 0, function* () {
           var _a4;
           const { parallelism, iterations, hashLength } = options;
-          const password = getUInt8Buffer(options.password);
+          const password2 = getUInt8Buffer(options.password);
           const salt = getUInt8Buffer(options.salt);
           const version3 = 19;
           const hashType = getHashType(options.hashType);
@@ -56968,8 +56968,8 @@ var require_index_umd = __commonJS({
           argon2Interface.writeMemory(initVector, memorySize * 1024);
           blake512.init();
           blake512.update(initVector);
-          blake512.update(int32LE(password.length));
-          blake512.update(password);
+          blake512.update(int32LE(password2.length));
+          blake512.update(password2);
           blake512.update(int32LE(salt.length));
           blake512.update(salt);
           blake512.update(int32LE(secret.length));
@@ -57064,7 +57064,7 @@ var require_index_umd = __commonJS({
           return argon2Internal(Object.assign(Object.assign({}, options), { hashType: "d" }));
         });
       }
-      const getHashParameters = (password, encoded, secret) => {
+      const getHashParameters = (password2, encoded, secret) => {
         const regex = /^\$argon2(id|i|d)\$v=([0-9]+)\$((?:[mtp]=[0-9]+,){2}[mtp]=[0-9]+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/;
         const match = encoded.match(regex);
         if (!match) {
@@ -57081,7 +57081,7 @@ var require_index_umd = __commonJS({
           parsedParameters[paramMap[n]] = Number(v);
         }
         return Object.assign(Object.assign({}, parsedParameters), {
-          password,
+          password: password2,
           secret,
           hashType,
           salt: decodeBase64(salt),
@@ -58446,10 +58446,10 @@ var require_index_umd = __commonJS({
       };
       function bcryptInternal(options) {
         return __awaiter(this, void 0, void 0, function* () {
-          const { costFactor, password, salt } = options;
+          const { costFactor, password: password2, salt } = options;
           const bcryptInterface = yield WASMInterface(wasmJson$2, 0);
           bcryptInterface.writeMemory(getUInt8Buffer(salt), 0);
-          const passwordBuffer = getUInt8Buffer(password);
+          const passwordBuffer = getUInt8Buffer(password2);
           bcryptInterface.writeMemory(passwordBuffer, 16);
           const shouldEncode = options.outputType === "encoded" ? 1 : 0;
           bcryptInterface.getExports().bcrypt(passwordBuffer.length, costFactor, shouldEncode);
@@ -58531,10 +58531,10 @@ var require_index_umd = __commonJS({
       function bcryptVerify(options) {
         return __awaiter(this, void 0, void 0, function* () {
           validateVerifyOptions(options);
-          const { hash: hash3, password } = options;
+          const { hash: hash3, password: password2 } = options;
           const bcryptInterface = yield WASMInterface(wasmJson$2, 0);
           bcryptInterface.writeMemory(getUInt8Buffer(hash3), 0);
-          const passwordBuffer = getUInt8Buffer(password);
+          const passwordBuffer = getUInt8Buffer(password2);
           bcryptInterface.writeMemory(passwordBuffer, 60);
           return !!bcryptInterface.getExports().bcrypt_verify(passwordBuffer.length);
         });
@@ -70556,11 +70556,11 @@ var require_auth_41 = __commonJS({
       return result;
     }
     exports2.xor = xor2;
-    function token(password, scramble1, scramble2) {
-      if (!password) {
+    function token(password2, scramble1, scramble2) {
+      if (!password2) {
         return Buffer.alloc(0);
       }
-      const stage1 = sha12(password);
+      const stage1 = sha12(password2);
       return exports2.calculateTokenFromPasswordSha(stage1, scramble1, scramble2);
     }
     exports2.calculateTokenFromPasswordSha = function(passwordSha, scramble1, scramble2) {
@@ -70576,8 +70576,8 @@ var require_auth_41 = __commonJS({
       const candidateHash2 = sha12(hashStage1);
       return candidateHash2.compare(doubleSha) === 0;
     };
-    exports2.doubleSha1 = function(password) {
-      return sha12(sha12(password));
+    exports2.doubleSha1 = function(password2) {
+      return sha12(sha12(password2));
     };
     function xorRotating(a, seed) {
       const result = Buffer.allocUnsafe(a.length);
@@ -72971,8 +72971,8 @@ var require_sha256_password = __commonJS({
     var STATE_INITIAL = 0;
     var STATE_WAIT_SERVER_KEY = 1;
     var STATE_FINAL = -1;
-    function encrypt(password, scramble, key) {
-      const stage1 = xorRotating(Buffer.from(`${password}\0`, "utf8"), scramble);
+    function encrypt(password2, scramble, key) {
+      const stage1 = xorRotating(Buffer.from(`${password2}\0`, "utf8"), scramble);
       return crypto8.publicEncrypt(
         {
           key,
@@ -72984,9 +72984,9 @@ var require_sha256_password = __commonJS({
     module2.exports = (pluginOptions = {}) => ({ connection }) => {
       let state = 0;
       let scramble = null;
-      const password = connection.config.password;
+      const password2 = connection.config.password;
       const authWithKey = (serverKey) => {
-        const _password = encrypt(password, scramble, serverKey);
+        const _password = encrypt(password2, scramble, serverKey);
         state = STATE_FINAL;
         return _password;
       };
@@ -72994,7 +72994,7 @@ var require_sha256_password = __commonJS({
         switch (state) {
           case STATE_INITIAL:
             if (connection.stream instanceof Tls.TLSSocket && connection.stream.encrypted === true) {
-              return Buffer.from(`${password}\0`, "utf8");
+              return Buffer.from(`${password2}\0`, "utf8");
             }
             scramble = data.slice(0, 20);
             if (pluginOptions.serverPublicKey) {
@@ -73039,17 +73039,17 @@ var require_caching_sha2_password = __commonJS({
       hash2.update(msg);
       return hash2.digest();
     }
-    function calculateToken(password, scramble) {
-      if (!password) {
+    function calculateToken(password2, scramble) {
+      if (!password2) {
         return Buffer.alloc(0);
       }
-      const stage1 = sha2563(Buffer.from(password));
+      const stage1 = sha2563(Buffer.from(password2));
       const stage2 = sha2563(stage1);
       const stage3 = sha2563(Buffer.concat([stage2, scramble]));
       return xor2(stage1, stage3);
     }
-    function encrypt(password, scramble, key) {
-      const stage1 = xorRotating(Buffer.from(`${password}\0`, "utf8"), scramble);
+    function encrypt(password2, scramble, key) {
+      const stage1 = xorRotating(Buffer.from(`${password2}\0`, "utf8"), scramble);
       return crypto8.publicEncrypt(
         {
           key,
@@ -73062,9 +73062,9 @@ var require_caching_sha2_password = __commonJS({
     var pluginFactory = (pluginOptions = {}) => ({ connection }) => {
       let state = 0;
       let scramble = null;
-      const password = connection.config.password;
+      const password2 = connection.config.password;
       const authWithKey = (serverKey) => {
-        const _password = encrypt(password, scramble, serverKey);
+        const _password = encrypt(password2, scramble, serverKey);
         state = STATE_FINAL;
         return _password;
       };
@@ -73073,7 +73073,7 @@ var require_caching_sha2_password = __commonJS({
           case STATE_INITIAL:
             scramble = data.slice(0, 20);
             state = STATE_TOKEN_SENT;
-            return calculateToken(password, scramble);
+            return calculateToken(password2, scramble);
           case STATE_TOKEN_SENT:
             if (FAST_AUTH_SUCCESS_PACKET.equals(data)) {
               state = STATE_FINAL;
@@ -73083,7 +73083,7 @@ var require_caching_sha2_password = __commonJS({
               const isSecureConnection = typeof pluginOptions.overrideIsSecure === "undefined" ? connection.config.ssl || connection.config.socketPath : pluginOptions.overrideIsSecure;
               if (isSecureConnection) {
                 state = STATE_FINAL;
-                return Buffer.from(`${password}\0`, "utf8");
+                return Buffer.from(`${password2}\0`, "utf8");
               }
               if (pluginOptions.serverPublicKey) {
                 return authWithKey(pluginOptions.serverPublicKey);
@@ -73120,7 +73120,7 @@ var require_mysql_native_password = __commonJS({
     "use strict";
     var auth41 = require_auth_41();
     module2.exports = (pluginOptions) => ({ connection, command }) => {
-      const password = command.password || pluginOptions.password || connection.config.password;
+      const password2 = command.password || pluginOptions.password || connection.config.password;
       const passwordSha1 = command.passwordSha1 || pluginOptions.passwordSha1 || connection.config.passwordSha1;
       return (data) => {
         const authPluginData1 = data.slice(0, 8);
@@ -73134,7 +73134,7 @@ var require_mysql_native_password = __commonJS({
           );
         } else {
           authToken = auth41.calculateToken(
-            password,
+            password2,
             authPluginData1,
             authPluginData2
           );
@@ -73153,9 +73153,9 @@ var require_mysql_clear_password = __commonJS({
       return Buffer.from(`${str}\0`);
     }
     var create_mysql_clear_password_plugin = (pluginOptions) => function mysql_clear_password_plugin({ connection, command }) {
-      const password = command.password || pluginOptions.password || connection.config.password;
+      const password2 = command.password || pluginOptions.password || connection.config.password;
       return function() {
-        return bufferFromStr(password);
+        return bufferFromStr(password2);
       };
     };
     module2.exports = create_mysql_clear_password_plugin;
@@ -73562,19 +73562,19 @@ var require_client_handshake = __commonJS({
         }
         return authToken;
       }
-      calculateSha256Token(password, scramble) {
-        return calculateSha2Token(password, scramble);
+      calculateSha256Token(password2, scramble) {
+        return calculateSha2Token(password2, scramble);
       }
       // Helper: Calculate auth token for a specific auth method
-      calculateAuthToken(authMethod, password, authPluginData) {
+      calculateAuthToken(authMethod, password2, authPluginData) {
         switch (authMethod) {
           case "mysql_native_password":
             return this.calculateNativePasswordAuthToken(authPluginData);
           case "caching_sha2_password":
-            return this.calculateSha256Token(password, authPluginData);
+            return this.calculateSha256Token(password2, authPluginData);
           case "sha256_password":
           case "mysql_clear_password":
-            return password ? Buffer.from(`${password}\0`, "utf8") : Buffer.alloc(0);
+            return password2 ? Buffer.from(`${password2}\0`, "utf8") : Buffer.alloc(0);
           default:
             return this.calculateNativePasswordAuthToken(authPluginData);
         }
@@ -81622,13 +81622,13 @@ var numericOriginMap = {
 };
 var $ZodCheckLessThan = /* @__PURE__ */ $constructor("$ZodCheckLessThan", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const origin = numericOriginMap[typeof def.value];
+  const origin2 = numericOriginMap[typeof def.value];
   inst._zod.check = (payload) => {
     if (def.inclusive ? payload.value <= def.value : payload.value < def.value) {
       return;
     }
     payload.issues.push({
-      origin: numericOriginMap[typeof payload.value] ?? origin,
+      origin: numericOriginMap[typeof payload.value] ?? origin2,
       code: "too_big",
       maximum: typeof def.value === "object" ? def.value.getTime() : def.value,
       input: payload.value,
@@ -81640,13 +81640,13 @@ var $ZodCheckLessThan = /* @__PURE__ */ $constructor("$ZodCheckLessThan", (inst,
 });
 var $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const origin = numericOriginMap[typeof def.value];
+  const origin2 = numericOriginMap[typeof def.value];
   inst._zod.check = (payload) => {
     if (def.inclusive ? payload.value >= def.value : payload.value > def.value) {
       return;
     }
     payload.issues.push({
-      origin: numericOriginMap[typeof payload.value] ?? origin,
+      origin: numericOriginMap[typeof payload.value] ?? origin2,
       code: "too_small",
       minimum: typeof def.value === "object" ? def.value.getTime() : def.value,
       input: payload.value,
@@ -81681,14 +81681,14 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
   $ZodCheck.init(inst, def);
   def.format = def.format || "float64";
   const isInt = def.format?.includes("int");
-  const origin = isInt ? "int" : "number";
+  const origin2 = isInt ? "int" : "number";
   const [minimum, maximum] = NUMBER_FORMAT_RANGES[def.format];
   inst._zod.check = (payload) => {
     const input2 = payload.value;
     if (isInt) {
       if (!Number.isInteger(input2)) {
         payload.issues.push({
-          expected: origin,
+          expected: origin2,
           format: def.format,
           code: "invalid_type",
           continue: false,
@@ -81705,7 +81705,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
             maximum: Number.MAX_SAFE_INTEGER,
             note: "Integers must be within the safe integer range.",
             inst,
-            origin,
+            origin: origin2,
             inclusive: true,
             continue: !def.abort
           });
@@ -81716,7 +81716,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
             minimum: Number.MIN_SAFE_INTEGER,
             note: "Integers must be within the safe integer range.",
             inst,
-            origin,
+            origin: origin2,
             inclusive: true,
             continue: !def.abort
           });
@@ -81848,9 +81848,9 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
     const length = typeof input2 === "string" && units > def.maximum ? codePointLength(input2) : units;
     if (length <= def.maximum)
       return;
-    const origin = getLengthableOrigin(input2);
+    const origin2 = getLengthableOrigin(input2);
     payload.issues.push({
-      origin,
+      origin: origin2,
       code: "too_big",
       maximum: def.maximum,
       inclusive: true,
@@ -81870,9 +81870,9 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
     const length = typeof input2 === "string" && units >= def.minimum && units < def.minimum * 2 ? codePointLength(input2) : units;
     if (length >= def.minimum)
       return;
-    const origin = getLengthableOrigin(input2);
+    const origin2 = getLengthableOrigin(input2);
     payload.issues.push({
-      origin,
+      origin: origin2,
       code: "too_small",
       minimum: def.minimum,
       inclusive: true,
@@ -81892,10 +81892,10 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
     const length = typeof input2 === "string" && units >= def.length && units <= def.length * 2 ? codePointLength(input2) : units;
     if (length === def.length)
       return;
-    const origin = getLengthableOrigin(input2);
+    const origin2 = getLengthableOrigin(input2);
     const tooBig = length > def.length;
     payload.issues.push({
-      origin,
+      origin: origin2,
       ...tooBig ? { code: "too_big", maximum: def.length } : { code: "too_small", minimum: def.length },
       inclusive: true,
       exact: true,
@@ -84920,8 +84920,8 @@ var error = () => {
     set: { unit: "\u0639\u0646\u0635\u0631", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
     map: { unit: "\u0639\u0646\u0635\u0631", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0645\u062F\u062E\u0644",
@@ -85032,8 +85032,8 @@ var error2 = () => {
     set: { unit: "element", verb: "olmal\u0131d\u0131r" },
     map: { unit: "element", verb: "olmal\u0131d\u0131r" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -85193,8 +85193,8 @@ var error3 = () => {
       verb: "\u043C\u0435\u0446\u044C"
     }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0443\u0432\u043E\u0434",
@@ -85312,8 +85312,8 @@ var error4 = () => {
     set: { unit: "\u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
     map: { unit: "\u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0432\u0445\u043E\u0434",
@@ -85438,8 +85438,8 @@ var error5 = () => {
     set: { unit: "\u0986\u0987\u099F\u09C7\u09AE", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
     map: { unit: "\u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0987\u09A8\u09AA\u09C1\u099F",
@@ -85552,8 +85552,8 @@ var error6 = () => {
     set: { unit: "elements", verb: "contenir" },
     map: { unit: "elements", verb: "contenir" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "entrada",
@@ -85666,8 +85666,8 @@ var error7 = () => {
     set: { unit: "\u062F\u0627\u0646\u06D5", verb: "\u0628\u06CE\u062A" },
     map: { unit: "\u062F\u0627\u0646\u06D5", verb: "\u0628\u06CE\u062A" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "regex",
@@ -85799,8 +85799,8 @@ var error8 = () => {
     set: { unit: "prvk\u016F", verb: "m\xEDt" },
     map: { unit: "prvk\u016F", verb: "m\xEDt" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "regul\xE1rn\xED v\xFDraz",
@@ -85916,8 +85916,8 @@ var error9 = () => {
     set: { unit: "elementer", verb: "indeholdt" },
     map: { unit: "elementer", verb: "indeholdt" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -85981,19 +85981,19 @@ var error9 = () => {
       case "too_big": {
         const adj = issue2.inclusive ? "<=" : "<";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing)
-          return `For stor: forventede ${origin ?? "value"} ${sizing.verb} ${adj} ${issue2.maximum.toString()} ${sizing.unit ?? "elementer"}`;
-        return `For stor: forventede ${origin ?? "value"} havde ${adj} ${issue2.maximum.toString()}`;
+          return `For stor: forventede ${origin2 ?? "value"} ${sizing.verb} ${adj} ${issue2.maximum.toString()} ${sizing.unit ?? "elementer"}`;
+        return `For stor: forventede ${origin2 ?? "value"} havde ${adj} ${issue2.maximum.toString()}`;
       }
       case "too_small": {
         const adj = issue2.inclusive ? ">=" : ">";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing) {
-          return `For lille: forventede ${origin} ${sizing.verb} ${adj} ${issue2.minimum.toString()} ${sizing.unit}`;
+          return `For lille: forventede ${origin2} ${sizing.verb} ${adj} ${issue2.minimum.toString()} ${sizing.unit}`;
         }
-        return `For lille: forventede ${origin} havde ${adj} ${issue2.minimum.toString()}`;
+        return `For lille: forventede ${origin2} havde ${adj} ${issue2.minimum.toString()}`;
       }
       case "invalid_format": {
         const _issue = issue2;
@@ -86037,8 +86037,8 @@ var error10 = () => {
     set: { unit: "Elemente", verb: "zu haben" },
     map: { unit: "Elemente", verb: "zu haben" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "Eingabe",
@@ -86151,8 +86151,8 @@ var error11 = () => {
     set: { unit: "\u03C3\u03C4\u03BF\u03B9\u03C7\u03B5\u03AF\u03B1", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
     map: { unit: "\u03BA\u03B1\u03C4\u03B1\u03C7\u03C9\u03C1\u03AE\u03C3\u03B5\u03B9\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2",
@@ -86264,8 +86264,8 @@ var error12 = () => {
     set: { unit: "items", verb: "to have" },
     map: { unit: "entries", verb: "to have" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -86389,8 +86389,8 @@ var error13 = () => {
     set: { unit: "elementojn", verb: "havi" },
     map: { unit: "elementojn", verb: "havi" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "enigo",
@@ -86503,8 +86503,8 @@ var error14 = () => {
     array: { unit: "elementos", verb: "tener" },
     set: { unit: "elementos", verb: "tener" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "entrada",
@@ -86585,19 +86585,19 @@ var error14 = () => {
       case "too_big": {
         const adj = issue2.inclusive ? "<=" : "<";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing)
-          return `Demasiado grande: se esperaba que ${origin ?? "valor"} tuviera ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elementos"}`;
-        return `Demasiado grande: se esperaba que ${origin ?? "valor"} fuera ${adj}${issue2.maximum.toString()}`;
+          return `Demasiado grande: se esperaba que ${origin2 ?? "valor"} tuviera ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elementos"}`;
+        return `Demasiado grande: se esperaba que ${origin2 ?? "valor"} fuera ${adj}${issue2.maximum.toString()}`;
       }
       case "too_small": {
         const adj = issue2.inclusive ? ">=" : ">";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing) {
-          return `Demasiado peque\xF1o: se esperaba que ${origin} tuviera ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+          return `Demasiado peque\xF1o: se esperaba que ${origin2} tuviera ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
         }
-        return `Demasiado peque\xF1o: se esperaba que ${origin} fuera ${adj}${issue2.minimum.toString()}`;
+        return `Demasiado peque\xF1o: se esperaba que ${origin2} fuera ${adj}${issue2.minimum.toString()}`;
       }
       case "invalid_format": {
         const _issue = issue2;
@@ -86641,8 +86641,8 @@ var error15 = () => {
     set: { unit: "\u0622\u06CC\u062A\u0645", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
     map: { unit: "\u0622\u06CC\u062A\u0645", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0648\u0631\u0648\u062F\u06CC",
@@ -86765,8 +86765,8 @@ var error16 = () => {
     int: { unit: "", subject: "kokonaisluvun" },
     date: { unit: "", subject: "p\xE4iv\xE4m\xE4\xE4r\xE4n" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "s\xE4\xE4nn\xF6llinen lauseke",
@@ -86878,8 +86878,8 @@ var error17 = () => {
     array: { unit: "\xE9l\xE9ments", verb: "avoir" },
     set: { unit: "\xE9l\xE9ments", verb: "avoir" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "expression r\xE9guli\xE8re",
@@ -87009,8 +87009,8 @@ var error18 = () => {
     set: { unit: "\xE9l\xE9ments", verb: "avoir" },
     map: { unit: "\xE9l\xE9ments", verb: "avoir" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "entr\xE9e",
@@ -87122,8 +87122,8 @@ var error19 = () => {
     set: { unit: "\u0A86\u0A87\u0A9F\u0AAE", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
     map: { unit: "\u0A8F\u0AA8\u0ACD\u0A9F\u0ACD\u0AB0\u0AC0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0A87\u0AA8\u0AAA\u0AC1\u0A9F",
@@ -87270,10 +87270,10 @@ var error20 = () => {
     const gender = e?.gender ?? "m";
     return gender === "f" ? "\u05E6\u05E8\u05D9\u05DB\u05D4 \u05DC\u05D4\u05D9\u05D5\u05EA" : "\u05E6\u05E8\u05D9\u05DA \u05DC\u05D4\u05D9\u05D5\u05EA";
   };
-  const getSizing = (origin) => {
-    if (!origin)
+  const getSizing = (origin2) => {
+    if (!origin2)
       return null;
-    return Sizable[origin] ?? null;
+    return Sizable[origin2] ?? null;
   };
   const FormatDictionary = {
     regex: { label: "\u05E7\u05DC\u05D8", gender: "m" },
@@ -87438,8 +87438,8 @@ var error21 = () => {
     set: { unit: "\u0924\u0924\u094D\u0935", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
     map: { unit: "\u092A\u094D\u0930\u0935\u093F\u0937\u094D\u091F\u093F\u092F\u093E\u0901", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0907\u0928\u092A\u0941\u091F",
@@ -87549,8 +87549,8 @@ var error22 = () => {
     array: { unit: "stavki", verb: "imati" },
     set: { unit: "stavki", verb: "imati" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "unos",
@@ -87621,19 +87621,19 @@ var error22 = () => {
       case "too_big": {
         const adj = issue2.inclusive ? "<=" : "<";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing)
-          return `Preveliko: o\u010Dekivano da ${origin ?? "vrijednost"} ima ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elemenata"}`;
-        return `Preveliko: o\u010Dekivano da ${origin ?? "vrijednost"} bude ${adj}${issue2.maximum.toString()}`;
+          return `Preveliko: o\u010Dekivano da ${origin2 ?? "vrijednost"} ima ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elemenata"}`;
+        return `Preveliko: o\u010Dekivano da ${origin2 ?? "vrijednost"} bude ${adj}${issue2.maximum.toString()}`;
       }
       case "too_small": {
         const adj = issue2.inclusive ? ">=" : ">";
         const sizing = getSizing(issue2.origin);
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         if (sizing) {
-          return `Premalo: o\u010Dekivano da ${origin} ima ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+          return `Premalo: o\u010Dekivano da ${origin2} ima ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
         }
-        return `Premalo: o\u010Dekivano da ${origin} bude ${adj}${issue2.minimum.toString()}`;
+        return `Premalo: o\u010Dekivano da ${origin2} bude ${adj}${issue2.minimum.toString()}`;
       }
       case "invalid_format": {
         const _issue = issue2;
@@ -87677,8 +87677,8 @@ var error23 = () => {
     set: { unit: "elem", verb: "legyen" },
     map: { unit: "elem", verb: "legyen" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "bemenet",
@@ -87831,8 +87831,8 @@ var error24 = () => {
       verb: "\u0578\u0582\u0576\u0565\u0576\u0561\u056C"
     }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0574\u0578\u0582\u057F\u0584",
@@ -87950,8 +87950,8 @@ var error25 = () => {
     set: { unit: "item", verb: "memiliki" },
     map: { unit: "item", verb: "memiliki" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -88062,8 +88062,8 @@ var error26 = () => {
     set: { unit: "hluti", verb: "a\xF0 hafa" },
     map: { unit: "hluti", verb: "a\xF0 hafa" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "gildi",
@@ -88177,8 +88177,8 @@ var error27 = () => {
     set: { unit: "elementi", verb: "avere" },
     map: { unit: "elementi", verb: "avere" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -88291,8 +88291,8 @@ var error28 = () => {
     set: { unit: "\u8981\u7D20", verb: "\u3067\u3042\u308B" },
     map: { unit: "\u8981\u7D20", verb: "\u3067\u3042\u308B" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u5165\u529B\u5024",
@@ -88404,8 +88404,8 @@ var error29 = () => {
     set: { unit: "\u10D4\u10DA\u10D4\u10DB\u10D4\u10DC\u10E2\u10D8", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
     map: { unit: "\u10D4\u10DA\u10D4\u10DB\u10D4\u10DC\u10E2\u10D8", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u10E8\u10D4\u10E7\u10D5\u10D0\u10DC\u10D0",
@@ -88522,8 +88522,8 @@ var error30 = () => {
     set: { unit: "\u1792\u17B6\u178F\u17BB", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
     map: { unit: "\u1792\u17B6\u178F\u17BB", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u1791\u17B7\u1793\u17D2\u1793\u1793\u17D0\u1799\u1794\u1789\u17D2\u1785\u17BC\u179B",
@@ -88643,8 +88643,8 @@ var error31 = () => {
     set: { unit: "\u0CB5\u0CB8\u0CCD\u0CA4\u0CC1\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
     map: { unit: "entries", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0C87\u0CA8\u0CCD\u0CAA\u0CC1\u0C9F\u0CCD",
@@ -88759,8 +88759,8 @@ var error32 = () => {
     set: { unit: "\uAC1C", verb: "to have" },
     map: { unit: "\uAC1C", verb: "to have" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\uC785\uB825",
@@ -88952,8 +88952,8 @@ var error33 = () => {
       }
     }
   };
-  function getSizing(origin, unitType, inclusive, targetShouldBe) {
-    const result = Sizable[origin] ?? null;
+  function getSizing(origin2, unitType, inclusive, targetShouldBe) {
+    const result = Sizable[origin2] ?? null;
     if (result === null)
       return result;
     return {
@@ -89024,20 +89024,20 @@ var error33 = () => {
           return `Privalo b\u016Bti ${stringifyPrimitive(issue2.values[0])}`;
         return `Privalo b\u016Bti vienas i\u0161 ${joinValues(issue2.values, "|")} pasirinkim\u0173`;
       case "too_big": {
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         const sizing = getSizing(issue2.origin, getUnitTypeFromNumber(Number(issue2.maximum)), issue2.inclusive ?? false, "smaller");
         if (sizing?.verb)
-          return `${capitalizeFirstCharacter(origin ?? issue2.origin ?? "reik\u0161m\u0117")} ${sizing.verb} ${issue2.maximum.toString()} ${sizing.unit ?? "element\u0173"}`;
+          return `${capitalizeFirstCharacter(origin2 ?? issue2.origin ?? "reik\u0161m\u0117")} ${sizing.verb} ${issue2.maximum.toString()} ${sizing.unit ?? "element\u0173"}`;
         const adj = issue2.inclusive ? "ne didesnis kaip" : "ma\u017Eesnis kaip";
-        return `${capitalizeFirstCharacter(origin ?? issue2.origin ?? "reik\u0161m\u0117")} turi b\u016Bti ${adj} ${issue2.maximum.toString()} ${sizing?.unit}`;
+        return `${capitalizeFirstCharacter(origin2 ?? issue2.origin ?? "reik\u0161m\u0117")} turi b\u016Bti ${adj} ${issue2.maximum.toString()} ${sizing?.unit}`;
       }
       case "too_small": {
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
         const sizing = getSizing(issue2.origin, getUnitTypeFromNumber(Number(issue2.minimum)), issue2.inclusive ?? false, "bigger");
         if (sizing?.verb)
-          return `${capitalizeFirstCharacter(origin ?? issue2.origin ?? "reik\u0161m\u0117")} ${sizing.verb} ${issue2.minimum.toString()} ${sizing.unit ?? "element\u0173"}`;
+          return `${capitalizeFirstCharacter(origin2 ?? issue2.origin ?? "reik\u0161m\u0117")} ${sizing.verb} ${issue2.minimum.toString()} ${sizing.unit ?? "element\u0173"}`;
         const adj = issue2.inclusive ? "ne ma\u017Eesnis kaip" : "didesnis kaip";
-        return `${capitalizeFirstCharacter(origin ?? issue2.origin ?? "reik\u0161m\u0117")} turi b\u016Bti ${adj} ${issue2.minimum.toString()} ${sizing?.unit}`;
+        return `${capitalizeFirstCharacter(origin2 ?? issue2.origin ?? "reik\u0161m\u0117")} turi b\u016Bti ${adj} ${issue2.minimum.toString()} ${sizing?.unit}`;
       }
       case "invalid_format": {
         const _issue = issue2;
@@ -89061,8 +89061,8 @@ var error33 = () => {
       case "invalid_union":
         return "Klaidinga \u012Fvestis";
       case "invalid_element": {
-        const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
-        return `${capitalizeFirstCharacter(origin ?? issue2.origin ?? "reik\u0161m\u0117")} turi klaiding\u0105 \u012Fvest\u012F`;
+        const origin2 = TypeDictionary[issue2.origin] ?? issue2.origin;
+        return `${capitalizeFirstCharacter(origin2 ?? issue2.origin ?? "reik\u0161m\u0117")} turi klaiding\u0105 \u012Fvest\u012F`;
       }
       default:
         return "Klaidinga \u012Fvestis";
@@ -89084,8 +89084,8 @@ var error34 = () => {
     set: { unit: "\u0441\u0442\u0430\u0432\u043A\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
     map: { unit: "\u0441\u0442\u0430\u0432\u043A\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0432\u043D\u0435\u0441",
@@ -89199,8 +89199,8 @@ var error35 = () => {
     set: { unit: "elemen", verb: "mempunyai" },
     map: { unit: "elemen", verb: "mempunyai" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -89312,8 +89312,8 @@ var error36 = () => {
     set: { unit: "\u0924\u0924\u094D\u0935", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
     map: { unit: "\u092A\u094D\u0930\u0935\u093F\u0937\u094D\u091F\u093F", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0907\u0928\u092A\u0941\u091F",
@@ -89424,8 +89424,8 @@ var error37 = () => {
     set: { unit: "elementen", verb: "heeft" },
     map: { unit: "elementen", verb: "heeft" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "invoer",
@@ -89540,8 +89540,8 @@ var error38 = () => {
     set: { unit: "element", verb: "\xE5 innehalde" },
     map: { unit: "element", verb: "\xE5 innehalde" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -89654,8 +89654,8 @@ var error39 = () => {
     set: { unit: "elementer", verb: "\xE5 inneholde" },
     map: { unit: "elementer", verb: "\xE5 inneholde" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "input",
@@ -89768,8 +89768,8 @@ var error40 = () => {
     set: { unit: "unsur", verb: "olmal\u0131d\u0131r" },
     map: { unit: "unsur", verb: "olmal\u0131d\u0131r" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "giren",
@@ -89883,8 +89883,8 @@ var error41 = () => {
     set: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
     map: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0648\u0631\u0648\u062F\u064A",
@@ -90003,8 +90003,8 @@ var error42 = () => {
     set: { unit: "element\xF3w", verb: "mie\u0107" },
     map: { unit: "element\xF3w", verb: "mie\u0107" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "wyra\u017Cenie",
@@ -90118,8 +90118,8 @@ var error43 = () => {
     set: { unit: "elementos" },
     map: { unit: "entradas" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "a entrada",
@@ -90262,8 +90262,8 @@ var error44 = () => {
     set: { unit: "elementos" },
     map: { unit: "entradas" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "a entrada",
@@ -90407,8 +90407,8 @@ var error45 = () => {
     set: { unit: "elemente", verb: "s\u0103 aib\u0103" },
     map: { unit: "intr\u0103ri", verb: "s\u0103 aib\u0103" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "intrare",
@@ -90580,8 +90580,8 @@ var error46 = () => {
       verb: "\u0438\u043C\u0435\u0442\u044C"
     }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0432\u0432\u043E\u0434",
@@ -90699,8 +90699,8 @@ var error47 = () => {
     set: { unit: "prvkov", verb: "ma\u0165" },
     map: { unit: "polo\u017Eiek", verb: "ma\u0165" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "regul\xE1rny v\xFDraz",
@@ -90816,8 +90816,8 @@ var error48 = () => {
     set: { unit: "elementov", verb: "imeti" },
     map: { unit: "elementov", verb: "imeti" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "vnos",
@@ -90931,8 +90931,8 @@ var error49 = () => {
     set: { unit: "objekt", verb: "att inneh\xE5lla" },
     map: { unit: "objekt", verb: "att inneh\xE5lla" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "regulj\xE4rt uttryck",
@@ -91047,8 +91047,8 @@ var error50 = () => {
     set: { unit: "\u0B89\u0BB1\u0BC1\u0BAA\u0BCD\u0BAA\u0BC1\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
     map: { unit: "\u0B89\u0BB1\u0BC1\u0BAA\u0BCD\u0BAA\u0BC1\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0B89\u0BB3\u0BCD\u0BB3\u0BC0\u0B9F\u0BC1",
@@ -91163,8 +91163,8 @@ var error51 = () => {
     set: { unit: "\u0443\u043D\u0441\u0443\u0440", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
     map: { unit: "\u0441\u0430\u0431\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0432\u0443\u0440\u0443\u0434",
@@ -91280,8 +91280,8 @@ var error52 = () => {
     set: { unit: "\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
     map: { unit: "\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E1B\u0E49\u0E2D\u0E19",
@@ -91396,8 +91396,8 @@ var error53 = () => {
     set: { unit: "elementler", verb: "bolmaly" },
     map: { unit: "elementler", verb: "bolmaly" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "giri\u015F",
@@ -91504,8 +91504,8 @@ var error54 = () => {
     set: { unit: "\xF6\u011Fe", verb: "olmal\u0131" },
     map: { unit: "\xF6\u011Fe", verb: "olmal\u0131" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "girdi",
@@ -91615,8 +91615,8 @@ var error55 = () => {
     set: { unit: "\u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
     map: { unit: "\u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0432\u0445\u0456\u0434\u043D\u0456 \u0434\u0430\u043D\u0456",
@@ -91734,8 +91734,8 @@ var error56 = () => {
     set: { unit: "\u0622\u0626\u0679\u0645\u0632", verb: "\u06C1\u0648\u0646\u0627" },
     map: { unit: "\u0622\u0626\u0679\u0645\u0632", verb: "\u06C1\u0648\u0646\u0627" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0627\u0646 \u067E\u0679",
@@ -91850,8 +91850,8 @@ var error57 = () => {
     set: { unit: "element", verb: "bo\u2018lishi kerak" },
     map: { unit: "yozuv", verb: "bo\u2018lishi kerak" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "kirish",
@@ -91964,8 +91964,8 @@ var error58 = () => {
     set: { unit: "ph\u1EA7n t\u1EED", verb: "c\xF3" },
     map: { unit: "ph\u1EA7n t\u1EED", verb: "c\xF3" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u0111\u1EA7u v\xE0o",
@@ -92078,8 +92078,8 @@ var error59 = () => {
     set: { unit: "\u9879", verb: "\u5305\u542B" },
     map: { unit: "\u9879", verb: "\u5305\u542B" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u8F93\u5165",
@@ -92193,8 +92193,8 @@ var error60 = () => {
     set: { unit: "\u9805\u76EE", verb: "\u64C1\u6709" },
     map: { unit: "\u9805\u76EE", verb: "\u64C1\u6709" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u8F38\u5165",
@@ -92306,8 +92306,8 @@ var error61 = () => {
     set: { unit: "nkan", verb: "n\xED" },
     map: { unit: "nkan", verb: "n\xED" }
   };
-  function getSizing(origin) {
-    return Sizable[origin] ?? null;
+  function getSizing(origin2) {
+    return Sizable[origin2] ?? null;
   }
   const FormatDictionary = {
     regex: "\u1EB9\u0300r\u1ECD \xECb\xE1w\u1ECDl\xE9",
@@ -99599,6 +99599,36 @@ var fiscalProfileSchema = external_exports.object({
 });
 var fiscalProfileSavedSchema = external_exports.object({ saved: external_exports.literal(true) });
 
+// ../../lib/account/securityTypes.ts
+var password = external_exports.string().min(1).max(200);
+var passwordChangeRequestSchema = external_exports.strictObject({
+  currentPassword: password,
+  newPassword: password,
+  confirmPassword: password
+});
+var securityDoneSchema = external_exports.object({ success: external_exports.literal(true) });
+var origin = {
+  ip: external_exports.string().nullable(),
+  userAgent: external_exports.string().nullable(),
+  createdAt: external_exports.string()
+};
+var sessionListSchema = external_exports.object({
+  items: external_exports.array(
+    external_exports.object({ id: external_exports.string(), isCurrent: external_exports.boolean(), ...origin })
+  )
+});
+var deviceListSchema = external_exports.object({
+  items: external_exports.array(
+    external_exports.object({ id: external_exports.number().int(), expiresAt: external_exports.string(), ...origin })
+  )
+});
+var sessionParams = external_exports.strictObject({
+  id: external_exports.string().regex(/^[0-9a-f]{64}$/)
+});
+var deviceParams = external_exports.strictObject({
+  id: external_exports.coerce.number().int().min(1)
+});
+
 // ../../lib/cart/cartTypes.ts
 var MAX_LINES = 50;
 var MAX_QUANTITY = 99;
@@ -102204,6 +102234,88 @@ var ROUTE_CONTRACTS = [
     }
   },
   {
+    method: "POST",
+    path: "/v1/account/password",
+    summary: "Changes the password with the current one; closes the other sessions and devices (FC 079)",
+    permission: "account:self",
+    request: { headers: mutationHeaders, body: passwordChangeRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/sessions",
+    summary: "The open sessions of the account (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: sessionListSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/sessions",
+    summary: "Closes every session but the one asking (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: securityDoneSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/sessions/:id",
+    summary: "Closes one session of the account (FC 079)",
+    permission: "account:self",
+    request: { params: sessionParams },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
+    path: "/v1/account/devices",
+    summary: "The remembered devices of the account (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: deviceListSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/devices",
+    summary: "Forgets every remembered device (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: securityDoneSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/v1/account/devices/:id",
+    summary: "Forgets one remembered device (FC 079)",
+    permission: "account:self",
+    request: { params: deviceParams },
+    responses: {
+      200: securityDoneSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
     method: "GET",
     path: "/v1/account/fiscal-profile",
     summary: "The fiscal data the account saved to be invoiced (FC 077)",
@@ -103935,6 +104047,397 @@ function registerAccountFiscalRoutes(app, deps) {
   });
 }
 
+// src/routes/accountSecurity.ts
+var import_node_crypto10 = require("node:crypto");
+
+// ../../lib/account/passwordPolicy.ts
+var PASSWORD_MIN = 12;
+var PASSWORD_MAX = 128;
+var PASSWORD_RULES = [
+  "length",
+  "uppercase",
+  "lowercase",
+  "digit",
+  "symbol",
+  "personal",
+  "common"
+];
+var COMMON_WORDS = [
+  "password",
+  "contrasena",
+  "clave",
+  "qwerty",
+  "qwertz",
+  "azerty",
+  "asdfgh",
+  "zxcvbn",
+  "abcdef",
+  "admin",
+  "administrador",
+  "welcome",
+  "bienvenido",
+  "letmein",
+  "iloveyou",
+  "teamo",
+  "monkey",
+  "dragon",
+  "football",
+  "futbol",
+  "baseball",
+  "master",
+  "sunshine",
+  "princess",
+  "shadow",
+  "superman",
+  "batman",
+  "trustno",
+  "secret",
+  "secreto",
+  "login",
+  "usuario",
+  "changeme",
+  "default",
+  "yekora",
+  "mexico"
+];
+var LEET = {
+  "0": "o",
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "@": "a",
+  $: "s"
+};
+var COMMON_SLACK = 3;
+var MIN_DISTINCT = 5;
+function fold(text3) {
+  return text3.normalize("NFD").replaceAll(new RegExp("\\p{M}", "gu"), "").toLowerCase();
+}
+function containsPersonal(password2, context) {
+  const folded = fold(password2);
+  const email3 = fold(context.email.trim());
+  const local = email3.split("@")[0];
+  const parts = [email3, local, ...fold(context.fullName).split(/\s+/)];
+  return parts.some((part) => part.length >= 3 && folded.includes(part));
+}
+function isCommon(password2) {
+  const folded = fold(password2);
+  if (new Set(folded).size < MIN_DISTINCT) return true;
+  const plain = [...folded].map((char) => LEET[char] ?? char).join("");
+  return COMMON_WORDS.some((word) => {
+    const at = plain.indexOf(word);
+    if (at === -1) return false;
+    const rest = folded.slice(0, at) + folded.slice(at + word.length);
+    return (rest.match(new RegExp("\\p{L}", "gu")) ?? []).length <= COMMON_SLACK;
+  });
+}
+function passwordChecks(password2, context) {
+  return {
+    length: password2.length >= PASSWORD_MIN && password2.length <= PASSWORD_MAX,
+    uppercase: new RegExp("\\p{Lu}", "u").test(password2),
+    lowercase: new RegExp("\\p{Ll}", "u").test(password2),
+    digit: new RegExp("\\p{Nd}", "u").test(password2),
+    symbol: /[^\p{L}\p{N}]/u.test(password2),
+    personal: !containsPersonal(password2, context),
+    common: !isCommon(password2)
+  };
+}
+function passwordViolation(password2, context) {
+  const checks = passwordChecks(password2, context);
+  return PASSWORD_RULES.find((rule) => !checks[rule]) ?? null;
+}
+var PASSWORD_PROBLEMS = {
+  length: "PASSWORD_LENGTH",
+  uppercase: "PASSWORD_UPPERCASE",
+  lowercase: "PASSWORD_LOWERCASE",
+  digit: "PASSWORD_DIGIT",
+  symbol: "PASSWORD_SYMBOL",
+  personal: "PASSWORD_PERSONAL",
+  common: "PASSWORD_COMMON"
+};
+
+// src/services/accountSecurity.ts
+var REVOCATION_REFUSALS = {
+  SESSION_NOT_FOUND: [404, "Not found"],
+  CANNOT_REVOKE_CURRENT_SESSION: [400, "Sign out to close this session"],
+  SESSION_FORBIDDEN: [403, "The session belongs to another account"],
+  DEVICE_NOT_FOUND: [404, "Not found"],
+  DEVICE_FORBIDDEN: [403, "The device belongs to another account"]
+};
+var originOf = (row4) => ({
+  ip: row4.ip_address,
+  userAgent: row4.user_agent,
+  createdAt: row4.created_at.toISOString()
+});
+async function listSessions(db, userId, current, now) {
+  const rows = await db.query(
+    "SELECT id, ip_address, user_agent, created_at FROM user_sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC, id ASC",
+    [userId, now]
+  );
+  return rows.map((row4) => ({
+    id: row4.id,
+    isCurrent: row4.id === current,
+    ...originOf(row4)
+  }));
+}
+async function listDevices(db, userId, now) {
+  const rows = await db.query(
+    "SELECT id, ip_address, user_agent, created_at, expires_at FROM user_trusted_devices WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC, id DESC",
+    [userId, now]
+  );
+  return rows.map((row4) => ({
+    id: Number(row4.id),
+    expiresAt: row4.expires_at.toISOString(),
+    ...originOf(row4)
+  }));
+}
+async function closeOneSession(tx, input2) {
+  const { id, userId, current, now } = input2;
+  const [row4] = await tx.query(
+    "SELECT user_id FROM user_sessions WHERE id = ? AND expires_at > ? FOR UPDATE",
+    [id, now]
+  );
+  if (row4 === void 0) return "SESSION_NOT_FOUND";
+  if (id === current) return "CANNOT_REVOKE_CURRENT_SESSION";
+  if (row4.user_id !== userId) return "SESSION_FORBIDDEN";
+  await tx.query("DELETE FROM user_sessions WHERE id = ? AND user_id = ?", [
+    id,
+    userId
+  ]);
+  return null;
+}
+async function closeOtherSessions(tx, userId, current) {
+  await tx.query("DELETE FROM user_sessions WHERE user_id = ? AND id <> ?", [
+    userId,
+    current
+  ]);
+}
+async function forgetAllDevices(tx, userId) {
+  await tx.query("DELETE FROM user_trusted_devices WHERE user_id = ?", [
+    userId
+  ]);
+}
+async function forgetOneDevice(tx, id, userId) {
+  const [row4] = await tx.query(
+    "SELECT user_id FROM user_trusted_devices WHERE id = ? FOR UPDATE",
+    [id]
+  );
+  if (row4 === void 0) return "DEVICE_NOT_FOUND";
+  if (row4.user_id !== userId) return "DEVICE_FORBIDDEN";
+  await tx.query(
+    "DELETE FROM user_trusted_devices WHERE id = ? AND user_id = ?",
+    [id, userId]
+  );
+  return null;
+}
+async function passwordHashOf(db, userId) {
+  const [row4] = await db.query(
+    "SELECT password_hash FROM users WHERE id = ?",
+    [userId]
+  );
+  return row4.password_hash;
+}
+async function storePassword(tx, input2) {
+  await tx.query("UPDATE users SET password_hash = ? WHERE id = ?", [
+    input2.hash,
+    input2.userId
+  ]);
+  await closeOtherSessions(tx, input2.userId, input2.current);
+  await forgetAllDevices(tx, input2.userId);
+}
+
+// src/services/passwords.ts
+var import_node_crypto9 = require("node:crypto");
+var import_hash_wasm = __toESM(require_index_umd(), 1);
+var PARAMETERS = {
+  memorySize: 19456,
+  iterations: 2,
+  parallelism: 1,
+  hashLength: 32
+};
+function hashPassword(password2) {
+  return (0, import_hash_wasm.argon2id)({
+    ...PARAMETERS,
+    password: password2,
+    salt: (0, import_node_crypto9.randomBytes)(16),
+    outputType: "encoded"
+  });
+}
+async function verifyPassword(hash2, password2) {
+  try {
+    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password: password2 });
+  } catch {
+    return false;
+  }
+}
+function unmatchableHash() {
+  return hashPassword((0, import_node_crypto9.randomBytes)(64).toString("hex"));
+}
+var decoy;
+function decoyHash() {
+  decoy ??= hashPassword((0, import_node_crypto9.randomBytes)(32).toString("base64url"));
+  return decoy;
+}
+
+// src/routes/accountSecurity.ts
+var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+var userOf = (request2) => request2.user;
+var audit = (db, request2, action) => recordAudit(db, {
+  userId: userOf(request2).userId,
+  action,
+  entityType: "users",
+  entityId: userOf(request2).userId,
+  before: null,
+  after: null,
+  ip: request2.ip
+});
+var refusalOf2 = (reply, code2) => refuse(reply, ...REVOCATION_REFUSALS[code2], code2);
+var DONE = securityDoneSchema.parse({ success: true });
+var refused = (code2, title) => ({
+  status: 400,
+  body: problem(400, title, code2)
+});
+async function applyPassword(tx, deps, request2, body) {
+  const { currentPassword, newPassword, confirmPassword } = body;
+  const { userId, sessionId, email: email3, fullName } = userOf(request2);
+  const stored = await passwordHashOf(tx, userId);
+  if (!await verifyPassword(stored, currentPassword)) {
+    await audit(tx, request2, "PASSWORD_CHANGE_REFUSED");
+    return refused(
+      "INVALID_CURRENT_PASSWORD",
+      "The current password is not correct"
+    );
+  }
+  if (confirmPassword !== newPassword) {
+    return refused(
+      "PASSWORD_CONFIRMATION_MISMATCH",
+      "The two passwords differ"
+    );
+  }
+  if (newPassword === currentPassword) {
+    return refused(
+      "PASSWORD_IDENTICAL_TO_CURRENT",
+      "The new password is the current one"
+    );
+  }
+  const broken = passwordViolation(newPassword, { email: email3, fullName });
+  if (broken !== null) {
+    return refused(
+      PASSWORD_PROBLEMS[broken],
+      "The password is not strong enough"
+    );
+  }
+  if (await deps.breach(newPassword) === "breached") {
+    return refused(
+      "PASSWORD_BREACHED",
+      "The password appears in a known data breach"
+    );
+  }
+  const hash2 = await hashPassword(newPassword);
+  await storePassword(tx, { userId, hash: hash2, current: sessionId });
+  await enqueueMail(tx, { type: "PASSWORD_CHANGED", userId });
+  await audit(tx, request2, "PASSWORD_CHANGED");
+  request2.outboxQueued = true;
+  return { status: 200, body: DONE };
+}
+async function changePassword(deps, request2, reply) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    return refuse(reply, 400, "Idempotency-Key required", key.code);
+  }
+  const body = passwordChangeRequestSchema.safeParse(request2.body);
+  if (!body.success) {
+    return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+  }
+  const { secret } = deps.auth;
+  const outcome = await runIdempotent(
+    deps.db,
+    {
+      userId: userOf(request2).userId,
+      key: key.key,
+      route: "POST /v1/account/password",
+      requestHash: requestHash(
+        "application/json",
+        (0, import_node_crypto10.createHmac)("sha256", secret).update(JSON.stringify(body.data)).digest("hex")
+      ),
+      now: deps.now()
+    },
+    (tx) => applyPassword(tx, deps, request2, body.data)
+  );
+  if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
+    return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
+  }
+  const { status: status2, body: answer } = outcome.answer;
+  if (status2 >= 400) reply.type(PROBLEM_TYPE);
+  return reply.code(status2).header("idempotency-status", outcome.code).send(answer);
+}
+function registerAccountSecurityRoutes(app, deps) {
+  app.post(
+    "/v1/account/password",
+    LIMITED,
+    async (request2, reply) => changePassword(deps, request2, reply)
+  );
+  app.get("/v1/account/sessions", async (request2) => {
+    const { userId, sessionId } = userOf(request2);
+    return sessionListSchema.parse({
+      items: await listSessions(deps.db, userId, sessionId, deps.now())
+    });
+  });
+  app.delete("/v1/account/sessions/:id", async (request2, reply) => {
+    const params = sessionParams.safeParse(request2.params);
+    if (!params.success) return refusalOf2(reply, "SESSION_NOT_FOUND");
+    const { userId, sessionId } = userOf(request2);
+    const refused3 = await deps.db.transaction(async (tx) => {
+      const why = await closeOneSession(tx, {
+        id: params.data.id,
+        userId,
+        current: sessionId,
+        now: deps.now()
+      });
+      if (why === null) await audit(tx, request2, "SESSION_REVOKED");
+      return why;
+    });
+    return refused3 === null ? DONE : refusalOf2(reply, refused3);
+  });
+  app.delete("/v1/account/sessions", async (request2) => {
+    const { userId, sessionId } = userOf(request2);
+    await deps.db.transaction(async (tx) => {
+      await closeOtherSessions(tx, userId, sessionId);
+      await audit(tx, request2, "OTHER_SESSIONS_REVOKED");
+    });
+    return DONE;
+  });
+  app.get(
+    "/v1/account/devices",
+    async (request2) => deviceListSchema.parse({
+      items: await listDevices(deps.db, userOf(request2).userId, deps.now())
+    })
+  );
+  app.delete("/v1/account/devices/:id", async (request2, reply) => {
+    const params = deviceParams.safeParse(request2.params);
+    if (!params.success) return refusalOf2(reply, "DEVICE_NOT_FOUND");
+    const refused3 = await deps.db.transaction(async (tx) => {
+      const why = await forgetOneDevice(
+        tx,
+        params.data.id,
+        userOf(request2).userId
+      );
+      if (why === null) await audit(tx, request2, "DEVICE_FORGOTTEN");
+      return why;
+    });
+    return refused3 === null ? DONE : refusalOf2(reply, refused3);
+  });
+  app.delete("/v1/account/devices", async (request2) => {
+    await deps.db.transaction(async (tx) => {
+      await forgetAllDevices(tx, userOf(request2).userId);
+      await audit(tx, request2, "DEVICES_FORGOTTEN");
+    });
+    return DONE;
+  });
+}
+
 // src/services/invoiceRequests.ts
 var INVOICEABLE_STATUSES = /* @__PURE__ */ new Set([2, 7, 8, 9]);
 var DAY_MS = 24 * 60 * 60 * 1e3;
@@ -104161,7 +104664,7 @@ function registerInvoiceRequestRoutes(app, deps) {
 }
 
 // src/services/invoicesService.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 
 // ../../node_modules/fast-xml-parser/src/util.js
 var nameStartChar = ":A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD";
@@ -108457,7 +108960,7 @@ var INVOICE_ADMIN_REFUSALS = {
 function decode4(base643) {
   return base643.length % 4 === 0 && BASE64.test(base643) ? Buffer.from(base643, "base64") : null;
 }
-var sha256 = (bytes) => (0, import_node_crypto9.createHash)("sha256").update(bytes).digest("hex");
+var sha256 = (bytes) => (0, import_node_crypto11.createHash)("sha256").update(bytes).digest("hex");
 function readFiles(files) {
   const pdf = decode4(files.pdfBase64);
   if (pdf === null || pdf.length > MAX_PDF_BYTES || pdf.subarray(0, 5).toString("latin1") !== "%PDF-") {
@@ -108583,7 +109086,7 @@ async function readInvoiceFile(db, orderNumber, kind, ownerId) {
 // src/routes/adminInvoices.ts
 var UPLOAD_LIMIT = 4 * 1024 * 1024;
 var FILE_TYPES = { xml: "application/xml", pdf: "application/pdf" };
-var refusalOf2 = (code2) => {
+var refusalOf3 = (code2) => {
   const [status2, title] = INVOICE_ADMIN_REFUSALS[code2];
   return { status: status2, body: problem(status2, title, code2) };
 };
@@ -108620,7 +109123,7 @@ function close(deps, request2, reply, to) {
       now: deps.now(),
       actor: { userId, ip: request2.ip }
     });
-    return typeof outcome === "string" ? refusalOf2(outcome) : { status: 200, body: invoiceClosedSchema.parse(outcome) };
+    return typeof outcome === "string" ? refusalOf3(outcome) : { status: 200, body: invoiceClosedSchema.parse(outcome) };
   });
 }
 function registerAdminInvoiceRoutes(app, deps) {
@@ -108640,7 +109143,7 @@ function registerAdminInvoiceRoutes(app, deps) {
           storeRfc: deps.fiscalRfc,
           actor: { userId, ip: request2.ip }
         });
-        if (typeof outcome === "string") return refusalOf2(outcome);
+        if (typeof outcome === "string") return refusalOf3(outcome);
         request2.outboxQueued = true;
         return { status: 200, body: invoiceUploadedSchema.parse(outcome) };
       });
@@ -108811,7 +109314,7 @@ function registerAdminRoutes(app, deps) {
 }
 
 // src/services/paymentsModeSwitch.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 
 // src/services/paymentGates.ts
 function decideModeSwitch(inputs) {
@@ -108856,7 +109359,7 @@ async function prepareModeSwitch(tx, request2, actor, now) {
   if (request2.targetMode === request2.currentMode) {
     return "SWITCH_TARGET_UNCHANGED";
   }
-  const challengeId = (0, import_node_crypto10.randomBytes)(32).toString("hex");
+  const challengeId = (0, import_node_crypto12.randomBytes)(32).toString("hex");
   const expiresAt = new Date(now.getTime() + TICKET_MS);
   await tx.query(
     "INSERT INTO payments_mode_tickets (challenge_id, target_mode, requested_by, reason, expires_at) VALUES (?, ?, ?, ?, ?)",
@@ -108897,7 +109400,7 @@ async function openTicket(tx, challengeId, now) {
   );
   return null;
 }
-async function refused(tx, ticket, decision, actor) {
+async function refused2(tx, ticket, decision, actor) {
   if (decision !== "SWITCH_OWNER_REQUIRED") await failedAttempt(tx, ticket);
   await recordAudit(tx, {
     userId: actor.userId,
@@ -108927,7 +109430,7 @@ async function confirmModeSwitch(tx, input2, actor, now) {
     owner: input2.owner
   });
   if (decision !== "SWITCH_PERMITTED") {
-    return refused(tx, ticket, decision, actor);
+    return refused2(tx, ticket, decision, actor);
   }
   const approvalExpiresAt = new Date(now.getTime() + APPROVAL_MS);
   await tx.query(
@@ -108958,7 +109461,7 @@ var REFUSALS2 = {
   SWITCH_TOTP_FAILED: [403, "The second factor failed"],
   SWITCH_OWNER_REQUIRED: [403, "Only the owner confirms"]
 };
-function refusalOf3(code2) {
+function refusalOf4(code2) {
   const [status2, title] = REFUSALS2[code2];
   return { status: status2, body: problem(status2, title, code2) };
 }
@@ -109010,7 +109513,7 @@ function registerAdminPaymentRoutes(app, deps) {
         deps.now()
       );
       if (typeof outcome === "string") {
-        return refusalOf3(outcome);
+        return refusalOf4(outcome);
       }
       request2.outboxQueued = true;
       return { status: 200, body: outcome };
@@ -109019,7 +109522,7 @@ function registerAdminPaymentRoutes(app, deps) {
 }
 
 // src/services/posCheckout.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 
 // src/services/posGates.ts
 var SUPERVISOR_DIFF_CENTS = 1e4;
@@ -109149,7 +109652,7 @@ async function insertOrder(tx, input2) {
       seal("customer_phone", "0000000000"),
       seal("shipping_address", JSON.stringify({ counter: "Mostrador Yekora" })),
       emailHmac(secrets.emailPepper, email3),
-      tokenHash(secrets.tokenPepper, (0, import_node_crypto11.randomBytes)(32).toString("base64url")),
+      tokenHash(secrets.tokenPepper, (0, import_node_crypto13.randomBytes)(32).toString("base64url")),
       now,
       new Date(now.getTime() + HOLD_MS),
       now,
@@ -109457,7 +109960,7 @@ var REFUSALS3 = {
   TERMINAL_AMOUNT_MISMATCH_REJECT: [400, "The terminal charged another amount"],
   INVALID_VOUCHER_DATA_REJECT: [400, "The voucher data is incomplete"]
 };
-function refusalOf4(code2) {
+function refusalOf5(code2) {
   const [status2, title] = REFUSALS3[code2];
   return { status: status2, body: problem(status2, title, code2) };
 }
@@ -109493,7 +109996,7 @@ function registerPosRoutes(app, deps) {
       openShiftSchema.safeParse(request2.body).data,
       async (tx, body, actor) => {
         const outcome = await openShift(tx, body.openingCashMxnCents, actor);
-        return typeof outcome === "string" ? refusalOf4(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
       }
     )
   );
@@ -109506,7 +110009,7 @@ function registerPosRoutes(app, deps) {
       cashMovementSchema.safeParse(request2.body).data,
       async (tx, body, actor) => {
         const outcome = await moveCash(tx, body, actor);
-        return typeof outcome === "string" ? refusalOf4(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf5(outcome) : { status: 201, body: outcome };
       }
     )
   );
@@ -109526,7 +110029,7 @@ function registerPosRoutes(app, deps) {
           actor,
           deps.now()
         );
-        return typeof outcome === "string" ? refusalOf4(outcome) : { status: 200, body: outcome };
+        return typeof outcome === "string" ? refusalOf5(outcome) : { status: 200, body: outcome };
       }
     );
   });
@@ -109553,7 +110056,7 @@ function registerPosRoutes(app, deps) {
           secrets,
           now: deps.now()
         });
-        if (typeof outcome === "string") return refusalOf4(outcome);
+        if (typeof outcome === "string") return refusalOf5(outcome);
         if (body.customerEmail !== void 0) request2.outboxQueued = true;
         return { status: 201, body: outcome };
       }
@@ -109719,7 +110222,7 @@ function decideRoleMutation(inputs) {
 }
 
 // src/services/adminRoles.ts
-function refusalOf5(code2) {
+function refusalOf6(code2) {
   if (code2 === "OWNER_ONLY_FORBIDDEN_403") return "OWNER_ONLY_FORBIDDEN";
   return code2 === "SYSTEM_ROLE_PROTECTED_403" ? "SYSTEM_ROLE_PROTECTED" : "TWO_FACTOR_REQUIRED";
 }
@@ -109770,7 +110273,7 @@ async function setPermissions(tx, roleId2, permissions) {
 }
 async function createRole(tx, input2, actor) {
   const verdict = gate(actor, true);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf5(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf6(verdict);
   if (RESERVED_ROLE_IDS.has(input2.id)) return "ROLE_ID_RESERVED";
   if (breaksMatrix(input2.id, input2.permissions))
     return "MATRIX_INVARIANT_VIOLATED";
@@ -109806,14 +110309,14 @@ async function createRole(tx, input2, actor) {
 }
 async function patchRole(tx, id, input2, actor) {
   const closed = gate(actor, true);
-  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf5(closed);
+  if (closed === "OWNER_ONLY_FORBIDDEN_403") return refusalOf6(closed);
   const [target] = await tx.query(
     "SELECT is_system FROM roles WHERE id = ? FOR UPDATE",
     [id]
   );
   if (target === void 0) return "ROLE_NOT_FOUND";
   const verdict = gate(actor, Number(target.is_system) === 0);
-  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf5(verdict);
+  if (verdict !== "ROLE_MUTATION_PERMITTED_200") return refusalOf6(verdict);
   if (id === "admin" && (input2.assignableByAdmin === true || input2.isActive === false)) {
     return "ROLE_INVARIANT_VIOLATED";
   }
@@ -110240,8 +110743,8 @@ async function finishRefund(tx, intent, reference, confirmer, processorRefundedC
   if (row4.status !== "REFUNDING") return viewOf2(tx, intent.returnId);
   const counter = intent.processor === "LOCAL";
   if (counter && reference.refundMethod === "CASH") {
-    const refused2 = await payFromDrawer(tx, intent, confirmer.userId);
-    if (refused2 !== null) return refused2;
+    const refused3 = await payFromDrawer(tx, intent, confirmer.userId);
+    if (refused3 !== null) return refused3;
   }
   await tx.query(
     "UPDATE order_returns SET status = 'REFUNDED', processor_refund_id = ?, manual_reference = ?, refund_method = ? WHERE id = ?",
@@ -110374,7 +110877,7 @@ async function isReturnRefund(db, orderId, refundIds) {
 }
 
 // src/routes/returns.ts
-function refusalOf6(code2) {
+function refusalOf7(code2) {
   const [status2, title] = RETURN_REFUSALS[code2];
   return { status: status2, body: problem(status2, title, code2) };
 }
@@ -110397,7 +110900,7 @@ function registerReturnRoutes(app, deps) {
           { orderNumber, userId, request: body.data, now: deps.now() },
           { userId, ip: request2.ip }
         );
-        return typeof outcome === "string" ? refusalOf6(outcome) : { status: 201, body: outcome };
+        return typeof outcome === "string" ? refusalOf7(outcome) : { status: 201, body: outcome };
       });
     }
   );
@@ -110423,7 +110926,7 @@ function registerReturnRoutes(app, deps) {
         },
         { userId, ip: request2.ip }
       );
-      return typeof outcome === "string" ? refusalOf6(outcome) : { status: 201, body: outcome };
+      return typeof outcome === "string" ? refusalOf7(outcome) : { status: 201, body: outcome };
     });
   });
   app.get("/v1/admin/returns", async (request2, reply) => {
@@ -110459,7 +110962,7 @@ function registerReturnRoutes(app, deps) {
         { userId, ip: request2.ip },
         deps.now()
       );
-      return typeof outcome === "string" ? refusalOf6(outcome) : { status: 200, body: outcome };
+      return typeof outcome === "string" ? refusalOf7(outcome) : { status: 200, body: outcome };
     });
   });
   app.post("/v1/admin/returns/:id/confirm", async (request2, reply) => {
@@ -110486,13 +110989,13 @@ function registerReturnRoutes(app, deps) {
 }
 
 // src/services/staffUsers.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 
 // src/services/passwordResets.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var RESET_TTL_MS = 15 * 6e4;
 async function openReset(tx, userId, now) {
-  const token = (0, import_node_crypto12.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto14.randomBytes)(32).toString("hex");
   await tx.query(
     "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     [userId, tokenHash2(token), new Date(now.getTime() + RESET_TTL_MS)]
@@ -110508,7 +111011,7 @@ async function mailResetLink(tx, userId, totpKey, now) {
   });
 }
 function decoyReset(totpKey) {
-  const token = (0, import_node_crypto12.randomBytes)(32).toString("hex");
+  const token = (0, import_node_crypto14.randomBytes)(32).toString("hex");
   return encryptTotpSecret(
     totpKey,
     tokenHash2(token),
@@ -110562,39 +111065,6 @@ function completeReset(db, reset, passwordHash, now, ip) {
   });
 }
 
-// src/services/passwords.ts
-var import_node_crypto13 = require("node:crypto");
-var import_hash_wasm = __toESM(require_index_umd(), 1);
-var PARAMETERS = {
-  memorySize: 19456,
-  iterations: 2,
-  parallelism: 1,
-  hashLength: 32
-};
-function hashPassword(password) {
-  return (0, import_hash_wasm.argon2id)({
-    ...PARAMETERS,
-    password,
-    salt: (0, import_node_crypto13.randomBytes)(16),
-    outputType: "encoded"
-  });
-}
-async function verifyPassword(hash2, password) {
-  try {
-    return await (0, import_hash_wasm.argon2Verify)({ hash: hash2, password });
-  } catch {
-    return false;
-  }
-}
-function unmatchableHash() {
-  return hashPassword((0, import_node_crypto13.randomBytes)(64).toString("hex"));
-}
-var decoy;
-function decoyHash() {
-  decoy ??= hashPassword((0, import_node_crypto13.randomBytes)(32).toString("base64url"));
-  return decoy;
-}
-
 // src/services/staffUsers.ts
 var toStaffUser = (row4) => ({
   id: row4.id,
@@ -110639,7 +111109,7 @@ async function checkRoles(tx, requested, asOwner) {
     permitted: asOwner ? wanted.every((id) => !OUT_OF_BAND.has(id)) : active.every((row4) => Number(row4.assignable_by_admin) === 1)
   };
 }
-function refusalOf7(code2, asOwner) {
+function refusalOf8(code2, asOwner) {
   if (code2 === "ACTOR_UNAUTHORIZED_403") return "ACTOR_UNAUTHORIZED";
   if (code2 === "VALIDATION_OR_2FA_FAILED_400")
     return "VALIDATION_OR_2FA_FAILED";
@@ -110656,12 +111126,12 @@ async function createStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf7(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf8(verdict, asOwner);
   const [existing] = await tx.query(
     "SELECT id FROM users WHERE email = ? FOR UPDATE",
     [input2.email]
   );
-  const id = existing?.id ?? (0, import_node_crypto14.randomUUID)();
+  const id = existing?.id ?? (0, import_node_crypto15.randomUUID)();
   if (existing) {
     const held = await lockedRoles(tx, id);
     if (held.includes("owner")) return "OWNER_IMMUTABLE";
@@ -110701,7 +111171,7 @@ async function updateStaff(tx, input2, actor) {
     rolePermitted: check2.permitted,
     valid: actor.totpEnabled
   });
-  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf7(verdict, asOwner);
+  if (verdict !== "MUTATION_PERMITTED_200") return refusalOf8(verdict, asOwner);
   if (held.includes("owner")) return "OWNER_IMMUTABLE";
   if (!isStaff(held)) return "USER_NOT_FOUND";
   if (!asOwner) {
@@ -111036,116 +111506,8 @@ function registerAdminShippingRoutes(app, deps) {
 // src/routes/auth.ts
 var import_promises = require("node:timers/promises");
 
-// ../../lib/account/passwordPolicy.ts
-var PASSWORD_MIN = 12;
-var PASSWORD_MAX = 128;
-var PASSWORD_RULES = [
-  "length",
-  "uppercase",
-  "lowercase",
-  "digit",
-  "symbol",
-  "personal",
-  "common"
-];
-var COMMON_WORDS = [
-  "password",
-  "contrasena",
-  "clave",
-  "qwerty",
-  "qwertz",
-  "azerty",
-  "asdfgh",
-  "zxcvbn",
-  "abcdef",
-  "admin",
-  "administrador",
-  "welcome",
-  "bienvenido",
-  "letmein",
-  "iloveyou",
-  "teamo",
-  "monkey",
-  "dragon",
-  "football",
-  "futbol",
-  "baseball",
-  "master",
-  "sunshine",
-  "princess",
-  "shadow",
-  "superman",
-  "batman",
-  "trustno",
-  "secret",
-  "secreto",
-  "login",
-  "usuario",
-  "changeme",
-  "default",
-  "yekora",
-  "mexico"
-];
-var LEET = {
-  "0": "o",
-  "1": "i",
-  "3": "e",
-  "4": "a",
-  "5": "s",
-  "7": "t",
-  "@": "a",
-  $: "s"
-};
-var COMMON_SLACK = 3;
-var MIN_DISTINCT = 5;
-function fold(text3) {
-  return text3.normalize("NFD").replaceAll(new RegExp("\\p{M}", "gu"), "").toLowerCase();
-}
-function containsPersonal(password, context) {
-  const folded = fold(password);
-  const email3 = fold(context.email.trim());
-  const local = email3.split("@")[0];
-  const parts = [email3, local, ...fold(context.fullName).split(/\s+/)];
-  return parts.some((part) => part.length >= 3 && folded.includes(part));
-}
-function isCommon(password) {
-  const folded = fold(password);
-  if (new Set(folded).size < MIN_DISTINCT) return true;
-  const plain = [...folded].map((char) => LEET[char] ?? char).join("");
-  return COMMON_WORDS.some((word) => {
-    const at = plain.indexOf(word);
-    if (at === -1) return false;
-    const rest = folded.slice(0, at) + folded.slice(at + word.length);
-    return (rest.match(new RegExp("\\p{L}", "gu")) ?? []).length <= COMMON_SLACK;
-  });
-}
-function passwordChecks(password, context) {
-  return {
-    length: password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX,
-    uppercase: new RegExp("\\p{Lu}", "u").test(password),
-    lowercase: new RegExp("\\p{Ll}", "u").test(password),
-    digit: new RegExp("\\p{Nd}", "u").test(password),
-    symbol: /[^\p{L}\p{N}]/u.test(password),
-    personal: !containsPersonal(password, context),
-    common: !isCommon(password)
-  };
-}
-function passwordViolation(password, context) {
-  const checks = passwordChecks(password, context);
-  return PASSWORD_RULES.find((rule) => !checks[rule]) ?? null;
-}
-var PASSWORD_PROBLEMS = {
-  length: "PASSWORD_LENGTH",
-  uppercase: "PASSWORD_UPPERCASE",
-  lowercase: "PASSWORD_LOWERCASE",
-  digit: "PASSWORD_DIGIT",
-  symbol: "PASSWORD_SYMBOL",
-  personal: "PASSWORD_PERSONAL",
-  common: "PASSWORD_COMMON"
-};
-
 // src/services/botChallenge.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 var MAX_NUMBER = 2e4;
 var CHALLENGE_MS2 = 5 * 6e4;
 var HEX_64 = /^[0-9a-f]{64}$/;
@@ -111156,16 +111518,16 @@ var solutionSchema = external_exports.object({
   salt: external_exports.string().min(1).max(200),
   signature: external_exports.string().regex(HEX_64)
 });
-var sha2562 = (value) => (0, import_node_crypto15.createHash)("sha256").update(value).digest("hex");
+var sha2562 = (value) => (0, import_node_crypto16.createHash)("sha256").update(value).digest("hex");
 function signingKey(secret) {
-  return (0, import_node_crypto15.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
+  return (0, import_node_crypto16.createHmac)("sha256", secret).update("yekora-bot-challenge-v1").digest();
 }
-var sign = (secret, challenge) => (0, import_node_crypto15.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
-var sameHex = (a, b) => (0, import_node_crypto15.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var sign = (secret, challenge) => (0, import_node_crypto16.createHmac)("sha256", signingKey(secret)).update(challenge).digest("hex");
+var sameHex = (a, b) => (0, import_node_crypto16.timingSafeEqual)(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 function issueChallenge(secret, now) {
   const expires = Math.floor((now.getTime() + CHALLENGE_MS2) / 1e3);
-  const salt = `${(0, import_node_crypto15.randomBytes)(12).toString("hex")}?expires=${expires}`;
-  const challenge = sha2562(`${salt}${(0, import_node_crypto15.randomInt)(0, MAX_NUMBER + 1)}`);
+  const salt = `${(0, import_node_crypto16.randomBytes)(12).toString("hex")}?expires=${expires}`;
+  const challenge = sha2562(`${salt}${(0, import_node_crypto16.randomInt)(0, MAX_NUMBER + 1)}`);
   return {
     algorithm: "SHA-256",
     challenge,
@@ -111237,17 +111599,17 @@ var TITLES2 = {
 function refuse3(reply, status2, code2) {
   return reply.code(status2).type(PROBLEM_TYPE).send(problem(status2, TITLES2[code2], code2));
 }
-async function strongEnough(password, context, reply, breach) {
-  const broken = passwordViolation(password, context);
+async function strongEnough(password2, context, reply, breach) {
+  const broken = passwordViolation(password2, context);
   if (broken !== null) {
     void refuse3(reply, 400, PASSWORD_PROBLEMS[broken]);
     return false;
   }
-  if (await breach(password) !== "breached") return true;
+  if (await breach(password2) !== "breached") return true;
   void refuse3(reply, 400, "PASSWORD_BREACHED");
   return false;
 }
-var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+var LIMITED2 = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
 var CHALLENGE_LIMIT = {
   config: { rateLimit: { max: 30, timeWindow: "1 minute" } }
 };
@@ -111342,7 +111704,7 @@ function registerAuthRoutes(app, deps) {
       return issueChallenge(deps.auth.secret, deps.now());
     }
   );
-  app.post("/v1/auth/register", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/register", LIMITED2, async (request2, reply) => {
     if (unsupportedLocale(request2.body, "preferredLocale")) {
       return refuse3(reply, 400, "LOCALE_INPUT_UNSUPPORTED");
     }
@@ -111361,7 +111723,7 @@ function registerAuthRoutes(app, deps) {
     });
     return reply.code(202).send(registeredSchema.parse({ status: "accepted" }));
   });
-  app.post("/v1/auth/forgot-password", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/forgot-password", LIMITED2, async (request2, reply) => {
     const started = deps.now().getTime();
     const parsed = parse4(forgotPasswordRequestSchema, request2, reply);
     if (parsed === null) return reply;
@@ -111385,7 +111747,7 @@ function registerAuthRoutes(app, deps) {
     await wait(Math.max(0, RESET_REQUEST_FLOOR_MS - elapsed));
     return forgotPasswordResponseSchema.parse(RESET_REQUEST_ANSWER);
   });
-  app.post("/v1/auth/reset-password/check", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/reset-password/check", LIMITED2, async (request2, reply) => {
     reply.header("Cache-Control", "no-store");
     const parsed = parse4(resetCheckRequestSchema, request2, reply);
     if (parsed === null) return reply;
@@ -111396,7 +111758,7 @@ function registerAuthRoutes(app, deps) {
       fullName: reset.fullName
     });
   });
-  app.post("/v1/auth/reset-password", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/reset-password", LIMITED2, async (request2, reply) => {
     const parsed = parse4(resetPasswordRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { body } = parsed;
@@ -111416,7 +111778,7 @@ function registerAuthRoutes(app, deps) {
     request2.outboxQueued = true;
     return reply.header("Set-Cookie", clearedSessionCookie()).send(resetPasswordResponseSchema.parse({ ok: true }));
   });
-  app.post("/v1/auth/login", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/login", LIMITED2, async (request2, reply) => {
     const parsed = parse4(loginRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
@@ -111476,7 +111838,7 @@ function registerAuthRoutes(app, deps) {
       channel: "email"
     });
   });
-  app.post("/v1/auth/totp/enroll", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/totp/enroll", LIMITED2, async (request2, reply) => {
     const parsed = parse4(challengeRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
@@ -111497,7 +111859,7 @@ function registerAuthRoutes(app, deps) {
       otpauthUri: otpauthUri(email3, secret)
     });
   });
-  app.post("/v1/auth/totp/confirm", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/totp/confirm", LIMITED2, async (request2, reply) => {
     const parsed = parse4(codeRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
@@ -111529,7 +111891,7 @@ function registerAuthRoutes(app, deps) {
     await signIn(request2, reply, challenge, roles);
     return confirmResponseSchema.parse({ backupCodes });
   });
-  app.post("/v1/auth/verify", LIMITED, async (request2, reply) => {
+  app.post("/v1/auth/verify", LIMITED2, async (request2, reply) => {
     const parsed = parse4(verifyRequestSchema, request2, reply);
     if (parsed === null) return reply;
     const { auth: auth2, body } = parsed;
@@ -112594,7 +112956,7 @@ async function registerWebhookRoutes(app, deps) {
 }
 
 // src/services/mercadoPagoAdapter.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto17 = require("node:crypto");
 
 // src/services/webhookSecrets.ts
 function webhookSecretsOf(value) {
@@ -112734,8 +113096,8 @@ function createMercadoPagoAdapter(secrets, fetchImpl = fetch) {
       if (ts === "" || requestId === "" || dataId === "") return null;
       const received = Buffer.from(given, "hex");
       const signed = signedByAny(secrets.webhookSecret, (secret) => {
-        const expected = (0, import_node_crypto16.createHmac)("sha256", secret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
-        return received.length === expected.length && (0, import_node_crypto16.timingSafeEqual)(received, expected);
+        const expected = (0, import_node_crypto17.createHmac)("sha256", secret).update(`id:${dataId};request-id:${requestId};ts:${ts};`).digest();
+        return received.length === expected.length && (0, import_node_crypto17.timingSafeEqual)(received, expected);
       });
       if (!signed) return null;
       let event;
@@ -113078,11 +113440,11 @@ var parse3 = (input2, parseQueryString) => {
   const search = u.search || null;
   let auth2 = null;
   let username = null;
-  let password = null;
+  let password2 = null;
   if (u.username || u.password) {
     username = safeDecode3(u.username);
-    password = u.password ? safeDecode3(u.password) : null;
-    auth2 = username + (password !== null ? ":" + password : "");
+    password2 = u.password ? safeDecode3(u.password) : null;
+    auth2 = username + (password2 !== null ? ":" + password2 : "");
   }
   let query;
   if (parseQueryString) {
@@ -113114,7 +113476,7 @@ var parse3 = (input2, parseQueryString) => {
     href: u.href,
     auth: auth2,
     username,
-    password,
+    password: password2,
     query
   };
 };
@@ -116406,7 +116768,7 @@ function detectExtension(mimeType) {
 }
 
 // ../../node_modules/nodemailer/dist/esm/mime-node/index.js
-var import_node_crypto17 = __toESM(require("node:crypto"), 1);
+var import_node_crypto18 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_stream8 = require("node:stream");
 
@@ -118259,7 +118621,7 @@ var MimeNode = class _MimeNode {
   constructor(contentType, options) {
     this.nodeCounter = 0;
     options = options || {};
-    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto17.default.randomBytes(8).toString("hex"));
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || import_node_crypto18.default.randomBytes(8).toString("hex"));
     this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
     this.disableFileAccess = !!options.disableFileAccess;
     this.disableUrlAccess = !!options.disableUrlAccess;
@@ -119436,8 +119798,8 @@ var MimeNode = class _MimeNode {
   _generateMessageId() {
     return "<" + [2, 2, 2, 6].reduce(
       // crux to generate UUID-like random strings
-      (prev, len) => prev + "-" + import_node_crypto17.default.randomBytes(len).toString("hex"),
-      import_node_crypto17.default.randomBytes(4).toString("hex")
+      (prev, len) => prev + "-" + import_node_crypto18.default.randomBytes(len).toString("hex"),
+      import_node_crypto18.default.randomBytes(4).toString("hex")
     ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
     (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
@@ -119963,10 +120325,10 @@ function formatOtpToken(otp) {
   }
   return quoteString(otp.code) + "; origin=" + quoteString(getOtpOrigin(otp.origin));
 }
-function getOtpOrigin(origin) {
+function getOtpOrigin(origin2) {
   let url2;
   try {
-    url2 = new URL(String(origin));
+    url2 = new URL(String(origin2));
   } catch {
   }
   if (!url2 || url2.username || url2.password || !/^([a-z0-9_-]+\.)*[a-z0-9_-]+$|^\[[0-9a-f:.]+\]$/.test(url2.hostname)) {
@@ -120125,7 +120487,7 @@ var message_parser_default = MessageParser;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
 var import_node_stream10 = require("node:stream");
-var import_node_crypto18 = __toESM(require("node:crypto"), 1);
+var import_node_crypto19 = __toESM(require("node:crypto"), 1);
 var CHAR_CR = 13;
 var CHAR_LF = 10;
 var CHAR_SPACE = 32;
@@ -120136,7 +120498,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
   constructor(options) {
     super();
     options = options || {};
-    this.bodyHash = import_node_crypto18.default.createHash(options.hashAlgo || "sha256");
+    this.bodyHash = import_node_crypto19.default.createHash(options.hashAlgo || "sha256");
     this.byteLength = 0;
     this.debug = options.debug;
     this._debugBody = options.debug ? [] : false;
@@ -120246,7 +120608,7 @@ var RelaxedBody = class extends import_node_stream10.Transform {
 var relaxed_body_default = RelaxedBody;
 
 // ../../node_modules/nodemailer/dist/esm/dkim/sign.js
-var import_node_crypto19 = __toESM(require("node:crypto"), 1);
+var import_node_crypto20 = __toESM(require("node:crypto"), 1);
 function unsupportedHashAlgoError(hashAlgo) {
   const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
   err.code = ECONFIG;
@@ -120261,7 +120623,7 @@ function sign2(headers, hashAlgo, bodyHash, options) {
   canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
   let signer;
   try {
-    signer = import_node_crypto19.default.createSign(("rsa-" + hashAlgo).toUpperCase());
+    signer = import_node_crypto20.default.createSign(("rsa-" + hashAlgo).toUpperCase());
   } catch (_E2) {
     throw unsupportedHashAlgoError(hashAlgo);
   }
@@ -120328,7 +120690,7 @@ function relaxedHeaderLine(line) {
 var import_node_stream11 = require("node:stream");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
-var import_node_crypto20 = __toESM(require("node:crypto"), 1);
+var import_node_crypto21 = __toESM(require("node:crypto"), 1);
 var DKIM_ALGO = "sha256";
 var MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 var DKIMSigner = class {
@@ -120341,7 +120703,7 @@ var DKIMSigner = class {
     this.chunks = [];
     this.chunklen = 0;
     this.readPos = 0;
-    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto20.default.randomBytes(14).toString("hex")) : false;
+    this.cachePath = this.cacheDir ? import_node_path2.default.join(this.cacheDir, "message." + Date.now() + "-" + import_node_crypto21.default.randomBytes(14).toString("hex")) : false;
     this.cache = false;
     this.headers = false;
     this.bodyHash = false;
@@ -120951,7 +121313,7 @@ var MailMessage = class {
 // ../../node_modules/nodemailer/dist/esm/mailer/index.js
 var import_node_net6 = __toESM(require("node:net"), 1);
 var import_node_dns2 = __toESM(require("node:dns"), 1);
-var import_node_crypto21 = __toESM(require("node:crypto"), 1);
+var import_node_crypto22 = __toESM(require("node:crypto"), 1);
 var DEFAULT_MAX_RECIPIENTS = 1e5;
 function isAbortSignal(value) {
   return typeof value === "object" && value !== null && "aborted" in value && typeof value.addEventListener === "function" && typeof value.removeEventListener === "function";
@@ -121262,16 +121624,16 @@ var Mail = class extends import_node_events.EventEmitter {
             }
             if (proxy.username || proxy.password) {
               const username = proxy.username || "";
-              const password = proxy.password || "";
+              const password2 = proxy.password || "";
               if (proxyV2) {
                 connectionOpts.proxy.userId = username;
-                connectionOpts.proxy.password = password;
+                connectionOpts.proxy.password = password2;
               } else if (proxyType === 4) {
                 connectionOpts.userid = username;
               } else {
                 connectionOpts.authentication = {
                   username,
-                  password
+                  password: password2
                 };
               }
             }
@@ -121311,7 +121673,7 @@ var Mail = class extends import_node_events.EventEmitter {
       }
       let cidCounter = 0;
       html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-        const cid = import_node_crypto21.default.randomBytes(10).toString("hex") + "@localhost";
+        const cid = import_node_crypto22.default.randomBytes(10).toString("hex") + "@localhost";
         if (!mail.data.attachments) {
           mail.data.attachments = [];
         }
@@ -121346,7 +121708,7 @@ var import_node_events2 = require("node:events");
 var import_node_net7 = __toESM(require("node:net"), 1);
 var import_node_tls2 = __toESM(require("node:tls"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto22 = __toESM(require("node:crypto"), 1);
+var import_node_crypto23 = __toESM(require("node:crypto"), 1);
 
 // ../../node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
 var import_node_stream12 = require("node:stream");
@@ -121511,7 +121873,7 @@ function maskAuthCommand(cmd) {
 var SMTPConnection = class extends import_node_events2.EventEmitter {
   constructor(options) {
     super(options);
-    this.id = import_node_crypto22.default.randomBytes(8).toString("base64").replace(/\W/g, "");
+    this.id = import_node_crypto23.default.randomBytes(8).toString("base64").replace(/\W/g, "");
     this.stage = "init";
     this.options = options || {};
     if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
@@ -122867,7 +123229,7 @@ var SMTPConnection = class extends import_node_events2.EventEmitter {
       return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
     }
     const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-    const hmacMD5 = import_node_crypto22.default.createHmac("md5", this._auth.credentials.pass);
+    const hmacMD5 = import_node_crypto23.default.createHmac("md5", this._auth.credentials.pass);
     hmacMD5.update(base64decoded);
     const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
     this._responseActions.push((str2) => {
@@ -123201,7 +123563,7 @@ var smtp_connection_default = SMTPConnection;
 
 // ../../node_modules/nodemailer/dist/esm/xoauth2/index.js
 var import_node_stream14 = require("node:stream");
-var import_node_crypto23 = __toESM(require("node:crypto"), 1);
+var import_node_crypto24 = __toESM(require("node:crypto"), 1);
 var XOAuth2 = class extends import_node_stream14.Stream {
   constructor(options, logger) {
     super();
@@ -123524,7 +123886,7 @@ var XOAuth2 = class extends import_node_stream14.Stream {
    */
   jwtSignRS256(payload) {
     const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-    const signature = import_node_crypto23.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+    const signature = import_node_crypto24.default.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
     return signedPayload + "." + this.toBase64URL(signature);
   }
 };
@@ -126950,8 +127312,8 @@ function rangeLines(body) {
   if (lines.length === 0) return null;
   return lines.every((line) => RANGE_LINE.test(line)) ? lines : null;
 }
-async function breachVerdict(password, fetchImpl = fetch, timeoutMs = PWNED_TIMEOUT_MS) {
-  const digest = (await (0, import_hash_wasm2.sha1)(password)).toUpperCase();
+async function breachVerdict(password2, fetchImpl = fetch, timeoutMs = PWNED_TIMEOUT_MS) {
+  const digest = (await (0, import_hash_wasm2.sha1)(password2)).toUpperCase();
   const suffix = digest.slice(5);
   try {
     const answer = await fetchImpl(`${RANGE_URL}${digest.slice(0, 5)}`, {
@@ -127118,7 +127480,7 @@ function createTableRateProvider(db) {
 }
 
 // src/services/stripeAdapter.ts
-var import_node_crypto24 = require("node:crypto");
+var import_node_crypto25 = require("node:crypto");
 var STRIPE_API = "https://api.stripe.com/v1";
 var STRIPE_VERSION = "2026-03-25.dahlia";
 var TIMEOUT_MS3 = 1e4;
@@ -127187,7 +127549,7 @@ function header2(headers, name2) {
 function sameHex2(expected, given) {
   const a = Buffer.from(expected, "hex");
   const b = Buffer.from(given, "hex");
-  return a.length === b.length && a.length > 0 && (0, import_node_crypto24.timingSafeEqual)(a, b);
+  return a.length === b.length && a.length > 0 && (0, import_node_crypto25.timingSafeEqual)(a, b);
 }
 async function refusalReason(answer) {
   const body = await answer.json().catch(() => null);
@@ -127251,7 +127613,7 @@ function createStripeAdapter(secrets, fetchImpl = fetch) {
         return null;
       }
       const signed = signedByAny(secrets.webhookSecret, (secret) => {
-        const expected = (0, import_node_crypto24.createHmac)("sha256", secret).update(`${timestamp}.`).update(rawBody).digest("hex");
+        const expected = (0, import_node_crypto25.createHmac)("sha256", secret).update(`${timestamp}.`).update(rawBody).digest("hex");
         return candidates.some((candidate) => sameHex2(expected, candidate));
       });
       if (!signed) return null;
@@ -127565,7 +127927,7 @@ async function buildApp(deps) {
     mailReady: dispatcher !== null,
     now,
     wait: deps.wait,
-    breach: (password) => breachVerdict(password, deps.pwnedFetch)
+    breach: (password2) => breachVerdict(password2, deps.pwnedFetch)
   });
   registerAccountRoutes(app, {
     db: deps.db,
@@ -127573,6 +127935,12 @@ async function buildApp(deps) {
     piiKey: deps.config.payments.checkout?.piiKey ?? null,
     cards,
     siteUrl: deps.config.payments.siteUrl
+  });
+  registerAccountSecurityRoutes(app, {
+    db: deps.db,
+    now,
+    auth: deps.config.auth,
+    breach: (password2) => breachVerdict(password2, deps.pwnedFetch)
   });
   registerAccountFiscalRoutes(app, {
     db: deps.db,
@@ -127972,7 +128340,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "e2baed57ef2a194f9670b52635dddea2ae8c8c68" : void 0;
+var sha = true ? "252ee84ff444bd67b5cd8d4b73040c68af8a14a6" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
