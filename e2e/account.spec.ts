@@ -103,14 +103,11 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await mockAccountApi(page, { signedIn: 'buyer' });
   await page.goto('/cuenta/');
   await expect(page.getByText('Hola, Ana E2E')).toBeVisible();
-  // FC 055 T2.4: an account without an address is never invited, or asked, to add one in the
-  // header: with no location allowed the place of the code stays empty.
-  await expect(
-    page.getByRole('banner').getByText(/Agregar CP|Tu CP|código postal/)
-  ).toHaveCount(0);
-  const delivery = page.getByRole('banner').getByRole('link', {
-    name: /Enviar al código postal/,
-  });
+  // FC 078: with no address and no location the header invites to enter a postal code.
+  const delivery = page
+    .getByRole('banner')
+    .getByRole('button', { name: /Enviar a/ });
+  await expect(delivery).toContainText('Ingresa tu C.P.');
   await openAccountMenu(page);
   await page.getByRole('link', { name: 'Mi información' }).click();
   await expect(page).toHaveURL(/\/cuenta\/datos\/$/);
@@ -136,7 +133,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
     await expect(page.getByText('Domicilio guardado.')).toBeVisible();
   };
   await addAddress('Casa', 'Av. Barones', '98612');
-  await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
+  await expect(delivery).toContainText('Zac. 98612');
   await expect(page.getByText('Predeterminado', { exact: true })).toHaveCount(
     1
   );
@@ -149,7 +146,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await expect(
     page.getByText('Ahora es tu domicilio predeterminado.')
   ).toBeVisible();
-  await expect(delivery).toHaveAccessibleName('Enviar al código postal 06600');
+  await expect(delivery).toContainText('CDMX 06600');
   // The browser keeps the state of the default address and nothing else of it.
   const stored = await page.evaluate(() => ({
     state: localStorage.getItem('yekora_shipping_state_v1'),
@@ -166,7 +163,7 @@ test('a buyer keeps their data and up to five addresses, and the header follows 
   await page.getByRole('button', { name: 'Sí, eliminar' }).click();
   await expect(page.getByText('Domicilio eliminado.')).toBeVisible();
   await expect(page.getByText('1 de 5 domicilios')).toBeVisible();
-  await expect(delivery).toHaveAccessibleName('Enviar al código postal 98612');
+  await expect(delivery).toContainText('Zac. 98612');
 });
 
 /**
@@ -504,7 +501,7 @@ test('the language switch is only in the account menu, and each code is a target
   await expect(page).toHaveURL(/\/en\/about\/$/);
 });
 
-test('the search box takes 90 % of its cell on a desktop bar and the whole row on a phone (FC 052 T2.5)', async ({
+test('the search box takes 85 % of its cell on a desktop bar and the whole row on a phone (FC 052 T2.5)', async ({
   page,
 }) => {
   const share = async () =>
@@ -516,8 +513,8 @@ test('the search box takes 90 % of its cell on a desktop bar and the whole row o
     });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  expect(await share()).toBeGreaterThan(0.88);
-  expect(await share()).toBeLessThan(0.92);
+  expect(await share()).toBeGreaterThan(0.83);
+  expect(await share()).toBeLessThan(0.87);
   await page.setViewportSize({ width: 390, height: 800 });
   expect(await share()).toBeGreaterThan(0.98);
 });

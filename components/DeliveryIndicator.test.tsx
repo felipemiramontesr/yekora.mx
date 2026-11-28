@@ -1,163 +1,134 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+/**
+ * FC 078 F1 evidence of the header indicator (T1.1, T2.3, T2.6): always a button with two lines,
+ * what it shows for an account, a visitor and nobody, and that its dialog only opens when asked.
+ */
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMessages } from '@/app/i18n';
+import { getMessages, type Locale } from '@/app/i18n';
 import { DeliveryIndicator } from './DeliveryIndicator';
 import { useDeliveryLocation } from './useDeliveryLocation';
 import { useHeaderAccount } from './useHeaderAccount';
 
 vi.mock('./useHeaderAccount', () => ({ useHeaderAccount: vi.fn() }));
 vi.mock('./useDeliveryLocation', () => ({ useDeliveryLocation: vi.fn() }));
+vi.mock('./DeliveryLocationModal', () => ({
+  DeliveryLocationModal: ({
+    signedIn,
+    onClose,
+  }: {
+    signedIn: boolean;
+    onClose: () => void;
+  }) => (
+    <button type="button" onClick={onClose}>
+      {signedIn ? 'dialog of an account' : 'dialog of a visitor'}
+    </button>
+  ),
+}));
 const account = vi.mocked(useHeaderAccount);
 const location = vi.mocked(useDeliveryLocation);
 const USER = {
   id: 'b0000000-0000-4000-8000-000000000001',
   email: 'ana@example.test',
-  fullName: 'Ana',
+  fullName: 'Ana Karen Flores',
   roles: ['customer'],
   permissions: ['account:self'],
 };
 
-const renderIndicator = (locale: 'es-MX' | 'en' = 'es-MX') =>
-  render(
-    <DeliveryIndicator
-      accountHref="/cuenta/"
-      locale={locale}
-      messages={getMessages(locale).header.delivery}
-    />
-  );
+const indicator = (locale: Locale = 'es-MX') => (
+  <DeliveryIndicator
+    accountHref="/cuenta/"
+    locale={locale}
+    messages={getMessages(locale).header.delivery}
+    exampleLabel="Ejemplo"
+  />
+);
+const show = (locale: Locale = 'es-MX') => render(indicator(locale));
+const trigger = () => screen.getAllByRole('button')[0];
 
-beforeEach(() => location.mockReturnValue({ place: null, resolving: false }));
+beforeEach(() => {
+  account.mockReturnValue({ firstName: null, user: null });
+  location.mockReturnValue({ place: null, resolving: false });
+});
 afterEach(cleanup);
 
-describe('delivery indicator of the header (FC 047 T1.1, T2.1; FC 055 T1.2, T2.4, T2.7)', () => {
-  it('shows a pin and only the postal code of the account, named for assistive technology', () => {
+describe('delivery indicator of the header (FC 078 F1)', () => {
+  it('invites to enter a postal code when there is nothing, and opens nothing by itself', () => {
+    show();
+    expect(trigger().textContent).toContain('Enviar a');
+    expect(trigger().textContent).toContain('Ingresa tu C.P.');
+    expect(trigger().getAttribute('aria-haspopup')).toBe('dialog');
+    expect(screen.queryByText(/dialog of/)).toBeNull();
+    expect(location).toHaveBeenLastCalledWith(true);
+  });
+
+  it('opens the dialog when asked and gives the focus back when it closes', () => {
+    show();
+    fireEvent.click(trigger());
+    fireEvent.click(screen.getByText('dialog of a visitor'));
+    expect(screen.queryByText(/dialog of/)).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('shows the first name, the state and the postal code of the account, and never asks the browser', () => {
     account.mockReturnValue({
       firstName: 'Ana',
       user: { ...USER, postalCode: '98000' },
-    });
-    renderIndicator();
-    const link = screen.getByRole('link', {
-      name: 'Enviar al código postal 98000',
-    });
-    expect(link.getAttribute('href')).toBe('/cuenta/');
-    expect(link.textContent).toBe('98000');
-    // An account with an address of its own never asks the browser where it is.
-    expect(location).toHaveBeenLastCalledWith(false);
-  });
-
-  it('shows the code of the browser, as a link to the data of the account, when the account has no address', () => {
-    account.mockReturnValue({
-      firstName: 'Ana',
-      user: { ...USER, postalCode: null },
     });
     location.mockReturnValue({ place: '06600', resolving: false });
-    renderIndicator();
-    const link = screen.getByRole('link', {
-      name: 'Enviar al código postal 06600',
-    });
-    expect(link.getAttribute('href')).toBe('/cuenta/');
-    expect(link.textContent).toBe('06600');
-    expect(location).toHaveBeenLastCalledWith(true);
-  });
-
-  it('stays silent for an account without an address when the browser gives no code', () => {
-    account.mockReturnValue({
-      firstName: 'Ana',
-      user: { ...USER, postalCode: null },
-    });
-    const { container } = renderIndicator();
-    expect(container.innerHTML).toBe('');
-    expect(screen.queryByRole('link')).toBeNull();
-  });
-
-  it('holds the place of the code, silently, while the session is being confirmed', () => {
-    account.mockReturnValue({ firstName: 'Ana', user: null });
-    const { container } = renderIndicator();
-    expect(screen.queryByRole('link')).toBeNull();
-    expect(container.firstElementChild?.getAttribute('aria-hidden')).toBe(
+    show();
+    expect(trigger().textContent).toContain('Enviar a Ana');
+    expect(screen.getByText('Zac. 98000').getAttribute('aria-hidden')).toBe(
       'true'
     );
-    // Until the account answers there is nothing to compare: the location is not asked yet.
+    expect(screen.getByText('Zacatecas 98000')).toBeTruthy();
     expect(location).toHaveBeenLastCalledWith(false);
+    fireEvent.click(trigger());
+    expect(screen.getByText('dialog of an account')).toBeTruthy();
   });
 
-  it('shows a visitor the code of the browser as plain text, named for assistive technology', () => {
-    account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue({ place: '98000', resolving: false });
-    const { container } = renderIndicator();
-    expect(screen.queryByRole('link')).toBeNull();
-    expect(container.textContent).toContain('Enviar al código postal 98000');
-    expect(container.querySelector('[aria-hidden="true"]')?.tagName).toBe(
-      'svg'
-    );
-    expect(location).toHaveBeenLastCalledWith(true);
-  });
+  it.each([
+    ['es-MX', '06600', 'Enviar a', 'CDMX 06600', 'Ciudad de México 06600'],
+    ['es-MX', 'ZAC', 'Enviar a', 'Zac.', 'Zacatecas'],
+    ['en', 'MEX', 'Deliver to', 'Edomex', 'State of Mexico'],
+  ])(
+    'shows a visitor what the tab holds (%s %s)',
+    (locale, place, label, shown, spoken) => {
+      location.mockReturnValue({ place, resolving: false });
+      show(locale as Locale);
+      expect(trigger().textContent).toContain(label);
+      expect(
+        screen.getByText(shown, { selector: '[aria-hidden]' })
+      ).toBeTruthy();
+      expect(screen.getByText(spoken, { selector: '.sr-only' })).toBeTruthy();
+    }
+  );
 
-  it('holds the place with a placeholder while the location is being resolved, then shows nothing if it ends with none (no freeze, no question)', () => {
-    account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue({ place: null, resolving: true });
-    const { container, rerender } = renderIndicator();
-    expect(container.firstElementChild?.getAttribute('aria-hidden')).toBe(
-      'true'
-    );
-    expect(screen.queryByRole('link')).toBeNull();
-    location.mockReturnValue({ place: null, resolving: false });
-    rerender(
-      <DeliveryIndicator
-        accountHref="/cuenta/"
-        locale="es-MX"
-        messages={getMessages('es-MX').header.delivery}
-      />
-    );
-    expect(container.innerHTML).toBe('');
-  });
-
-  it('shows a visitor nothing, with no link and no question, when there is no code', () => {
-    account.mockReturnValue({ firstName: null, user: null });
-    const { container } = renderIndicator();
-    expect(container.innerHTML).toBe('');
-    expect(screen.queryByRole('link')).toBeNull();
-  });
-
-  it('shows a visitor the state by its abbreviation, with its full name for assistive technology, when there is no postal code (FC 055 T2.9)', () => {
-    account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue({ place: 'ZAC', resolving: false });
-    const { container } = renderIndicator();
-    expect(screen.queryByRole('link')).toBeNull();
-    expect(container.textContent).toContain('Enviar a Zacatecas');
-    expect(screen.getByText('Zac.').getAttribute('aria-hidden')).toBe('true');
-  });
-
-  it('says it in English too, and names the state in English', () => {
-    account.mockReturnValue({ firstName: null, user: null });
-    location.mockReturnValue({ place: 'MEX', resolving: false });
-    const { container } = renderIndicator('en');
-    expect(container.textContent).toContain('Deliver to State of Mexico');
-    expect(screen.getByText('Edomex')).toBeTruthy();
-  });
-
-  it('links the state of an account without an address to its data, like the postal code', () => {
+  it('shows a code of no known state as it is', () => {
     account.mockReturnValue({
       firstName: 'Ana',
-      user: { ...USER, postalCode: null },
+      user: { ...USER, postalCode: '00000' },
     });
-    location.mockReturnValue({ place: 'CMX', resolving: false });
-    renderIndicator();
-    const link = screen.getByRole('link', {
-      name: 'Enviar a Ciudad de México',
-    });
-    expect(link.getAttribute('href')).toBe('/cuenta/');
-    expect(link.textContent).toBe('CDMX');
+    show();
+    expect(screen.getByText('00000', { selector: '.sr-only' })).toBeTruthy();
   });
 
-  it('shows the postal code of the account, never a state, when it has one', () => {
-    account.mockReturnValue({
-      firstName: 'Ana',
-      user: { ...USER, postalCode: '98000' },
-    });
-    location.mockReturnValue({ place: 'ZAC', resolving: false });
-    renderIndicator();
-    expect(screen.getByRole('link').textContent).toBe('98000');
+  it.each([
+    ['the session is being confirmed', { firstName: 'Ana', user: null }, false],
+    ['the location is being resolved', { firstName: null, user: null }, true],
+  ])('holds its box while %s', (_case, who, resolving) => {
+    account.mockReturnValue(who);
+    location.mockReturnValue({ place: null, resolving });
+    show();
+    expect(trigger().textContent).not.toContain('Ingresa tu C.P.');
+    expect(trigger().querySelector('span.h-4')).toBeTruthy();
+  });
+
+  it('is prerendered as a held box that cannot be pressed yet', () => {
+    const html = renderToStaticMarkup(indicator());
+    expect(html).toContain('disabled=""');
+    expect(html).toContain('h-4 w-16');
+    expect(html).not.toContain('Ingresa tu C.P.');
   });
 });

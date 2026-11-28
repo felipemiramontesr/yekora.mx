@@ -92,7 +92,7 @@
   },
   "legal": {
     "updatedLabel": "Última actualización",
-    "updated": "17 de noviembre de 2026",
+    "updated": "27 de noviembre de 2026",
     "privacy": {
       "metaTitle": "Aviso de privacidad | YĒKORA",
       "title": "Aviso de privacidad y manejo de datos personales",
@@ -155,7 +155,8 @@
           "paragraphs": [
             "Con tu consentimiento, que das en el aviso de cookies al elegir «Acepto», y con el permiso que tu navegador te pide, usamos tu ubicación aproximada solo para mostrar en el encabezado el código postal de entrega o, si no hay, tu estado. No es necesaria para comprar y el sitio funciona igual sin ella.",
             "Para convertir tus coordenadas en un código postal o un estado, tu navegador las envía directamente a BigDataCloud (api-bdc.io) y, como respaldo, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), proveedores de geocodificación inversa que reciben esas coordenadas y tu dirección IP. Las coordenadas no pasan por los servidores de YĒKORA ni se guardan en nuestra base de datos ni en nuestros registros.",
-            "Conservamos el código postal o el estado resultante solo en el almacenamiento de sesión de tu pestaña, hasta que la cierres. Puedes retirar tu consentimiento en cualquier momento borrando las cookies y los datos del sitio, o negando el permiso en tu navegador. Si ya tienes un domicilio de entrega en tu cuenta, mostramos el suyo y no usamos tu ubicación."
+            "Conservamos el código postal o el estado resultante solo en el almacenamiento de sesión de tu pestaña, hasta que la cierres. Puedes retirar tu consentimiento en cualquier momento borrando las cookies y los datos del sitio, o negando el permiso en tu navegador. Si ya tienes un domicilio de entrega en tu cuenta, mostramos el suyo y no usamos tu ubicación.",
+            "También puedes escribir tú un código postal en el encabezado, aceptes o no el uso de tu ubicación. Lo conservamos solo en el almacenamiento de sesión de esa pestaña, hasta que la cierres; no se envía a los servicios de ubicación ni se guarda en nuestra base de datos. Para calcular el envío en tu mochila recordamos únicamente la clave del estado."
           ]
         },
         {
@@ -209,7 +210,7 @@
           "paragraphs": [
             "Si eliges «Acepto» en el aviso de cookies, el sitio le pide a tu navegador tu ubicación aproximada para mostrar, en el encabezado, el código postal de entrega o, si en tu zona ningún servicio lo conoce, tu estado abreviado (por ejemplo, «Zac.»), como lo hacen otras tiendas en línea. Tu navegador te pide además su propio permiso antes de compartirla, y puedes negarlo: el sitio funciona igual y simplemente no muestra tu ubicación.",
             "Tus coordenadas viajan desde tu navegador al servicio BigDataCloud (api-bdc.io) o, si este no responde, a Nominatim de OpenStreetMap (nominatim.openstreetmap.org), que las convierten en un código postal o en un estado. Nunca pasan por los servidores de YĒKORA y no las guardamos.",
-            "El código postal o el estado resultante se conserva solo en el almacenamiento de sesión de esa pestaña, bajo el nombre «yekora_delivery_place_v1», y se borra al cerrarla. Tu permiso se recuerda con la cookie «yekora_location_consent»; puedes retirarlo borrando las cookies o los datos del sitio en tu navegador."
+            "El código postal o el estado resultante se conserva solo en el almacenamiento de sesión de esa pestaña, bajo el nombre «yekora_delivery_place_v1», y se borra al cerrarla. Tu permiso se recuerda con la cookie «yekora_location_consent»; puedes retirarlo borrando las cookies o los datos del sitio en tu navegador. El código postal que escribas tú en el encabezado se guarda en esa misma entrada, con o sin ese permiso."
           ]
         },
         {
@@ -385,8 +386,22 @@
     },
     "delivery": {
       "label": "Enviar a",
-      "to": "Enviar al código postal {code}",
-      "toState": "Enviar a {state}"
+      "toName": "Enviar a {name}",
+      "enter": "Ingresa tu C.P.",
+      "title": "¿A dónde enviamos?",
+      "close": "Cerrar",
+      "saved": "Tus direcciones",
+      "current": "Predeterminada",
+      "manage": "Administrar mis direcciones",
+      "codeTitle": "Código postal",
+      "codeHint": "Los 5 dígitos de donde quieres recibir. Solo se guarda en esta pestaña.",
+      "codeExample": "98612",
+      "useCode": "Usar este código",
+      "invalidCode": "Ese código postal no existe. Revisa los 5 dígitos.",
+      "loading": "Cargando…",
+      "failedLoad": "No pudimos leer tus direcciones. Revisa tu conexión.",
+      "failedSave": "No pudimos cambiar la dirección. Intenta de nuevo.",
+      "retry": "Reintentar"
     },
     "accountMenu": {
       "enter": "Entrar",
@@ -462,7 +477,7 @@
   },
   "cookieBanner": {
     "label": "Aviso de cookies",
-    "text": "Usamos cookies técnicas propias, sin analítica ni cookies de terceros. Con «Acepto» usamos además la ubicación de tu navegador para mostrar tu código postal o estado de entrega; con «No acepto» solo guardamos la cookie de este aviso.",
+    "text": "Usamos cookies técnicas propias, sin analítica ni cookies de terceros. Con «Acepto» usamos además la ubicación de tu navegador para mostrar tu código postal o estado de entrega; con «No acepto» no usamos tu ubicación y solo guardamos la cookie de este aviso. Si tú escribes un código postal en el encabezado, se conserva solo en esa pestaña.",
     "privacy": "Aviso de privacidad",
     "policy": "Política de cookies",
     "agree": "Acepto",

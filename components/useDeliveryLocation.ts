@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   recallDeliveryPlace,
   rememberDeliveryPlace,
+  subscribeDeliveryPlace,
 } from '@/lib/delivery/deliveryPlace';
 import {
   hasLocationConsent,
@@ -17,15 +18,17 @@ const POSITION_TIMEOUT_MS = 10_000;
 const POSITION_MAX_AGE_MS = 10 * 60 * 1000;
 
 /**
- * Where the browser is (FC 055 T1.2, T2.6 to T2.9, Enmienda 1): a postal code or, where none is
- * known, a Mexican state. It asks the
- * browser for the position only when `enabled` and only after the visitor said «yes» in the
- * cookie notice, so the permission prompt is never a surprise. Whatever fails (permission denied,
- * no support, timeout, a geocoder that names no code) leaves it at null: the header stays silent
- * and nobody is asked anything. A place resolved earlier in this tab is reused from session
- * storage; the coordinates are handed to the geocoder and then dropped.
+ * Where this tab delivers when no saved address says it (FC 055 T1.2, T2.6 to T2.9; FC 078 T2.6).
  *
- * @param enabled - False while the account, if any, still has a postal code of its own or is being confirmed.
+ * What the person typed in the header, or what was resolved before, is shown whether or not they
+ * agreed to the location: it is read from session storage and followed as it changes. Only asking
+ * the browser for its position needs `enabled` and the «yes» of the cookie notice, so the
+ * permission prompt is never a surprise; a postal code typed meanwhile wins over what the browser
+ * answers. Whatever fails (permission denied, no support, timeout, a geocoder that names no code)
+ * leaves it at null, and nobody is asked anything. The coordinates are handed to the geocoder and
+ * then dropped.
+ *
+ * @param enabled - False while the account, if any, still has a postal code of its own.
  * @returns `place`: five digits (a postal code), the code of a state of the closed list (`ZAC`), or
  *   null; and `resolving`: true from the visitor's «yes» until the position and the geocoders have
  *   answered, so the header can show that it is working instead of looking frozen.
@@ -34,7 +37,12 @@ export function useDeliveryLocation(enabled: boolean): {
   place: string | null;
   resolving: boolean;
 } {
-  const [place, setPlace] = useState<string | null>(null);
+  const kept = useSyncExternalStore(
+    subscribeDeliveryPlace,
+    recallDeliveryPlace,
+    () => null
+  );
+  const [detected, setDetected] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [allowed, setAllowed] = useState(false);
 
@@ -44,14 +52,8 @@ export function useDeliveryLocation(enabled: boolean): {
   }, []);
 
   useEffect(() => {
-    if (!enabled || !allowed) {
-      setPlace(null);
+    if (!enabled || !allowed || recallDeliveryPlace() !== null) {
       setResolving(false);
-      return;
-    }
-    const remembered = recallDeliveryPlace();
-    if (remembered !== null) {
-      setPlace(remembered);
       return;
     }
     if (!('geolocation' in globalThis.navigator)) return;
@@ -65,14 +67,19 @@ export function useDeliveryLocation(enabled: boolean): {
         // A state known at once is shown at once; a postal code that follows replaces it.
         const early = (state: string) => {
           if (controller.signal.aborted) return;
-          setPlace(state);
+          setDetected(state);
           setResolving(false);
         };
         void placeOf(coords, controller.signal, undefined, early).then(
           (found) => {
-            if (found !== null && !controller.signal.aborted) {
+            // What the person typed while this was resolving is not overwritten.
+            if (
+              found !== null &&
+              !controller.signal.aborted &&
+              recallDeliveryPlace() === null
+            ) {
+              setDetected(found);
               rememberDeliveryPlace(found);
-              setPlace(found);
             }
             done();
           }
@@ -84,7 +91,9 @@ export function useDeliveryLocation(enabled: boolean): {
     return () => controller.abort();
   }, [enabled, allowed]);
 
-  return enabled && allowed
-    ? { place, resolving }
-    : { place: null, resolving: false };
+  if (!enabled) return { place: null, resolving: false };
+  return {
+    place: kept ?? (allowed ? detected : null),
+    resolving: kept === null && allowed && resolving,
+  };
 }

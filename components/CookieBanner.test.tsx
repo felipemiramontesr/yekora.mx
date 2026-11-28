@@ -56,8 +56,9 @@ describe('CookieBanner', () => {
         .getAttribute('href')
     ).toBe('/privacidad/');
     // Short on purpose: the providers and the withdrawal are in the policy pages the links open.
+    // FC 078: one more sentence, approved by the owner, says a typed postal code stays in the tab.
     expect(banner.textContent).toContain('ubicación');
-    expect(banner.textContent?.length).toBeLessThan(330);
+    expect(banner.textContent?.length).toBeLessThan(420);
     // The text names the two choices exactly as the buttons do.
     expect(banner.textContent).toContain('«Acepto»');
     expect(banner.textContent).toContain('«No acepto»');

@@ -1,9 +1,9 @@
 /**
- * The place the browser's location resolved to (FC 055 T2.6, T2.9, Enmienda 1), kept only in this
- * tab's session storage under `yekora_delivery_place_v1`, so the header does not ask the position
- * and the geocoder again on every page. It is five digits (a postal code) or the three letters of
- * a state of the closed list, and nothing else: the coordinates are never stored, and the value is
- * gone when the tab closes.
+ * Where this tab delivers when no saved address says it (FC 055, FC 078 F1), kept only in the
+ * tab's session storage under `yekora_delivery_place_v1`: the postal code the person typed in the
+ * header, or what the browser's location resolved to. It is five digits (a postal code) or the
+ * three letters of a state of the closed list, and nothing else: coordinates are never stored, and
+ * the value is gone when the tab closes. Whoever shows it is told when it changes.
  *
  * @module
  */
@@ -11,6 +11,8 @@ import { asPostalCode } from './reverseGeocode';
 import { asStateCode } from './stateAbbreviations';
 
 const STORAGE_KEY = 'yekora_delivery_place_v1';
+
+const listeners = new Set<() => void>();
 
 function sessionStore(): Storage | null {
   try {
@@ -33,7 +35,7 @@ function asPlace(value: unknown): string | null {
 }
 
 /**
- * Remembers the place for this tab.
+ * Remembers the place for this tab and tells whoever listens.
  *
  * @param place - A postal code or a state code.
  * @param storage - Session storage, injectable for tests.
@@ -47,10 +49,11 @@ export function rememberDeliveryPlace(
   } catch {
     // quota or privacy mode: the place is just asked again on the next page
   }
+  for (const listener of listeners) listener();
 }
 
 /**
- * The place this tab resolved before, if it is still stored and well formed.
+ * The place this tab holds, if it is still stored and well formed.
  *
  * @param storage - Session storage, injectable for tests.
  */
@@ -62,4 +65,17 @@ export function recallDeliveryPlace(
   } catch {
     return null; // blocked storage
   }
+}
+
+/**
+ * Calls `listener` every time a place is remembered.
+ *
+ * @param listener - What to call.
+ * @returns A function that stops the calls.
+ */
+export function subscribeDeliveryPlace(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

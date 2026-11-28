@@ -3,6 +3,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { placeOf } from '@/lib/delivery/reverseGeocode';
 import { useDeliveryLocation } from './useDeliveryLocation';
+import { rememberDeliveryPlace } from '@/lib/delivery/deliveryPlace';
 
 vi.mock('@/lib/delivery/reverseGeocode', async (original) => ({
   ...(await original<typeof import('@/lib/delivery/reverseGeocode')>()),
@@ -216,6 +217,40 @@ describe('useDeliveryLocation (FC 055 T1.2, T2.6 to T2.8)', () => {
     );
     expect(result.current.place).toBe('98000');
     rerender({ enabled: false });
+    expect(result.current.place).toBeNull();
+  });
+});
+
+describe('what the person typed (FC 078 F1)', () => {
+  it('is shown without the yes to the location, and followed as it changes', () => {
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    expect(result.current.place).toBeNull();
+    act(() => rememberDeliveryPlace('44100'));
+    expect(result.current).toEqual({ place: '44100', resolving: false });
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('is not overwritten by what the browser answers later', async () => {
+    allow();
+    let finish: ((place: string | null) => void) | undefined;
+    geocode.mockImplementation(
+      () => new Promise<string | null>((resolve) => (finish = resolve))
+    );
+    const { result } = renderHook(() => useDeliveryLocation(true));
+    act(() => grant());
+    act(() => rememberDeliveryPlace('44100'));
+    expect(result.current).toEqual({ place: '44100', resolving: false });
+    await act(async () => {
+      finish?.('06600');
+      await Promise.resolve();
+    });
+    expect(result.current.place).toBe('44100');
+    expect(sessionStorage.getItem('yekora_delivery_place_v1')).toBe('44100');
+  });
+
+  it('is not shown while not enabled (the account has its own address)', () => {
+    sessionStorage.setItem('yekora_delivery_place_v1', '44100');
+    const { result } = renderHook(() => useDeliveryLocation(false));
     expect(result.current.place).toBeNull();
   });
 });

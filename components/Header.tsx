@@ -44,9 +44,9 @@ function DisciplineBar({ locale, messages }: Readonly<HeaderProps>) {
 
 /**
  * Site header (FC 047), laid out like the big stores and dressed as Yekora: from left to right the
- * logo, where we deliver (only the postal code of the account), the product search, the account
+ * logo, where we deliver (FC 078: a button of two lines), the product search, the account
  * menu (which also holds the language) and the cart; under the bar, the strip of disciplines. On a
- * phone the bar becomes rows: logo, account and cart; the search at full width; the delivery code.
+ * phone the bar becomes rows: logo, account and cart; the search at full width; the delivery strip.
  * No hamburger: everything a person needs has a place in view. The bar stays on screen while the
  * page scrolls; the strip of disciplines does not, so it never eats the height of a phone.
  * Every target is at least 44 px (FC 003 gate), and internal links use `next/link` (FC 043 T2.3).
@@ -76,7 +76,8 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
               height={18}
             />
           </Link>
-          <div className="order-5 md:order-2">
+          {/* FC 078: on a phone, a thin strip of its own under the bar. */}
+          <div className="order-5 w-full border-t border-marfil/15 md:order-2 md:w-auto md:border-0">
             <DeliveryIndicator
               accountHref={accountPath(routeFor('account', locale), {
                 tab: 'profile',
@@ -84,12 +85,13 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
               })}
               locale={locale}
               messages={messages.header.delivery}
+              exampleLabel={messages.account.exampleLabel}
             />
           </div>
           <div className="order-4 w-full md:order-3 md:w-auto md:flex-1">
-            {/* FC 052 T2.5: from `md` the search takes 90 % of its cell, centred, so the elements
-                of the bar breathe; on a phone it keeps its own full row. */}
-            <div className="md:mx-auto md:w-[90%]">
+            {/* FC 052 T2.5, FC 078: from `md` the search takes 85 % of its cell, centred, so the
+                elements of the bar breathe; on a phone it keeps its own full row. */}
+            <div className="md:mx-auto md:w-[85%]">
               <SearchCombobox
                 locale={locale}
                 action={routeFor('catalog', locale)}

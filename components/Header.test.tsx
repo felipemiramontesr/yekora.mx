@@ -48,10 +48,10 @@ describe('Header', () => {
     expect(spanish).toContain('action="/catalogo/"');
   });
 
-  it('gives the search 90 % of its cell, centred, from md up, and its whole row on a phone (FC 052 T2.5)', () => {
+  it('gives the search 85 % of its cell, centred, from md up, and its whole row on a phone (FC 052 T2.5)', () => {
     // The cell that holds the search is the one that grows; the search sits inside it at 90 %.
     expect(html).toMatch(
-      /<div class="md:mx-auto md:w-\[90%\]">[\s\S]*?role="search"/
+      /<div class="md:mx-auto md:w-\[85%\]">[\s\S]*?role="search"/
     );
     expect(html).not.toMatch(/<form[^>]*class="[^"]*w-\[90%\]/);
   });
