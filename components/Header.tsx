@@ -55,7 +55,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
   return (
     <>
       <header className="sticky top-0 z-40 bg-petroleo text-marfil">
-        <div className="mx-auto flex max-w-adaptive flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 md:flex-nowrap md:gap-x-4">
+        <div className="mx-auto flex max-w-adaptive flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 md:flex-nowrap md:gap-x-3 lg:gap-x-4">
           <Link
             href={routeFor('home', locale)}
             aria-label={messages.brand.homeLink}
@@ -88,7 +88,7 @@ export function Header({ locale, messages }: Readonly<HeaderProps>) {
               exampleLabel={messages.account.exampleLabel}
             />
           </div>
-          <div className="order-4 w-full md:order-3 md:w-auto md:flex-1">
+          <div className="order-4 w-full md:order-3 md:w-auto md:min-w-0 md:flex-1">
             {/* FC 052 T2.5, FC 078: from `md` the search takes 85 % of its cell, centred, so the
                 elements of the bar breathe; on a phone it keeps its own full row. */}
             <div className="md:mx-auto md:w-[85%]">

@@ -180,5 +180,13 @@ for (const width of [320, 360, 768, 1280, 1920]) {
       .locator('header')
       .evaluate((header) => header.scrollWidth - header.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+    // A wider fallback font (Linux) must shrink the search, never widen the bar.
+    await page.addStyleTag({
+      content: 'header input { font-size: 30px !important; }',
+    });
+    const stressed = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth
+    );
+    expect(stressed).toBeLessThanOrEqual(0);
   });
 }
