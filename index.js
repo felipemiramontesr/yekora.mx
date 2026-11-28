@@ -99628,6 +99628,23 @@ var sessionParams = external_exports.strictObject({
 var deviceParams = external_exports.strictObject({
   id: external_exports.coerce.number().int().min(1)
 });
+var twoFactorStateSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  mandatory: external_exports.boolean()
+});
+var totpEnableRequestSchema = external_exports.strictObject({
+  code: external_exports.string().regex(/^\d{6}$/)
+});
+var totpDisableRequestSchema = external_exports.strictObject({
+  password,
+  code: external_exports.string().regex(/^(?:\d{6}|\d{8})$/)
+});
+var backupCodesRequestSchema = external_exports.strictObject({ password });
+var recover2faRequestSchema = external_exports.strictObject({
+  targetEmail: external_exports.string().trim().max(255),
+  reason: external_exports.string().trim().max(255),
+  ownerTotpCode: external_exports.string().max(10)
+});
 
 // ../../lib/cart/cartTypes.ts
 var MAX_LINES = 50;
@@ -102317,6 +102334,82 @@ var ROUTE_CONTRACTS = [
   },
   {
     method: "GET",
+    path: "/v1/account/2fa",
+    summary: "Whether the second factor is on, and whether it is mandatory (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: twoFactorStateSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/2fa/totp/setup",
+    summary: "Starts the enrolment of an authenticator (FC 079)",
+    permission: "account:self",
+    request: {},
+    responses: {
+      200: enrollResponseSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/2fa/totp/enable",
+    summary: "Turns the second factor on and answers the backup codes once (FC 079)",
+    permission: "account:self",
+    request: { body: totpEnableRequestSchema },
+    responses: {
+      200: confirmResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/2fa/totp/disable",
+    summary: "Turns the second factor off with the password and a code (FC 079)",
+    permission: "account:self",
+    request: { body: totpDisableRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/account/2fa/backup-codes/regenerate",
+    summary: "Replaces the backup codes, shown once (FC 079)",
+    permission: "account:self",
+    request: { body: backupCodesRequestSchema },
+    responses: {
+      200: confirmResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/users/recover-2fa",
+    summary: "The owner turns off the second factor of a customer who lost it (Idempotency-Key, audited, FC 079)",
+    permission: "roles:manage",
+    request: { headers: mutationHeaders, body: recover2faRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS
+    }
+  },
+  {
+    method: "GET",
     path: "/v1/account/fiscal-profile",
     summary: "The fiscal data the account saved to be invoiced (FC 077)",
     permission: "account:self",
@@ -103394,6 +103487,15 @@ async function closeSession(db, sessionId) {
 function secondFactorSatisfied(user) {
   return !isPrivileged(user.roles) || user.totpEnabled;
 }
+async function disableTotp(tx, userId) {
+  await tx.query(
+    "UPDATE two_factor_auth SET is_totp_enabled = 0, totp_secret_encrypted = NULL WHERE user_id = ?",
+    [userId]
+  );
+  await tx.query("DELETE FROM two_factor_backup_codes WHERE user_id = ?", [
+    userId
+  ]);
+}
 
 // src/services/trustedDevices.ts
 var DEVICE_SECONDS = 30 * 24 * 3600;
@@ -104281,6 +104383,37 @@ function decoyHash() {
   return decoy;
 }
 
+// src/services/paymentGates.ts
+function decideModeSwitch(inputs) {
+  if (!inputs.challenge) return "SWITCH_CHALLENGE_INVALID";
+  if (!inputs.phrase) return "SWITCH_PHRASE_MISMATCH";
+  if (!inputs.totp) return "SWITCH_TOTP_FAILED";
+  return inputs.owner ? "SWITCH_PERMITTED" : "SWITCH_OWNER_REQUIRED";
+}
+function decideStepUp(inputs) {
+  if (!inputs.active) return "STEP_UP_UNAUTHORIZED_401";
+  if (!inputs.enrolled) return "STEP_UP_NOT_ENROLLED_403";
+  return inputs.valid ? "STEP_UP_GRANTED_200" : "STEP_UP_CODE_INVALID_403";
+}
+
+// src/services/totpStepUp.ts
+async function verifyStepUpTotp(db, check2) {
+  const stored = await totpOf(db, check2.userId);
+  if (!stored?.enabled) {
+    return decideStepUp({ active: true, enrolled: false, valid: false });
+  }
+  const secret = decryptTotpSecret(
+    check2.totpKey,
+    check2.userId,
+    stored.encrypted
+  );
+  return decideStepUp({
+    active: true,
+    enrolled: true,
+    valid: verifyTotp(secret, check2.code, check2.now)
+  });
+}
+
 // src/routes/accountSecurity.ts
 var LIMITED = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
 var userOf = (request2) => request2.user;
@@ -104342,6 +104475,29 @@ async function applyPassword(tx, deps, request2, body) {
   request2.outboxQueued = true;
   return { status: 200, body: DONE };
 }
+async function oncePerKey(deps, request2, reply, asked, work) {
+  const { secret } = deps.auth;
+  const outcome = await runIdempotent(
+    deps.db,
+    {
+      userId: userOf(request2).userId,
+      key: asked.key,
+      route: asked.route,
+      requestHash: requestHash(
+        "application/json",
+        (0, import_node_crypto10.createHmac)("sha256", secret).update(JSON.stringify(asked.body)).digest("hex")
+      ),
+      now: deps.now()
+    },
+    work
+  );
+  if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
+    return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
+  }
+  const { status: status2, body: answer } = outcome.answer;
+  if (status2 >= 400) reply.type(PROBLEM_TYPE);
+  return reply.code(status2).header("idempotency-status", outcome.code).send(answer);
+}
 async function changePassword(deps, request2, reply) {
   const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
   if (key.code !== "IDEMP_KEY_ACCEPTED") {
@@ -104351,27 +104507,216 @@ async function changePassword(deps, request2, reply) {
   if (!body.success) {
     return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
   }
-  const { secret } = deps.auth;
-  const outcome = await runIdempotent(
-    deps.db,
-    {
-      userId: userOf(request2).userId,
-      key: key.key,
-      route: "POST /v1/account/password",
-      requestHash: requestHash(
-        "application/json",
-        (0, import_node_crypto10.createHmac)("sha256", secret).update(JSON.stringify(body.data)).digest("hex")
-      ),
-      now: deps.now()
-    },
+  return oncePerKey(
+    deps,
+    request2,
+    reply,
+    { key: key.key, route: "POST /v1/account/password", body: body.data },
     (tx) => applyPassword(tx, deps, request2, body.data)
   );
-  if (outcome.code === "IDEMP_PAYLOAD_MISMATCH") {
-    return refuse(reply, 409, "Idempotency-Key reused", outcome.code);
+}
+async function setupTotp(deps, request2, reply) {
+  const { userId, email: email3 } = userOf(request2);
+  const { totpKey } = deps.auth;
+  if ((await totpOf(deps.db, userId))?.enabled) {
+    return refuse(reply, 409, "Already on", "TOTP_ALREADY_ENABLED");
   }
-  const { status: status2, body: answer } = outcome.answer;
-  if (status2 >= 400) reply.type(PROBLEM_TYPE);
-  return reply.code(status2).header("idempotency-status", outcome.code).send(answer);
+  const secret = newTotpSecret();
+  await savePendingTotp(
+    deps.db,
+    userId,
+    encryptTotpSecret(totpKey, userId, secret)
+  );
+  return enrollResponseSchema.parse({
+    secret: base32(secret),
+    otpauthUri: otpauthUri(email3, secret)
+  });
+}
+function freshCodes(auth2) {
+  const codes = newBackupCodes();
+  return { codes, hashes: codes.map((code2) => codeHash(auth2.secret, code2)) };
+}
+async function enableSecondFactor(deps, request2, reply) {
+  const body = totpEnableRequestSchema.safeParse(request2.body);
+  if (!body.success) {
+    return refuse(reply, 400, "Invalid code", "INVALID_TOTP_CODE");
+  }
+  const { userId } = userOf(request2);
+  const auth2 = deps.auth;
+  const totp = await totpOf(deps.db, userId);
+  if (totp === null) {
+    return refuse(reply, 409, "Start the setup first", "TOTP_NOT_ENROLLED");
+  }
+  if (totp.enabled) {
+    return refuse(reply, 409, "Already on", "TOTP_ALREADY_ENABLED");
+  }
+  const secret = decryptTotpSecret(auth2.totpKey, userId, totp.encrypted);
+  if (!verifyTotp(secret, body.data.code, deps.now())) {
+    return refuse(reply, 400, "Invalid code", "INVALID_TOTP_CODE");
+  }
+  const { codes, hashes } = freshCodes(auth2);
+  await deps.db.transaction(async (tx) => {
+    await enableTotp(tx, userId, hashes);
+    await forgetAllDevices(tx, userId);
+    await enqueueMail(tx, { type: "TOTP_ENABLED", userId });
+    await audit(tx, request2, "TOTP_ENROLLED");
+  });
+  request2.outboxQueued = true;
+  return confirmResponseSchema.parse({ backupCodes: codes });
+}
+var wrongPassword = async (deps, request2, reply, action) => {
+  await audit(deps.db, request2, action);
+  return refuse(
+    reply,
+    400,
+    "The current password is not correct",
+    "INVALID_CURRENT_PASSWORD"
+  );
+};
+async function disableSecondFactor(deps, request2, reply) {
+  const { userId, roles } = userOf(request2);
+  if (isPrivileged(roles)) {
+    return refuse(
+      reply,
+      403,
+      "The second factor of this account is mandatory",
+      "STAFF_TOTP_MANDATORY_REJECT"
+    );
+  }
+  const body = totpDisableRequestSchema.safeParse(request2.body);
+  if (!body.success) {
+    return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+  }
+  const auth2 = deps.auth;
+  const { password: password2, code: code2 } = body.data;
+  const stored = await passwordHashOf(deps.db, userId);
+  if (!await verifyPassword(stored, password2)) {
+    return wrongPassword(deps, request2, reply, "TOTP_DISABLE_REFUSED");
+  }
+  const totp = await totpOf(deps.db, userId);
+  if (!totp?.enabled) {
+    return refuse(reply, 409, "It is not on", "TOTP_NOT_ENABLED");
+  }
+  const secret = decryptTotpSecret(auth2.totpKey, userId, totp.encrypted);
+  const passes = async (tx) => code2.length === 6 ? verifyTotp(secret, code2, deps.now()) : useBackupCode(
+    tx,
+    userId,
+    codeHash(auth2.secret, code2),
+    deps.now()
+  );
+  const turnOff = async (tx) => {
+    await disableTotp(tx, userId);
+    await forgetAllDevices(tx, userId);
+    await enqueueMail(tx, { type: "TOTP_DISABLED", userId });
+    await audit(tx, request2, "TOTP_DISABLED");
+  };
+  const done = await deps.db.transaction(async (tx) => {
+    const passed = await passes(tx);
+    if (passed) await turnOff(tx);
+    return passed;
+  });
+  if (!done) {
+    await audit(deps.db, request2, "TOTP_DISABLE_REFUSED");
+    return refuse(reply, 400, "Invalid code", "INVALID_2FA_CODE");
+  }
+  request2.outboxQueued = true;
+  return DONE;
+}
+async function regenerateCodes(deps, request2, reply) {
+  const body = backupCodesRequestSchema.safeParse(request2.body);
+  if (!body.success) {
+    return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+  }
+  const { userId } = userOf(request2);
+  const stored = await passwordHashOf(deps.db, userId);
+  if (!await verifyPassword(stored, body.data.password)) {
+    return wrongPassword(deps, request2, reply, "BACKUP_CODES_REFUSED");
+  }
+  if (!(await totpOf(deps.db, userId))?.enabled) {
+    return refuse(reply, 409, "It is not on", "TOTP_NOT_ENABLED");
+  }
+  const { codes, hashes } = freshCodes(deps.auth);
+  await deps.db.transaction(async (tx) => {
+    await enableTotp(tx, userId, hashes);
+    await enqueueMail(tx, { type: "TOTP_BACKUP_CODES_REGENERATED", userId });
+    await audit(tx, request2, "BACKUP_CODES_REGENERATED");
+  });
+  request2.outboxQueued = true;
+  return confirmResponseSchema.parse({ backupCodes: codes });
+}
+var acceptableReason = (reason) => reason.length >= 10 && !/@|\d{7}/.test(reason);
+var recoveryRefused = (status2, code2, title) => ({
+  status: status2,
+  body: problem(status2, title, code2)
+});
+async function applyRecovery(tx, deps, request2, body) {
+  const owner = userOf(request2).userId;
+  const step = await verifyStepUpTotp(tx, {
+    userId: owner,
+    code: body.ownerTotpCode,
+    totpKey: deps.auth.totpKey,
+    now: deps.now()
+  });
+  if (step !== "STEP_UP_GRANTED_200" || !acceptableReason(body.reason)) {
+    return recoveryRefused(
+      400,
+      "INVALID_OWNER_STEPUP_OR_REASON",
+      "Your code or the reason is not valid"
+    );
+  }
+  const target = await findUserByEmail(
+    tx,
+    canonicalEmail(body.targetEmail)
+  );
+  if (target === null) {
+    return recoveryRefused(404, "USER_NOT_FOUND", "No such account");
+  }
+  const { roles } = await capabilitiesOf(tx, target.id);
+  if (isPrivileged(roles)) {
+    return recoveryRefused(
+      400,
+      "STAFF_2FA_CANNOT_BE_RECOVERED",
+      "The second factor of that account is mandatory"
+    );
+  }
+  if (!(await totpOf(tx, target.id))?.enabled) {
+    return recoveryRefused(400, "TOTP_NOT_ENABLED", "It is not on");
+  }
+  await disableTotp(tx, target.id);
+  await revokeAccess(tx, target.id);
+  await enqueueMail(tx, { type: "TOTP_RECOVERED", userId: target.id });
+  await recordAudit(tx, {
+    userId: owner,
+    action: "CUSTOMER_2FA_RESET_BY_OWNER",
+    entityType: "user",
+    entityId: target.id,
+    before: null,
+    after: { reason: body.reason },
+    ip: request2.ip
+  });
+  request2.outboxQueued = true;
+  return { status: 200, body: DONE };
+}
+async function recoverSecondFactor(deps, request2, reply) {
+  const key = checkIdempotencyKey(request2.headers["idempotency-key"]);
+  if (key.code !== "IDEMP_KEY_ACCEPTED") {
+    return refuse(reply, 400, "Idempotency-Key required", key.code);
+  }
+  const body = recover2faRequestSchema.safeParse(request2.body);
+  if (!body.success) {
+    return refuse(reply, 400, "Invalid request", "INVALID_REQUEST");
+  }
+  return oncePerKey(
+    deps,
+    request2,
+    reply,
+    {
+      key: key.key,
+      route: "POST /v1/admin/users/recover-2fa",
+      body: body.data
+    },
+    (tx) => applyRecovery(tx, deps, request2, body.data)
+  );
 }
 function registerAccountSecurityRoutes(app, deps) {
   app.post(
@@ -104409,6 +104754,39 @@ function registerAccountSecurityRoutes(app, deps) {
     });
     return DONE;
   });
+  app.get("/v1/account/2fa", async (request2) => {
+    const { userId, roles } = userOf(request2);
+    const totp = await totpOf(deps.db, userId);
+    return twoFactorStateSchema.parse({
+      enabled: totp?.enabled ?? false,
+      mandatory: isPrivileged(roles)
+    });
+  });
+  app.post(
+    "/v1/account/2fa/totp/setup",
+    LIMITED,
+    async (request2, reply) => setupTotp(deps, request2, reply)
+  );
+  app.post(
+    "/v1/account/2fa/totp/enable",
+    LIMITED,
+    async (request2, reply) => enableSecondFactor(deps, request2, reply)
+  );
+  app.post(
+    "/v1/account/2fa/totp/disable",
+    LIMITED,
+    async (request2, reply) => disableSecondFactor(deps, request2, reply)
+  );
+  app.post(
+    "/v1/account/2fa/backup-codes/regenerate",
+    LIMITED,
+    async (request2, reply) => regenerateCodes(deps, request2, reply)
+  );
+  app.post(
+    "/v1/admin/users/recover-2fa",
+    LIMITED,
+    async (request2, reply) => recoverSecondFactor(deps, request2, reply)
+  );
   app.get(
     "/v1/account/devices",
     async (request2) => deviceListSchema.parse({
@@ -109315,39 +109693,6 @@ function registerAdminRoutes(app, deps) {
 
 // src/services/paymentsModeSwitch.ts
 var import_node_crypto12 = require("node:crypto");
-
-// src/services/paymentGates.ts
-function decideModeSwitch(inputs) {
-  if (!inputs.challenge) return "SWITCH_CHALLENGE_INVALID";
-  if (!inputs.phrase) return "SWITCH_PHRASE_MISMATCH";
-  if (!inputs.totp) return "SWITCH_TOTP_FAILED";
-  return inputs.owner ? "SWITCH_PERMITTED" : "SWITCH_OWNER_REQUIRED";
-}
-function decideStepUp(inputs) {
-  if (!inputs.active) return "STEP_UP_UNAUTHORIZED_401";
-  if (!inputs.enrolled) return "STEP_UP_NOT_ENROLLED_403";
-  return inputs.valid ? "STEP_UP_GRANTED_200" : "STEP_UP_CODE_INVALID_403";
-}
-
-// src/services/totpStepUp.ts
-async function verifyStepUpTotp(db, check2) {
-  const stored = await totpOf(db, check2.userId);
-  if (!stored?.enabled) {
-    return decideStepUp({ active: true, enrolled: false, valid: false });
-  }
-  const secret = decryptTotpSecret(
-    check2.totpKey,
-    check2.userId,
-    stored.encrypted
-  );
-  return decideStepUp({
-    active: true,
-    enrolled: true,
-    valid: verifyTotp(secret, check2.code, check2.now)
-  });
-}
-
-// src/services/paymentsModeSwitch.ts
 var TICKET_MS = 10 * 60 * 1e3;
 var MAX_ATTEMPTS2 = 3;
 var APPROVAL_MS = 24 * 60 * 60 * 1e3;
@@ -126673,7 +127018,7 @@ var COPY = {
       content: {
         heading: "Tu contrase\xF1a cambi\xF3",
         paragraphs: [
-          "Tu contrase\xF1a cambi\xF3 y cerramos todas tus sesiones abiertas."
+          "Tu contrase\xF1a cambi\xF3 y cerramos las sesiones abiertas en otros lugares."
         ],
         notice: `Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
       }
@@ -126682,7 +127027,9 @@ var COPY = {
       subject: "You changed your Y\u0112KORA password",
       content: {
         heading: "Your password changed",
-        paragraphs: ["Your password changed and we closed every open session."],
+        paragraphs: [
+          "Your password changed and we closed the sessions open elsewhere."
+        ],
         notice: `If this was not you, write to ${SUPPORT_EMAIL2} right away.`
       }
     })
@@ -126753,6 +127100,70 @@ var COPY = {
       }
     })
   },
+  TOTP_DISABLED: {
+    "es-MX": () => ({
+      subject: "La verificaci\xF3n en dos pasos se desactiv\xF3 en Y\u0112KORA",
+      content: {
+        heading: "Verificaci\xF3n en dos pasos desactivada",
+        paragraphs: [
+          "Tu cuenta ya no pide el c\xF3digo de la app de autenticaci\xF3n al entrar."
+        ],
+        notice: `Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: () => ({
+      subject: "Two-step verification was turned off on Y\u0112KORA",
+      content: {
+        heading: "Two-step verification is off",
+        paragraphs: [
+          "Your account no longer asks for the authenticator code when you sign in."
+        ],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  },
+  TOTP_BACKUP_CODES_REGENERATED: {
+    "es-MX": () => ({
+      subject: "Se generaron nuevos c\xF3digos de respaldo en Y\u0112KORA",
+      content: {
+        heading: "Nuevos c\xF3digos de respaldo",
+        paragraphs: ["Los c\xF3digos de respaldo anteriores dejaron de servir."],
+        notice: `Si no fuiste t\xFA, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: () => ({
+      subject: "New backup codes were created on Y\u0112KORA",
+      content: {
+        heading: "New backup codes",
+        paragraphs: ["The previous backup codes no longer work."],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  },
+  TOTP_RECOVERED: {
+    "es-MX": () => ({
+      subject: "Restablecimos tu verificaci\xF3n en dos pasos en Y\u0112KORA",
+      content: {
+        heading: "Verificaci\xF3n en dos pasos restablecida",
+        paragraphs: [
+          "A solicitud de recuperaci\xF3n, desactivamos la verificaci\xF3n en dos pasos de tu cuenta y cerramos tus sesiones.",
+          "Entra con tu contrase\xF1a y config\xFArala de nuevo en la secci\xF3n de seguridad."
+        ],
+        notice: `Si no lo pediste, escr\xEDbenos de inmediato a ${SUPPORT_EMAIL2}.`
+      }
+    }),
+    en: () => ({
+      subject: "We reset your two-step verification on Y\u0112KORA",
+      content: {
+        heading: "Two-step verification reset",
+        paragraphs: [
+          "Following a recovery request, we turned off two-step verification on your account and closed your sessions.",
+          "Sign in with your password and set it up again in the security section."
+        ],
+        notice: `If you did not ask for this, write to ${SUPPORT_EMAIL2} right away.`
+      }
+    })
+  },
   TOTP_ENABLED: {
     "es-MX": () => ({
       subject: "Activaste la verificaci\xF3n en dos pasos en Y\u0112KORA",
@@ -126800,6 +127211,12 @@ function copyOf(keys, event, locale) {
       return COPY.PASSWORD_CHANGED[locale]();
     case "TOTP_ENABLED":
       return COPY.TOTP_ENABLED[locale]();
+    case "TOTP_RECOVERED":
+      return COPY.TOTP_RECOVERED[locale]();
+    case "TOTP_DISABLED":
+      return COPY.TOTP_DISABLED[locale]();
+    case "TOTP_BACKUP_CODES_REGENERATED":
+      return COPY.TOTP_BACKUP_CODES_REGENERATED[locale]();
     case "PAYMENTS_MODE_APPROVED":
       return COPY.PAYMENTS_MODE_APPROVED[locale](event.targetMode);
     case "PAYMENTS_PROBE_FAILED":
@@ -128340,7 +128757,7 @@ async function start(env2, makeDb = createDb, fetchImpl = fetch) {
 }
 
 // src/server.ts
-var sha = true ? "252ee84ff444bd67b5cd8d4b73040c68af8a14a6" : void 0;
+var sha = true ? "f43aeeda2a026e41145a491a0a74145c9f18c6db" : void 0;
 var env = sha ? { ...process.env, GIT_SHA: sha } : process.env;
 function onStarted({ stop }) {
   for (const signal of ["SIGTERM", "SIGINT"]) {
