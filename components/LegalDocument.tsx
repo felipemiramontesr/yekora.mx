@@ -10,6 +10,8 @@ interface LegalDocumentProps {
   legal: Messages['legal'];
   /** The document to render: privacy notice, cookie policy, terms or shipping and returns. */
   document: Messages['legal'][LegalDocumentKey];
+  /** «Where you are», above the title (FC 078). */
+  trail?: ReactNode;
   /** Extra content after the sections, e.g. the cookie table. */
   children?: ReactNode;
 }
@@ -23,11 +25,13 @@ interface LegalDocumentProps {
 export function LegalDocument({
   legal,
   document,
+  trail,
   children,
 }: Readonly<LegalDocumentProps>) {
   return (
     <article className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-4xl font-semibold">{document.title}</h1>
+      {trail}
+      <h1 className="mt-4 text-4xl font-semibold">{document.title}</h1>
       <p className="mt-3 text-sm text-petroleo/80">
         {legal.updatedLabel}: {legal.updated}
       </p>

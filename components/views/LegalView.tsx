@@ -1,5 +1,6 @@
 import { getMessages, type Locale } from '@/app/i18n';
 import { LegalDocument } from '../LegalDocument';
+import { PageTrail } from '../PageTrail';
 
 /** Props of {@link LegalView}. */
 interface LegalViewProps {
@@ -15,12 +16,17 @@ interface LegalViewProps {
  */
 export function LegalView({ locale, document }: Readonly<LegalViewProps>) {
   const { legal } = getMessages(locale);
+  const trail = (
+    <PageTrail locale={locale} steps={[{ label: legal[document].title }]} />
+  );
   if (document !== 'cookies') {
-    return <LegalDocument legal={legal} document={legal[document]} />;
+    return (
+      <LegalDocument legal={legal} document={legal[document]} trail={trail} />
+    );
   }
   const { table } = legal.cookies;
   return (
-    <LegalDocument legal={legal} document={legal.cookies}>
+    <LegalDocument legal={legal} document={legal.cookies} trail={trail}>
       <table className="mt-10 w-full border-collapse text-left text-sm">
         <caption className="mb-3 text-left font-semibold">
           {table.caption}

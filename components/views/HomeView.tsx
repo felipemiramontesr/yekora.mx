@@ -125,6 +125,7 @@ export function HomeView({ locale }: Readonly<{ locale: Locale }>) {
               discipline={discipline}
               name={messages.disciplines[discipline]}
               activity={messages.activities.items[discipline]}
+              href={`${routeFor('catalog', locale)}?disciplina=${discipline}`}
             />
           ))}
         </div>

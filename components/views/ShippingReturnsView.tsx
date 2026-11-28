@@ -1,5 +1,6 @@
 import { getMessages, type Locale } from '@/app/i18n';
 import { LegalDocument } from '../LegalDocument';
+import { PageTrail } from '../PageTrail';
 
 /**
  * Shipping and returns policy (FC 005), shared by `/envios-y-devoluciones/` and
@@ -14,5 +15,13 @@ import { LegalDocument } from '../LegalDocument';
  */
 export function ShippingReturnsView({ locale }: Readonly<{ locale: Locale }>) {
   const { legal } = getMessages(locale);
-  return <LegalDocument legal={legal} document={legal.shipping} />;
+  return (
+    <LegalDocument
+      legal={legal}
+      document={legal.shipping}
+      trail={
+        <PageTrail locale={locale} steps={[{ label: legal.shipping.title }]} />
+      }
+    />
+  );
 }

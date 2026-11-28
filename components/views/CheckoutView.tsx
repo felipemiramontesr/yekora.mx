@@ -1,4 +1,6 @@
 import { getMessages, type Locale } from '@/app/i18n';
+import { routeFor } from '@/lib/routes';
+import { PageTrail } from '../PageTrail';
 import { CheckoutForm } from '../checkout/CheckoutForm';
 import { OrderStatus } from '../checkout/OrderStatus';
 
@@ -10,10 +12,17 @@ import { OrderStatus } from '../checkout/OrderStatus';
  * @param locale - Language of the page.
  */
 export function CheckoutView({ locale }: Readonly<{ locale: Locale }>) {
-  const { checkout, cart, catalog } = getMessages(locale);
+  const { checkout, cart, catalog, breadcrumbs } = getMessages(locale);
   return (
     <div className="mx-auto max-w-adaptive px-4 py-16">
-      <h1 className="text-4xl font-semibold">{checkout.title}</h1>
+      <PageTrail
+        locale={locale}
+        steps={[
+          { label: breadcrumbs.cart, href: routeFor('cart', locale) },
+          { label: breadcrumbs.checkout },
+        ]}
+      />
+      <h1 className="mt-4 text-4xl font-semibold">{checkout.title}</h1>
       <p className="mt-3 text-petroleo/80">{checkout.intro}</p>
       <div className="mt-8">
         <CheckoutForm

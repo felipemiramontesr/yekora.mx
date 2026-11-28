@@ -2345,5 +2345,13 @@
       "next": "Siguiente",
       "page": "Página {page} de {pages}"
     }
+  },
+  "breadcrumbs": {
+    "label": "Estás en",
+    "home": "Inicio",
+    "catalog": "Catálogo",
+    "cart": "Mochila",
+    "checkout": "Pago",
+    "about": "Nosotros"
   }
 }

@@ -27,7 +27,7 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
     <footer className="bg-petroleo text-marfil">
       <div className="mx-auto grid max-w-adaptive gap-10 px-4 py-14 md:grid-cols-4">
         <div className="flex flex-col gap-4">
-          {/* Horizontal lockup from the client's individual elements: isotype, then name over descriptor. */}
+          {/* The lockup of the header (FC 078 T2.2): isotype and name, with no descriptor. */}
           <div className="flex items-center gap-4">
             <img
               src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"
@@ -35,20 +35,12 @@ export function Footer({ locale, messages }: Readonly<FooterProps>) {
               width={49}
               height={56}
             />
-            <div className="flex flex-col gap-2">
-              <img
-                src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"
-                alt=""
-                width={123}
-                height={22}
-              />
-              <img
-                src="/brand/elements/YEKORA_03_TIENDA_OUTDOOR_MARFIL.svg"
-                alt=""
-                width={113}
-                height={8}
-              />
-            </div>
+            <img
+              src="/brand/elements/YEKORA_02_NOMBRE_MARFIL.svg"
+              alt=""
+              width={123}
+              height={22}
+            />
           </div>
           <p className="text-sm text-marfil/90">{footer.tagline}</p>
         </div>

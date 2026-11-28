@@ -20,7 +20,8 @@ function cspViolations(page: Page): string[] {
   return violations;
 }
 
-const cards = (page: Page) => page.locator('main li');
+// The breadcrumbs (FC 078) are an ordered list; the products are not.
+const cards = (page: Page) => page.locator('main :not(ol) > li');
 
 /**
  * FC 047: the navigation that lives in the account menu of the header (the language, and the

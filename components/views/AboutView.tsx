@@ -1,5 +1,6 @@
 import { Award, ShieldCheck, Sparkles, Trees, Users } from 'lucide-react';
 import { getMessages, type Locale } from '@/app/i18n';
+import { PageTrail } from '../PageTrail';
 
 /**
  * Icon of each brand value, in the order of `about.values` in both dictionaries:
@@ -15,10 +16,11 @@ const VALUE_ICONS = [ShieldCheck, Award, Trees, Sparkles, Users] as const;
  * @param locale - Language of the page; picks the dictionary.
  */
 export function AboutView({ locale }: Readonly<{ locale: Locale }>) {
-  const { about } = getMessages(locale);
+  const { about, breadcrumbs } = getMessages(locale);
   return (
     <article className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-4xl font-semibold">{about.title}</h1>
+      <PageTrail locale={locale} steps={[{ label: breadcrumbs.about }]} />
+      <h1 className="mt-4 text-4xl font-semibold">{about.title}</h1>
       <p className="mt-6 text-xl leading-relaxed">{about.lede}</p>
 
       {about.sections.map((section) => (

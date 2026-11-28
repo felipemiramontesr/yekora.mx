@@ -11,9 +11,13 @@ describe('ActivityCard', () => {
         discipline="escalada"
         name={disciplines.escalada}
         activity={activities.items.escalada}
+        href="/catalogo/?disciplina=escalada"
       />
     );
     expect(html).toContain('id="escalada"');
+    // FC 078 T2.1: the whole card leads to the catalog of the discipline, read with its own text.
+    expect(html).toMatch(/^<a [^>]*href="\/catalogo\/\?disciplina=escalada"/);
+    expect(html).not.toContain('aria-labelledby');
     expect(html).toContain('Escalada');
     expect(html).not.toContain('Nivel');
     expect(html).toContain('para qué no');
@@ -26,6 +30,7 @@ describe('ActivityCard', () => {
         discipline="canonismo"
         name={disciplines.canonismo}
         activity={activities.items.canonismo}
+        href="/en/catalog/?disciplina=canonismo"
       />
     );
     expect(html).toMatch(

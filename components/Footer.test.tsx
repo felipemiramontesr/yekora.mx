@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { getMessages } from '@/app/i18n';
@@ -13,6 +14,14 @@ describe('Footer', () => {
       'src="/brand/elements/YEKORA_01_ISOTIPO_MARFIL.svg"'
     );
     expect(html).toContain('Equipo adecuado. Información clara.');
+  });
+
+  it('carries only the isotype and the name, and the descriptor file is gone (FC 078 T2.2)', () => {
+    expect(html).toContain('YEKORA_02_NOMBRE_MARFIL.svg');
+    expect(html).not.toContain('TIENDA_OUTDOOR');
+    expect(
+      existsSync('public/brand/elements/YEKORA_03_TIENDA_OUTDOOR_MARFIL.svg')
+    ).toBe(false);
   });
 
   it('links the legal pages in the current language', () => {

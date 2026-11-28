@@ -1,5 +1,6 @@
 import { getMessages, type Locale } from '@/app/i18n';
 import { CartContents } from '../cart/CartContents';
+import { PageTrail } from '../PageTrail';
 
 /**
  * Cart page body, shared by `/carrito/` and `/en/cart/`. The content lives in the visitor's
@@ -9,10 +10,11 @@ import { CartContents } from '../cart/CartContents';
  * @param locale - Language of the page.
  */
 export function CartView({ locale }: Readonly<{ locale: Locale }>) {
-  const { cart, catalog } = getMessages(locale);
+  const { cart, catalog, breadcrumbs } = getMessages(locale);
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-4xl font-semibold">{cart.title}</h1>
+      <PageTrail locale={locale} steps={[{ label: breadcrumbs.cart }]} />
+      <h1 className="mt-4 text-4xl font-semibold">{cart.title}</h1>
       <div className="mt-8">
         <CartContents
           locale={locale}

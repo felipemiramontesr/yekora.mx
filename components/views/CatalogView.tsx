@@ -6,6 +6,7 @@ import { priceNote, priceText } from '@/lib/catalog/format';
 import type { CatalogSnapshot } from '@/lib/catalog/snapshot';
 import { productPath, routeFor } from '@/lib/routes';
 import { CatalogGrid, type GridItem } from '../catalog/CatalogGrid';
+import { CatalogTrail } from '../catalog/CatalogTrail';
 
 function gridItem(product: Product, locale: Locale): GridItem {
   return {
@@ -69,7 +70,8 @@ export function CatalogView({
   const products = snapshot.products[locale];
   return (
     <div className="mx-auto max-w-adaptive px-4 py-16">
-      <h1 className="text-4xl font-semibold">{catalog.title}</h1>
+      <CatalogTrail locale={locale} />
+      <h1 className="mt-4 text-4xl font-semibold">{catalog.title}</h1>
       <p className="mt-4 max-w-3xl text-lg text-petroleo/80">{catalog.lede}</p>
       {products.length === 0 ? (
         <ComingSoon locale={locale} messages={catalog.comingSoon} />

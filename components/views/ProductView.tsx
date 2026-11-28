@@ -6,6 +6,7 @@ import { fill, priceNote, priceText } from '@/lib/catalog/format';
 import { routeFor } from '@/lib/routes';
 import { AddToCartButton } from '../cart/AddToCartButton';
 import { ProductVisual } from '../catalog/ProductVisual';
+import { PageTrail } from '../PageTrail';
 
 /** Props of {@link ProductView}. */
 interface ProductViewProps {
@@ -27,11 +28,22 @@ export function ProductView({
   product,
   exchangeRate,
 }: Readonly<ProductViewProps>) {
-  const { catalog } = getMessages(locale);
+  const { catalog, breadcrumbs } = getMessages(locale);
   const price = priceText(product, locale);
   const gallery = product.images.length > 0 ? product.images : [null];
   return (
     <article className="mx-auto max-w-adaptive px-4 py-12">
+      <PageTrail
+        locale={locale}
+        steps={[
+          { label: breadcrumbs.catalog, href: routeFor('catalog', locale) },
+          {
+            label: product.disciplineName,
+            href: `${routeFor('catalog', locale)}?disciplina=${product.discipline}`,
+          },
+          { label: product.name },
+        ]}
+      />
       <Link
         href={routeFor('catalog', locale)}
         className="tap-target gap-2 text-sm underline-offset-4 hover:underline"
