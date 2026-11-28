@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 /**
  * FC 078 F0 evidence: the 16 rows of the gate of the breadcrumbs (T1.2) and its accessible markup
  * (T2.5).
  */
+import { fireEvent, render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { breadcrumbsVerdict } from '@/lib/ui/breadcrumbsGate';
 import { Breadcrumbs } from './Breadcrumbs';
 
@@ -49,12 +51,31 @@ describe('Breadcrumbs (T2.5)', () => {
     expect(html.match(/<li/g)).toHaveLength(3);
     expect(html.match(/<a /g)).toHaveLength(2);
     expect(html.match(/<span aria-hidden="true">›<\/span>/g)).toHaveLength(2);
-    expect(html).toMatch(/<span aria-current="page"[^>]*>Mochila<\/span>/);
+    expect(html).toMatch(/<li aria-current="page"[^>]*>.*Mochila<\/li>/);
   });
 
   it('draws nothing for a trail the gate refuses', () => {
     expect(
       renderToStaticMarkup(<Breadcrumbs label="Estás en" steps={[]} />)
     ).toBe('');
+  });
+});
+
+describe('a step of an area that routes its own paths (FC 078 F4)', () => {
+  it('keeps its address and takes the person there without loading a page', () => {
+    const onSelect = vi.fn();
+    render(
+      <Breadcrumbs
+        label="Estás en"
+        steps={[
+          { label: 'Mi cuenta', href: '/cuenta/', onSelect },
+          { label: 'Pedidos' },
+        ]}
+      />
+    );
+    const link = screen.getByRole('link', { name: 'Mi cuenta' });
+    expect(link.getAttribute('href')).toBe('/cuenta/');
+    expect(fireEvent.click(link)).toBe(false);
+    expect(onSelect).toHaveBeenCalledOnce();
   });
 });

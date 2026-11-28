@@ -10,6 +10,11 @@ export interface Crumb {
   label: string;
   /** Where it leads; the last step has none. */
   href?: string;
+  /**
+   * Takes the person there without loading a page, for an area that routes its own paths: the
+   * address stays in `href`, for the new tab and the screen reader.
+   */
+  onSelect?: () => void;
 }
 
 /** Why a trail is not drawn (T1.2). */

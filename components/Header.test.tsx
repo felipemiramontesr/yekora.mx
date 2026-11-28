@@ -123,9 +123,14 @@ const PLAIN_ANCHORS: Record<string, { count: number; reason: string }> = {
       'the cards of the centre of the catalog (FC 078): each one a section of the area, same in-area router',
   },
   'components/account/AccountApp.tsx': {
-    count: 4,
+    count: 1,
     reason:
-      'the breadcrumb of the account area, its «Administración» step and the link to «Datos para factura» (FC 077): its own paths (Apache fallback, no export), changed without a reload',
+      'the link to «Datos para factura» (FC 077): its own path (Apache fallback, no export), changed without a reload',
+  },
+  'components/ui/Breadcrumbs.tsx': {
+    count: 1,
+    reason:
+      'a step of the account area (FC 078): its own path, which the area routes without loading a page',
   },
   'components/account/invoiceShared.tsx': {
     count: 1,

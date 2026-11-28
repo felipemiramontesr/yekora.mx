@@ -43,6 +43,7 @@ import { AccountPaymentMethods } from './AccountPaymentMethods';
 import { AccountProfileAddresses } from './AccountProfileAddresses';
 import { SessionSkeleton } from './SessionSkeleton';
 import { AccountFiscalProfile } from './AccountFiscalProfile';
+import { Breadcrumbs } from '../ui/Breadcrumbs';
 import type { InvoicingTexts } from './AccountInvoicesConsole';
 import type { FiscalTexts } from './invoiceShared';
 import type { UsersTexts } from './AccountUsersConsole';
@@ -449,6 +450,37 @@ function crumbOf(view: AccountView, texts: Messages['account']): string {
 }
 
 /**
+ * The trail of the signed-in area (FC 047 T2.5, FC 078): «Mi cuenta», «Administración» above a
+ * console, «Productos» above a section of the catalog, and where one is. Every step but the last
+ * changes the view without loading a page.
+ */
+function trailOf(
+  view: AccountView,
+  texts: Messages['account'],
+  area: string,
+  underAdmin: boolean,
+  onNavigate: (view: AccountView) => void
+) {
+  const step = (label: string, tab: AccountView['tab']) => {
+    const target = { tab, orderNumber: null };
+    return {
+      label,
+      href: accountPath(area, target),
+      onSelect: () => onNavigate(target),
+    };
+  };
+  const insideCatalog = view.tab === 'catalog' && Boolean(view.section);
+  return [
+    step(texts.title, 'orders'),
+    ...(underAdmin ? [step(texts.dashboard.admin, 'admin')] : []),
+    ...(insideCatalog
+      ? [step(texts.adminHub.cards.products.name, 'catalog')]
+      : []),
+    { label: crumbOf(view, texts) },
+  ];
+}
+
+/**
  * The signed-in area (FC 047 T2.5): where the person is, and the open list or order. The sections
  * themselves, with sign-out and the language, live in the account menu of the header, so the area
  * has no navigation of its own; it only says where you are: the greeting, and a breadcrumb
@@ -490,63 +522,16 @@ function Dashboard({
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <nav aria-label={dashboard.breadcrumb}>
-          <ol className="flex flex-wrap items-center gap-2 text-sm text-petroleo/80">
-            <li>
-              <a
-                href={accountPath(area, { tab: 'orders', orderNumber: null })}
-                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-                  event.preventDefault();
-                  onNavigate({ tab: 'orders', orderNumber: null });
-                }}
-                className="tap-target underline underline-offset-4"
-              >
-                {texts.account.title}
-              </a>
-            </li>
-            {underAdmin && (
-              <>
-                <li aria-hidden="true">›</li>
-                <li>
-                  <a
-                    href={accountPath(area, {
-                      tab: 'admin',
-                      orderNumber: null,
-                    })}
-                    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-                      event.preventDefault();
-                      onNavigate({ tab: 'admin', orderNumber: null });
-                    }}
-                    className="tap-target underline underline-offset-4"
-                  >
-                    {dashboard.admin}
-                  </a>
-                </li>
-              </>
-            )}
-            {tab === 'catalog' && view.section && (
-              <>
-                <li aria-hidden="true">›</li>
-                <li>
-                  <a
-                    href={accountPath(area, { tab, orderNumber: null })}
-                    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-                      event.preventDefault();
-                      onNavigate({ tab, orderNumber: null });
-                    }}
-                    className="tap-target underline underline-offset-4"
-                  >
-                    {texts.account.adminHub.cards.products.name}
-                  </a>
-                </li>
-              </>
-            )}
-            <li aria-hidden="true">›</li>
-            <li aria-current="page" className="font-semibold text-petroleo">
-              {crumbOf({ ...view, tab }, texts.account)}
-            </li>
-          </ol>
-        </nav>
+        <Breadcrumbs
+          label={dashboard.breadcrumb}
+          steps={trailOf(
+            { ...view, tab },
+            texts.account,
+            area,
+            underAdmin,
+            onNavigate
+          )}
+        />
         <p className="text-xl font-semibold">
           {fill(dashboard.greeting, { name: user.fullName })}
         </p>
