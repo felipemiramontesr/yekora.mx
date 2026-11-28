@@ -111,6 +111,8 @@ function expectedPermission(route: (typeof ROUTE_CONTRACTS)[number]): string {
   )
     return 'orders:manage';
   // FC 072: the staff and the roles; only the owner writes the matrix.
+  // FC 079: only the owner turns off the second factor of a customer.
+  if (route.path === '/v1/admin/users/recover-2fa') return 'roles:manage';
   if (route.path.startsWith('/v1/admin/roles') && route.method !== 'GET')
     return 'roles:manage';
   if (/^\/v1\/admin\/(users|roles)/.test(route.path)) return 'sellers:manage';

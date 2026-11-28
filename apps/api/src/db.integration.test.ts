@@ -90,6 +90,7 @@ import {
   capabilitiesOf,
   closeSession,
   createCustomer,
+  disableTotp,
   enableTotp,
   failChallenge,
   findUserByEmail,
@@ -3394,5 +3395,25 @@ describe('the security of the account on real SQL (accountSecurity.ts, FC 079 F0
       mine,
       theirs,
     ]);
+  });
+});
+
+describe('the second factor on real SQL (identity.ts, FC 079 F1)', () => {
+  it('turns it off with its secret and codes', async () => {
+    const [{ id }] = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 1'
+    );
+    await savePendingTotp(db, id, 'v1:real-sql');
+    await db.transaction((tx) => enableTotp(tx, id, ['a'.repeat(64)]));
+    expect((await totpOf(db, id))?.enabled).toBe(true);
+    await db.transaction((tx) => disableTotp(tx, id));
+    expect(await totpOf(db, id)).toBeNull();
+    expect(
+      await db.query(
+        'SELECT id FROM two_factor_backup_codes WHERE user_id = ?',
+        [id]
+      )
+    ).toEqual([]);
+    await db.query('DELETE FROM two_factor_auth WHERE user_id = ?', [id]);
   });
 });

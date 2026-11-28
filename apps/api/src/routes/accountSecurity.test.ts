@@ -3,15 +3,24 @@
  * a fast hash of it, what it closes (T2.1), and the sessions and devices of one account only
  * (T1.2, T2.2, T2.4).
  *
+ * FC 079 F1 evidence: the second factor with the rows of T1.3, T1.4 and T1.5, what is stored of its
+ * secrets (T0.4, T2.3), staff keeping theirs (T2.6) and the owner's recovery (T2.7).
+ *
  * The database is an in-memory table of handlers keyed by the start of each statement, so the real
  * guard, routes and services run unchanged.
  */
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
-import { tokenHash } from '../services/authCrypto';
+import {
+  codeHash,
+  decryptTotpSecret,
+  encryptTotpSecret,
+  newTotpSecret,
+  tokenHash,
+} from '../services/authCrypto';
 import type { Db, Transactional } from '../services/db';
 import { hashPassword, verifyPassword } from '../services/passwords';
 
@@ -33,8 +42,12 @@ const store = {
   mails: [] as unknown[],
   audit: [] as unknown[],
   keys: new Map<string, Record<string, unknown>>(),
+  role: 'customer',
+  totp: new Map<string, { encrypted: string | null; enabled: number }>(),
+  codes: [] as { user_id: string; hash: string; used: boolean }[],
 };
 let breached = false;
+let targetRole = 'customer';
 
 const remove = <T>(list: T[], gone: (item: T) => boolean) => {
   for (let index = list.length - 1; index >= 0; index -= 1) {
@@ -61,7 +74,87 @@ const HANDLERS: [string, (params: readonly unknown[]) => unknown][] = [
   ],
   [
     'SELECT ur.role_id',
-    () => [{ role_id: 'customer', permission_id: 'account:self' }],
+    (p) => {
+      const role = p[0] === ANA ? store.role : targetRole;
+      return ['account:self', 'roles:manage']
+        .slice(0, role === 'owner' ? 2 : 1)
+        .map((permission_id) => ({ role_id: role, permission_id }));
+    },
+  ],
+  [
+    'SELECT is_totp_enabled FROM two_factor_auth',
+    (p) => {
+      const row = store.totp.get(p[0] as string);
+      return row ? [{ is_totp_enabled: row.enabled }] : [];
+    },
+  ],
+  [
+    'SELECT totp_secret_encrypted',
+    (p) => {
+      const row = store.totp.get(p[0] as string);
+      return row
+        ? [
+            {
+              totp_secret_encrypted: row.encrypted,
+              is_totp_enabled: row.enabled,
+            },
+          ]
+        : [];
+    },
+  ],
+  [
+    'INSERT INTO two_factor_auth',
+    (p) => {
+      store.totp.set(p[0] as string, { encrypted: p[1] as string, enabled: 0 });
+      return [];
+    },
+  ],
+  [
+    'UPDATE two_factor_auth SET is_totp_enabled = 1',
+    (p) => {
+      const row = store.totp.get(p[0] as string);
+      if (row) row.enabled = 1;
+      return [];
+    },
+  ],
+  [
+    'UPDATE two_factor_auth SET is_totp_enabled = 0',
+    (p) => {
+      store.totp.set(p[0] as string, { encrypted: null, enabled: 0 });
+      return [];
+    },
+  ],
+  [
+    'DELETE FROM two_factor_backup_codes',
+    (p) => {
+      remove(store.codes, (c) => c.user_id === p[0]);
+      return [];
+    },
+  ],
+  [
+    'INSERT INTO two_factor_backup_codes',
+    (p) => {
+      store.codes.push({
+        user_id: p[0] as string,
+        hash: p[1] as string,
+        used: false,
+      });
+      return [];
+    },
+  ],
+  [
+    'UPDATE two_factor_backup_codes',
+    (p) => {
+      const found = store.codes.find(
+        (c) => c.user_id === p[1] && c.hash === p[2] && !c.used
+      );
+      if (found) found.used = true;
+      return { affectedRows: found ? 1 : 0 };
+    },
+  ],
+  [
+    'SELECT id, email, password_hash',
+    (p) => (p[0] === 'luis@example.test' ? [{ id: LUIS }] : []),
   ],
   ['SELECT password_hash FROM users', () => [{ password_hash: store.hash }]],
   [
@@ -98,6 +191,13 @@ const HANDLERS: [string, (params: readonly unknown[]) => unknown][] = [
     'DELETE FROM user_sessions WHERE user_id = ? AND id <> ?',
     (p) => {
       remove(store.sessions, (s) => s.user_id === p[0] && s.id !== p[1]);
+      return [];
+    },
+  ],
+  [
+    'DELETE FROM user_sessions WHERE user_id = ?',
+    (p) => {
+      remove(store.sessions, (s) => s.user_id === p[0]);
       return [];
     },
   ],
@@ -236,6 +336,10 @@ beforeEach(() => {
   store.mails = [];
   store.audit = [];
   store.keys.clear();
+  store.role = 'customer';
+  store.totp.clear();
+  store.codes = [];
+  targetRole = 'customer';
 });
 
 interface Options {
@@ -417,5 +521,258 @@ describe('the remembered devices of the account (FC 079 T2.2)', () => {
     expect(answer.statusCode).toBe(status);
     expect(answer.json().detail).toBe(code);
     expect(store.devices).toHaveLength(2);
+  });
+});
+
+const post = (url: string, payload?: unknown, key: string | null = null) =>
+  send('POST', url, { key, ...(payload === undefined ? {} : { payload }) });
+
+/** Gives an account an authenticator, on or pending; returns its secret. */
+function authenticator(userId: string, enabled = true) {
+  const secret = newTotpSecret();
+  store.totp.set(userId, {
+    encrypted: encryptTotpSecret(KEY, userId, secret),
+    enabled: enabled ? 1 : 0,
+  });
+  return secret;
+}
+
+/** The code an authenticator shows now (RFC 6238), computed apart from the API under test. */
+function codeNow(secret: Buffer): string {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(NOW.getTime() / 30_000)));
+  const mac = createHmac('sha1', secret).update(counter).digest();
+  const value = mac.readUInt32BE(mac[mac.length - 1] & 0x0f) & 0x7fffffff;
+  return String(value % 1_000_000).padStart(6, '0');
+}
+const wrongCode = (secret: Buffer) =>
+  codeNow(secret) === '000000' ? '111111' : '000000';
+
+describe('the second factor of the account (FC 079 T1.3, T0.4, T2.3)', () => {
+  const setup = () => post('/v1/account/2fa/totp/setup');
+  const enable = (code: string) =>
+    post('/v1/account/2fa/totp/enable', { code });
+  const state = async () => (await send('GET', '/v1/account/2fa')).json();
+
+  it('says it is off and optional for a customer', async () => {
+    expect(await state()).toEqual({ enabled: false, mandatory: false });
+  });
+
+  it('sets up a pending secret and turns it on with its code, showing eight codes once', async () => {
+    const started = await setup();
+    expect(started.json().otpauthUri).toContain('otpauth://totp/');
+    const kept = store.totp.get(ANA);
+    expect(kept?.enabled).toBe(0);
+    expect(kept?.encrypted).not.toContain(started.json().secret);
+    const secret = decryptTotpSecret(KEY, ANA, kept?.encrypted as string);
+
+    const done = await enable(codeNow(secret));
+    const { backupCodes } = done.json();
+    expect(backupCodes).toHaveLength(8);
+    expect(store.codes.map((c) => c.hash)).toEqual(
+      backupCodes.map((code: string) => codeHash(KEY, code))
+    );
+    expect(await state()).toEqual({ enabled: true, mandatory: false });
+    expect(store.devices.map((d) => d.id)).toEqual([2]);
+    expect(store.mails).toEqual(['TOTP_ENABLED']);
+    expect(store.audit).toContain('TOTP_ENROLLED');
+    expect(store.keys.size).toBe(0);
+    expect((await enable(codeNow(secret))).json().detail).toBe(
+      'TOTP_ALREADY_ENABLED'
+    );
+  });
+
+  it('never restarts over an active second factor', async () => {
+    authenticator(ANA);
+    const answer = await setup();
+    expect(answer.statusCode).toBe(409);
+    expect(answer.json().detail).toBe('TOTP_ALREADY_ENABLED');
+    expect(store.totp.get(ANA)?.enabled).toBe(1);
+  });
+
+  it('refuses without a setup, with a wrong code or with a malformed one', async () => {
+    expect((await enable('123456')).json().detail).toBe('TOTP_NOT_ENROLLED');
+    const secret = authenticator(ANA, false);
+    expect((await enable(wrongCode(secret))).json().detail).toBe(
+      'INVALID_TOTP_CODE'
+    );
+    expect((await enable('12')).json().detail).toBe('INVALID_TOTP_CODE');
+    expect(store.totp.get(ANA)?.enabled).toBe(0);
+    expect(store.codes).toHaveLength(0);
+  });
+});
+
+describe('turning the second factor off (FC 079 T1.4, T2.6)', () => {
+  const disable = (code: string, password = CURRENT) =>
+    post('/v1/account/2fa/totp/disable', { password, code });
+
+  it('needs the password and takes the code of the authenticator', async () => {
+    const secret = authenticator(ANA);
+    const done = await disable(codeNow(secret));
+    expect(done.json()).toEqual({ success: true });
+    expect(store.totp.get(ANA)).toEqual({ encrypted: null, enabled: 0 });
+    expect(store.devices.map((d) => d.id)).toEqual([2]);
+    expect(store.mails).toEqual(['TOTP_DISABLED']);
+    expect(store.audit).toContain('TOTP_DISABLED');
+    expect((await disable('123456')).json().detail).toBe('TOTP_NOT_ENABLED');
+  });
+
+  it('takes an unused backup code instead', async () => {
+    authenticator(ANA);
+    store.codes = [
+      { user_id: ANA, hash: codeHash(KEY, '12345678'), used: false },
+    ];
+    expect((await disable('12345678')).statusCode).toBe(200);
+    expect(store.codes).toHaveLength(0);
+  });
+
+  it('refuses a wrong password, a wrong second factor and a malformed request', async () => {
+    const secret = authenticator(ANA);
+    expect((await disable(codeNow(secret), 'otra')).json().detail).toBe(
+      'INVALID_CURRENT_PASSWORD'
+    );
+    expect((await disable(wrongCode(secret))).json().detail).toBe(
+      'INVALID_2FA_CODE'
+    );
+    expect((await disable('87654321')).json().detail).toBe('INVALID_2FA_CODE');
+    expect((await disable('1')).json().detail).toBe('INVALID_REQUEST');
+    expect(store.totp.get(ANA)?.enabled).toBe(1);
+    expect(store.audit).toContain('TOTP_DISABLE_REFUSED');
+    expect(store.mails).toHaveLength(0);
+  });
+
+  it('keeps the second factor of staff, whatever they send', async () => {
+    store.role = 'owner';
+    const secret = authenticator(ANA);
+    const answer = await disable(codeNow(secret));
+    expect(answer.statusCode).toBe(403);
+    expect(answer.json().detail).toBe('STAFF_TOTP_MANDATORY_REJECT');
+    expect(store.totp.get(ANA)?.enabled).toBe(1);
+  });
+});
+
+describe('new backup codes (FC 079 T0.4)', () => {
+  const regenerate = (payload: unknown) =>
+    post('/v1/account/2fa/backup-codes/regenerate', payload);
+
+  it('replaces the old ones, once shown and never stored in clear', async () => {
+    authenticator(ANA);
+    store.codes = [{ user_id: ANA, hash: 'old', used: false }];
+    const { backupCodes } = (await regenerate({ password: CURRENT })).json();
+    expect(backupCodes).toHaveLength(8);
+    expect(store.codes).toHaveLength(8);
+    expect(JSON.stringify(store.codes)).not.toContain(backupCodes[0]);
+    expect(store.mails).toEqual(['TOTP_BACKUP_CODES_REGENERATED']);
+    expect(store.audit).toContain('BACKUP_CODES_REGENERATED');
+    expect(store.keys.size).toBe(0);
+  });
+
+  it('refuses a wrong password, an account without the second factor and a bare request', async () => {
+    expect((await regenerate({ password: CURRENT })).json().detail).toBe(
+      'TOTP_NOT_ENABLED'
+    );
+    expect((await regenerate({ password: 'otra' })).json().detail).toBe(
+      'INVALID_CURRENT_PASSWORD'
+    );
+    expect((await regenerate({})).json().detail).toBe('INVALID_REQUEST');
+    expect(store.audit).toContain('BACKUP_CODES_REFUSED');
+  });
+});
+
+describe('the recovery by the owner (FC 079 T1.5, T2.7)', () => {
+  const REASON = 'Cotejo de dos pedidos y llamada telefónica';
+  let owner: Buffer;
+
+  beforeEach(() => {
+    store.role = 'owner';
+    owner = authenticator(ANA);
+    authenticator(LUIS);
+    store.codes = [{ user_id: LUIS, hash: 'old', used: false }];
+  });
+
+  const recover = (over: Record<string, string> = {}, key = 'r-1') =>
+    post(
+      '/v1/admin/users/recover-2fa',
+      {
+        targetEmail: ' Luis@Example.test ',
+        reason: REASON,
+        ownerTotpCode: codeNow(owner),
+        ...over,
+      },
+      key
+    );
+
+  const untouched = () => {
+    expect(store.totp.get(LUIS)?.enabled).toBe(1);
+    expect(store.sessions).toHaveLength(3);
+    expect(store.mails).toHaveLength(0);
+  };
+
+  it('turns the second factor of a customer off, closes their access, warns and audits', async () => {
+    const done = await recover();
+    expect(done.json()).toEqual({ success: true });
+    expect(store.totp.get(LUIS)).toEqual({ encrypted: null, enabled: 0 });
+    expect(store.codes).toHaveLength(0);
+    expect(store.sessions.map((s) => s.id)).toEqual([MINE, OTHER_OF_ANA]);
+    expect(store.devices.map((d) => d.id)).toEqual([1]);
+    expect(store.totp.get(ANA)?.enabled).toBe(1);
+    expect(store.mails).toEqual(['TOTP_RECOVERED']);
+    expect(store.audit).toContain('CUSTOMER_2FA_RESET_BY_OWNER');
+    expect(JSON.stringify([...store.keys.values()])).not.toContain(
+      codeNow(owner)
+    );
+    const again = await recover();
+    expect(again.headers['idempotency-status']).toBe('IDEMP_REPLAY_SUCCESS');
+    expect(store.mails).toHaveLength(1);
+  });
+
+  it.each([
+    ['a wrong code of the owner', { ownerTotpCode: 'x' }],
+    ['a short reason', { reason: 'porque sí' }],
+    ['an e-mail in the reason', { reason: 'Pidió luis@example.test' }],
+    ['a phone in the reason', { reason: 'Llamé al 4921234567' }],
+  ])('refuses %s', async (_case, over) => {
+    const answer = await recover(over);
+    expect(answer.statusCode).toBe(400);
+    expect(answer.json().detail).toBe('INVALID_OWNER_STEPUP_OR_REASON');
+    untouched();
+  });
+
+  it('refuses an owner without an authenticator', async () => {
+    store.totp.delete(ANA);
+    // Without it the guard stops a privileged account before the route.
+    expect((await recover()).statusCode).toBe(403);
+    untouched();
+  });
+
+  it('names a missing account before anything about it', async () => {
+    const answer = await recover({ targetEmail: 'nadie@example.test' });
+    expect(answer.statusCode).toBe(404);
+    expect(answer.json().detail).toBe('USER_NOT_FOUND');
+    untouched();
+  });
+
+  it('never recovers staff', async () => {
+    targetRole = 'admin';
+    expect((await recover()).json().detail).toBe(
+      'STAFF_2FA_CANNOT_BE_RECOVERED'
+    );
+    untouched();
+  });
+
+  it('says when there is nothing to turn off', async () => {
+    store.totp.delete(LUIS);
+    expect((await recover()).json().detail).toBe('TOTP_NOT_ENABLED');
+    expect(store.sessions).toHaveLength(3);
+  });
+
+  it('needs the key, the three fields and the owner’s permission', async () => {
+    const noKey = await post('/v1/admin/users/recover-2fa', {});
+    expect(noKey.json().detail).toBe('IDEMP_KEY_MISSING');
+    const noBody = await post('/v1/admin/users/recover-2fa', {}, 'r-2');
+    expect(noBody.json().detail).toBe('INVALID_REQUEST');
+    store.role = 'customer';
+    expect((await recover()).statusCode).toBe(403);
+    untouched();
   });
 });

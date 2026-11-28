@@ -32,6 +32,21 @@ export type MailEvent = (
       userId: string;
     }
   | {
+      /** Security alert: the second factor was turned off, by the person or by the owner (FC 079). */
+      type: 'TOTP_DISABLED';
+      userId: string;
+    }
+  | {
+      /** Security alert: the owner turned off the second factor the person lost (FC 079 T1.5). */
+      type: 'TOTP_RECOVERED';
+      userId: string;
+    }
+  | {
+      /** Security alert: new backup codes replaced the old ones (FC 079). */
+      type: 'TOTP_BACKUP_CODES_REGENERATED';
+      userId: string;
+    }
+  | {
       /** The 15-minute link of «¿Olvidaste tu contraseña?» (FC 042 T1.1). */
       type: 'PASSWORD_RESET';
       userId: string;

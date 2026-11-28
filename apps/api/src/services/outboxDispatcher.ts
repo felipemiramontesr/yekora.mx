@@ -173,7 +173,7 @@ const COPY = {
       content: {
         heading: 'Tu contraseña cambió',
         paragraphs: [
-          'Tu contraseña cambió y cerramos todas tus sesiones abiertas.',
+          'Tu contraseña cambió y cerramos las sesiones abiertas en otros lugares.',
         ],
         notice: `Si no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
       },
@@ -182,7 +182,9 @@ const COPY = {
       subject: 'You changed your YĒKORA password',
       content: {
         heading: 'Your password changed',
-        paragraphs: ['Your password changed and we closed every open session.'],
+        paragraphs: [
+          'Your password changed and we closed the sessions open elsewhere.',
+        ],
         notice: `If this was not you, write to ${SUPPORT_EMAIL} right away.`,
       },
     }),
@@ -256,6 +258,70 @@ const COPY = {
       },
     }),
   },
+  TOTP_DISABLED: {
+    'es-MX': (): Copy => ({
+      subject: 'La verificación en dos pasos se desactivó en YĒKORA',
+      content: {
+        heading: 'Verificación en dos pasos desactivada',
+        paragraphs: [
+          'Tu cuenta ya no pide el código de la app de autenticación al entrar.',
+        ],
+        notice: `Si no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (): Copy => ({
+      subject: 'Two-step verification was turned off on YĒKORA',
+      content: {
+        heading: 'Two-step verification is off',
+        paragraphs: [
+          'Your account no longer asks for the authenticator code when you sign in.',
+        ],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
+  TOTP_BACKUP_CODES_REGENERATED: {
+    'es-MX': (): Copy => ({
+      subject: 'Se generaron nuevos códigos de respaldo en YĒKORA',
+      content: {
+        heading: 'Nuevos códigos de respaldo',
+        paragraphs: ['Los códigos de respaldo anteriores dejaron de servir.'],
+        notice: `Si no fuiste tú, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (): Copy => ({
+      subject: 'New backup codes were created on YĒKORA',
+      content: {
+        heading: 'New backup codes',
+        paragraphs: ['The previous backup codes no longer work.'],
+        notice: `If this was not you, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
+  TOTP_RECOVERED: {
+    'es-MX': (): Copy => ({
+      subject: 'Restablecimos tu verificación en dos pasos en YĒKORA',
+      content: {
+        heading: 'Verificación en dos pasos restablecida',
+        paragraphs: [
+          'A solicitud de recuperación, desactivamos la verificación en dos pasos de tu cuenta y cerramos tus sesiones.',
+          'Entra con tu contraseña y configúrala de nuevo en la sección de seguridad.',
+        ],
+        notice: `Si no lo pediste, escríbenos de inmediato a ${SUPPORT_EMAIL}.`,
+      },
+    }),
+    en: (): Copy => ({
+      subject: 'We reset your two-step verification on YĒKORA',
+      content: {
+        heading: 'Two-step verification reset',
+        paragraphs: [
+          'Following a recovery request, we turned off two-step verification on your account and closed your sessions.',
+          'Sign in with your password and set it up again in the security section.',
+        ],
+        notice: `If you did not ask for this, write to ${SUPPORT_EMAIL} right away.`,
+      },
+    }),
+  },
   TOTP_ENABLED: {
     'es-MX': (): Copy => ({
       subject: 'Activaste la verificación en dos pasos en YĒKORA',
@@ -312,6 +378,12 @@ function copyOf(
       return COPY.PASSWORD_CHANGED[locale]();
     case 'TOTP_ENABLED':
       return COPY.TOTP_ENABLED[locale]();
+    case 'TOTP_RECOVERED':
+      return COPY.TOTP_RECOVERED[locale]();
+    case 'TOTP_DISABLED':
+      return COPY.TOTP_DISABLED[locale]();
+    case 'TOTP_BACKUP_CODES_REGENERATED':
+      return COPY.TOTP_BACKUP_CODES_REGENERATED[locale]();
     case 'PAYMENTS_MODE_APPROVED':
       return COPY.PAYMENTS_MODE_APPROVED[locale](event.targetMode);
     case 'PAYMENTS_PROBE_FAILED':

@@ -50,3 +50,33 @@ export const sessionParams = z.strictObject({
 export const deviceParams = z.strictObject({
   id: z.coerce.number().int().min(1),
 });
+
+/** Answer of `GET /v1/account/2fa`: whether the second factor is on, and whether it is mandatory. */
+export const twoFactorStateSchema = z.object({
+  enabled: z.boolean(),
+  mandatory: z.boolean(),
+});
+
+/** Body of `POST /v1/account/2fa/totp/enable`: the six digits of the authenticator. */
+export const totpEnableRequestSchema = z.strictObject({
+  code: z.string().regex(/^\d{6}$/),
+});
+
+/**
+ * Body of `POST /v1/account/2fa/totp/disable`: the password and a second factor, six digits of the
+ * authenticator or eight of a backup code.
+ */
+export const totpDisableRequestSchema = z.strictObject({
+  password,
+  code: z.string().regex(/^(?:\d{6}|\d{8})$/),
+});
+
+/** Body of `POST /v1/account/2fa/backup-codes/regenerate`. */
+export const backupCodesRequestSchema = z.strictObject({ password });
+
+/** Body of `POST /v1/admin/users/recover-2fa`: whose, why, and the owner's own code. */
+export const recover2faRequestSchema = z.strictObject({
+  targetEmail: z.string().trim().max(255),
+  reason: z.string().trim().max(255),
+  ownerTotpCode: z.string().max(10),
+});

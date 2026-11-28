@@ -63,8 +63,19 @@ const INVENTORY = [
   // FC 079: the open sessions and the remembered devices of the account.
   '├── /v1/account/sessions (GET, HEAD, DELETE)',
   '│   └── /:id (DELETE)',
+  // FC 079: the second factor of the account.
+  '├── /v1/account/2fa (GET, HEAD)',
+  '│   ├── /totp/setup (POST)',
+  '│   ├── /totp/enable (POST)',
+  '│   ├── /totp/disable (POST)',
+  '│   └── /backup-codes/regenerate (POST)',
   '├── /v1/account/devices (GET, HEAD, DELETE)',
   '│   └── /:id (DELETE)',
+  // FC 072: the staff of the panel; FC 079: the owner's recovery of a customer's second factor.
+  // Fastify prints the branch where its first route was registered.
+  '├── /v1/admin/users (GET, HEAD, POST)',
+  '│   ├── /recover-2fa (POST)',
+  '│   └── /:id (PATCH)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 068: the three steps of the fulfillment (orders:manage); PUT, PATCH and DELETE on the
@@ -85,9 +96,7 @@ const INVENTORY = [
   '├── /v1/admin/pos/products (GET, HEAD)',
   '├── /v1/admin/pos/checkout (POST)',
   '├── /v1/admin/pos/orders/:order_number/receipt (GET, HEAD)',
-  // FC 072: the staff and the roles of the panel «Usuarios, roles y permisos».
-  '├── /v1/admin/users (GET, HEAD, POST)',
-  '│   └── /:id (PATCH)',
+  // FC 072: the roles of the panel «Usuarios, roles y permisos».
   '├── /v1/admin/roles (GET, HEAD, POST)',
   '│   └── /:id (PATCH)',
   // FC 071: the board of returns (returns:view), prepared (returns:prepare) and confirmed by
@@ -291,6 +300,7 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       .split('\n')
       .filter((line) => /\/admin\b/.test(line));
     expect(panel).toEqual([
+      '├── /v1/admin/users (GET, HEAD, POST)',
       '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
       '├── /v1/admin/payments/health (GET, HEAD)',
       // FC 075: the payments mode switch (users:manage: the owner and the administrators).
@@ -304,7 +314,6 @@ describe('A01 signed-in surface behind the guard (FC 028)', () => {
       '├── /v1/admin/pos/products (GET, HEAD)',
       '├── /v1/admin/pos/checkout (POST)',
       '├── /v1/admin/pos/orders/:order_number/receipt (GET, HEAD)',
-      '├── /v1/admin/users (GET, HEAD, POST)',
       '├── /v1/admin/roles (GET, HEAD, POST)',
       '├── /v1/admin/returns (GET, HEAD)',
       '├── /v1/admin/invoices/requests (POST, GET, HEAD)',

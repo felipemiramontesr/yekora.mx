@@ -519,3 +519,23 @@ export async function closeSession(db: Db, sessionId: string): Promise<void> {
 export function secondFactorSatisfied(user: Capabilities): boolean {
   return !isPrivileged(user.roles) || user.totpEnabled;
 }
+
+/**
+ * Turns the second factor off (FC 079): the flag, the secret and the backup codes, in the caller's
+ * transaction.
+ *
+ * @param tx - Transaction.
+ * @param userId - The account.
+ */
+export async function disableTotp(
+  tx: Pick<Db, 'query'>,
+  userId: string
+): Promise<void> {
+  await tx.query(
+    'UPDATE two_factor_auth SET is_totp_enabled = 0, totp_secret_encrypted = NULL WHERE user_id = ?',
+    [userId]
+  );
+  await tx.query('DELETE FROM two_factor_backup_codes WHERE user_id = ?', [
+    userId,
+  ]);
+}

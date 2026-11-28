@@ -45,6 +45,11 @@ import {
   fiscalProfileSchema,
 } from '../../../lib/account/fiscalTypes';
 import {
+  backupCodesRequestSchema,
+  recover2faRequestSchema,
+  totpDisableRequestSchema,
+  totpEnableRequestSchema,
+  twoFactorStateSchema,
   deviceListSchema,
   deviceParams,
   passwordChangeRequestSchema,
@@ -646,6 +651,86 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     responses: {
       200: securityDoneSchema,
       404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/2fa',
+    summary:
+      'Whether the second factor is on, and whether it is mandatory (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: twoFactorStateSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/2fa/totp/setup',
+    summary: 'Starts the enrolment of an authenticator (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: enrollResponseSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/2fa/totp/enable',
+    summary:
+      'Turns the second factor on and answers the backup codes once (FC 079)',
+    permission: 'account:self',
+    request: { body: totpEnableRequestSchema },
+    responses: {
+      200: confirmResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/2fa/totp/disable',
+    summary:
+      'Turns the second factor off with the password and a code (FC 079)',
+    permission: 'account:self',
+    request: { body: totpDisableRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/2fa/backup-codes/regenerate',
+    summary: 'Replaces the backup codes, shown once (FC 079)',
+    permission: 'account:self',
+    request: { body: backupCodesRequestSchema },
+    responses: {
+      200: confirmResponseSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/admin/users/recover-2fa',
+    summary:
+      'The owner turns off the second factor of a customer who lost it (Idempotency-Key, audited, FC 079)',
+    permission: 'roles:manage',
+    request: { headers: mutationHeaders, body: recover2faRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      404: problemSchema,
+      409: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

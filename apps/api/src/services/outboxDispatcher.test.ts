@@ -898,6 +898,21 @@ describe('the language of every mail: event, account, guest order, es-MX (FC 067
       'You turned on two-step verification on YĒKORA',
       'Activaste la verificación en dos pasos en YĒKORA',
     ],
+    [
+      'TOTP_DISABLED',
+      'Two-step verification was turned off on YĒKORA',
+      'La verificación en dos pasos se desactivó en YĒKORA',
+    ],
+    [
+      'TOTP_RECOVERED',
+      'We reset your two-step verification on YĒKORA',
+      'Restablecimos tu verificación en dos pasos en YĒKORA',
+    ],
+    [
+      'TOTP_BACKUP_CODES_REGENERATED',
+      'New backup codes were created on YĒKORA',
+      'Se generaron nuevos códigos de respaldo en YĒKORA',
+    ],
   ])(
     '%s: the preference of the account decides when the event names no language',
     async (type, english, spanish) => {
