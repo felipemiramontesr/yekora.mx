@@ -45,6 +45,14 @@ import {
   fiscalProfileSchema,
 } from '../../../lib/account/fiscalTypes';
 import {
+  deviceListSchema,
+  deviceParams,
+  passwordChangeRequestSchema,
+  securityDoneSchema,
+  sessionListSchema,
+  sessionParams,
+} from '../../../lib/account/securityTypes';
+import {
   invoiceClosedSchema,
   invoiceCloseRequestSchema,
   invoiceParams,
@@ -555,6 +563,89 @@ export const ROUTE_CONTRACTS: readonly RouteContract[] = [
     responses: {
       200: profileUpdatedSchema,
       400: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/account/password',
+    summary:
+      'Changes the password with the current one; closes the other sessions and devices (FC 079)',
+    permission: 'account:self',
+    request: { headers: mutationHeaders, body: passwordChangeRequestSchema },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      409: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/sessions',
+    summary: 'The open sessions of the account (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: sessionListSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/sessions',
+    summary: 'Closes every session but the one asking (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: securityDoneSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/sessions/:id',
+    summary: 'Closes one session of the account (FC 079)',
+    permission: 'account:self',
+    request: { params: sessionParams },
+    responses: {
+      200: securityDoneSchema,
+      400: problemSchema,
+      404: problemSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'GET',
+    path: '/v1/account/devices',
+    summary: 'The remembered devices of the account (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: deviceListSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/devices',
+    summary: 'Forgets every remembered device (FC 079)',
+    permission: 'account:self',
+    request: {},
+    responses: {
+      200: securityDoneSchema,
+      ...SIGNED_IN_REFUSALS,
+    },
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/account/devices/:id',
+    summary: 'Forgets one remembered device (FC 079)',
+    permission: 'account:self',
+    request: { params: deviceParams },
+    responses: {
+      200: securityDoneSchema,
+      404: problemSchema,
       ...SIGNED_IN_REFUSALS,
     },
   },

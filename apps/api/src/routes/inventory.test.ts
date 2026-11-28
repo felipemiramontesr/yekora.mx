@@ -45,6 +45,8 @@ const INVENTORY = [
   '│   ├── /setup (POST)',
   '│   ├── /settle (POST)',
   '│   └── /:id (DELETE)',
+  // FC 079: the change of password from a session.
+  '├── /v1/account/password (POST)',
   '├── /v1/account/addresses (GET, HEAD, POST)',
   '│   └── /:id (PATCH, DELETE)',
   '├── /v1/account/forget-device (POST)',
@@ -58,6 +60,11 @@ const INVENTORY = [
   '│       ├── /invoice-request (POST, GET, HEAD)',
   '│       ├── /invoice/xml (GET, HEAD)',
   '│       └── /invoice/pdf (GET, HEAD)',
+  // FC 079: the open sessions and the remembered devices of the account.
+  '├── /v1/account/sessions (GET, HEAD, DELETE)',
+  '│   └── /:id (DELETE)',
+  '├── /v1/account/devices (GET, HEAD, DELETE)',
+  '│   └── /:id (DELETE)',
   '├── /v1/admin/orders (GET, HEAD, POST, PUT, PATCH, DELETE)',
   '│   └── /:order_number (GET, HEAD, POST, PUT, PATCH, DELETE)',
   // FC 068: the three steps of the fulfillment (orders:manage); PUT, PATCH and DELETE on the

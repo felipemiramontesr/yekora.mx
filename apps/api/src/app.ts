@@ -22,6 +22,7 @@ import { PERMISSIONS } from './lib/permissions';
 import { problem, PROBLEM_TYPE } from './lib/problem';
 import { registerAccountRoutes } from './routes/account';
 import { registerAccountFiscalRoutes } from './routes/accountFiscal';
+import { registerAccountSecurityRoutes } from './routes/accountSecurity';
 import { registerInvoiceRequestRoutes } from './routes/invoiceRequests';
 import { registerAdminInvoiceRoutes } from './routes/adminInvoices';
 import { registerAdminRoutes } from './routes/admin';
@@ -248,6 +249,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     piiKey: deps.config.payments.checkout?.piiKey ?? null,
     cards,
     siteUrl: deps.config.payments.siteUrl,
+  });
+  // FC 079: the change of password, the open sessions and the remembered devices.
+  registerAccountSecurityRoutes(app, {
+    db: deps.db,
+    now,
+    auth: deps.config.auth,
+    breach: (password) => breachVerdict(password, deps.pwnedFetch),
   });
   registerAccountFiscalRoutes(app, {
     db: deps.db,

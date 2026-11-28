@@ -36,7 +36,9 @@ import {
   decryptTotpSecret,
   encryptTotpSecret,
   newToken,
+  tokenHash,
 } from './services/authCrypto';
+import { rememberDevice } from './services/trustedDevices';
 import {
   createProduct,
   listAdminProducts,
@@ -56,6 +58,14 @@ import {
   readFiscalProfile,
   saveFiscalProfile,
 } from './services/fiscalProfiles';
+import {
+  closeOneSession,
+  forgetOneDevice,
+  listDevices,
+  listSessions,
+  passwordHashOf,
+  storePassword,
+} from './services/accountSecurity';
 import {
   listInvoiceRequests,
   orderInvoiceState,
@@ -3322,6 +3332,67 @@ describe('the fiscal profile on real SQL (migration 021, fiscalProfiles.ts, FC 0
     expect(String(rows[0].legal_name_enc)).not.toContain('LA ROSA');
     await db.query('DELETE FROM customer_fiscal_profiles WHERE user_id = ?', [
       id,
+    ]);
+  });
+});
+
+describe('the security of the account on real SQL (accountSecurity.ts, FC 079 F0)', () => {
+  it('lists and closes only the sessions and devices of one account', async () => {
+    const users = await db.query<{ id: string }>(
+      'SELECT id FROM users ORDER BY created_at LIMIT 2'
+    );
+    const [mine, theirs] = [users[0].id, users[1].id];
+    const now = new Date();
+    const open = (userId: string) =>
+      openSession(db, {
+        challengeId: null,
+        userId,
+        privileged: false,
+        ip: '127.0.0.1',
+        userAgent: 'real-sql',
+        now,
+      });
+    const ids = async (userId: string) =>
+      (await listSessions(db, userId, '', new Date())).map((s) => s.id);
+    await db.query('DELETE FROM user_sessions WHERE user_id IN (?, ?)', [
+      mine,
+      theirs,
+    ]);
+    const current = tokenHash((await open(mine)).token);
+    const other = tokenHash((await open(mine)).token);
+    const foreign = tokenHash((await open(theirs)).token);
+    await rememberDevice(db, {
+      userId: mine,
+      ip: null,
+      userAgent: 'real-sql',
+      now,
+    });
+    const [device] = await listDevices(db, mine, new Date());
+    expect(device).toMatchObject({ userAgent: 'real-sql' });
+
+    const close = (id: string) =>
+      db.transaction((tx) =>
+        closeOneSession(tx, { id, userId: mine, current, now: new Date() })
+      );
+    expect(await close(foreign)).toBe('SESSION_FORBIDDEN');
+    expect(await close(current)).toBe('CANNOT_REVOKE_CURRENT_SESSION');
+    expect(
+      await db.transaction((tx) => forgetOneDevice(tx, device.id, theirs))
+    ).toBe('DEVICE_FORBIDDEN');
+    expect(await close(other)).toBeNull();
+    expect(await ids(mine)).toEqual([current]);
+
+    const hash = await passwordHashOf(db, mine);
+    await open(mine);
+    await db.transaction((tx) =>
+      storePassword(tx, { userId: mine, hash, current })
+    );
+    expect(await ids(mine)).toEqual([current]);
+    expect(await ids(theirs)).toEqual([foreign]);
+    expect(await listDevices(db, mine, new Date())).toEqual([]);
+    await db.query('DELETE FROM user_sessions WHERE user_id IN (?, ?)', [
+      mine,
+      theirs,
     ]);
   });
 });
